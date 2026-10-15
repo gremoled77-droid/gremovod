@@ -740,6 +740,8 @@ from backend.refinement import register as register_refinement
 register_refinement(app,sys.modules[__name__])
 from backend.external_generation import register as register_external
 register_external(app,sys.modules[__name__])
+from backend.activity import register as register_activity
+register_activity(app,sys.modules[__name__])
 from backend.character_versions import register as register_character_versions
 register_character_versions(app,sys.modules[__name__])
 from backend import security
