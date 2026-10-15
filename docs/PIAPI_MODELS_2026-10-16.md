@@ -83,3 +83,8 @@ LLM: единый OpenAI-совместимый эндпоинт (`/docs/llm-api
 
 ## Противоречия в источниках (проверить)
 Длительность Seedance 2.5 (4–15 с или 1–30 с); цена Seedance 2 ($0.042 или $0.08/с); поверхностные страницы без `model`/`task_type` для большинства видеомоделей; тариф Creator ($15 или $8/мес).
+
+## Раскладка по разделам интерфейса (решение владельца 16.10.2026)
+- **Видео:** seedance-2.5, minimax-h3, **Seedance 2 (+ Private Asset Library, omni-референс)**, **Kling 3.0 / Omni / Elements**.
+- **Другое:** OmniHuman 1.5, Kling Avatar, Flux Kontext, Z-Image Turbo, апскейл изображений и видео.
+- **Изображения:** seedream-5-lite, seedream-5-pro, nano-banana-2.1, GPT Image (2.0; 2.5 / 2.5-flare; правки — 2.5-sunburst), qwen-image-2.1.
