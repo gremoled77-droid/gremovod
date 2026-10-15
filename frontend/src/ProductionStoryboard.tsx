@@ -1,50 +1,554 @@
 import SeriesEconomics from './SeriesEconomics';
 import ProductionEntityEditor from './ProductionEntityEditor';
-import {readLocal,writeLocal} from './localDrafts';
-import {useEffect,useState} from 'react';
+import {readLocal, writeLocal} from './localDrafts';
+import {useEffect, useState} from 'react';
 import {apiFetch} from './api';
 import {responseJson} from './ChatGPTPanel';
 import './ProductionStoryboard.css';
 
-type Node={id:string;kind:string;parent_id:string|null;title:string;number:number;notes:string};
-type Production={id:string;title:string};
-type Media={id:string;asset_id:string|null;kind:string;filename:string;url:string};
-type Selection={character_node_ids:string[];location_node_id:string|null;selected_image_file_id:string|null;selected_video_file_id:string|null};
-type Frame=Node&{files:Media[];project_id:string|null;selection:Selection};
-type Board={series:Node;scenes:(Node&{frames:Frame[];selection:Selection})[];script:string;revision:string};
-type Plan={existing:{id:string;title:string;notes:string}[];scenes:{title:string;notes:string}[];conflicts:string[];body:{script:string;base_revision:string;request_id:string;mode:'append'|'update';scene_node_ids:(string|null)[]}};
-const request=async(path:string,body?:unknown)=>responseJson(await apiFetch(path,body===undefined?undefined:{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}));
+type Node = {
+  id: string;
+  kind: string;
+  parent_id: string | null;
+  title: string;
+  number: number;
+  notes: string;
+};
+type Production = {id: string; title: string};
+type Media = {id: string; asset_id: string | null; kind: string; filename: string; url: string};
+type Selection = {
+  character_node_ids: string[];
+  location_node_id: string | null;
+  selected_image_file_id: string | null;
+  selected_video_file_id: string | null;
+};
+type Frame = Node & {files: Media[]; project_id: string | null; selection: Selection};
+type Board = {
+  series: Node;
+  scenes: (Node & {frames: Frame[]; selection: Selection})[];
+  script: string;
+  revision: string;
+};
+type Plan = {
+  existing: {id: string; title: string; notes: string}[];
+  scenes: {title: string; notes: string}[];
+  conflicts: string[];
+  body: {
+    script: string;
+    base_revision: string;
+    request_id: string;
+    mode: 'append' | 'update';
+    scene_node_ids: (string | null)[];
+  };
+};
+const request = async (path: string, body?: unknown) =>
+  responseJson(
+    await apiFetch(
+      path,
+      body === undefined
+        ? undefined
+        : {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)}
+    )
+  );
 
-export default function ProductionStoryboard({onInspect,onOpenProject}:{onInspect:(productionId:string,nodeId:string)=>void;onOpenProject:(id:string)=>void}){
- const [productions,setProductions]=useState<Production[]>([]),[pid,setPid]=useState(()=>readLocal<{pid:string;sid:string}>('studio:board-location',{pid:'',sid:''}).pid),[sid,setSid]=useState(()=>readLocal<{pid:string;sid:string}>('studio:board-location',{pid:'',sid:''}).sid);
- const [nodes,setNodes]=useState<Node[]>([]),[board,setBoard]=useState<Board|null>(null),[tick,setTick]=useState(0);
- const [drafts,setDrafts]=useState<Record<string,string>>(()=>readLocal('studio:storyboard-drafts',{})),[plan,setPlan]=useState<Plan|null>(null),[name,setName]=useState('');
- const [editorStack,setEditorStack]=useState<string[]>([]),[storageOK,setStorageOK]=useState(true);
- const [busy,setBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState(''),[showScript,setShowScript]=useState(false),[importMode,setImportMode]=useState<'append'|'update'>('append');
- const key=pid+'/'+sid,path=`/api/productions/${pid}/series/${sid}/storyboard`;
- const script=drafts[key]??board?.script??'';
- const perform=async(fn:()=>Promise<void>)=>{setBusy(true);setError('');setNotice('');try{await fn()}catch(e){setError(e instanceof Error?e.message:String(e))}finally{setBusy(false)}};
- useEffect(()=>{let live=true;void request('/api/productions').then((items:Production[])=>{if(live){setProductions(items);setPid(p=>items.some(x=>x.id===p)?p:items.find(x=>x.title.toLowerCase()==='gremovod')?.id||items[0]?.id||'')}}).catch(e=>{if(live)setError(String(e))});return()=>{live=false}},[]);
- useEffect(()=>{let live=true;setNodes([]);setBoard(null);if(pid)void request('/api/productions/'+pid).then(t=>{if(live){setNodes(t.nodes);setSid(current=>t.nodes.some((n:Node)=>n.id===current&&n.kind==='series')?current:t.nodes.find((n:Node)=>n.kind==='series')?.id||'')}}).catch(e=>{if(live)setError(String(e))});return()=>{live=false}},[pid,tick]);
- useEffect(()=>{let live=true;setBoard(null);if(pid&&sid)void request(path).then(b=>{if(live)setBoard(b)}).catch(e=>{if(live)setError(String(e))});return()=>{live=false}},[pid,sid,tick,path]);
- useEffect(()=>{if(pid&&sid&&nodes.some(n=>n.id===sid))writeLocal('studio:board-location',{pid,sid})},[pid,sid,nodes]);
- const inspect=(id:string)=>{if(nodes.find(n=>n.id===id)?.kind==='series'){onInspect(pid,id);return}setEditorStack([id])};
- useEffect(()=>{setStorageOK(writeLocal('studio:storyboard-drafts',drafts))},[drafts]);
- function prepare(){void perform(async()=>{if(!board)return;const body={script,base_revision:board.revision,request_id:crypto.randomUUID(),mode:importMode,scene_node_ids:[] as (string|null)[]};const preview=await request(path+'/preview',body);setPlan({...preview,body:{...body,scene_node_ids:preview.scenes.map(()=>null)}})})}
- function importPlan(){void perform(async()=>{if(!plan)return;const result=await request(path+'/import',plan.body);setPlan(null);setDrafts(d=>{const next={...d};delete next[key];return next});setTick(t=>t+1);setNotice(result.file_warning||`Сохранено сцен: ${result.node_ids.length}. Текст и папки сохранены; готовые кадры остались на месте.`);setShowScript(false)})}
- function createFrame(scene:Node){void perform(async()=>{const title=name.trim();if(!title)return;await request(`/api/productions/${pid}/nodes`,{kind:'frame',parent_id:scene.id,title,notes:scene.notes});setName('');setTick(t=>t+1);setNotice('Кадр создан. Открой его в студии для подготовки изображения.')})}
- function openFrame(frame:Frame){void perform(async()=>{const bound=await request(`/api/productions/${pid}/nodes/${frame.id}/open-project`,{});onOpenProject(bound.project_id)})}
- return <section className="panel ps-board"><div className="panel-title"><div><small>GremoVOD · рабочие данные</small><h2>Сценарий и раскадровка</h2></div><button disabled={busy} onClick={()=>{setPlan(null);setTick(t=>t+1)}}>Обновить доску</button></div><p className="muted">Сцены и кадры связаны с папками проекта. Это сохраняемая доска; демонстрация остаётся под кнопкой «Раскадровка · демо».</p>
- {!storageOK&&<p role="alert">Черновик не сохранён браузером. Сохрани сценарий до ухода со страницы.</p>}{error&&<p role="alert" className="alert">{error}</p>}{notice&&<p role="status" className="notice">{notice}</p>}
- <div className="twocol"><label>Проект раскадровки<select disabled={busy} value={pid} onChange={e=>{setPid(e.target.value);setSid('');setPlan(null);setError('')}}><option value="">Выбери проект</option>{productions.map(p=><option key={p.id} value={p.id}>{p.title}</option>)}</select></label><label>Серия раскадровки<select disabled={busy||!pid} value={sid} onChange={e=>{setSid(e.target.value);setPlan(null);setError('')}}><option value="">Выбери серию</option>{nodes.filter(n=>n.kind==='series').map(n=><option key={n.id} value={n.id}>{n.number}. {n.title}</option>)}</select></label></div>
- {!productions.length&&<p>Создай общий проект в разделе «Папки проекта».</p>}
- {pid&&<details><summary>＋ Новая серия</summary><label>Название серии<input disabled={busy} value={name} onChange={e=>setName(e.target.value)}/></label><button disabled={busy||!name.trim()} onClick={()=>void perform(async()=>{const n=await request(`/api/productions/${pid}/nodes`,{kind:'series',title:name.trim()});setSid(n.id);setName('');setTick(t=>t+1)})}>Создать серию</button></details>}
- {board&&<><SeriesEconomics key={pid+sid} pid={pid} sid={sid}/><div className="chips"><button onClick={()=>setShowScript(s=>!s)}>Вставить сценарий</button><button onClick={()=>inspect(sid)}>Файлы и описание серии ↗</button></div>
- {showScript&&<section className="ps-script"><label>Режим импорта<select value={importMode} disabled={busy} onChange={e=>{setImportMode(e.target.value as 'append'|'update');setPlan(null)}}><option value="append">Добавить новые сцены</option><option value="update">Сопоставить и обновить существующие</option></select></label><label>Сценарий с заголовками «Сцена 1 — Название»<textarea rows={10} disabled={busy} value={script} onChange={e=>{setDrafts(d=>({...d,[key]:e.target.value}));setPlan(null)}} placeholder={'Сцена 1 — Встреча\nДействие и реплики...\n\nСцена 2 — Поездка\nДействие и реплики...'}/></label><p className="muted">В режиме обновления явно выбери соответствие сцен. Неупомянутые сцены, кадры и готовые результаты остаются. Папки обновлённых сцен сохраняют прежний путь. Названия должны различаться. Перед импортом текст ещё не сохранён.</p><button disabled={busy||!script.trim()} onClick={prepare}>Предпросмотр сцен</button>{plan&&<div><h3>Будет добавлено: {plan.scenes.length}</h3>{plan.scenes.map((s,i)=><article key={i}><b>{i+1}. {s.title}</b>{plan.body.mode==='update'&&<label>Действие со сценой<select disabled={busy} value={plan.body.scene_node_ids[i]||''} onChange={e=>{const id=e.target.value||null;setPlan(p=>p?{...p,body:{...p.body,scene_node_ids:p.body.scene_node_ids.map((old,j)=>i===j?id:old)}}:p)}}><option value="">Создать новую сцену</option>{plan.existing.map(n=><option key={n.id} value={n.id}>Обновить: {n.title}</option>)}</select></label>}{plan.body.scene_node_ids[i]&&<details><summary>Было</summary><p>{plan.existing.find(n=>n.id===plan.body.scene_node_ids[i])?.notes}</p></details>}<p>Станет: {s.notes}</p></article>)}{!!plan.conflicts.length&&<p role="alert">Уже существуют: {plan.conflicts.join(', ')}. Измени названия или отредактируй существующие сцены.</p>}<button className="primary" disabled={busy||!!plan.conflicts.length} onClick={importPlan}>Сохранить сценарий и сцены</button><button disabled={busy} onClick={()=>setPlan(null)}>Отмена</button></div>}</section>}
- {!board.scenes.length&&<p>Сцен ещё нет. Вставь сценарий и проверь разбиение перед сохранением.</p>}
- {board.scenes.map(scene=><article key={scene.id} className="ps-scene"><div className="panel-title"><button className="ps-heading" onClick={()=>inspect(scene.id)}><small>СЦЕНА {String(scene.number).padStart(2,'0')}</small><h3>{scene.title} ↗</h3></button><small>Кадров: {scene.frames.length}</small></div><p className="ps-text">{scene.notes||'Описание пока не добавлено'}</p><div className="ps-cast">{scene.selection.character_node_ids.map(id=><button key={id} onClick={()=>inspect(id)}>{nodes.find(n=>n.id===id)?.title||'Персонаж'} ↗</button>)}{scene.selection.location_node_id&&<button onClick={()=>inspect(scene.selection.location_node_id!)}>{nodes.find(n=>n.id===scene.selection.location_node_id)?.title||'Локация'} ↗</button>}<button onClick={()=>inspect(scene.id)}>Состав сцены и бэкграунд</button></div><div className="ps-frames">{scene.frames.map(frame=>{const image=frame.files.find(f=>f.id===frame.selection.selected_image_file_id)||frame.files.find(f=>f.kind==='image'),video=frame.files.find(f=>f.id===frame.selection.selected_video_file_id)||frame.files.find(f=>f.kind==='video');return <article key={frame.id} className="ps-frame">{image?<img src={image.asset_id?`/api/library/${image.asset_id}/thumbnail`:image.url} alt={frame.title} loading="lazy"/>:<div className="ps-empty">Фото пока нет</div>}<b>{scene.number}.{frame.number} · {frame.title}</b><small>{image?(frame.selection.selected_image_file_id?'Основное фото':'Последнее изображение · не утверждено'):'Запланирован'}{video?(frame.selection.selected_video_file_id?' · Финальный дубль':' · Есть видео'):''}</small><button disabled={busy} onClick={()=>openFrame(frame)}>Открыть кадр в студии</button><button onClick={()=>inspect(frame.id)}>Файлы и описание ↗</button></article>})}</div><details><summary>＋ Кадр сцены</summary><label>Название нового кадра<input disabled={busy} value={name} onChange={e=>setName(e.target.value)} placeholder="Например: реакция гостя"/></label><button disabled={busy||!name.trim()} onClick={()=>createFrame(scene)}>Создать кадр</button></details></article>)}
- <details><summary>Общие персонажи и локации проекта</summary><p className="muted">Открой сцену, чтобы закрепить её участников и локацию. Карточки ниже общие для проекта.</p><div className="chips">{nodes.filter(n=>['character','location'].includes(n.kind)).map(n=><button key={n.id} onClick={()=>inspect(n.id)}>{n.kind==='character'?'Персонаж':'Локация'} · {n.title} ↗</button>)}</div></details>
- </>}
- {editorStack.length>0&&<ProductionEntityEditor key={pid+'/'+editorStack[editorStack.length-1]} pid={pid} nid={editorStack[editorStack.length-1]} onClose={()=>{setEditorStack(stack=>stack.slice(0,-1));setTick(t=>t+1)}} onNavigate={id=>setEditorStack(stack=>[...stack,id])} onSaved={()=>setTick(t=>t+1)} onOpenProject={onOpenProject}/>}
- </section>;
+export default function ProductionStoryboard({
+  onInspect,
+  onOpenProject,
+}: {
+  onInspect: (productionId: string, nodeId: string) => void;
+  onOpenProject: (id: string) => void;
+}) {
+  const [productions, setProductions] = useState<Production[]>([]),
+    [pid, setPid] = useState(
+      () => readLocal<{pid: string; sid: string}>('studio:board-location', {pid: '', sid: ''}).pid
+    ),
+    [sid, setSid] = useState(
+      () => readLocal<{pid: string; sid: string}>('studio:board-location', {pid: '', sid: ''}).sid
+    );
+  const [nodes, setNodes] = useState<Node[]>([]),
+    [board, setBoard] = useState<Board | null>(null),
+    [tick, setTick] = useState(0);
+  const [drafts, setDrafts] = useState<Record<string, string>>(() =>
+      readLocal('studio:storyboard-drafts', {})
+    ),
+    [plan, setPlan] = useState<Plan | null>(null),
+    [name, setName] = useState('');
+  const [editorStack, setEditorStack] = useState<string[]>([]),
+    [storageOK, setStorageOK] = useState(true);
+  const [busy, setBusy] = useState(false),
+    [error, setError] = useState(''),
+    [notice, setNotice] = useState(''),
+    [showScript, setShowScript] = useState(false),
+    [importMode, setImportMode] = useState<'append' | 'update'>('append');
+  const key = pid + '/' + sid,
+    path = `/api/productions/${pid}/series/${sid}/storyboard`;
+  const script = drafts[key] ?? board?.script ?? '';
+  const perform = async (fn: () => Promise<void>) => {
+    setBusy(true);
+    setError('');
+    setNotice('');
+    try {
+      await fn();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+  useEffect(() => {
+    let live = true;
+    void request('/api/productions')
+      .then((items: Production[]) => {
+        if (live) {
+          setProductions(items);
+          setPid(p =>
+            items.some(x => x.id === p)
+              ? p
+              : items.find(x => x.title.toLowerCase() === 'gremovod')?.id || items[0]?.id || ''
+          );
+        }
+      })
+      .catch(e => {
+        if (live) setError(String(e));
+      });
+    return () => {
+      live = false;
+    };
+  }, []);
+  useEffect(() => {
+    let live = true;
+    setNodes([]);
+    setBoard(null);
+    if (pid)
+      void request('/api/productions/' + pid)
+        .then(t => {
+          if (live) {
+            setNodes(t.nodes);
+            setSid(current =>
+              t.nodes.some((n: Node) => n.id === current && n.kind === 'series')
+                ? current
+                : t.nodes.find((n: Node) => n.kind === 'series')?.id || ''
+            );
+          }
+        })
+        .catch(e => {
+          if (live) setError(String(e));
+        });
+    return () => {
+      live = false;
+    };
+  }, [pid, tick]);
+  useEffect(() => {
+    let live = true;
+    setBoard(null);
+    if (pid && sid)
+      void request(path)
+        .then(b => {
+          if (live) setBoard(b);
+        })
+        .catch(e => {
+          if (live) setError(String(e));
+        });
+    return () => {
+      live = false;
+    };
+  }, [pid, sid, tick, path]);
+  useEffect(() => {
+    if (pid && sid && nodes.some(n => n.id === sid)) writeLocal('studio:board-location', {pid, sid});
+  }, [pid, sid, nodes]);
+  const inspect = (id: string) => {
+    if (nodes.find(n => n.id === id)?.kind === 'series') {
+      onInspect(pid, id);
+      return;
+    }
+    setEditorStack([id]);
+  };
+  useEffect(() => {
+    setStorageOK(writeLocal('studio:storyboard-drafts', drafts));
+  }, [drafts]);
+  function prepare() {
+    void perform(async () => {
+      if (!board) return;
+      const body = {
+        script,
+        base_revision: board.revision,
+        request_id: crypto.randomUUID(),
+        mode: importMode,
+        scene_node_ids: [] as (string | null)[],
+      };
+      const preview = await request(path + '/preview', body);
+      setPlan({...preview, body: {...body, scene_node_ids: preview.scenes.map(() => null)}});
+    });
+  }
+  function importPlan() {
+    void perform(async () => {
+      if (!plan) return;
+      const result = await request(path + '/import', plan.body);
+      setPlan(null);
+      setDrafts(d => {
+        const next = {...d};
+        delete next[key];
+        return next;
+      });
+      setTick(t => t + 1);
+      setNotice(
+        result.file_warning ||
+          `Сохранено сцен: ${result.node_ids.length}. Текст и папки сохранены; готовые кадры остались на месте.`
+      );
+      setShowScript(false);
+    });
+  }
+  function createFrame(scene: Node) {
+    void perform(async () => {
+      const title = name.trim();
+      if (!title) return;
+      await request(`/api/productions/${pid}/nodes`, {
+        kind: 'frame',
+        parent_id: scene.id,
+        title,
+        notes: scene.notes,
+      });
+      setName('');
+      setTick(t => t + 1);
+      setNotice('Кадр создан. Открой его в студии для подготовки изображения.');
+    });
+  }
+  function openFrame(frame: Frame) {
+    void perform(async () => {
+      const bound = await request(`/api/productions/${pid}/nodes/${frame.id}/open-project`, {});
+      onOpenProject(bound.project_id);
+    });
+  }
+  return (
+    <section className="panel ps-board">
+      <div className="panel-title">
+        <div>
+          <small>GremoVOD · рабочие данные</small>
+          <h2>Сценарий и раскадровка</h2>
+        </div>
+        <button
+          disabled={busy}
+          onClick={() => {
+            setPlan(null);
+            setTick(t => t + 1);
+          }}
+        >
+          Обновить доску
+        </button>
+      </div>
+      <p className="muted">
+        Сцены и кадры связаны с папками проекта. Это сохраняемая доска; демонстрация остаётся под кнопкой
+        «Раскадровка · демо».
+      </p>
+      {!storageOK && (
+        <p role="alert">Черновик не сохранён браузером. Сохрани сценарий до ухода со страницы.</p>
+      )}
+      {error && (
+        <p role="alert" className="alert">
+          {error}
+        </p>
+      )}
+      {notice && (
+        <p role="status" className="notice">
+          {notice}
+        </p>
+      )}
+      <div className="twocol">
+        <label>
+          Проект раскадровки
+          <select
+            disabled={busy}
+            value={pid}
+            onChange={e => {
+              setPid(e.target.value);
+              setSid('');
+              setPlan(null);
+              setError('');
+            }}
+          >
+            <option value="">Выбери проект</option>
+            {productions.map(p => (
+              <option key={p.id} value={p.id}>
+                {p.title}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Серия раскадровки
+          <select
+            disabled={busy || !pid}
+            value={sid}
+            onChange={e => {
+              setSid(e.target.value);
+              setPlan(null);
+              setError('');
+            }}
+          >
+            <option value="">Выбери серию</option>
+            {nodes
+              .filter(n => n.kind === 'series')
+              .map(n => (
+                <option key={n.id} value={n.id}>
+                  {n.number}. {n.title}
+                </option>
+              ))}
+          </select>
+        </label>
+      </div>
+      {!productions.length && <p>Создай общий проект в разделе «Папки проекта».</p>}
+      {pid && (
+        <details>
+          <summary>＋ Новая серия</summary>
+          <label>
+            Название серии
+            <input disabled={busy} value={name} onChange={e => setName(e.target.value)} />
+          </label>
+          <button
+            disabled={busy || !name.trim()}
+            onClick={() =>
+              void perform(async () => {
+                const n = await request(`/api/productions/${pid}/nodes`, {
+                  kind: 'series',
+                  title: name.trim(),
+                });
+                setSid(n.id);
+                setName('');
+                setTick(t => t + 1);
+              })
+            }
+          >
+            Создать серию
+          </button>
+        </details>
+      )}
+      {board && (
+        <>
+          <SeriesEconomics key={pid + sid} pid={pid} sid={sid} />
+          <div className="chips">
+            <button onClick={() => setShowScript(s => !s)}>Вставить сценарий</button>
+            <button onClick={() => inspect(sid)}>Файлы и описание серии ↗</button>
+          </div>
+          {showScript && (
+            <section className="ps-script">
+              <label>
+                Режим импорта
+                <select
+                  value={importMode}
+                  disabled={busy}
+                  onChange={e => {
+                    setImportMode(e.target.value as 'append' | 'update');
+                    setPlan(null);
+                  }}
+                >
+                  <option value="append">Добавить новые сцены</option>
+                  <option value="update">Сопоставить и обновить существующие</option>
+                </select>
+              </label>
+              <label>
+                Сценарий с заголовками «Сцена 1 — Название»
+                <textarea
+                  rows={10}
+                  disabled={busy}
+                  value={script}
+                  onChange={e => {
+                    setDrafts(d => ({...d, [key]: e.target.value}));
+                    setPlan(null);
+                  }}
+                  placeholder={
+                    'Сцена 1 — Встреча\nДействие и реплики...\n\nСцена 2 — Поездка\nДействие и реплики...'
+                  }
+                />
+              </label>
+              <p className="muted">
+                В режиме обновления явно выбери соответствие сцен. Неупомянутые сцены, кадры и готовые
+                результаты остаются. Папки обновлённых сцен сохраняют прежний путь. Названия должны
+                различаться. Перед импортом текст ещё не сохранён.
+              </p>
+              <button disabled={busy || !script.trim()} onClick={prepare}>
+                Предпросмотр сцен
+              </button>
+              {plan && (
+                <div>
+                  <h3>Будет добавлено: {plan.scenes.length}</h3>
+                  {plan.scenes.map((s, i) => (
+                    <article key={i}>
+                      <b>
+                        {i + 1}. {s.title}
+                      </b>
+                      {plan.body.mode === 'update' && (
+                        <label>
+                          Действие со сценой
+                          <select
+                            disabled={busy}
+                            value={plan.body.scene_node_ids[i] || ''}
+                            onChange={e => {
+                              const id = e.target.value || null;
+                              setPlan(p =>
+                                p
+                                  ? {
+                                      ...p,
+                                      body: {
+                                        ...p.body,
+                                        scene_node_ids: p.body.scene_node_ids.map((old, j) =>
+                                          i === j ? id : old
+                                        ),
+                                      },
+                                    }
+                                  : p
+                              );
+                            }}
+                          >
+                            <option value="">Создать новую сцену</option>
+                            {plan.existing.map(n => (
+                              <option key={n.id} value={n.id}>
+                                Обновить: {n.title}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                      )}
+                      {plan.body.scene_node_ids[i] && (
+                        <details>
+                          <summary>Было</summary>
+                          <p>{plan.existing.find(n => n.id === plan.body.scene_node_ids[i])?.notes}</p>
+                        </details>
+                      )}
+                      <p>Станет: {s.notes}</p>
+                    </article>
+                  ))}
+                  {!!plan.conflicts.length && (
+                    <p role="alert">
+                      Уже существуют: {plan.conflicts.join(', ')}. Измени названия или отредактируй
+                      существующие сцены.
+                    </p>
+                  )}
+                  <button className="primary" disabled={busy || !!plan.conflicts.length} onClick={importPlan}>
+                    Сохранить сценарий и сцены
+                  </button>
+                  <button disabled={busy} onClick={() => setPlan(null)}>
+                    Отмена
+                  </button>
+                </div>
+              )}
+            </section>
+          )}
+          {!board.scenes.length && (
+            <p>Сцен ещё нет. Вставь сценарий и проверь разбиение перед сохранением.</p>
+          )}
+          {board.scenes.map(scene => (
+            <article key={scene.id} className="ps-scene">
+              <div className="panel-title">
+                <button className="ps-heading" onClick={() => inspect(scene.id)}>
+                  <small>СЦЕНА {String(scene.number).padStart(2, '0')}</small>
+                  <h3>{scene.title} ↗</h3>
+                </button>
+                <small>Кадров: {scene.frames.length}</small>
+              </div>
+              <p className="ps-text">{scene.notes || 'Описание пока не добавлено'}</p>
+              <div className="ps-cast">
+                {scene.selection.character_node_ids.map(id => (
+                  <button key={id} onClick={() => inspect(id)}>
+                    {nodes.find(n => n.id === id)?.title || 'Персонаж'} ↗
+                  </button>
+                ))}
+                {scene.selection.location_node_id && (
+                  <button onClick={() => inspect(scene.selection.location_node_id!)}>
+                    {nodes.find(n => n.id === scene.selection.location_node_id)?.title || 'Локация'} ↗
+                  </button>
+                )}
+                <button onClick={() => inspect(scene.id)}>Состав сцены и бэкграунд</button>
+              </div>
+              <div className="ps-frames">
+                {scene.frames.map(frame => {
+                  const image =
+                      frame.files.find(f => f.id === frame.selection.selected_image_file_id) ||
+                      frame.files.find(f => f.kind === 'image'),
+                    video =
+                      frame.files.find(f => f.id === frame.selection.selected_video_file_id) ||
+                      frame.files.find(f => f.kind === 'video');
+                  return (
+                    <article key={frame.id} className="ps-frame">
+                      {image ? (
+                        <img
+                          src={image.asset_id ? `/api/library/${image.asset_id}/thumbnail` : image.url}
+                          alt={frame.title}
+                          loading="lazy"
+                        />
+                      ) : (
+                        <div className="ps-empty">Фото пока нет</div>
+                      )}
+                      <b>
+                        {scene.number}.{frame.number} · {frame.title}
+                      </b>
+                      <small>
+                        {image
+                          ? frame.selection.selected_image_file_id
+                            ? 'Основное фото'
+                            : 'Последнее изображение · не утверждено'
+                          : 'Запланирован'}
+                        {video
+                          ? frame.selection.selected_video_file_id
+                            ? ' · Финальный дубль'
+                            : ' · Есть видео'
+                          : ''}
+                      </small>
+                      <button disabled={busy} onClick={() => openFrame(frame)}>
+                        Открыть кадр в студии
+                      </button>
+                      <button onClick={() => inspect(frame.id)}>Файлы и описание ↗</button>
+                    </article>
+                  );
+                })}
+              </div>
+              <details>
+                <summary>＋ Кадр сцены</summary>
+                <label>
+                  Название нового кадра
+                  <input
+                    disabled={busy}
+                    value={name}
+                    onChange={e => setName(e.target.value)}
+                    placeholder="Например: реакция гостя"
+                  />
+                </label>
+                <button disabled={busy || !name.trim()} onClick={() => createFrame(scene)}>
+                  Создать кадр
+                </button>
+              </details>
+            </article>
+          ))}
+          <details>
+            <summary>Общие персонажи и локации проекта</summary>
+            <p className="muted">
+              Открой сцену, чтобы закрепить её участников и локацию. Карточки ниже общие для проекта.
+            </p>
+            <div className="chips">
+              {nodes
+                .filter(n => ['character', 'location'].includes(n.kind))
+                .map(n => (
+                  <button key={n.id} onClick={() => inspect(n.id)}>
+                    {n.kind === 'character' ? 'Персонаж' : 'Локация'} · {n.title} ↗
+                  </button>
+                ))}
+            </div>
+          </details>
+        </>
+      )}
+      {editorStack.length > 0 && (
+        <ProductionEntityEditor
+          key={pid + '/' + editorStack[editorStack.length - 1]}
+          pid={pid}
+          nid={editorStack[editorStack.length - 1]}
+          onClose={() => {
+            setEditorStack(stack => stack.slice(0, -1));
+            setTick(t => t + 1);
+          }}
+          onNavigate={id => setEditorStack(stack => [...stack, id])}
+          onSaved={() => setTick(t => t + 1)}
+          onOpenProject={onOpenProject}
+        />
+      )}
+    </section>
+  );
 }
