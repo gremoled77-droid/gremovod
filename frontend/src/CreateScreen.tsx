@@ -58,6 +58,10 @@ export default function CreateScreen({projectId, heroes}: {projectId: string; he
   const [busy, setBusy] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
   const [pasteFor, setPasteFor] = useState('');
+  const [animate, setAnimate] = useState('');
+  const [videoModel, setVideoModel] = useState('seedance-2.5');
+  const [motion, setMotion] = useState('');
+  const [videoOptions, setVideoOptions] = useState<Record<string, string | number>>({});
   const [tab, setTab] = useState<'results' | 'favorites' | 'temp'>('results');
   const [temp, setTemp] = useState<TempItem[]>([]);
   const [wouldRemove, setWouldRemove] = useState<string[] | null>(null);
@@ -124,6 +128,37 @@ export default function CreateScreen({projectId, heroes}: {projectId: string; he
       })
     );
     return r.url as string;
+  };
+
+  /** Параметры видеомодели: из spec.options или из плоских полей старых спецификаций. */
+  const videoSpec = (id: string): Record<string, OptionSpec> => {
+    const spec = specs[id] as (Spec & Record<string, any>) | undefined;
+    if (!spec) return {};
+    if (spec.options) return spec.options;
+    return {
+      resolution: {values: spec.resolution, default: spec.resolution?.[0]},
+      duration: {min: spec.duration_min, max: spec.duration_max, default: spec.duration_min},
+      aspect_ratio: {values: spec.aspect_ratio, default: spec.aspect_ratio?.[0]},
+    };
+  };
+  const startAnimate = async () => {
+    setError('');
+    if (!motion.trim()) return setError('Опиши движение в кадре');
+    setBusy(true);
+    try {
+      const url = await ensureCloudUrl(animate);
+      const opts = Object.fromEntries(
+        Object.entries(videoSpec(videoModel)).map(([k, sp]) => [k, videoOptions[k] ?? sp.default])
+      ) as Record<string, string | number>;
+      setQueue([
+        {project_id: projectId, model_id: videoModel, prompt: motion, options: opts, reference_urls: [url]},
+      ]);
+      setAnimate('');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
   };
 
   const start = async () => {
@@ -249,7 +284,9 @@ export default function CreateScreen({projectId, heroes}: {projectId: string; he
   };
 
   const waiting = items.filter(i => i.status === 'waiting_external');
-  const results = items.filter(i => i.kind === 'image' && i.status !== 'waiting_external');
+  const results = items.filter(
+    i => (i.kind === 'image' || i.kind === 'video') && i.status !== 'waiting_external'
+  );
 
   return (
     <section className="panel create-screen">
@@ -449,8 +486,13 @@ export default function CreateScreen({projectId, heroes}: {projectId: string; he
                 const a = byId[aid];
                 return a ? (
                   <div key={aid}>
-                    <img src={a.thumbnail_url || a.url} alt="" style={{maxWidth: '100%'}} />
+                    {item.kind === 'video' ? (
+                      <video src={a.url} controls style={{maxWidth: '100%'}} />
+                    ) : (
+                      <img src={a.thumbnail_url || a.url} alt="" style={{maxWidth: '100%'}} />
+                    )}
                     <div className="chips">
+                      {item.kind === 'image' && <button onClick={() => setAnimate(aid)}>🎬 Оживить</button>}
                       <button onClick={() => regenerate(item)}>↻ Перегенерировать</button>
                       <button onClick={() => favorite(aid, !a.metadata.favorite)}>
                         {a.metadata.favorite ? '♥' : '♡'}
@@ -473,6 +515,70 @@ export default function CreateScreen({projectId, heroes}: {projectId: string; he
         {!results.length && <span className="muted">Здесь появятся результаты</span>}
       </div>
 
+      {animate && (
+        <div className="modal-backdrop">
+          <section className="panel generation-review" role="dialog" aria-modal="true">
+            <h2>Оживить кадр</h2>
+            {byId[animate] && (
+              <img src={byId[animate].thumbnail_url || byId[animate].url} alt="" width={160} />
+            )}
+            <label>
+              Модель
+              <select
+                value={videoModel}
+                onChange={e => {
+                  setVideoModel(e.target.value);
+                  setVideoOptions({});
+                }}
+              >
+                {['seedance-2.5', 'minimax-h3']
+                  .filter(id => specs[id])
+                  .map(id => (
+                    <option key={id} value={id}>
+                      {id === 'seedance-2.5' ? 'Seedance 2.5' : 'MiniMax H3'}
+                      {specs[id].launch_enabled === false ? ' (проверяется)' : ''}
+                    </option>
+                  ))}
+              </select>
+            </label>
+            <label>
+              Что должно происходить
+              <textarea rows={3} value={motion} onChange={e => setMotion(e.target.value)} />
+            </label>
+            {Object.entries(videoSpec(videoModel)).map(([key, sp]) => (
+              <label key={key}>
+                {key}
+                {sp.values ? (
+                  <select
+                    value={String(videoOptions[key] ?? sp.default)}
+                    onChange={e => setVideoOptions(o => ({...o, [key]: e.target.value}))}
+                  >
+                    {sp.values.map(v => (
+                      <option key={String(v)} value={String(v)}>
+                        {String(v)}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    type="number"
+                    min={sp.min}
+                    max={sp.max}
+                    value={Number(videoOptions[key] ?? sp.default)}
+                    onChange={e => setVideoOptions(o => ({...o, [key]: Number(e.target.value)}))}
+                  />
+                )}
+              </label>
+            ))}
+            <div className="chips">
+              <button className="primary" disabled={busy} onClick={() => void startAnimate()}>
+                {busy ? 'Готовлю…' : 'Дальше: оценка и подтверждение'}
+              </button>
+              <button onClick={() => setAnimate('')}>Отмена</button>
+            </div>
+          </section>
+        </div>
+      )}
       {queue[0] && (
         <GenerationReview
           request={queue[0]}
