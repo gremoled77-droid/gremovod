@@ -43,7 +43,7 @@ def collect(studio, project_id):
                 status = 'saving' if d['state'] == 'retry' else 'attention'
             request = json.loads(r['request'] or '{}')
             items.append({'id': r['id'], 'source': 'api', 'kind': r['kind'], 'provider': r['provider'],
-                          'model': (request.get('payload') or {}).get('task_type') or r['kind'],
+                          'model': request.get('model_id') or (request.get('payload') or {}).get('task_type') or r['kind'],
                           'status': status, 'raw_status': r['status'], 'created_at': r['created_at'],
                           'prompt': _prompt_of(r['request']), 'asset_ids': assets.get(r['id'], []),
                           'delivery': dict(d) if d else None})
