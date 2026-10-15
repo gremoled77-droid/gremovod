@@ -11,6 +11,10 @@ class Cost(BaseModel):
 class Decision(BaseModel):
     decision: str
 
+def free_provider(provider):
+    """Попытки без оплаты по API: чат Codex и ручная внешняя генерация."""
+    return provider=='codex_chat' or provider.startswith('external:')
+
 def register(app,studio):
     @app.on_event('startup')
     def setup():
@@ -41,6 +45,7 @@ def register(app,studio):
             rows=db.execute('SELECT j.id,j.status,j.kind,j.provider,j.request,j.created_at,a.estimated_usd FROM jobs j LEFT JOIN generation_approvals a ON a.job_id=j.id WHERE j.project_id=?',(project_id,)).fetchall()
             native=db.execute("SELECT id,status,operation,target,created_at FROM native_chat_jobs WHERE project_id=? AND operation!='describe_character'",(project_id,)).fetchall()
             prompts=db.execute("SELECT id,target,provider,created_at FROM prompt_versions WHERE project_id=? AND provider!='codex_chat'",(project_id,)).fetchall()
+            external=db.execute('SELECT id,status,target,service,created_at FROM external_jobs WHERE project_id=?',(project_id,)).fetchall()
             costs={x['job_id']:dict(x) for x in db.execute('SELECT * FROM clip_costs')}
             assets=[dict(x) for x in db.execute("SELECT a.id,a.job_id,a.metadata,COALESCE(o.decision,'undecided') AS decision FROM library_assets a LEFT JOIN asset_outcomes o ON o.asset_id=a.id WHERE a.project_id=?",(project_id,))]
         attempts=[]
@@ -50,6 +55,9 @@ def register(app,studio):
             attempts.append({'id':row['id'],'status':row['status'],'provider':row['provider'],'target':target,'kind':row['kind'],'created_at':row['created_at'],'estimated_usd':row['estimated_usd']})
         for row in native:
             attempts.append({'id':row['id'],'status':row['status'],'provider':'codex_chat','target':row['target'],'kind':'image' if row['operation'] in {'generate','edit'} else 'prompt','created_at':row['created_at'],'estimated_usd':None})
+        for row in external:
+            status={'received':'completed','waiting_external':'queued'}.get(row['status'],row['status'])
+            attempts.append({'id':row['id'],'status':status,'provider':'external:'+row['service'],'target':row['target'],'kind':'image','created_at':row['created_at'],'estimated_usd':None})
         for row in prompts:
             attempts.append({'id':row['id'],'status':'completed','provider':row['provider'],'target':row['target']+' · prompt','kind':'prompt','created_at':row['created_at'],'estimated_usd':None})
         for attempt in attempts:
@@ -59,7 +67,7 @@ def register(app,studio):
             attempt['used']=any(x['decision']=='used' for x in outputs)
             attempt['rejected']=bool(outputs) and all(x['decision']=='rejected' for x in outputs)
             attempt['api_equivalent']=None
-            if attempt['provider']=='codex_chat' and attempt['kind']=='image' and attempt['status']=='completed':
+            if free_provider(attempt['provider']) and attempt['kind']=='image' and attempt['status']=='completed':
                 meta=json.loads(outputs[0]['metadata']) if outputs else {}
                 attempt['api_equivalent']=api_equivalent(meta.get('width'),meta.get('height'),attempt['target'])
         media=[x for x in attempts if x['kind'] in {'image','video'} and x['status'] not in {'queued','preparing','generating','pending','processing','cancelled','submitting'}]
@@ -67,14 +75,14 @@ def register(app,studio):
         known=[x for x in attempts if x['actual_usd'] is not None]
         actual=sum(x['actual_usd'] for x in known)
         # Chat use is counted, but does not require a per-image charge or subscription allocation.
-        unknown=sum(x['actual_usd'] is None for x in attempts if x['status']!='cancelled' and x['provider']!='codex_chat')
-        llm_unpriced=sum(x['actual_usd'] is None for x in attempts if x['kind']=='prompt' and x['status']!='cancelled' and x['provider']!='codex_chat')
-        media_unknown=sum(x['actual_usd'] is None for x in attempts if x['kind'] in {'image','video','audio'} and x['status']!='cancelled' and x['provider']!='codex_chat')
+        unknown=sum(x['actual_usd'] is None for x in attempts if x['status']!='cancelled' and not free_provider(x['provider']))
+        llm_unpriced=sum(x['actual_usd'] is None for x in attempts if x['kind']=='prompt' and x['status']!='cancelled' and not free_provider(x['provider']))
+        media_unknown=sum(x['actual_usd'] is None for x in attempts if x['kind'] in {'image','video','audio'} and x['status']!='cancelled' and not free_provider(x['provider']))
         periods={}
         for x in media:
             key=(x['created_at'][:7],x['target'])
             bucket=periods.setdefault(key,{'month':key[0],'model':key[1],'attempts':0,'used':0,'actual_usd':0,'unknown_costs':0})
-            bucket['attempts']+=1;bucket['used']+=int(x['used']);bucket['actual_usd']+=x['actual_usd'] or 0;bucket['unknown_costs']+=int(x['actual_usd'] is None and x['provider']!='codex_chat')
+            bucket['attempts']+=1;bucket['used']+=int(x['used']);bucket['actual_usd']+=x['actual_usd'] or 0;bucket['unknown_costs']+=int(x['actual_usd'] is None and not free_provider(x['provider']))
         chat_images=[x for x in attempts if x['api_equivalent']]
         return {'project_id':project_id,'actual_usd_known':round(actual,6),'costs_complete':unknown==0,
                 'chat_image_count':len(chat_images),'chat_api_equivalent_usd':round(sum(x['api_equivalent']['usd'] for x in chat_images),6),
