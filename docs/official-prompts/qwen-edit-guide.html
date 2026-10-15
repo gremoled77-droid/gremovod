@@ -1,0 +1,525 @@
+
+<!DOCTYPE html>
+<html lang="en" class="transparent alicloud back-to-top new_default">
+<link rel="stylesheet" href="//g.alicdn.com/aliyun-help/help-portal-fe/0.12.65/css/index.css" />
+<head>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8"/>
+<meta name="spm-id" content="a2c63">
+<meta name="data-spm" content="a2c63" />
+<meta name="aplus-core" content="aplus.js">
+<meta name="aplus-ajax" content="chksum">
+<meta name="aplus-waiting" content="MAN">
+<meta name="aplus-pvhash" content="1">
+ <!-- MINOR_LANG_ENTRY_GATE：ko/de/tr/vi/th 入口卡点，翻译/内容就绪后把 content 追加 ko,de,tr,vi,th -->
+<!-- ES_ENTRY_GATE：es 已放开（本分支 ES_ENTRY_ENABLED=true），content 已含 es；如需回退从此处删除 es -->
+<!-- FR_ENTRY_GATE：fr 已在预发验证分支放开（本分支 FR_ENTRY_ENABLED=true）；线上卡点分支的 content 为 en,zh,tc,ja,id,pt-BR -->
+<meta name="kloud:supported-langs" content="en,zh,tc,ja,id,pt-BR,fr,es"/>
+
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<meta name="applicable-device" content="pc,mobile">
+<meta name="aplus-rhost-v" content="sg.mmstat.com">
+<meta name="aplus-rhost-g" content="sg.mmstat.com">
+<title>
+ Qwen, Qwen-Image-Edit, image editing, instructions, editing, usage - Alibaba Cloud Model Studio - Alibaba Cloud Documentation Center
+
+</title>
+ <meta name="keywords" content="qwen api,image editing,qwen-image,qwen-image-edit,image-to-image">
+ <meta name="description" content="Qwen, Qwen-Image-Edit, image editing, instructions, editing, usage,Alibaba Cloud Model Studio:Qwen-Image-Edit supports multi-image input and output. It can modify text in images, add/delete/move objects, change subject actions, transfer styles, and enhance details.">
+ <script>
+window.globalData = {
+website: "intl",
+language: "en",
+nodeId:"2977275",
+channel: "",
+notfound: "",
+statusCode: "",
+errorType: ""
+};
+// UT的全局配置变量，在CDN加载前配置
+window.$ACE_TRACKER_CONFIG = {
+enableHistory: true,
+enableHash: false
+};
+</script>
+<!-- <base href="https://www.alibabacloud.com">-->
+<link rel="canonical" href="https://www.alibabacloud.com/help/en/model-studio/qwen-image-edit-guide"/>
+ <meta property="og:title" content="Qwen-Image-Edit - Alibaba Cloud" />
+ <meta property="og:type" content="website" />
+ <meta property="og:url" content="https://www.alibabacloud.com/help/en/model-studio/qwen-image-edit-guide" />
+ <meta property="og:image" content="https://img.alicdn.com/tfs/TB1xpNqnmslXu8jSZFuXXXg7FXa-1200-630.png_.webp" />
+ <meta property="og:description" content="Qwen, Qwen-Image-Edit, image editing, instructions, editing, usage,Alibaba Cloud Model Studio:Qwen-Image-Edit supports multi-image input and output. It can modify text in images, add/delete/move objects, change subject actions, transfer styles, and enhance details." />
+ <link rel="shortcut icon" href="//img.alicdn.com/tfs/TB1ugg7M9zqK1RjSZPxXXc4tVXa-32-32.png"/>
+<link rel="stylesheet" href="https://o.alicdn.com/fund/alicloud-pure-layout/css/index.min.css" />
+ <link
+rel="icon"
+href="https://img.alicdn.com/imgextra/i2/O1CN01TFs5Qw27uYvfA6gib_!!6000000007857-55-tps-32-32.svg"
+type="image/x-icon"
+/>
+</head>
+<body data-spm="" class="HAS_ALPS_RESOURCE"><script>
+with(document)with(body)with(insertBefore(createElement("script"),firstChild))setAttribute("exparams","category=&userid=&aplus&yunid=&&trid=0a3c4ee417920441018824289eb1ef&asid=AQAAAABGbNBqnN2MaAAAAADVuWf5WUxbAw==",id="tb-beacon-aplus",src=(location>"https"?"//g":"//g")+".alicdn.com/alilog/mlog/aplus_v2.js")
+</script>
+
+ <script async src="https://o.alicdn.com/fund/alicloud-pure-layout/index.js"></script>
+
+<div id="app">
+<div class="aliyun-app-layout">
+
+<!-- docId:2977275 -->
+<input type="hidden" id="website" value="intl">
+<div class="products-wrapper$tip" data-spm="879954">
+<section id="products" class="intl-product container">
+<div class="row">
+<div class="col-lg-3 col-md-3 col-sm-4 col-xs-12" id="navDocument">
+<div class="doc-nav">
+<a class="doc-center" href="/help/en">
+<i class="icon-docs icon-docs-back"></i>
+Document Center
+</a>
+</div>
+<div class="placeholder-ele">&nbsp;</div>
+</div>
+<div class="col-lg-7 col-md-7 col-sm-8 col-xs-12 doc-content">
+<div class="all-products action" id="J_AllProducts">
+<div class="all-products-head">
+<div class="all-products-title">All Products</div>
+<div class="all-products-search-wrapper">
+<div class="all-products-search focus">
+<input autocomplete="off" class="all-products-search-box-input" id="J_AllProductsSearch" placeholder="Search Product" data-spm-anchor-id="a2c4g.11186623.6.i0.1f753945H9RVzu">
+<i class="icon-search icon-docs icon-docs-search"></i>
+<ul class="all-products-search-result" style="display: none;">
+</ul>
+</div>
+</div>
+</div>
+<div class="all-products-body" id="J_AllProductsBody"></div>
+</div>
+<div class="search-product-modal">
+Search
+</div>
+<div class="breadcrumbs-top" data-spm="a1">
+<div class="row nav-breadcrumb">
+ <div class="col-md-12 hidden-sm hidden-xs">
+<ul class="breadcrumb text-sm">
+<li><a class="active" title="Document Center" href="/help/en">Document Center</a></li>
+ <li><a class="active" title="Alibaba Cloud Model Studio" href="/help/en/model-studio/">Alibaba Cloud Model Studio</a></li>
+ <li><a class="active" title="User Guide (Models)" href="/help/en/model-studio/model-user-guide/">User Guide (Models)</a></li>
+ <li><a class="active" title="Model Playground" href="/help/en/model-studio/model-experience/">Model Playground</a></li>
+ <li><a class="active" title="Image generation and editing" href="/help/en/model-studio/image-model/">Image generation and editing</a></li>
+ <li><a class="active" title="Image editing" href="/help/en/model-studio/image-edit-guide/">Image editing</a></li>
+ <li><a class="active" title="Image editing - Qwen" href="/help/en/model-studio/qwen-image-edit-guide">Image editing - Qwen</a></li>
+ </ul>
+</div>
+ <div class="col-md-4 col-sm-12">
+<button type="button" class="navbar-toggle bc mr0" data-toggle="collapse"
+data-target="#sideMenu-mobile">
+<span class="icon-bar"></span>
+<span class="icon-bar"></span>
+all-products-head <span class="icon-bar"></span>
+</button>
+</div>
+</div>
+<form class="search-bar clearfix" method="GET" action="/s/en">
+<input type="hidden" name="type" value="doc"/>
+<div class="select">
+<p class="select-text">
+<span class="placeholder">This Product</span>
+<i class="icon-docs icon-docs-selected"></i>
+</p>
+<ul class="select-options" style="display:none;">
+<li class="option selected" data-value="h_pid_$productId">This Product</li>
+<li class="option" data-value="">All Products</li>
+</ul>
+<input type="hidden" name="rangeinfo" value="h_pid_2400256"/>
+</div>
+<input autocomplete="off" class="search-key" type="text" placeholder="Search by keyword" name="k"/>
+<ul class="help-top-search-result" style="display: block;"></ul>
+<button class="search-submit" type="submit">
+<i class="icon-docs icon-docs-search"></i>
+</button>
+<div class="collapse-menus select">
+<p class="select-text">
+<span class="placeholder">Alibaba Cloud Model Studio:Qwen-Image-Edit</span>
+<i class="icon-docs icon-docs-more"></i>
+</p>
+</div>
+</form>
+</div>
+<header id="header-faq" class="clearfix">
+<a class="doc-center" href="/help/en">
+<i class="icon-docs icon-docs-back"></i>
+Document Center
+</a>
+<div class="download-links">
+ </div>
+<h1 class="page-title">Alibaba Cloud Model Studio:Qwen-Image-Edit</h1>
+<div class="doc-status">
+Last Updated:Oct 11, 2026
+</div>
+</header>
+<article class="product-description markdown-body">
+<div lang="en" class="icms-help-docs-content">
+<link rel="preload" as="image" href="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/3509593671/p1025838.webp"/><link rel="preload" as="image" href="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/3509593671/p1025839.webp"/><link rel="preload" as="image" href="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/3509593671/p1021092.webp"/><link rel="preload" as="image" href="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/3509593671/p1021093.webp"/><link rel="preload" as="image" href="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/6844029571/p1011712.webp"/><link rel="preload" as="image" href="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/6844029571/p1011753.webp"/><link rel="preload" as="image" href="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/4405461671/p1012002.webp"/><link rel="preload" as="image" href="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/4405461671/p1012004.webp"/><link rel="preload" as="image" href="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/6844029571/p1011789.webp"/><link rel="preload" as="image" href="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/5844029571/p1011790.webp"/><link rel="preload" as="image" href="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/6844029571/p1011791.webp"/><link rel="preload" as="image" href="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/6844029571/p1011792.webp"/><link rel="preload" as="image" href="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/5844029571/p1012037.webp"/><link rel="preload" as="image" href="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/5844029571/p1012038.webp"/><link rel="preload" as="image" href="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/6844029571/p1012039.webp"/><link rel="preload" as="image" href="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/5844029571/p1012040.webp"/><link rel="preload" as="image" href="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/6844029571/p1011821.webp"/><link rel="preload" as="image" href="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/6844029571/p1011822.webp"/><link rel="preload" as="image" href="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/6844029571/p1011824.webp"/><link rel="preload" as="image" href="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/6844029571/p999719.png"/><link rel="preload" as="image" href="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/5844029571/p1011685.webp"/><link rel="preload" as="image" href="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/5844029571/p1011686.webp"/><link rel="preload" as="image" href="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/5844029571/p1011687.webp"/><link rel="preload" as="image" href="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/5844029571/p999632.png"/><link rel="preload" as="image" href="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/6844029571/p999633.png"/><link rel="preload" as="image" href="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/6844029571/p999630.png"/><link rel="preload" as="image" href="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/6844029571/p1011810.webp"/><link rel="preload" as="image" href="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/5844029571/p1011811.webp"/><link rel="preload" as="image" href="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/5844029571/p1011812.webp"/><link rel="preload" as="image" href="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/5844029571/p1011817.webp"/><link rel="preload" as="image" href="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/5844029571/p1011818.webp"/><link rel="preload" as="image" href="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/6844029571/p1011819.webp"/><link rel="preload" as="image" href="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/6844029571/p999641.png"/><link rel="preload" as="image" href="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/6844029571/p999642.png"/><link rel="preload" as="image" href="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/6844029571/p1000039.png"/><link rel="preload" as="image" href="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/6844029571/p1000062.png"/><link rel="preload" as="image" href="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/5844029571/p1011772.webp"/><link rel="preload" as="image" href="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/6844029571/p1011774.webp"/><link rel="preload" as="image" href="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/6844029571/p1011775.webp"/><link rel="preload" as="image" href="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/6844029571/p1011776.webp"/><link rel="preload" as="image" href="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/5844029571/p1011777.jpeg"/><link rel="preload" as="image" href="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/6844029571/p1011779.jpeg"/><link rel="preload" as="image" href="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/5844029571/p1011780.jpeg"/><link rel="preload" as="image" href="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/6844029571/p1011783.webp"/><link rel="preload" as="image" href="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/6844029571/p1011784.webp"/><link rel="preload" as="image" href="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/5844029571/p1011786.webp"/><link rel="preload" as="image" href="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/6844029571/p999647.png"/><link rel="preload" as="image" href="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/5844029571/p999648.png"/><link rel="preload" as="image" href="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/5844029571/p999649.png"/><link rel="preload" as="image" href="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/6844029571/p999650.png"/><link rel="preload" as="image" href="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/6844029571/p999964.png"/><link rel="preload" as="image" href="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/5844029571/p999968.png"/><link rel="preload" as="image" href="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/5844029571/p999969.png"/><link rel="preload" as="image" href="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/6844029571/p999970.png"/><link rel="preload" as="image" href="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/5844029571/p999974.png"/><link rel="preload" as="image" href="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/5844029571/p999975.png"/><link rel="preload" as="image" href="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/6844029571/p999971.png"/><link rel="preload" as="image" href="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/5844029571/p999972.png"/><link rel="preload" as="image" href="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/6844029571/p999552.png"/><link rel="preload" as="image" href="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/6844029571/p999554.png"/><link rel="preload" as="image" href="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/5844029571/p1011757.webp"/><link rel="preload" as="image" href="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/6844029571/p1011759.webp"/><div lang="en" class="icms-help-docs-content"><p data-tag="shortdesc" class="shortdesc">Qwen-Image-Edit supports multi-image input and output. It can modify text in images, add/delete/move objects, change subject actions, transfer styles, and enhance details.</p><h2 id="getting-started">Getting started <span id="61747164c4o6o"></span> <span id="1fff24bb33edl"></span></h2>
+<p>Before making a call, <a href="/help/en/model-studio/get-api-key">get an API key</a> and export the API key as an environment variable.</p>
+<p>To call the API using the SDK, <a href="/help/en/model-studio/install-sdk">install the DashScope SDK</a>. The SDK is available for Python and Java.</p>
+<section data-tag="tabbed-content-box" outputclass="tabbed-content-box" id="sec-tabs" class="tabbed-content-box section"><section id="python" class="section"><h4 id="python-h4">Python</h4><pre data-tag="codeblock" id="code-block" code-type="xCode" class="pre codeblock"><code>import os
+import base64
+import mimetypes
+import dashscope
+from dashscope import MultiModalConversation
+
+dashscope.base_http_api_url = &#x27;https://{WorkspaceId}.ap-southeast-1.maas.aliyuncs.com/api/v1&#x27;
+
+def encode_file(file_path):
+    mime_type, _ = mimetypes.guess_type(file_path)
+    if not mime_type or not mime_type.startswith(&quot;image/&quot;):
+        raise ValueError(&quot;Unsupported or unrecognized image format&quot;)
+    with open(file_path, &quot;rb&quot;) as image_file:
+        encoded_string = base64.b64encode(image_file.read()).decode(&#x27;utf-8&#x27;)
+    return f&quot;data:{mime_type};base64,{encoded_string}&quot;
+
+# [Method 1] Use a public image URL
+image_url = &quot;https://alidocs.oss-cn-zhangjiakou.aliyuncs.com/res/yBRq1ZPYEaXdyOdv/img/33a80a19-7ac7-4c64-b0fa-7d685b7046a0.png&quot;
+
+# [Method 2] Use a Base64-encoded image
+# image_url = encode_file(&quot;./your_image.png&quot;)
+
+response = MultiModalConversation.call(
+    api_key=os.getenv(&quot;DASHSCOPE_API_KEY&quot;),
+    model=&quot;qwen-image-3.0-pro&quot;,
+    messages=[{
+        &quot;role&quot;: &quot;user&quot;,
+        &quot;content&quot;: [
+            {&quot;image&quot;: image_url},
+            {&quot;text&quot;: &quot;Generate a sophisticated urban-style female portrait. Perfectly preserve the facial features and smooth black long hair of the young woman in the input image. Change her outfit to an elegant urban professional look. Set the scene in a modern minimalist upscale coffee shop.&quot;}
+        ]
+    }],
+    prompt_extend=True
+)
+
+print(response)
+if response.status_code == 200:
+    url = response.output.choices[0].message.content[0][&quot;image&quot;]
+    print(f&quot;Generated image URL: {url}&quot;)
+else:
+    print(f&quot;Error: {response.code} - {response.message}&quot;)
+</code></pre></section><section id="java" class="section"><h4 id="java-h4">Java</h4><pre data-tag="codeblock" id="code-block-2" code-type="xCode" class="pre codeblock"><code>import java.util.Arrays;
+import java.util.Base64;
+import java.util.Collections;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import com.alibaba.dashscope.aigc.multimodalconversation.MultiModalConversation;
+import com.alibaba.dashscope.aigc.multimodalconversation.MultiModalConversationParam;
+import com.alibaba.dashscope.aigc.multimodalconversation.MultiModalConversationResult;
+import com.alibaba.dashscope.common.MultiModalMessage;
+import com.alibaba.dashscope.common.Role;
+import com.alibaba.dashscope.utils.Constants;
+
+public class ImageEditExample {
+    public static void main(String[] args) {
+        Constants.baseHttpApiUrl = &quot;https://{WorkspaceId}.ap-southeast-1.maas.aliyuncs.com/api/v1&quot;;
+
+        // [Method 1] Use a public image URL
+        String imageUrl = &quot;https://alidocs.oss-cn-zhangjiakou.aliyuncs.com/res/yBRq1ZPYEaXdyOdv/img/33a80a19-7ac7-4c64-b0fa-7d685b7046a0.png&quot;;
+
+        // [Method 2] Use a Base64-encoded image
+        // String imageUrl = encodeFile(&quot;/path/to/your/image.png&quot;);
+
+        MultiModalConversation conv = new MultiModalConversation();
+        MultiModalMessage userMessage = MultiModalMessage.builder()
+            .role(Role.USER.getValue())
+            .content(Arrays.asList(
+                Collections.singletonMap(&quot;image&quot;, imageUrl),
+                Collections.singletonMap(&quot;text&quot;, &quot;Generate a sophisticated urban-style female portrait. Perfectly preserve the facial features and smooth black long hair of the young woman in the input image. Change her outfit to an elegant urban professional look. Set the scene in a modern minimalist upscale coffee shop.&quot;)
+            ))
+            .build();
+        MultiModalConversationParam param = MultiModalConversationParam.builder()
+            .apiKey(System.getenv(&quot;DASHSCOPE_API_KEY&quot;))
+            .model(&quot;qwen-image-3.0-pro&quot;)
+            .messages(Arrays.asList(userMessage))
+            .parameter(&quot;prompt_extend&quot;, true)
+            .build();
+        try {
+            MultiModalConversationResult result = conv.call(param);
+            System.out.println(result);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    public static String encodeFile(String filePath) {
+        Path path = Paths.get(filePath);
+        if (!Files.exists(path)) {
+            throw new IllegalArgumentException(&quot;File does not exist: &quot; + filePath);
+        }
+        String mimeType = null;
+        try {
+            mimeType = Files.probeContentType(path);
+        } catch (IOException e) {
+            throw new IllegalArgumentException(&quot;Cannot detect file type: &quot; + filePath);
+        }
+        if (mimeType == null || !mimeType.startsWith(&quot;image/&quot;)) {
+            throw new IllegalArgumentException(&quot;Unsupported or unrecognized image format&quot;);
+        }
+        byte[] fileBytes = null;
+        try {
+            fileBytes = Files.readAllBytes(path);
+        } catch (IOException e) {
+            throw new IllegalArgumentException(&quot;Cannot read file content: &quot; + filePath);
+        }
+        String encodedString = Base64.getEncoder().encodeToString(fileBytes);
+        return &quot;data:&quot; + mimeType + &quot;;base64,&quot; + encodedString;
+    }
+}
+</code></pre></section><section id="curl" class="section"><h4 id="curl-h4">curl</h4><p>The following command uses the URL for the Singapore region. If you use a model in the China (Beijing) region, replace the URL with: <code>https://{WorkspaceId}.cn-beijing.maas.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation</code></p><pre data-tag="codeblock" id="code-block-3" code-type="xCode" class="pre codeblock"><code>curl --location &#x27;https://{WorkspaceId}.ap-southeast-1.maas.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation&#x27; \
+--header &#x27;Content-Type: application/json&#x27; \
+--header &quot;Authorization: Bearer $DASHSCOPE_API_KEY&quot; \
+--data &#x27;{
+    &quot;model&quot;: &quot;qwen-image-3.0-pro&quot;,
+    &quot;input&quot;: {
+        &quot;messages&quot;: [
+            {
+                &quot;role&quot;: &quot;user&quot;,
+                &quot;content&quot;: [
+                    {
+                        &quot;image&quot;: &quot;https://alidocs.oss-cn-zhangjiakou.aliyuncs.com/res/yBRq1ZPYEaXdyOdv/img/33a80a19-7ac7-4c64-b0fa-7d685b7046a0.png&quot;
+                    },
+                    {
+                        &quot;text&quot;: &quot;Generate a sophisticated urban-style female portrait. Perfectly preserve the facial features and smooth black long hair of the young woman in the input image. She changes from her beige knit top into an elegant urban professional outfit: a champagne silk blouse with a well-tailored dark grey casual blazer and matching high-waisted wide-leg trousers. The scene is in a modern minimalist upscale coffee shop with floor-to-ceiling windows showing a bustling city view. Dark wood tables and leather chairs furnish the interior, with a silver laptop, documents, and a steaming Americano on the table. She sits relaxed, leaning slightly back with one arm on the armrest and the other holding a coffee cup, gazing at the camera with calm, slightly languid eyes and an elegant smile. Polished formal makeup with clean base, defined brows, and mauve lipstick. Soft afternoon light enters from the side through the windows, creating delicate light transitions on her face and clothing. Natural bokeh background in earth tones, greys and warm whites, creating a serene, sophisticated urban office atmosphere.&quot;
+                    }
+                ]
+            }
+        ]
+    },
+    &quot;parameters&quot;: {
+        &quot;prompt_extend&quot;: true
+    }
+}&#x27;
+</code></pre><section class="collapse" id="accordion-response-example"><p>Response example</p><div><pre data-tag="codeblock" id="code-block-4" code-type="xCode" class="pre codeblock"><code>{
+    &quot;output&quot;: {
+        &quot;choices&quot;: [
+            {
+                &quot;finish_reason&quot;: &quot;stop&quot;,
+                &quot;message&quot;: {
+                    &quot;content&quot;: [
+                        {
+                            &quot;image&quot;: &quot;https://dashscope-result-sz.oss-cn-shenzhen.aliyuncs.com/xxx.png?Expires=xxx&quot;
+                        }
+                    ],
+                    &quot;role&quot;: &quot;assistant&quot;
+                }
+            }
+        ]
+    },
+    &quot;usage&quot;: {
+        &quot;output_height&quot;: 1024,
+        &quot;output_width&quot;: 1024,
+        &quot;input_image_count&quot;: 1,
+        &quot;input_image_type&quot;: &quot;qima_input_1k&quot;,
+        &quot;output_image_count&quot;: 1,
+        &quot;output_image_type&quot;: &quot;qima_output_1k&quot;
+    },
+    &quot;request_id&quot;: &quot;571ae02f-5c9d-436c-83c2-f221e6df0xxx&quot;
+}
+</code></pre></div></section></section></section>
+<section class="collapse" id="accordion-download-images-to-your-local-device"><p>Download images to your local device</p><div><div outputclass="tabbed-codeblock" data-tag="fig" id="fig-code-group" class="tabbed-codeblock-box"><div class="tab-box"></div><input id="fig-code-group-code-1-tab" type="radio" name="check-fig-code-group" checked=""/><label for="fig-code-group-code-1-tab">Code 1</label><div class="codeblock-item"><pre data-tag="codeblock" id="code-code-group-code-1" code-type="xCode" class="pre codeblock"><code># You need to install requests to download the image: pip install requests
+import requests
+
+def download_image(image_url, save_path=&#x27;output.png&#x27;):
+    try:
+        response = requests.get(image_url, stream=True, timeout=300)  # Set a timeout.
+        response.raise_for_status()  # Raise an exception if the HTTP status code is not 200.
+        with open(save_path, &#x27;wb&#x27;) as f:
+            for chunk in response.iter_content(chunk_size=8192):
+                f.write(chunk)
+        print(f&quot;Image successfully downloaded to: {save_path}&quot;)
+
+    except requests.exceptions.RequestException as e:
+        print(f&quot;Image download failed: {e}&quot;)
+
+image_url = &quot;https://dashscope-result-sz.oss-cn-shenzhen.aliyuncs.com/xxx.png?Expires=xxx&quot;
+download_image(image_url, save_path=&#x27;output.png&#x27;)
+</code></pre></div><input id="fig-code-group-code-2-tab" type="radio" name="check-fig-code-group"/><label for="fig-code-group-code-2-tab">Code 2</label><div class="codeblock-item"><pre data-tag="codeblock" id="code-code-group-code-2" code-type="xCode" class="pre codeblock"><code>import java.io.FileOutputStream;
+import java.io.InputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+
+public class ImageDownloader {
+    public static void downloadImage(String imageUrl, String savePath) {
+        try {
+            URL url = new URL(imageUrl);
+            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+            connection.setConnectTimeout(5000);
+            connection.setReadTimeout(300000);
+            connection.setRequestMethod(&quot;GET&quot;);
+            InputStream inputStream = connection.getInputStream();
+            FileOutputStream outputStream = new FileOutputStream(savePath);
+            byte[] buffer = new byte[8192];
+            int bytesRead;
+            while ((bytesRead = inputStream.read(buffer)) != -1) {
+                outputStream.write(buffer, 0, bytesRead);
+            }
+            inputStream.close();
+            outputStream.close();
+
+            System.out.println(&quot;Image downloaded successfully to: &quot; + savePath);
+        } catch (Exception e) {
+            System.err.println(&quot;Image download failed: &quot; + e.getMessage());
+        }
+    }
+
+    public static void main(String[] args) {
+        String imageUrl = &quot;http://dashscope-result-bj.oss-cn-beijing.aliyuncs.com/xxx?Expires=xxx&quot;;
+        String savePath = &quot;output.png&quot;;
+        downloadImage(imageUrl, savePath);
+    }
+}
+</code></pre></div></div></div></section>
+<h2 id="model-recommendations">Model recommendations <span id="435d878036n1t"></span> <span id="418c71d0b07el"></span></h2>
+<ul>
+<li><code>qwen-image-3.0-pro</code><strong> (Flagship quality):</strong> The flagship Qwen Image 3.0 model with comprehensively upgraded image generation and editing capabilities, offering enhanced text rendering, realistic textures, semantic adherence, and intelligent prompt rewriting.</li>
+<li><code>qwen-image-2.1-pro</code><strong> (Best balance of speed, quality, and cost):</strong> Supports up to 10 reference images for image-to-image tasks and can automatically output images with transparent channels based on the prompt. Does not support <code>negative_prompt</code>.</li>
+<li><code>qwen-image-2.1-turbo</code><strong> (Best cost-effectiveness):</strong> The most cost-efficient model in the Qwen-Image series. Supports up to 10 reference images for image-to-image tasks and can automatically output images with transparent channels based on the prompt. Does not support <code>negative_prompt</code>.</li>
+<li><code>qwen-image-3.0</code><strong>:</strong> The standard Qwen Image 3.0 model that balances quality and speed.</li>
+</ul>
+<p>For the models supported in each region, see <a href="/help/en/model-studio/models">Model list</a>.</p>
+<h2 id="input-instructions">Input instructions <span id="96633cdad4avs"></span> <span id="cfa18c76f3wii"></span></h2>
+<h3 id="input-images-messages">Input images (messages) <span id="7995070a9ep8i"></span> <span id="fe3b38309f65z"></span></h3>
+<p>The <code>messages</code> parameter is an array that must contain a single object. This object must include the <code>role</code> and <code>content</code> properties. The <code>role</code> property must be set to <code>user</code>. The <code>content</code> property must include both <code>image</code> and <code>text</code> (one editing instruction). The qwen-image-3.0 series supports one to three images, and the qwen-image-2.1 series supports one to ten images.</p>
+<p>The input images must meet the following requirements:</p>
+<ul>
+<li>
+<p>The supported image formats are JPG, JPEG, PNG, BMP, TIFF, WEBP, and GIF.</p>
+<blockquote>
+<p>The output image is in PNG format. For animated GIFs, only the first frame is processed.</p>
+</blockquote>
+</li>
+<li>
+<p>For best results, the image resolution should be between 384 and 3072 pixels for both width and height. A low resolution may result in a blurry output, while a high resolution increases processing time.</p>
+</li>
+<li>
+<p>The size of a single image file cannot exceed 10 MB.</p>
+</li>
+</ul>
+<pre data-tag="codeblock" id="code-block-5" outputclass="language-json" code-type="xCode" class="pre codeblock language-json"><code>&quot;messages&quot;: [
+    {
+        &quot;role&quot;: &quot;user&quot;,
+        &quot;content&quot;: [
+            { &quot;image&quot;: &quot;Public URL or Base64 data of Image 1&quot; },
+            { &quot;image&quot;: &quot;Public URL or Base64 data of Image 2&quot; },
+            { &quot;image&quot;: &quot;Public URL or Base64 data of Image 3&quot; },
+            { &quot;text&quot;: &quot;Your editing instruction, for example: &#x27;The girl in Image 1 wears the black dress from Image 2 and sits in the pose from Image 3&#x27;&quot; }
+        ]
+    }
+]
+</code></pre>
+<h3 id="image-input-order">Image input order <span id="87e8051f646bi"></span> <span id="cf7e1f56b535m"></span></h3>
+<p>Image numbers in prompts correspond to array position: the first image is &quot;image 1&quot;, the second is &quot;image 2&quot;. You can also use markers like &quot;[image 1]&quot; and &quot;[image 2]&quot;.</p>
+<pre data-tag="codeblock" id="code-block-6" outputclass="language-json" code-type="xCode" class="pre codeblock language-json"><code>{
+    &quot;content&quot;: [
+        {&quot;text&quot;: &quot;Editing instruction, for example: Place the alarm clock from image 1 next to the vase on the dining table in image 2&quot;},
+        {&quot;image&quot;: &quot;https://example.com/image1.png&quot;},
+        {&quot;image&quot;: &quot;https://example.com/image2.png&quot;}
+    ]
+}
+</code></pre>
+<table style="display:table;table-layout:fixed;width:100%"><colgroup><col style="width:25%"/><col style="width:25%"/><col style="width:25%"/><col style="width:25%"/></colgroup><thead><tr><th colspan="2"><p><strong>Input image</strong></p></th><th colspan="2"><p><strong>Output image</strong></p></th></tr></thead><tbody><tr><td style="vertical-align:top"><p><img class="image break" src="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/3509593671/p1025838.webp" alt="image (19)-转换自-png" width="300" height="300"/></p> <p>Image 1</p></td><td style="vertical-align:top"><p><img class="image break" src="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/3509593671/p1025839.webp" alt="image (20)-转换自-png" width="225" height="300"/></p> <p>Image 2</p></td><td style="vertical-align:top"><p><img class="image break" src="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/3509593671/p1021092.webp" alt="04e0fc39-7ad6-41e0-9df9-1f69ac3ce825-转换自-png" width="300" height="300"/></p> <p>Prompt: Move image 1 onto image 2</p></td><td style="vertical-align:top"><p><img class="image break" src="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/3509593671/p1021093.webp" alt="36ed450d-bd54-4169-b13f-3d0f26d9d360-转换自-png" width="300" height="300"/></p> <p>Prompt: Move image 2 onto image 1</p></td></tr></tbody></table>
+<h3 id="image-input-methods">Image input methods <span id="f3dddcc9cc2w0"></span> <span id="c110bdcd2erhh"></span></h3>
+<strong>Public URL</strong>
+<ul>
+<li>You can provide a publicly accessible image URL that supports the HTTP or HTTPS protocol.</li>
+<li>Example value: <code>https://xxxx/img.png</code>.</li>
+</ul>
+<strong>Base64 encoding</strong>
+<p>Convert the image file to a Base64-encoded string and concatenate it in the following format: <code>data:{mime_type};base64,{base64_data}</code>.</p>
+<ul>
+<li><code>{mime_type}</code>: The media type of the image, which must correspond to the file format.</li>
+<li><code>{base64_data}</code>: The Base64-encoded string of the file.</li>
+<li>Example value: <code>data:image/jpeg;base64,GDU7MtCZz...</code> (The example is truncated for demonstration purposes.)</li>
+</ul>
+<p>For complete code examples, see <a href="/help/en/model-studio/qwen-image-edit-api#a3ad9a3b6d9if">Python SDK call</a> and <a href="/help/en/model-studio/qwen-image-edit-api#589b80853e6rn">Call using the Java SDK</a>.</p>
+<h3 id="more-parameters">More parameters <span id="ca14ce5cee6m7"></span> <span id="ac07d69b4ag98"></span></h3>
+<p>Adjust the generation results using the following <strong>optional</strong> parameters:</p>
+<ul>
+<li><strong>n</strong>: Number of output images (default: 1, maximum: 6). The value of n directly affects cost.</li>
+<li><strong>negative_prompt</strong>: Describes content to exclude from the image (such as &quot;blur&quot; or &quot;extra fingers&quot;) to optimize quality. The qwen-image-2.1 series does not support this parameter; describe unwanted elements in the prompt instead.</li>
+<li><strong>size</strong>: Output resolution in <code>width*height</code> format. The qwen-image-3.0 and qwen-image-2.1 series support 512*512 to 2048*2048 (aspect ratio 1:8 to 8:1). If not specified, the model auto-recommends a resolution.</li>
+<li><strong>prompt_extend</strong>: Prompt rewriting (enabled by default). Enable for brief prompts; disable for detailed prompts or latency-sensitive scenarios.</li>
+<li><strong>seed</strong>: Random seed. Using the same value produces relatively stable results.</li>
+<li><strong>watermark</strong>: Whether to add a watermark (disabled by default).</li>
+</ul>
+<p>For a complete list of parameters, see <a href="/help/en/model-studio/qwen-image-edit-api">Qwen-Image-Edit API reference</a>.</p>
+<h2 id="overview">Overview <span id="9cae04c1813pz"></span> <span id="c90a7d9194k2z"></span></h2>
+<h3 id="multi-image-fusion">Multi-image fusion <span id="bf15c676fb8di"></span> <span id="f319c68261oqy"></span></h3>
+<table style="display:table;table-layout:fixed;width:100%"><colgroup><col style="width:25%"/><col style="width:25%"/><col style="width:25%"/><col style="width:25%"/></colgroup><thead><tr><th><p><strong>Input image 1</strong></p></th><th><p><strong>Input image 2</strong></p></th><th><p><strong>Input image 3</strong></p></th><th><p><strong>Output image</strong></p></th></tr></thead><tbody><tr><td style="vertical-align:top"><p><img class="image break" src="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/6844029571/p1011712.webp" alt="image83" width="250"/></p></td><td style="vertical-align:top"><p><img class="image break" src="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/6844029571/p1011753.webp" alt="image103" width="250"/></p></td><td style="vertical-align:top"><p><img class="image break" src="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/4405461671/p1012002.webp" alt="1" width="250"/></p></td><td style="vertical-align:top"><p><img class="image break" src="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/4405461671/p1012004.webp" alt="2" width="250"/></p><p>The girl in Image 1 wears the necklace from Image 2 and carries the bag from Image 3 on her left shoulder.</p></td></tr></tbody></table>
+<h3 id="subject-consistency">Subject consistency <span id="ec1bc82f88x04"></span> <span id="33ac7fee16bml"></span></h3>
+<table style="display:table;table-layout:fixed;width:100%"><colgroup><col style="width:25%"/><col style="width:25%"/><col style="width:25%"/><col style="width:25%"/></colgroup><thead><tr><th><p><strong>Input image</strong></p></th><th><p><strong>Output image 1</strong></p></th><th><p><strong>Output image 2</strong></p></th><th><p><strong>Output image 3</strong></p></th></tr></thead><tbody><tr><td rowspan="2" style="vertical-align:top"><p><img class="image break" src="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/6844029571/p1011789.webp" alt="image5" width="250"/></p></td><td rowspan="2" style="vertical-align:top"><p><img class="image break" src="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/5844029571/p1011790.webp" alt="image4" width="250"/></p><p>Change the image to an ID photo with a blue background. The person is wearing a white shirt, a black suit, and a striped tie.</p></td><td rowspan="2" style="vertical-align:top"><p><img class="image break" src="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/6844029571/p1011791.webp" alt="image6" width="250"/></p><p>The person is wearing a white shirt, a gray suit, and a striped tie. One hand rests on the tie. The background is light-colored.</p></td><td rowspan="2" style="vertical-align:top"><p><img class="image break" src="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/6844029571/p1011792.webp" alt="image7" width="250"/></p><p>The person is wearing a black hoodie with &quot;Qwen Image&quot; in a thick brushstroke font. They are leaning on a guardrail with sunlight in their hair. A bridge and the sea are in the background.</p></td></tr><tr><td rowspan="2" style="vertical-align:top"><p><img class="image break" src="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/5844029571/p1012037.webp" alt="image12" width="250"/></p></td><td rowspan="2" style="vertical-align:top"><p><img class="image break" src="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/5844029571/p1012038.webp" alt="image13" width="250"/></p><p>The air conditioner is placed in a living room next to a sofa.</p></td><td rowspan="2" style="vertical-align:top"><p><img class="image break" src="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/6844029571/p1012039.webp" alt="image14" width="250"/></p><p>Mist is added from the air conditioner&#x27;s vent, extending over the sofa. Green leaves are also added.</p></td><td rowspan="2" style="vertical-align:top"><p><img class="image break" src="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/5844029571/p1012040.webp" alt="image15" width="250"/></p><p>The white handwritten text &quot;Natural Fresh Air Enjoy Breathing&quot; is added at the top.</p></td></tr></tbody></table>
+<h3 id="sketch-creation">Sketch creation <span id="801542a01agqh"></span> <span id="4feadcda55a5u"></span></h3>
+<table style="display:table;table-layout:fixed;width:100%"><colgroup><col style="width:33%"/><col style="width:33%"/><col style="width:33%"/></colgroup><thead><tr><th><p><strong>Input image</strong></p></th><th colspan="2"><p><strong>Output image</strong></p></th></tr></thead><tbody><tr><td style="vertical-align:top"><p><img class="image break" src="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/6844029571/p1011821.webp" alt="image42" width="300"/></p></td><td style="vertical-align:top"><p><img class="image break" src="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/6844029571/p1011822.webp" alt="image43" width="300"/></p><p>Generate an image that matches the detailed shape outlined in Image 1 and follows this description: A young woman smiles on a sunny day. She wears round brown sunglasses with a leopard print frame. Her hair is neatly tied up, she wears pearl earrings, a dark blue scarf with purple star patterns, and a black leather jacket.</p></td><td style="vertical-align:top"><p><img class="image break" src="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/6844029571/p1011824.webp" alt="image44" width="300"/></p><p>Generate an image that matches the detailed shape outlined in Image 1 and follows this description: An elderly man smiles at the camera. His face is wrinkled, his hair is messy in the wind, and he wears round-framed reading glasses. He has a worn-out red scarf with star patterns around his neck and is wearing a cotton-padded jacket.</p></td></tr></tbody></table>
+<h3 id="creative-product-generation">Creative product generation <span id="8fadfa0717t1o"></span> <span id="fddad781bd3dy"></span></h3>
+<table style="display:table;table-layout:fixed;width:100%"><colgroup><col style="width:25%"/><col style="width:25%"/><col style="width:25%"/><col style="width:25%"/></colgroup><thead><tr><th><p><strong>Input image</strong></p></th><th colspan="3"><p><strong>Output image</strong></p></th></tr></thead><tbody><tr><td rowspan="2" style="vertical-align:top"><p><img class="image break" src="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/6844029571/p999719.png" alt="image 1" width="300"/></p></td><td style="vertical-align:top"><p><img class="image break" src="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/5844029571/p1011685.webp" alt="image23" width="300"/></p><p>Make this bear sit under the moon (represented by a light gray crescent outline on a white background), holding a guitar, with small stars and speech bubbles with phrases such as &quot;Be Kind&quot; floating around.</p></td><td style="vertical-align:top"><p><img class="image break" src="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/5844029571/p1011686.webp" alt="image22" width="300"/></p><p>Print this design on a T-shirt and a paper tote bag. A female model is displaying these items. The woman is also wearing a baseball cap with &quot;Be kind&quot; written on it.</p></td><td style="vertical-align:top"><p><img class="image break" src="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/5844029571/p1011687.webp" alt="image21" width="300"/></p><p>A hyper-realistic 1/7 scale character model, designed as a commercial finished product, is placed on a desk with an iMac that has a white keyboard. The model stands on a clean, round, transparent acrylic base with no labels or text. Professional studio lighting highlights the sculpted details. On the iMac screen in the background, the ZBrush modeling process for the same model is displayed. Next to the model, place a packaging box with a transparent window on the front, showing only the clear plastic shell inside. The box is slightly taller than the model and reasonably sized to hold it.</p></td></tr><tr><td style="vertical-align:top"><p><img class="image break" src="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/5844029571/p999632.png" alt="image" width="300"/></p><p>This bear is wearing an astronaut suit and pointing into the distance.</p></td><td style="vertical-align:top"><p><img class="image break" src="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/6844029571/p999633.png" alt="image" width="300"/></p><p>This bear is wearing a gorgeous ball gown, with its arms spread in an elegant dance pose.</p></td><td style="vertical-align:top"><p><img class="image break" src="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/6844029571/p999630.png" alt="image" width="300"/></p><p>This bear is wearing sportswear, holding a basketball, with one leg bent.</p><p></p></td></tr></tbody></table>
+<h3 id="generate-image-from-depth-map">Generate image from depth map <span id="98ef7c1efc1ge"></span> <span id="3fd397ff4fgbf"></span></h3>
+<table style="display:table;table-layout:fixed;width:100%"><colgroup><col style="width:33%"/><col style="width:33%"/><col style="width:33%"/></colgroup><thead><tr><th><p><strong>Input image</strong></p></th><th colspan="2"><p><strong>Output image</strong></p></th></tr></thead><tbody><tr><td style="vertical-align:top"><p><img class="image break" src="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/6844029571/p1011810.webp" alt="image36" width="300"/></p></td><td style="vertical-align:top"><p><img class="image break" src="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/5844029571/p1011811.webp" alt="image37" width="300"/></p><p>Generate an image that matches the depth map outlined in Image 1 and follows this description: A blue bicycle is parked in a side alley, with a few weeds growing from cracks in the stone in the background.</p></td><td style="vertical-align:top"><p><img class="image break" src="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/5844029571/p1011812.webp" alt="image38" width="300"/></p><p>Generate an image that matches the depth map outlined in Image 1 and follows this description: A worn-out red bicycle is parked on a muddy path, with a dense primeval forest in the background.</p></td></tr></tbody></table>
+<h3 id="generate-image-from-keypoints">Generate image from keypoints <span id="ecb13d474al4f"></span> <span id="e362a38799sv5"></span></h3>
+<table style="display:table;table-layout:fixed;width:100%"><colgroup><col style="width:33%"/><col style="width:33%"/><col style="width:33%"/></colgroup><thead><tr><th><p><strong>Input image</strong></p></th><th colspan="2"><p><strong>Output image</strong></p></th></tr></thead><tbody><tr><td style="vertical-align:top"><p><img class="image break" src="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/5844029571/p1011817.webp" alt="image40" width="300"/></p></td><td style="vertical-align:top"><p><img class="image break" src="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/5844029571/p1011818.webp" alt="image41" width="300"/></p><p>Generate an image that matches the human pose outlined in Image 1 and follows this description: A Chinese woman in a Hanfu is holding an oil-paper umbrella in the rain, with a Suzhou garden in the background.</p></td><td style="vertical-align:top"><p><img class="image break" src="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/6844029571/p1011819.webp" alt="image39" width="300"/></p><p>Generate an image that matches the human pose outlined in Image 1 and follows this description: A young man stands on a subway platform. He wears a baseball cap, a T-shirt, and jeans. A train is speeding by behind him.</p></td></tr></tbody></table>
+<h3 id="text-editing">Text editing <span id="4b444a1ae43hz"></span> <span id="ab5f7e9f13c0t"></span></h3>
+<table style="display:table;table-layout:fixed;width:100%"><colgroup><col style="width:25.03%"/><col style="width:25.03%"/><col style="width:25.03%"/><col style="width:24.91%"/></colgroup><thead><tr><th><p><strong>Input image</strong></p></th><th><p><strong>Output image</strong></p></th><th><p><strong>Input image</strong></p></th><th><p><strong>Output image</strong></p></th></tr></thead><tbody><tr><td style="vertical-align:top"><p><img class="image break" src="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/6844029571/p999641.png" alt="image" width="250"/></p></td><td style="vertical-align:top"><p><img class="image break" src="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/6844029571/p999642.png" alt="image" width="250"/></p><p>Replace &#x27;HEALTH INSURANCE&#x27; on the Scrabble tiles with &#x27;<strong>Tomorrow Will Be Better</strong>&#x27;.</p></td><td style="vertical-align:top"><p><img class="image break" src="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/6844029571/p1000039.png" alt="image" width="250"/></p></td><td style="vertical-align:top"><p><img class="image break" src="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/6844029571/p1000062.png" alt="image" width="250"/></p><p>Change the phrase &quot;Take a Breather&quot; on the note to &quot;<strong>Relax and Recharge</strong>&quot;.</p></td></tr></tbody></table>
+<table style="display:table;table-layout:fixed;width:100%"><colgroup><col style="width:25%"/><col style="width:25%"/><col style="width:25%"/><col style="width:25%"/></colgroup><thead><tr><th><p><strong>Input image</strong></p></th><th colspan="3"><p><strong>Output image</strong></p></th></tr></thead><tbody><tr><td rowspan="3" style="vertical-align:top"><p><img class="image break" src="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/5844029571/p1011772.webp" alt="image53"/></p></td><td style="vertical-align:top"><p><img class="image break" src="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/6844029571/p1011774.webp" alt="image45"/></p><p>Change &quot;Qwen-Image&quot; to a black ink-drip font.</p></td><td style="vertical-align:top"><p><img class="image break" src="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/6844029571/p1011775.webp" alt="image46"/></p><p>Change &quot;Qwen-Image&quot; to a black handwriting font.</p></td><td style="vertical-align:top"><p><img class="image break" src="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/6844029571/p1011776.webp" alt="image49"/></p><p>Change &quot;Qwen-Image&quot; to a black pixel font.</p></td></tr><tr><td style="vertical-align:top"><p><img class="image break" src="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/5844029571/p1011777.jpeg" alt="image54"/></p><p>Change &quot;Qwen-Image&quot; to red.</p></td><td style="vertical-align:top"><p><img class="image break" src="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/6844029571/p1011779.jpeg" alt="image57"/></p><p>Change &quot;Qwen-Image&quot; to a blue-purple gradient.</p></td><td style="vertical-align:top"><p><img class="image break" src="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/5844029571/p1011780.jpeg" alt="image59"/></p><p>Change &quot;Qwen-Image&quot; to candy colors.</p></td></tr><tr><td style="vertical-align:top"><p><img class="image break" src="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/6844029571/p1011783.webp" alt="image63"/></p><p>Change the material of &quot;Qwen-Image&quot; to metal.</p></td><td style="vertical-align:top"><p><img class="image break" src="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/6844029571/p1011784.webp" alt="image64"/></p><p>Change the material of &quot;Qwen-Image&quot; to clouds.</p></td><td style="vertical-align:top"><p><img class="image break" src="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/5844029571/p1011786.webp" alt="image67"/></p><p>Change the material of &quot;Qwen-Image&quot; to glass.</p></td></tr></tbody></table>
+<h3 id="add-and-delete">Add and delete <span id="283abbf15eygg"></span> <span id="e1a7cc7da089f"></span></h3>
+<table style="display:table;table-layout:fixed;width:100%"><colgroup><col style="width:20%"/><col style="width:40%"/><col style="width:40%"/></colgroup><thead><tr><th><p><strong>Capability</strong></p></th><th><p><strong>Input image</strong></p></th><th><p><strong>Output image</strong></p></th></tr></thead><tbody><tr><td style="vertical-align:top"><p><strong>Add element</strong></p></td><td style="vertical-align:top"><p><img class="image break" src="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/6844029571/p999647.png" alt="image" width="250"/></p></td><td style="vertical-align:top"><p><img class="image break" src="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/5844029571/p999648.png" alt="image" width="250"/></p><p>Add a small wooden sign in front of the penguin that says &quot;Welcome to Penguin Beach&quot;.</p></td></tr><tr><td style="vertical-align:top"><p><strong>Delete element</strong></p></td><td style="vertical-align:top"><p><img class="image break" src="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/5844029571/p999649.png" alt="image" width="250"/></p></td><td style="vertical-align:top"><p><img class="image break" src="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/6844029571/p999650.png" alt="image" width="250"/></p><p>Remove the hair from the plate.</p></td></tr></tbody></table>
+<h3 id="viewpoint-transformation">Viewpoint transformation <span id="f2dc87f477869"></span> <span id="3698d5e344uvu"></span></h3>
+<table style="display:table;table-layout:fixed;width:100%"><colgroup><col style="width:25%"/><col style="width:25%"/><col style="width:25%"/><col style="width:25%"/></colgroup><thead><tr><th><p><strong>Input image</strong></p></th><th><p><strong>Output image</strong></p></th><th><p><strong>Input image</strong></p></th><th><p><strong>Output image</strong></p></th></tr></thead><tbody><tr><td style="vertical-align:top"><p><img class="image break" src="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/6844029571/p999964.png" alt="image" width="250"/></p></td><td style="vertical-align:top"><p><img class="image break" src="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/5844029571/p999968.png" alt="image" width="250"/></p><p>Get a front view.</p></td><td style="vertical-align:top"><p><img class="image break" src="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/5844029571/p999969.png" alt="image" width="250"/></p></td><td style="vertical-align:top"><p><img class="image break" src="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/6844029571/p999970.png" alt="image" width="250"/></p><p>Face left.</p></td></tr><tr><td style="vertical-align:top"><p><img class="image break" src="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/5844029571/p999974.png" alt="image" width="250"/></p></td><td style="vertical-align:top"><p><img class="image break" src="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/5844029571/p999975.png" alt="image" width="250"/></p><p>Get a rear view.</p></td><td style="vertical-align:top"><p><img class="image break" src="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/6844029571/p999971.png" alt="image" width="250"/></p></td><td style="vertical-align:top"><p><img class="image break" src="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/5844029571/p999972.png" alt="image" width="250"/></p><p>Face right.</p></td></tr></tbody></table>
+<h3 id="old-photo-processing">Old photo processing <span id="6ffb9cd9568z7"></span> <span id="03f071047dvho"></span></h3>
+<table style="display:table;table-layout:fixed;width:100%"><colgroup><col style="width:20.04%"/><col style="width:40.01%"/><col style="width:39.95%"/></colgroup><thead><tr><th><p><strong>Capability</strong></p></th><th><p><strong>Input image</strong></p></th><th><p><strong>Output image</strong></p></th></tr></thead><tbody><tr><td rowspan="2" style="vertical-align:top"><p><strong>Old photo restoration and colorization</strong></p></td><td style="vertical-align:top"><p><img class="image break" src="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/6844029571/p999552.png" alt="image" width="250"/></p></td><td style="vertical-align:top"><p><img class="image break" src="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/6844029571/p999554.png" alt="image" width="250"/></p><p>Restore the old photo, remove scratches, reduce noise, enhance details, high resolution, realistic image, natural skin tone, clear facial features, no distortion.</p></td></tr><tr><td style="vertical-align:top"><p><img class="image break" src="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/5844029571/p1011757.webp" alt="image31" width="250"/></p></td><td style="vertical-align:top"><p><img class="image break" src="https://help-static-aliyun-doc.aliyuncs.com/assets/img/en-US/6844029571/p1011759.webp" alt="image32" width="250"/></p><p>Intelligently colorize the image based on its content to make it more vivid.</p></td></tr></tbody></table>
+<h2 id="api-reference">API reference <span id="5e47636b7ekb5"></span> <span id="eea0c1fcf9qf7"></span></h2>
+<p>See <a href="/help/en/model-studio/qwen-image-edit-api">Qwen-Image Edit</a> for API parameters.</p>
+<h2 id="error-codes">Error codes <span id="OajFO"></span> <span id="3e1e579599soq"></span></h2>
+<p>If the model call fails and returns an error message, see <a href="/help/en/model-studio/error-code">Error codes</a> for resolution.</p>
+<h2 id="faq">FAQ <span id="fe491e0f39tfz"></span> <span id="2d3c365129zh8"></span></h2>
+<h4 id="q-what-languages-does-the-qwen-image-editing-model-support">Q: What languages does the Qwen Image Editing model support? <span id="e70c6f863ecyc"></span> <span id="5eb914c827539"></span></h4>
+<p>A: The model currently supports <strong>Simplified Chinese and English</strong>. You can try other languages, but performance is not guaranteed.</p>
+<h4 id="q-how-do-i-view-model-invocation-metrics">Q: How do I view model invocation metrics? <span id="ae11776b04p4u"></span> <span id="129f7dfb3axu1"></span></h4>
+<p>A: One hour after a model invocation completes, go to the <a href="https://modelstudio.console.alibabacloud.com/model/telemetry"><strong>Monitoring</strong> (Singapore)</a> or <a href="https://modelstudio.console.alibabacloud.com/model/telemetry"><strong>Monitoring</strong> (China (Beijing))</a> page to view metrics such as invocation count and success rate. For more information, see <a href="/help/en/model-studio/bill-query-and-cost-management">Billing and cost management</a>.</p>
+<h4 id="q-how-do-i-get-the-domain-name-whitelist-for-image-storage">Q: How do I get the domain name whitelist for image storage? <span id="5fb153423ct8z"></span> <span id="6b49b1be69q4c"></span></h4>
+<p>A: Images generated by models are stored in OSS. The API returns a temporary public URL. <strong>To configure a firewall whitelist for this download URL</strong>, note the following: The underlying storage may change dynamically. This topic does not provide a fixed OSS domain name whitelist to prevent access issues caused by outdated information. If you have security control requirements, contact your account manager to obtain the latest OSS domain name list.</p>
+<p>See the <a href="/help/en/model-studio/image-faq">Image generation FAQ</a>.</p></div>
+</div>
+</article>
+<script type="text/javascript">
+window.storeDocs = {
+language: '$lang',
+docGithubLink: '$!githubInfo.url'
+}
+</script>
+<div class="nav-footer">
+ </div>
+<div class="alicloud-document-ask clearfix"></div>
+<div class="feedback-message" style="display:none;">
+<span class="hasfeedback acon acon-done-16"></span>
+Thank you! We've received your  feedback.
+</div>
+</div>
+<div class="col-log-2 col-md-2 col-sm-0 col-xs-0 nav-catalog">
+<div class="article-catalog" id="articleCatalog"></div>
+</div>
+</div>
+</section>
+</div>
+</div>
+</div>
+<script
+crossorigin
+src="https://g.alicdn.com/code/lib/??react/16.8.6/umd/react.production.min.js,react-dom/16.8.6/umd/react-dom.production.min.js"
+></script>
+<script
+src="https://g.alicdn.com/code/lib/lodash.js/4.17.21/lodash.min.js"
+crossorigin="anonymous"
+></script>
+<script src="//g.alicdn.com/aliyun-help/help-portal-fe/0.12.65/js/vendor.js"></script>
+<script src="//g.alicdn.com/aliyun-help/help-portal-fe/0.12.65/js/index.js"></script>
+<script defer src="https://cloud-assets.alicdn.com/alicdn/dawn/user-tracker/latest/js/index.js"></script>
+</body>
+</html>

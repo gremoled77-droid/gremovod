@@ -1,0 +1,23 @@
+{
+  "asset_id": "7d2415bd39174fc6a416544a6f12dd12",
+  "source_project_id": "7cc54697-b80f-418c-b99f-39ffc3ed3593",
+  "source_job_id": "import-7d2415bd39174fc6a416544a6f12dd12",
+  "metadata": {
+    "format": "PNG",
+    "width": 1086,
+    "height": 1448,
+    "kind": "image",
+    "provider": "local_import",
+    "original_name": "Изображение ChatGPT 15 окт. 2026 г., 05_16_38.png",
+    "sha256": "a37a57ae9dae7c52d481a58562cb756e953c7820be16ae23e7b1cc91ecb51bc0",
+    "role": "user_reference",
+    "request": {
+      "payload": {
+        "task_type": "local-reference",
+        "input": {
+          "prompt": ""
+        }
+      }
+    }
+  }
+}

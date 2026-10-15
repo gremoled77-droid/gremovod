@@ -1,0 +1,260 @@
+BytePlus
+ModelArk
+Document
+Coding Plan
+API reference
+Resources
+AI Suite
+ModelArk
+ModelArk
+API reference
+Search
+Prerequisites
+Obtain and configure an API key
+Install and upgrade SDK
+Base URL and authentication
+Chat API
+Chat API
+Responses API
+Create a model response
+Retrieve a model response
+Retrieve response context
+Delete a model response
+The response object
+Streaming response
+Messages API
+Create message
+Count tokens for Messages requests
+Files API
+Upload file
+Retrieve file
+List files
+Delete file
+The file object
+Video generation API
+Create a video generation task
+Retrieve a video generation task
+List video generation tasks
+Cancel or delete a video generation task
+Image generation API
+Image generation API
+Streaming response
+3D generation API
+Hyper3D API
+Create a 3D generation task
+Retrieve a 3D generation task
+List 3D generation tasks
+Cancel or delete a 3D generation task
+Hitem3d API
+Create a 3D generation task
+Retrieve a 3D generation task
+List 3D generation tasks
+Cancel or delete a 3D generation task
+Embedding API
+Multimodal Vectorization API
+Context caching API
+Create context caching API
+Context caching conversation API
+Managed Agents API
+Agents
+Create agent
+List agents
+Get agent
+Update agent
+Delete agent
+List agent versions
+Environments
+Create environment
+List environments
+Get environment
+Update environment
+Delete environment
+Self-hosted worker
+Long-poll for work
+Acknowledge work
+List work items
+Get a work item
+Renew work lease
+Stop work
+Get work queue statistics
+Sessions
+Create session
+List sessions
+Get session
+Update session
+Upgrade session
+Delete session
+Session events
+Send session event
+List session events
+Stream session events
+Session event schema reference
+Session resources
+Add session resource
+List session resources
+Get session resource
+Session threads
+List threads
+Get thread
+List thread events
+Stream thread events
+Vaults
+Create vault
+List vaults
+Get vault
+Update vault
+Delete vault
+Credentials
+Create credential
+List credentials
+Get credential
+Update credential
+Delete credential
+Validate MCP OAuth credential
+Memory Stores
+Create memory store
+List memory stores
+Get memory store
+Update memory store
+Delete memory store
+Memories
+Create memory
+Batch create memories
+List memories
+Get memory
+Update memory
+Delete memory
+Dreams
+Create dream
+List dreams
+Retrieve dream
+Cancel dream
+Skills
+Create skill
+List skills
+Get skill
+Set skill content protection
+Delete skill
+Create new skill version
+List skill versions
+Retrieve skill of specified version
+Delete specified version of skill
+Download skill of specified version
+Scan GitHub skills
+Import GitHub skills
+Application (Bot) API
+Application (Bot) API
+Batch inference API
+Batch API (Chat)
+Batch inference API (Job)
+CreateBatchInferenceJob
+ListBatchInferenceJobs
+GetBatchInferenceJob
+UpdateBatchInferenceJob
+DeleteBatchInferenceJob
+StopBatchInferenceJob
+Control plane API
+Manage inference endpoints
+StartEndpoint
+StopEndpoint
+ListEndpoints
+GetEndpoint
+DeleteEndpoint
+UpdateEndpoint
+Create an inference endpoint
+GetEndpointCertificate
+CreateEndpointRolling - Create an inference endpoint rolling upgrade task
+GetEndpointRolling - Query inference endpoint rolling upgrade details
+RollbackEndpointRolling - Roll back inference endpoint rolling upgrade
+CancelEndpointRolling - Cancel inference endpoint rolling upgrade
+Manage API keys
+GetApiKey
+Manage foundation model
+ListFoundationModelVersions
+GetFoundationModelVersion
+ListFoundationModels
+GetFoundationModel
+GetFoundationModelVersionConfiguration
+Security audit
+Retrieve Security audit logs
+GetArkOfficialResult - Obtain ModelArk artifact verification result
+CreateArkOfficialResultQuery - Create a ModelArk artifact verification query
+Manage model usage
+Query inference usage
+Create a usage record export task
+Query a usage record export task
+Query model inference limits
+Enable model inference limits
+Disable model inference limits
+Model activation
+ActivateModels - Batch activation of foundation models
+EnableAutoModelActivation - Enable automatic activation of new models
+DisableAutoModelActivation - Turn off automatic activation of new models
+GetModelActivation - Query model activation details
+ListModelActivations - List activated models
+Case report API
+CasePlatformV1BadcaseReport - BytePlus ModelArk Seedance 2.x Generations Quality Diagnostics API
+CasePlatformV1BadcaseQuery — BytePlus ModelArk Seedance 2.x Generations Quality Diagnostics Result Query API
+Others
+Compatible with OpenAI API
+Best practices for backward compatibility
+Error codes
+Common SDK usage examples
+Tokenization API
+Tokenization API
+Home
+ModelArk
+Image generation API
+Image generation API
+Copy Page
+Image generation API
+Image generation API
+Copy Page
+Image generation API
+Feedback
+Last updated:
+October 13, 2026 09:43:11
+Was this page helpful to you?
+Yes
+Yes
+No
+No
+Products and solutions
+See all products
+Pricing
+Developers
+Documentation
+API Explorer
+SDK
+BytePlus Discord Community
+Learn and build
+BytePlus Free Tier
+AI Startups Accelerator
+BytePlus Concepts
+Customer success
+BytePlus Academy
+Blog
+Insights
+Connect
+Partner Central
+Partner Network
+Events & webinars
+Company
+About us
+Trust center
+Careers
+Engage and support
+Contact sales
+Contact support
+Become a Partner
+Join Affiliate Program
+Report abuse
+Sitemap
+English
+© 2026 BytePlus Pte Ltd.
+Terms of Service
+•
+Privacy Policy
+•
+The AI-native enterprise partner from
+English

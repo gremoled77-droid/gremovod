@@ -1,0 +1,652 @@
+Seedream 5 - Seedream API - PiAPI docs
+PiAPI
+Home
+Workspace
+Home
+Workspace
+Seedream
+Copy Page
+Get Started
+Overview
+Quickstart
+Make Instruction: How to Use PiAPI to Build a Workflow on Make?
+Endpoints
+Seedance
+Less-Restriction Models Guide
+Private Asset Library
+Seedance 2.5
+Seedance 2
+Video Watermark Remover
+Get task
+Seedream
+Seedream 5
+POST
+Get Task
+GET
+Byteaudio
+Seed-audio
+Get Task
+Kling
+Lipsync With PiAPI Kling API Examples
+Motion Brush With PiAPI Kling API Example
+Kling Elements Video Generation API
+Kling Effects Video Generation
+Cancel Task
+Cancel Task
+Cancel Tasks
+Get Task
+Create Task
+Kling Virtual Try-On
+Kling Effects
+Kling Sound
+Kling Avatar
+Kling Motion Control
+Kling Turbo
+Kling 3.0
+Kling omni
+Kling o1
+Kling 3.0 omni
+Get Task
+Minimax
+Generate Video
+Get Task
+Sora2
+Sora2-preview Text to Video
+Sora2 Text to Video
+Sora2-Pro Text to Video
+Sora2 Remove Watermark
+Get task
+Tools
+File Upload API
+Remove Background API
+Remove Background-Get Task
+Segment With Prompt API
+Segment With Prompt API-Get Task
+Image Upscale(Super Resolution) API
+Image Upscale-Get Task
+Video Upscale
+Video Upscale-Get Task
+Video Remove Background
+Video Remove Background-Get task
+Skin Tokens
+Skin Tokens-Get task
+Gemini
+Gemini-2.5-flash-image
+Nano Banana Pro
+Nano Banana 2
+Get task
+GPT image
+GPT-image API
+LLM
+How To Avoid Timeouts in Completion API
+LLM API | Basic Completions
+Omni Human
+OmniHuman 1.5
+Get task
+Flux
+Flux with LoRA and Controlnet
+Available LoRA and Controlnet
+Flux API with Redux Variation, Fill, Inpaint and Outpaint
+Create Task
+Text to Image
+Image to Image
+Kontext
+Get task
+Qwen Image
+Text to Image
+Image Edit
+Get task
+Z-Image
+Text to Image
+Get task
+Faceswap
+Multi Faceswap
+Image Faceswap
+Video Faceswap
+Get Task
+WanX
+Generate WanX Task with LoRA Using PiAPI
+Available LoRA Types for Wanx
+Use Cases for Wanx LoRA
+Use Cases for Wanx Control Camera
+Create Task
+Get Task
+Wan
+Wan2.6 Text to Video
+Wan2.6 Image to Video
+Get task
+Hailuo
+Generate Video
+Get Task
+Veo3
+Veo3 Text to Video
+Veo3 Image to Video
+Veo3.1 Text to Video
+Veo3.1 Image to Video
+Get task
+Skyreels
+Create Task
+Get Task
+Framepack
+Create Task
+Get Task
+Hunyuan Video
+How to Make a Hunyuan API Call
+Available Hunyuan Lora models
+Get Task
+Generate Video
+Luma Dream Machine
+Create Task
+Get Task
+Suno(service stopped)
+Music(service stopped)
+Lyrics(service stopped)
+Get task
+Song(Udio)
+Song API Task Creation Examples
+[Udio] Song Extend
+Get Task
+Create Task
+[Udio] Generate Lyrics
+Mmaudio
+Get Task
+Generate Audio
+DiffRhythm
+Generate Audio
+Get Task
+Ace Step
+Create Task
+Text to Audio
+Audio to Audio
+Audio Edit
+Audio Extend
+Get Task
+TTS
+Zeroshot Text-to-Speech F5-TTS
+Get Task
+Trellis
+Trellis Create Task
+Trellis2 Create Task
+Get Task
+Meshy
+Meshy Create Task
+Get Task
+Pixal3D
+Pixal3D Create Task
+Get Task
+Joycaption
+Image Caption
+Get Task
+Midjourney
+PiAPI Penalties on Midjourney Usage
+Detailed Explaination on Midjourney Task Result
+Midjourney V7 API Instructions
+Create Task
+Imagine
+Upscale
+Variation
+Reroll
+Describe
+Seed
+Blend
+Inpaint
+Outpaint
+Pan
+Cancel Task
+Cancel Task
+Cancel Tasks
+Get Task
+AI Hug
+Get Task
+Create Task
+PiAPI Account Management
+PiAPI Account Info
+Task List Info
+User Task History
+Resources
+Change Log
+Output Storage
+Unified API Schema
+Webhook
+Bulk Generation Service
+Billings
+PiAPI MCP Server
+Workspace Manual
+Host-your-account (HYA) | Back-up Account
+Host-your-account (HYA) | Debug Checklist
+Host-your-account (HYA) | Connected Account Status
+Announcements
+PiAPI 2025 January 1st Pricing Update
+The discontinued support for midjourney
+Sunsetting Suno
+Schemas
+Schemas
+motion brush
+Create Task
+camera control
+Cancel Params
+Float2 Point
+Control Points
+txt2video-1.3b
+txt2video-14b
+txt2video-14b-lora
+img2video-14b
+img2video-14b-lora
+img2video-14b-keyframe
+img2video-14b-control-camera
+wan22-txt2video-14b
+wan22-img2video-14b
+hunyuan-txt2video-lora
+Trellis API/text-to-3D
+Trellis API/image-to-3D
+Trellis2 API/image-to-3D
+Kling omni multi shot
+VideoGenerationRequest
+TaskRequest
+TaskConfig
+TaskInput
+TaskResponse
+ErrorResponse
+Response
+Unified-Task-Response
+RequestBodies
+Unified-Task-Request-Body
+config
+control_net_setting
+lora_setting
+VideoGenerationResponse
+Pixal3D API/image-to-3D
+Seedream
+Copy Page
+Seedream 5
+POST
+https://api.piapi.ai
+/api/v1/task
+Try it
+Overview
+#
+Seedream 5.0 provides high-quality image generation from text prompts, with optional image references for editing. Tasks are delivered synchronously (no polling required).
+Currently available models
+#
+Model
+Tier
+Content moderation
+Sizes
+seedream-5-lite
+Lite
+Strict
+2K (default), 3K
+seedream-5-lite-less-restriction
+Lite
+Less restrictive
+2K (default), 3K
+seedream-5-pro
+Pro
+Strict
+1K (default), 2K
+seedream-5-pro-less-restriction
+Pro
+Less restrictive
+1K (default), 2K
+The
+-less-restriction
+variants apply a more permissive content review. They accept exactly the same input schema as the strict models but bill at a +25% markup. See Content Moderation below.
+Pricing
+#
+Model
+1K
+2K
+3K
+seedream-5-lite
+—
+$0.052
+$0.052
+seedream-5-lite-less-restriction
+—
+$0.065
+$0.065
+seedream-5-pro
+$0.068
+$0.136
+—
+seedream-5-pro-less-restriction
+$0.085
+$0.17
+—
+Lite is flat-priced: 2K and 3K cost the same within the same moderation tier.
+The
+-less-restriction
+variants are priced at a
++25% markup
+over the strict variant at the same size.
+Pro reference image surcharge
+: the first reference image is free; each additional reference image adds **
+0.006). Lite has no reference image surcharge.
+Parameters
+#
+size
+#
+Controls output resolution.
+Lite models:
+2K
+(default) or
+3K
+.
+Pro models:
+1K
+(default) or
+2K
+. Pro 2K renders at roughly twice the pixel dimensions of 1K (e.g. 16:9 → 2560x1440 vs 1312x736).
+aspect_ratio
+#
+Supported ratios:
+1:1
+,
+16:9
+,
+9:16
+,
+4:3
+,
+3:4
+,
+3:2
+,
+2:3
+,
+4:5
+,
+5:4
+,
+21:9
+. Default:
+1:1
+.
+The upstream API does not accept an
+aspect_ratio
+field directly; this engine encodes the requested ratio into the pixel dimensions sent upstream.
+output_format
+#
+Output image format. Accepted values:
+jpeg
+(default),
+png
+,
+webp
+.
+image_urls
+#
+Optional. Provide up to 10 image URLs to use as references for editing / style transfer. Use publicly accessible URLs (CDN or cloud storage); signed/expiring URLs may fail.
+For Pro models, the first reference image is free and each additional image adds $0.003 (see Pricing).
+sequential_image_generation (advanced, Lite only)
+#
+disabled
+(default) or
+auto
+. When
+auto
+, supply
+max_images
+(1–15) to control batch size; the model will return multiple related images in a single request.
+Not supported on Pro models
+— these fields are ignored for
+seedream-5-pro
+and
+seedream-5-pro-less-restriction
+.
+Content moderation
+#
+All models apply content moderation. Submissions found to contain disallowed content are rejected and your credits are refunded.
+Strict models
+apply our standard content review.
+-less-restriction
+models
+apply a more permissive content review. A rejection is final and is not retried — your credits are refunded and the task ends with a content-violation error.
+Response
+#
+Seedream is delivered synchronously. The response contains the generated image URLs directly — no polling is required.
+Tips
+#
+Use publicly accessible URLs for any reference images.
+For higher resolutions (Lite 3K, Pro 2K), expect slightly longer generation times.
+The output is one or more images (not video).
+Request
+Header Params
+Generate Code
+Body Params
+application/json
+Generate Code
+Examples
+text to image
+image edit
+pro text to image
+{
+"model"
+:
+"seedream"
+,
+"task_type"
+:
+"seedream-5-lite"
+,
+"input"
+:
+{
+"prompt"
+:
+"A golden retriever playing in a field of sunflowers at sunset"
+,
+"aspect_ratio"
+:
+"16:9"
+,
+"output_format"
+:
+"png"
+,
+"size"
+:
+"2K"
+}
+}
+Request Code Samples
+Shell
+JavaScript
+Java
+Swift
+Go
+PHP
+Python
+HTTP
+C
+C#
+Objective-C
+Ruby
+OCaml
+Dart
+R
+Request
+Request Example
+Shell
+JavaScript
+Java
+Swift
+cURL
+text to image
+image edit
+pro text to image
+curl
+--location
+'https://api.piapi.ai/api/v1/task'
+\
+--header
+'X-API-Key;'
+\
+--header
+'Content-Type: application/json'
+\
+--data
+'{
+    "model": "seedream",
+    "task_type": "seedream-5-lite",
+    "input": {
+        "prompt": "A golden retriever playing in a field of sunflowers at sunset",
+        "aspect_ratio": "16:9",
+        "output_format": "png",
+        "size": "2K"
+    }
+}'
+Responses
+🟢
+200
+application/json
+Generate Code
+Body
+application/json
+Generate Code
+Example
+{
+"code"
+:
+200
+,
+"data"
+:
+{
+"task_id"
+:
+"a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+,
+"model"
+:
+"seedream"
+,
+"task_type"
+:
+"seedream-5-lite"
+,
+"status"
+:
+"pending"
+,
+"config"
+:
+{
+"service_mode"
+:
+""
+,
+"webhook_config"
+:
+{
+"endpoint"
+:
+""
+,
+"secret"
+:
+""
+}
+}
+,
+"input"
+:
+{
+"prompt"
+:
+"A golden retriever playing in a field of sunflowers at sunset"
+,
+"aspect_ratio"
+:
+"16:9"
+,
+"output_format"
+:
+"png"
+,
+"size"
+:
+"2K"
+}
+,
+"output"
+:
+null
+,
+"meta"
+:
+{
+"created_at"
+:
+"2026-03-16T10:00:00.000000000Z"
+,
+"started_at"
+:
+"0001-01-01T00:00:00Z"
+,
+"ended_at"
+:
+"0001-01-01T00:00:00Z"
+,
+"usage"
+:
+{
+"type"
+:
+"point"
+,
+"frozen"
+:
+0
+,
+"consume"
+:
+520000
+}
+,
+"is_using_private_pool"
+:
+false
+}
+,
+"detail"
+:
+null
+,
+"logs"
+:
+[
+]
+,
+"error"
+:
+{
+"code"
+:
+0
+,
+"raw_message"
+:
+""
+,
+"message"
+:
+""
+,
+"detail"
+:
+null
+}
+}
+,
+"message"
+:
+"success"
+}
+Modified at
+2026-07-09 03:04:10
+Previous
+Get task
+Next
+Get Task
+LLMs.txt

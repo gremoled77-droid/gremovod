@@ -1,0 +1,24 @@
+{
+  "asset_id": "de12fbf6622a4e59a2b548db99b4450c",
+  "source_project_id": "7cc54697-b80f-418c-b99f-39ffc3ed3593",
+  "source_job_id": "247d6324-752c-4e96-8635-65ee206bdd26",
+  "metadata": {
+    "request": {
+      "payload": {
+        "input": {
+          "aspect_ratio": "16:9",
+          "output_format": "png",
+          "prompt": "A cinematic still of a quiet Minsk street at blue hour after rain, recognizable stylized Belarusian urban architecture, warm amber streetlights reflected on wet pavement, deep blue shadows, premium tactile 3D animated feature film style, carefully composed wide shot, rich materials, soft atmospheric depth, no people, no cars, no text, no logos, no watermark.",
+          "size": "2K"
+        },
+        "model": "seedream",
+        "task_type": "seedream-5-lite"
+      },
+      "project_id": "7cc54697-b80f-418c-b99f-39ffc3ed3593"
+    },
+    "provider": "piapi",
+    "format": "PNG",
+    "width": 2560,
+    "height": 1440
+  }
+}

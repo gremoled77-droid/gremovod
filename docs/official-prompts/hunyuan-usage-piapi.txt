@@ -1,0 +1,478 @@
+Hunyuan Video API Guide - PiAPI docs
+PiAPI
+Home
+Workspace
+Home
+Workspace
+Hunyuan Video
+Copy Page
+Get Started
+Overview
+Quickstart
+Make Instruction: How to Use PiAPI to Build a Workflow on Make?
+Endpoints
+Seedance
+Less-Restriction Models Guide
+Private Asset Library
+Seedance 2.5
+Seedance 2
+Video Watermark Remover
+Get task
+Seedream
+Seedream 5
+Get Task
+Byteaudio
+Seed-audio
+Get Task
+Kling
+Lipsync With PiAPI Kling API Examples
+Motion Brush With PiAPI Kling API Example
+Kling Elements Video Generation API
+Kling Effects Video Generation
+Cancel Task
+Cancel Task
+Cancel Tasks
+Get Task
+Create Task
+Kling Virtual Try-On
+Kling Effects
+Kling Sound
+Kling Avatar
+Kling Motion Control
+Kling Turbo
+Kling 3.0
+Kling omni
+Kling o1
+Kling 3.0 omni
+Get Task
+Minimax
+Generate Video
+Get Task
+Sora2
+Sora2-preview Text to Video
+Sora2 Text to Video
+Sora2-Pro Text to Video
+Sora2 Remove Watermark
+Get task
+Tools
+File Upload API
+Remove Background API
+Remove Background-Get Task
+Segment With Prompt API
+Segment With Prompt API-Get Task
+Image Upscale(Super Resolution) API
+Image Upscale-Get Task
+Video Upscale
+Video Upscale-Get Task
+Video Remove Background
+Video Remove Background-Get task
+Skin Tokens
+Skin Tokens-Get task
+Gemini
+Gemini-2.5-flash-image
+Nano Banana Pro
+Nano Banana 2
+Get task
+GPT image
+GPT-image API
+LLM
+How To Avoid Timeouts in Completion API
+LLM API | Basic Completions
+Omni Human
+OmniHuman 1.5
+Get task
+Flux
+Flux with LoRA and Controlnet
+Available LoRA and Controlnet
+Flux API with Redux Variation, Fill, Inpaint and Outpaint
+Create Task
+Text to Image
+Image to Image
+Kontext
+Get task
+Qwen Image
+Text to Image
+Image Edit
+Get task
+Z-Image
+Text to Image
+Get task
+Faceswap
+Multi Faceswap
+Image Faceswap
+Video Faceswap
+Get Task
+WanX
+Generate WanX Task with LoRA Using PiAPI
+Available LoRA Types for Wanx
+Use Cases for Wanx LoRA
+Use Cases for Wanx Control Camera
+Create Task
+Get Task
+Wan
+Wan2.6 Text to Video
+Wan2.6 Image to Video
+Get task
+Hailuo
+Generate Video
+Get Task
+Veo3
+Veo3 Text to Video
+Veo3 Image to Video
+Veo3.1 Text to Video
+Veo3.1 Image to Video
+Get task
+Skyreels
+Create Task
+Get Task
+Framepack
+Create Task
+Get Task
+Hunyuan Video
+How to Make a Hunyuan API Call
+Available Hunyuan Lora models
+Get Task
+GET
+Generate Video
+POST
+Luma Dream Machine
+Create Task
+Get Task
+Suno(service stopped)
+Music(service stopped)
+Lyrics(service stopped)
+Get task
+Song(Udio)
+Song API Task Creation Examples
+[Udio] Song Extend
+Get Task
+Create Task
+[Udio] Generate Lyrics
+Mmaudio
+Get Task
+Generate Audio
+DiffRhythm
+Generate Audio
+Get Task
+Ace Step
+Create Task
+Text to Audio
+Audio to Audio
+Audio Edit
+Audio Extend
+Get Task
+TTS
+Zeroshot Text-to-Speech F5-TTS
+Get Task
+Trellis
+Trellis Create Task
+Trellis2 Create Task
+Get Task
+Meshy
+Meshy Create Task
+Get Task
+Pixal3D
+Pixal3D Create Task
+Get Task
+Joycaption
+Image Caption
+Get Task
+Midjourney
+PiAPI Penalties on Midjourney Usage
+Detailed Explaination on Midjourney Task Result
+Midjourney V7 API Instructions
+Create Task
+Imagine
+Upscale
+Variation
+Reroll
+Describe
+Seed
+Blend
+Inpaint
+Outpaint
+Pan
+Cancel Task
+Cancel Task
+Cancel Tasks
+Get Task
+AI Hug
+Get Task
+Create Task
+PiAPI Account Management
+PiAPI Account Info
+Task List Info
+User Task History
+Resources
+Change Log
+Output Storage
+Unified API Schema
+Webhook
+Bulk Generation Service
+Billings
+PiAPI MCP Server
+Workspace Manual
+Host-your-account (HYA) | Back-up Account
+Host-your-account (HYA) | Debug Checklist
+Host-your-account (HYA) | Connected Account Status
+Announcements
+PiAPI 2025 January 1st Pricing Update
+The discontinued support for midjourney
+Sunsetting Suno
+Schemas
+Schemas
+motion brush
+Create Task
+camera control
+Cancel Params
+Float2 Point
+Control Points
+txt2video-1.3b
+txt2video-14b
+txt2video-14b-lora
+img2video-14b
+img2video-14b-lora
+img2video-14b-keyframe
+img2video-14b-control-camera
+wan22-txt2video-14b
+wan22-img2video-14b
+hunyuan-txt2video-lora
+Trellis API/text-to-3D
+Trellis API/image-to-3D
+Trellis2 API/image-to-3D
+Kling omni multi shot
+VideoGenerationRequest
+TaskRequest
+TaskConfig
+TaskInput
+TaskResponse
+ErrorResponse
+Response
+Unified-Task-Response
+RequestBodies
+Unified-Task-Request-Body
+config
+control_net_setting
+lora_setting
+VideoGenerationResponse
+Pixal3D API/image-to-3D
+Hunyuan Video
+Copy Page
+How to Make a Hunyuan API Call
+Hey guys! In order to help users create task with Hunyuan API more fluently, here I would like to give some examples to demonstrate how to choose each task type based on you need and make a perfect API call.
+Here we go!
+hunyuan-txt2video
+#
+{
+"model"
+:
+"Qubico/hunyuan"
+,
+"task_type"
+:
+"txt2video"
+,
+"input"
+:
+{
+"prompt"
+:
+"A cat walks on the grass, realistic style."
+}
+,
+"config"
+:
+{
+"webhook_config"
+:
+{
+"endpoint"
+:
+""
+,
+"secret"
+:
+""
+}
+}
+}
+hunyuan-txt2video-lora
+#
+{
+"model"
+:
+"Qubico/hunyuan"
+,
+"task_type"
+:
+"txt2video-lora"
+,
+"input"
+:
+{
+"prompt"
+:
+"A cat walks on the grass, anime style."
+,
+"lora_settings"
+:
+[
+{
+"lora_type"
+:
+"anime"
+，
+"lora_strength"
+:
+1.0
+}
+]
+}
+,
+"config"
+:
+{
+"webhook_config"
+:
+{
+"endpoint"
+:
+""
+,
+"secret"
+:
+""
+}
+}
+}
+hunyuan-fastvideo-txt2video
+#
+{
+"model"
+:
+"Qubico/hunyuan"
+,
+"task_type"
+:
+"fast-txt2video"
+,
+"input"
+:
+{
+"prompt"
+:
+"A cat walks on the grass, realistic style."
+}
+,
+"config"
+:
+{
+"webhook_config"
+:
+{
+"endpoint"
+:
+""
+,
+"secret"
+:
+""
+}
+}
+}
+hunyuan-img2video-concat
+#
+{
+"model"
+:
+"Qubico/hunyuan"
+,
+"task_type"
+:
+"img2video-concat"
+,
+"input"
+:
+{
+"image"
+:
+"https://i.ibb.co/5g8hj28f/hug.webp"
+,
+"prompt"
+:
+"Describe a heartfelt scenario where one person expresses affection through warm embrace to the other, highlighting the emotional warmth and intimacy shared in that moment."
+,
+"aspect_ratio"
+:
+"1:1"
+}
+,
+"config"
+:
+{
+"webhook_config"
+:
+{
+"endpoint"
+:
+""
+,
+"secret"
+:
+""
+}
+}
+}
+hunyuan-img2video-replace
+#
+{
+"model"
+:
+"Qubico/hunyuan"
+,
+"task_type"
+:
+"img2video-replace"
+,
+"input"
+:
+{
+"image"
+:
+"https://i.ibb.co/5g8hj28f/hug.webp"
+,
+"prompt"
+:
+"Describe a heartfelt scenario where one person expresses affection through warm embrace to the other, highlighting the emotional warmth and intimacy shared in that moment."
+,
+"aspect_ratio"
+:
+"1:1"
+}
+,
+"config"
+:
+{
+"webhook_config"
+:
+{
+"endpoint"
+:
+""
+,
+"secret"
+:
+""
+}
+}
+}
+And you could check the specific parameter meaning in
+POST
+and generate a task based on example provided above.
+Modified at
+2025-04-10 08:07:01
+Previous
+Get Task
+Next
+Available Hunyuan Lora models
+LLMs.txt

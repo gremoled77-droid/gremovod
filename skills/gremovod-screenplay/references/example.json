@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "revision": 1,
+  "production_id": null,
+  "series_node_id": null,
+  "title": "Пример структуры — встреча гостя",
+  "source_text": "Сцена 1. Грэм приветствует гостя в салоне. Грэм: Куда едем?\nСцена 2. Машина стоит у места назначения. Гость: Спасибо за поездку.",
+  "scenes": [
+    {
+      "key": "scene-arrival",
+      "node_id": null,
+      "number": 1,
+      "title": "Встреча в салоне",
+      "characters": [
+        {"key": "grem", "character_id": null, "name": "Грэм"},
+        {"key": "guest", "character_id": null, "name": "Гость"}
+      ],
+      "background": {"location_node_id": null, "name": "Утверждённый салон", "reference_asset_ids": []},
+      "time_and_light": "По выбранному референсу",
+      "action": "Грэм приветствует гостя в салоне.",
+      "dialogue": [{"speaker_key": "grem", "text": "Куда едем?", "delivery": "in_scene"}],
+      "shots": [
+        {
+          "key": "shot-grem-greeting", "node_id": null, "number": 1,
+          "title": "Приветствие Грэма", "action": "Грэм произносит приветственную реплику.",
+          "framing": "Средний план водителя; положение руля по референсу",
+          "visible_character_keys": ["grem"], "reference_asset_ids": [],
+          "image_prompt": null, "video_prompt": null,
+          "animation_intent": "Небольшая естественная мимика во время реплики, камера закреплена относительно салона.",
+          "selected_image_asset_id": null, "selected_video_asset_id": null
+        }
+      ]
+    },
+    {
+      "key": "scene-destination", "node_id": null, "number": 2,
+      "title": "У места назначения",
+      "characters": [{"key": "guest", "character_id": null, "name": "Гость"}],
+      "background": {"location_node_id": null, "name": "Тот же салон у места назначения", "reference_asset_ids": []},
+      "time_and_light": "Согласовать с предыдущей сценой",
+      "action": "Машина стоит. Гость благодарит за поездку.",
+      "dialogue": [{"speaker_key": "guest", "text": "Спасибо за поездку.", "delivery": "in_scene"}],
+      "shots": [
+        {
+          "key": "shot-guest-farewell", "node_id": null, "number": 1,
+          "title": "Благодарность гостя", "action": "Гость произносит заключительную реплику.",
+          "framing": "Средний план гостя с сохранением выбранного места в салоне",
+          "visible_character_keys": ["guest"], "reference_asset_ids": [],
+          "image_prompt": null, "video_prompt": null,
+          "animation_intent": "Мягкая улыбка; камера неподвижна, автомобиль стоит.",
+          "selected_image_asset_id": null, "selected_video_asset_id": null
+        }
+      ]
+    }
+  ],
+  "unresolved": [
+    {"path": "production_id", "reason": "Выбрать существующий GremoVOD и серию; это демонстрационный документ."},
+    {"path": "scenes", "reason": "Сопоставить персонажей и салон с библиотекой, выбрать рассадку и референсы; финальные промпты ещё не подготовлены."}
+  ]
+}

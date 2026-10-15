@@ -1,0 +1,492 @@
+Generate Video - Hunyuan Video API - PiAPI docs
+PiAPI
+Home
+Workspace
+Home
+Workspace
+Hunyuan Video
+Copy Page
+Get Started
+Overview
+Quickstart
+Make Instruction: How to Use PiAPI to Build a Workflow on Make?
+Endpoints
+Seedance
+Less-Restriction Models Guide
+Private Asset Library
+Seedance 2.5
+Seedance 2
+Video Watermark Remover
+Get task
+Seedream
+Seedream 5
+Get Task
+Byteaudio
+Seed-audio
+Get Task
+Kling
+Lipsync With PiAPI Kling API Examples
+Motion Brush With PiAPI Kling API Example
+Kling Elements Video Generation API
+Kling Effects Video Generation
+Cancel Task
+Cancel Task
+Cancel Tasks
+Get Task
+Create Task
+Kling Virtual Try-On
+Kling Effects
+Kling Sound
+Kling Avatar
+Kling Motion Control
+Kling Turbo
+Kling 3.0
+Kling omni
+Kling o1
+Kling 3.0 omni
+Get Task
+Minimax
+Generate Video
+Get Task
+Sora2
+Sora2-preview Text to Video
+Sora2 Text to Video
+Sora2-Pro Text to Video
+Sora2 Remove Watermark
+Get task
+Tools
+File Upload API
+Remove Background API
+Remove Background-Get Task
+Segment With Prompt API
+Segment With Prompt API-Get Task
+Image Upscale(Super Resolution) API
+Image Upscale-Get Task
+Video Upscale
+Video Upscale-Get Task
+Video Remove Background
+Video Remove Background-Get task
+Skin Tokens
+Skin Tokens-Get task
+Gemini
+Gemini-2.5-flash-image
+Nano Banana Pro
+Nano Banana 2
+Get task
+GPT image
+GPT-image API
+LLM
+How To Avoid Timeouts in Completion API
+LLM API | Basic Completions
+Omni Human
+OmniHuman 1.5
+Get task
+Flux
+Flux with LoRA and Controlnet
+Available LoRA and Controlnet
+Flux API with Redux Variation, Fill, Inpaint and Outpaint
+Create Task
+Text to Image
+Image to Image
+Kontext
+Get task
+Qwen Image
+Text to Image
+Image Edit
+Get task
+Z-Image
+Text to Image
+Get task
+Faceswap
+Multi Faceswap
+Image Faceswap
+Video Faceswap
+Get Task
+WanX
+Generate WanX Task with LoRA Using PiAPI
+Available LoRA Types for Wanx
+Use Cases for Wanx LoRA
+Use Cases for Wanx Control Camera
+Create Task
+Get Task
+Wan
+Wan2.6 Text to Video
+Wan2.6 Image to Video
+Get task
+Hailuo
+Generate Video
+Get Task
+Veo3
+Veo3 Text to Video
+Veo3 Image to Video
+Veo3.1 Text to Video
+Veo3.1 Image to Video
+Get task
+Skyreels
+Create Task
+Get Task
+Framepack
+Create Task
+Get Task
+Hunyuan Video
+How to Make a Hunyuan API Call
+Available Hunyuan Lora models
+Get Task
+GET
+Generate Video
+POST
+Luma Dream Machine
+Create Task
+Get Task
+Suno(service stopped)
+Music(service stopped)
+Lyrics(service stopped)
+Get task
+Song(Udio)
+Song API Task Creation Examples
+[Udio] Song Extend
+Get Task
+Create Task
+[Udio] Generate Lyrics
+Mmaudio
+Get Task
+Generate Audio
+DiffRhythm
+Generate Audio
+Get Task
+Ace Step
+Create Task
+Text to Audio
+Audio to Audio
+Audio Edit
+Audio Extend
+Get Task
+TTS
+Zeroshot Text-to-Speech F5-TTS
+Get Task
+Trellis
+Trellis Create Task
+Trellis2 Create Task
+Get Task
+Meshy
+Meshy Create Task
+Get Task
+Pixal3D
+Pixal3D Create Task
+Get Task
+Joycaption
+Image Caption
+Get Task
+Midjourney
+PiAPI Penalties on Midjourney Usage
+Detailed Explaination on Midjourney Task Result
+Midjourney V7 API Instructions
+Create Task
+Imagine
+Upscale
+Variation
+Reroll
+Describe
+Seed
+Blend
+Inpaint
+Outpaint
+Pan
+Cancel Task
+Cancel Task
+Cancel Tasks
+Get Task
+AI Hug
+Get Task
+Create Task
+PiAPI Account Management
+PiAPI Account Info
+Task List Info
+User Task History
+Resources
+Change Log
+Output Storage
+Unified API Schema
+Webhook
+Bulk Generation Service
+Billings
+PiAPI MCP Server
+Workspace Manual
+Host-your-account (HYA) | Back-up Account
+Host-your-account (HYA) | Debug Checklist
+Host-your-account (HYA) | Connected Account Status
+Announcements
+PiAPI 2025 January 1st Pricing Update
+The discontinued support for midjourney
+Sunsetting Suno
+Schemas
+Schemas
+motion brush
+Create Task
+camera control
+Cancel Params
+Float2 Point
+Control Points
+txt2video-1.3b
+txt2video-14b
+txt2video-14b-lora
+img2video-14b
+img2video-14b-lora
+img2video-14b-keyframe
+img2video-14b-control-camera
+wan22-txt2video-14b
+wan22-img2video-14b
+hunyuan-txt2video-lora
+Trellis API/text-to-3D
+Trellis API/image-to-3D
+Trellis2 API/image-to-3D
+Kling omni multi shot
+VideoGenerationRequest
+TaskRequest
+TaskConfig
+TaskInput
+TaskResponse
+ErrorResponse
+Response
+Unified-Task-Response
+RequestBodies
+Unified-Task-Request-Body
+config
+control_net_setting
+lora_setting
+VideoGenerationResponse
+Pixal3D API/image-to-3D
+Hunyuan Video
+Copy Page
+Generate Video
+POST
+https://api.piapi.ai
+/api/v1/task
+Try it
+Hunyuan Video Generation API Documentation
+#
+Overview
+#
+PiAPI's Hunyuan Video Generation service provides text-to-video capabilities with two different models optimized for different use cases. The service supports both standard and fast video generation options, each with specific characteristics and pricing.
+Hunyuan Video Model Can Do NSFW
+Pricing
+#
+Model
+Resolution
+FPS
+Steps
+Price (USD)
+txt2video
+480x848/640x640
+85
+20
+$0.09
+fast-txt2video
+480x848/640x640
+85
+6
+$0.03
+img2video-concat
+544x960/720x720
+85
+20
+$0.09
+img2video-replace
+544x960/720x720
+85
+20
+$0.09
+txt2video-lora
+480x848/640x640
+85
+20
+$0.09
+Model Information
+#
+Standard Text-to-Video (txt2video)
+#
+Model Name
+: Qubico/hunyuan
+Task Type
+: txt2video
+Quality Focus
+: Higher quality with more processing steps (20 steps)
+Best For
+: Projects requiring higher quality output
+Fast Text-to-Video (fastvideo-txt2video)
+#
+Model Name
+: Qubico/hunyuan
+Task Type
+: fast-txt2video
+Speed Focus
+: Faster generation with fewer steps (6 steps)
+Best For
+: Quick iterations and preview purposes
+Hunyuan-img2video-concat
+#
+Model Name
+: Qubico/hunyuan
+Task Type
+: img2video-concat
+Speed Focus
+: Faster generation with more processing steps (20 steps)
+Best For
+: Generate videos based on images for better movement.
+Hunyuan-img2video-replace
+#
+Model Name
+: Qubico/hunyuan
+Task Type
+: img2video-replace
+Speed Focus
+: Faster generation with more processing steps (20 steps)
+Best For
+: Generate videos following the guilding image better.
+Hunyuan-txt2video-lora
+#
+Model Name
+: Qubico/hunyuan
+Task Type
+: txt2video-lora
+Speed Focus
+: Faster generation with more processing steps (20 steps)
+Best For
+: Generate videos based on LoRA.
+Request
+Header Params
+Generate Code
+Body Params
+application/json
+Generate Code
+Example
+{
+"model"
+:
+"Qubico/hunyuan"
+,
+"task_type"
+:
+"txt2video"
+,
+"input"
+:
+{
+"prompt"
+:
+"A cat walks on the grass, realistic style."
+}
+,
+"config"
+:
+{
+"webhook_config"
+:
+{
+"endpoint"
+:
+""
+,
+"secret"
+:
+""
+}
+}
+}
+Request Code Samples
+Shell
+JavaScript
+Java
+Swift
+Go
+PHP
+Python
+HTTP
+C
+C#
+Objective-C
+Ruby
+OCaml
+Dart
+R
+Request
+Request Example
+Shell
+JavaScript
+Java
+Swift
+cURL
+cURL-Windows
+Httpie
+wget
+PowerShell
+curl
+--location
+'https://api.piapi.ai/api/v1/task'
+\
+--header
+'x-api-key;'
+\
+--header
+'Content-Type: application/json'
+\
+--data
+'{
+    "model": "Qubico/hunyuan",
+    "task_type": "txt2video",
+    "input": {
+        "prompt": "A cat walks on the grass, realistic style."
+    },
+    "config": {
+        "webhook_config": {
+            "endpoint": "",
+            "secret": ""
+        }
+    }
+}'
+Responses
+🟢
+200
+OK
+application/json
+Successful response
+Body
+application/json
+Generate Code
+Example
+{
+"code"
+:
+200
+,
+"message"
+:
+"string"
+,
+"data"
+:
+{
+"task_id"
+:
+"736fde4d-9029-4915-8189-01353d6982cb"
+,
+"status"
+:
+"string"
+,
+"output"
+:
+{
+"video_url"
+:
+"http://example.com"
+}
+}
+}
+Modified at
+2025-04-08 11:50:09
+Previous
+Get Task
+Next
+Create Task
+LLMs.txt

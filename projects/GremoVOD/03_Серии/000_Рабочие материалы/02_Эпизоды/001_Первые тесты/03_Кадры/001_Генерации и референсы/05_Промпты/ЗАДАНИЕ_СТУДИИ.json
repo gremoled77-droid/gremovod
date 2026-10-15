@@ -1,0 +1,39 @@
+{
+  "project_id": "7cc54697-b80f-418c-b99f-39ffc3ed3593",
+  "brief": "Создать один пробный кадр главного героя Грэма в полный рост, вертикальная композиция 2:3, на нейтральном светло-сером студийном фоне. Использовать приложенный портрет как строгий источник идентичности и степени реализма/стилизации: тот же мужчина, лицо, видимый возраст, хитрый прищур, асимметричная закрытая полуулыбка, усы и короткая борода с сединой, та же красная вельветовая плоская кепка, та же чёрная футболка. Крепкая коренастая фигура без атлетического редизайна; тёмные прямые брюки и простая тёмная обувь — спокойная реконструкция невидимой части тела. Стоит лицом к камере, руки расслаблены вдоль тела, кисти видны; голова в близком к исходнику ракурсе и выражении. Весь герой от кепки до обуви внутри кадра, с полями. Мягкий нейтральный студийный свет, читаемая фактура тканей и лица, без бьюти-ретуши и чрезмерной резкости кожи. Это карточка персонажа, не сцена на улице: не переносить город, вечернюю палитру, машину и реквизит из общей библии мира. Один человек, один вид; без надписей, сетки, дополнительных панелей и аксессуаров. Сохранить максимум доступного нативного качества и деталей. Итог пока кандидат на утверждение.",
+  "prompts": {
+    "seedream-5-lite": "A cinematic still of a quiet Minsk street at blue hour after rain, recognizable stylized Belarusian urban architecture, warm amber streetlights reflected on wet pavement, deep blue shadows, premium tactile 3D animated feature film style, carefully composed wide shot, rich materials, soft atmospheric depth, no people, no cars, no text, no logos, no watermark.",
+    "seedance-2.5": "Use @image1 as the reference for the location, composition, architecture, materials and lighting. Preserve this empty Minsk street after rain, its blue evening atmosphere, warm amber streetlamps, wet road and existing stylized animated-film appearance.\n\nBegin almost still with a wide composition closely matching the reference. Ease into a very slow, smooth forward dolly along the street centreline toward the existing vanishing point, then gently settle to a stop at the end. Keep the camera at the reference height and orientation with a fixed focal length. Travel only a small distance, producing subtle natural parallax between the nearby facades and distant buildings while retaining the wide view.\n\nLet the existing distant mist drift faintly across the street. Tiny ripples gently disturb the existing puddles, with restrained changes in their amber reflections as the water and viewpoint move. Keep the lamps steady and the evening light, exposure and colours consistent.\n\nMaintain the building silhouettes, facade proportions, balconies, window spacing, overhead wires and road geometry throughout. Keep the street empty and every existing object in place. Introduce no people, vehicles, objects, signs or text. One continuous shot with no cuts, transitions, zoom, orbit, camera shake, focus pulls, architectural warping or texture flicker.",
+    "gpt-image-2.5": "Create a single full-body studio character image of Grem, the same fictional adult man shown in Image 1. Image 1 is the strict identity and stylization reference. Preserve his apparent age, broad lower face and cheeks, pronounced nasolabial folds, asymmetric thick eyebrows, sly narrowed brown eyes and sideways gaze, asymmetric closed-mouth half-smile, broad moustache, and short dark beard with grey strands. Keep exactly the reference's red corduroy flat cap and plain black crew-neck T-shirt. Match the portrait's head angle and expression closely.\n\nOne person, one view, standing facing the camera with a sturdy, stocky build, broad torso and natural non-athletic proportions. Arms relaxed at his sides, both hands visible with natural fingers. Complete the unseen lower body conservatively with plain dark straight-leg trousers and simple dark shoes; these are provisional design choices for this candidate, not established costume canon.\n\nVertical 2:3 composition, centered, with the entire figure from the top of the cap through both shoes comfortably inside the frame and clear margins. Neutral light-grey seamless studio background and floor, soft neutral studio lighting and a subtle grounding shadow. Match the reference's existing stylized 3D character rendering and degree of realism exactly; preserve tactile fabric and face detail without beauty retouching, exaggerated skin sharpness or increased photorealism. Request the highest available native image quality and resolution.\n\nUse Image 1 only for character identity, visible clothing and visual treatment. No city, street, evening palette, vehicle, props, additional accessories, feline features, logos, text, grid, panels, turnaround sheet, inset portraits or extra figures. Deliver exactly one full-body image, not variants. This is a candidate for review."
+  },
+  "scene": {
+    "brief": "Пустая улица Минска после дождя. Один непрерывный кадр на 5 секунд: очень медленный плавный проезд камеры вперёд, лёгкий туман вдали и небольшая рябь в лужах. Сохранить геометрию зданий, свет и стиль исходника. Без людей, машин, надписей, диалогов и музыки.",
+    "assets": [
+      {
+        "asset_id": "de12fbf6622a4e59a2b548db99b4450c",
+        "role": "location",
+        "note": "Сохранить планировку улицы, архитектуру, мокрое покрытие, янтарные фонари и синий вечерний свет."
+      }
+    ],
+    "target": "seedance-2.5",
+    "prompts": {
+      "seedance-2.5": "Use @image1 as the reference for the location, composition, architecture, materials and lighting. Preserve this empty Minsk street after rain, its blue evening atmosphere, warm amber streetlamps, wet road and existing stylized animated-film appearance.\n\nBegin almost still with a wide composition closely matching the reference. Ease into a very slow, smooth forward dolly along the street centreline toward the existing vanishing point, then gently settle to a stop at the end. Keep the camera at the reference height and orientation with a fixed focal length. Travel only a small distance, producing subtle natural parallax between the nearby facades and distant buildings while retaining the wide view.\n\nLet the existing distant mist drift faintly across the street. Tiny ripples gently disturb the existing puddles, with restrained changes in their amber reflections as the water and viewpoint move. Keep the lamps steady and the evening light, exposure and colours consistent.\n\nMaintain the building silhouettes, facade proportions, balconies, window spacing, overhead wires and road geometry throughout. Keep the street empty and every existing object in place. Introduce no people, vehicles, objects, signs or text. One continuous shot with no cuts, transitions, zoom, orbit, camera shake, focus pulls, architectural warping or texture flicker."
+    }
+  },
+  "parameters": {
+    "seedream-5-lite": {
+      "size": "2K",
+      "aspect_ratio": "16:9",
+      "output_format": "png"
+    },
+    "seedance-2.5": {
+      "resolution": "480p",
+      "duration": 5,
+      "aspect_ratio": "16:9"
+    }
+  },
+  "camera": null,
+  "composition": null,
+  "cameraPromptBasis": {},
+  "compositionPromptBasis": {}
+}

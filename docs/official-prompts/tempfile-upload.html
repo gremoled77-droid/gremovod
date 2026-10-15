@@ -1,0 +1,1414 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    
+    <!-- Primary Meta Tags -->
+    <title>Developer API - TempFile.org | Temporary File Hosting API Documentation</title>
+    <meta name="title" content="Free Developer API - TempFile.org | Temporary File Hosting API Documentation">
+    <meta name="description" content="Free REST API for temporary file hosting. Upload files programmatically, get direct download URLs, automatic deletion. No registration required. Perfect for developers building file sharing apps.">
+    <meta name="keywords" content="file hosting API, temporary file API, free developer API, REST API file upload, programmatic file sharing, API documentation, temporary storage API, auto-delete files API, file hosting integration">
+    <meta name="author" content="TempFile.org">
+    <meta name="robots" content="index, follow">
+    <meta name="language" content="English">
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://tempfile.org/api">
+    <meta property="og:title" content="Free Developer API - TempFile.org | Temporary File Hosting API">
+    <meta property="og:description" content="Free REST API for temporary file hosting. Upload files programmatically with automatic deletion. No registration required - perfect for developers.">
+    <meta property="og:site_name" content="TempFile.org">
+    <meta property="og:locale" content="en_US">
+    
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="https://tempfile.org/api">
+    <meta property="twitter:title" content="Free Developer API - TempFile.org | Temporary File Hosting API">
+    <meta property="twitter:description" content="Free REST API for temporary file hosting. Upload files programmatically with automatic deletion. No registration required.">
+    
+    <!-- Additional SEO Meta Tags -->
+    <meta name="color-scheme" content="light dark">
+    <meta name="theme-color" content="#ffffff">
+    <!-- Theme: runs before first paint so there is no flash of the wrong theme.
+         Saved choice (localStorage "tf-user-theme") wins, otherwise the system setting.
+         Colours must match THEME_COLORS in public/js/pwa.js and the CSS. -->
+    <script>
+    (function () {
+      try {
+        var t = null;
+        try { t = localStorage.getItem('tf-user-theme'); } catch (e) {}
+        if (t !== 'dark' && t !== 'light') {
+          t = (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+        }
+        document.documentElement.setAttribute('data-theme', t);
+        var m = document.querySelector('meta[name="theme-color"]');
+        if (m) m.setAttribute('content', t === 'dark' ? '#1a1a1a' : '#ffffff');
+      } catch (e) {}
+    })();
+    </script>
+    <meta name="application-name" content="TempFile.org">
+    <meta name="apple-mobile-web-app-title" content="TempFile.org">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    
+    <!-- Canonical URL -->
+    <link rel="canonical" href="https://tempfile.org/api">
+    
+    <!-- Alternate Languages -->
+    <link rel="alternate" hreflang="en" href="https://tempfile.org/api">
+    <link rel="alternate" hreflang="x-default" href="https://tempfile.org/api">
+    
+    <!-- Additional Schema.org (Google, Bing) -->
+    <meta itemprop="name" content="Developer API - TempFile.org | Temporary File Hosting API Documentation">
+    <meta itemprop="image" content="/images/tempfile_banner_1200x630.jpg">
+    <meta name="twitter:image" content="/images/tempfile_banner_1200x630.jpg">
+    <meta property="og:image" content="/images/tempfile_banner_1200x630.jpg">
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="shortcut icon" href="/favicon.png"/>
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    
+    <!-- Schema.org structured data -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "WebPage",
+        "name": "Free Developer API - TempFile.org",
+        "description": "Complete API documentation for TempFile.org temporary file hosting service with code examples and integration guides",
+        "url": "https://tempfile.org/api",
+        "isPartOf": {
+            "@type": "WebSite",
+            "name": "TempFile.org",
+            "url": "https://tempfile.org"
+        },
+        "about": {
+            "@type": "SoftwareAPI",
+            "name": "TempFile.org API",
+            "description": "REST API for temporary file hosting with automatic deletion",
+            "provider": {
+                "@type": "Organization",
+                "name": "TempFile.org"
+            },
+            "operatingSystem": "Any",
+            "applicationCategory": "DeveloperApplication"
+        },
+        "mainEntity": {
+            "@type": "TechArticle",
+            "name": "TempFile.org API Documentation",
+            "description": "Complete developer guide for integrating temporary file hosting into applications",
+            "datePublished": "2025-09-01",
+            "dateModified": "2026-10-04"
+        }
+    }
+    </script>
+    
+    <!-- Stylesheet -->
+    <link rel="stylesheet" href="/css/header.css?ver=1.0.1" media="all">
+    <link rel="stylesheet" href="/css/footer.css?ver=1.0.2" media="all">
+    <link rel='stylesheet' id='api-style-css' href='/css/api.css?ver=6.9.11' media='all' />
+    <!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-TQHHWR0XPQ"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'G-TQHHWR0XPQ');
+</script>
+    <link rel="stylesheet" href="/css/pwa.css?ver=1.0.1" media="all">
+    <link rel="stylesheet" href="/css/support.css?ver=1.0.1" media="all">
+    <link rel="stylesheet" href="/css/badges.css?ver=1.1.1" media="all">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="header-top">
+                <div class="logo-section">
+                    <div class="logo">
+                        <svg class="logo-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+                            <circle cx="12" cy="12" r="2"></circle>
+                            <line x1="8" y1="14" x2="16" y2="14"></line>
+                            <line x1="8" y1="16" x2="16" y2="16"></line>
+                        </svg>
+                        <span class="logo-text">TempFile.org</span>
+                    </div>
+                    <div class="tagline-row">
+                        <div class="tagline">Upload • Share • Auto-Delete</div>
+                        <a class="sb-link" href="https://status.tempfile.org/?utm_source=tempfile.org&amp;utm_medium=status_dot" title="Live system status">Status <img src="https://status.tempfile.org/badge.svg" width="14" height="14" alt="" onerror="this.remove()"></a>
+                    </div>
+                </div>
+                
+                <div class="nav-section">
+                    <div class="nav-buttons">
+                        <a href="/" class="nav-btn">
+                            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                                <polyline points="9,22 9,12 15,12 15,22"></polyline>
+                            </svg>
+                            Home
+                        </a>
+                        <a href="/help" class="nav-btn">
+                            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                                <path d="M12 17h.01"></path>
+                            </svg>
+                            Help
+                        </a>
+                        <a href="/terms" class="nav-btn">
+                            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                <polyline points="14,2 14,8 20,8"></polyline>
+                                <line x1="16" y1="13" x2="8" y2="13"></line>
+                                <line x1="16" y1="17" x2="8" y2="17"></line>
+                            </svg>
+                            Terms
+                        </a>
+                        <a href="/privacy" class="nav-btn">
+                            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <rect width="18" height="11" x="3" y="11" rx="2" ry="2"></rect>
+                                <path d="m7 11V7a5 5 0 0 1 10 0v4"></path>
+                            </svg>
+                            Privacy
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="legal-content">
+            <h1>
+                <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"></path>
+                </svg>
+                Developer API <span class="version-badge">v2.4.0</span>
+            </h1>
+            <p><strong>Base URL:</strong> https://tempfile.org/api</p>
+            <div class="sb-meta">Live status: <a class="sb-chip" href="https://status.tempfile.org/?utm_source=tempfile.org&amp;utm_medium=status_pill" title="API status"><img src="https://status.tempfile.org/badge/service/api.svg" height="20" alt="API status" loading="lazy" onerror="this.closest('.sb-meta').remove()"></a> <span class="sb-dotsep" aria-hidden="true">•</span> <a href="https://status.tempfile.org/history?utm_source=tempfile.org&amp;utm_medium=text_link">Uptime history</a></div>
+            
+            <h2>Overview</h2>
+            <p>Our REST API enables developers to integrate temporary file hosting into their applications. Upload files programmatically, get instant download URLs, and leverage automatic deletion for secure temporary storage.</p>
+
+            <div class="whats-new-banner">
+                <h3><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"></path>
+            </svg>
+            What's New in v2.4.0</h3>
+                <ul>
+                    <li><strong>Rate-Limit Headers in Browsers</strong> - <code>X-RateLimit-Limit</code>, <code>X-RateLimit-Remaining</code>, <code>X-RateLimit-Reset</code> and <code>Retry-After</code> are now readable from browser JavaScript so clients can back off properly on 429</li>
+                    <li><strong>Consistent Error Bodies</strong> - Rate-limit (429) errors now include <code>"success": false</code> like every other API error, and the upload limit message clarifies it counts requests (up to 20 files each), not files</li>
+                    <li><strong>Array-Style File Fields</strong> - Multi-file uploads accept <code>files</code>, <code>files[]</code> and <code>files[0]</code>, <code>files[1]</code>, ... Any other field name is rejected with a clear error</li>
+                </ul>
+                <p><a href="/api/changelog" style="font-weight: 600;">View Full Changelog →</a></p>
+            </div>
+            
+            <div class="api-resources-box">
+                <div class="resource-links">
+                    <a href="/api/docs" class="resource-link">
+                        <svg class="resource-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"></path>
+                        </svg>
+                        <span class="resource-title">Interactive API Documentation</span>
+                    </a>
+                    <span class="resource-divider">|</span>
+                    <a href="/openapi.json" class="resource-link" target="_blank">
+                        <svg class="resource-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="7 10 12 15 17 10"></polyline>
+                            <line x1="12" y1="15" x2="12" y2="3"></line>
+                        </svg>
+                        <span class="resource-title">OpenAPI Specification</span>
+                    </a>
+                </div>
+                <p class="resource-description">Test endpoints in real-time with our interactive documentation, or download the complete OpenAPI 3.2 schema for integration</p>
+            </div>
+            
+            <div class="contact-info">
+                <h3>
+                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M3 3v5h5"></path>
+                        <path d="M3 12h18l-3-3"></path>
+                        <path d="M21 21v-5h-5"></path>
+                        <path d="M21 12H3l3 3"></path>
+                    </svg>
+                    API Limits & Features
+                </h3>
+                <p><strong>File Size:</strong> 100MB maximum per file</p>
+                <p><strong>Files per Request:</strong> 20 maximum - send multiple files in one request</p>
+                <p><strong>Rate Limit:</strong> 200 requests per hour per IP (up to 20 files per request = up to 4,000 files per hour)</p>
+                <p><strong>Retention:</strong> 1-48 hours automatic deletion</p>
+                <p><strong>Authentication:</strong> None required</p>
+                <p><strong>CDN Caching:</strong> Intelligent cache invalidation on delete</p>
+                <p><strong>Supported Formats:</strong> All safe file types (malware scanning included)</p>
+            </div>
+
+            <h2 class="sb-h2"><span>1. Upload Local File</span><a class="sb-chip" href="https://status.tempfile.org/?utm_source=tempfile.org&amp;utm_medium=status_pill" title="File uploads status"><picture><source media="(max-width: 600px)" srcset="https://status.tempfile.org/badge/dot/uploads.svg"><img src="https://status.tempfile.org/badge/service/uploads.svg" height="20" alt="File uploads status" loading="lazy" onerror="this.closest('.sb-chip').remove()"></picture></a></h2>
+            <p><strong>Endpoint:</strong> <code>POST /api/upload/local</code></p>
+            <p><strong>Content-Type:</strong> multipart/form-data</p>
+            
+            <h3>Parameters</h3>
+            <ul>
+                <li><strong>files</strong> - File(s) to upload, up to 20 per request (required). To upload several files, repeat the <code>files</code> field once per file. Array-style names (<code>files[]</code>, <code>files[0]</code>, <code>files[1]</code>, ...) are also accepted, which is how PHP and some HTTP libraries name them</li>
+                <li><strong>expiryHours</strong> - Hours until deletion: 1, 6, 24, or 48 (default: 1)</li>
+            </ul>
+            
+            <h3>Example Request</h3>
+            
+                <div class="code-box">
+                <div class="code-box-header">
+                    <span class="code-box-lang">cURL</span>
+                    <button type="button" class="code-copy-btn" aria-label="Copy cURL code to clipboard"><svg class="code-copy-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg><span class="code-copy-label">Copy</span></button>
+                </div>
+                <pre><code>curl -X POST https://tempfile.org/api/upload/local \
+  -F "<a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="36505f5a53450b76525955435b53584218465250">[email&#160;protected]</a>" \
+  -F "expiryHours=24"</code></pre>
+            </div>
+            
+            
+            <p><strong>Uploading more than one file?</strong> Send them together in a single request (up to 20) instead of one request per file - see <a href="#multi-upload">Upload Multiple Files in One Request</a>.</p>
+            
+            <h3>Response</h3>
+            
+                <div class="code-box">
+                <div class="code-box-header">
+                    <span class="code-box-lang">JSON</span>
+                    <button type="button" class="code-copy-btn" aria-label="Copy JSON code to clipboard"><svg class="code-copy-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg><span class="code-copy-label">Copy</span></button>
+                </div>
+                <pre><code>{
+  "success": true,
+  "files": [
+    {
+      "id": "kN8mP2xQvR7",
+      "name": "document.pdf",
+      "size": 2048576,
+      "url": "https://tempfile.org/kN8mP2xQvR7/",
+      "expiryTime": 1725273634567
+    }
+  ],
+  "message": "1 file(s) uploaded successfully"
+}</code></pre>
+            </div>
+
+            <h2 class="sb-h2"><span>2. Upload from URL</span><a class="sb-chip" href="https://status.tempfile.org/?utm_source=tempfile.org&amp;utm_medium=status_pill" title="File uploads status"><picture><source media="(max-width: 600px)" srcset="https://status.tempfile.org/badge/dot/uploads.svg"><img src="https://status.tempfile.org/badge/service/uploads.svg" height="20" alt="File uploads status" loading="lazy" onerror="this.closest('.sb-chip').remove()"></picture></a></h2>
+            <p><strong>Endpoint:</strong> <code>POST /api/upload/url</code></p>
+            <p><strong>Content-Type:</strong> application/json</p>
+            
+            <h3>Parameters</h3>
+            <ul>
+                <li><strong>url</strong> - Source URL to download (required)</li>
+                <li><strong>customName</strong> - Custom filename (optional). If it has no extension, the source file's extension is added automatically</li>
+                <li><strong>expiryHours</strong> - Hours until deletion: 1, 6, 24, or 48 (default: 1)</li>
+            </ul>
+            
+            <h3>Example Request</h3>
+            
+                <div class="code-box">
+                <div class="code-box-header">
+                    <span class="code-box-lang">cURL</span>
+                    <button type="button" class="code-copy-btn" aria-label="Copy cURL code to clipboard"><svg class="code-copy-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg><span class="code-copy-label">Copy</span></button>
+                </div>
+                <pre><code>curl -X POST https://tempfile.org/api/upload/url \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://example.com/image.jpg",
+    "customName": "my-image.jpg",
+    "expiryHours": 6
+  }'</code></pre>
+            </div>
+            
+            
+            <h3>Response</h3>
+            
+                <div class="code-box">
+                <div class="code-box-header">
+                    <span class="code-box-lang">JSON</span>
+                    <button type="button" class="code-copy-btn" aria-label="Copy JSON code to clipboard"><svg class="code-copy-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg><span class="code-copy-label">Copy</span></button>
+                </div>
+                <pre><code>{
+  "success": true,
+  "file": {
+    "id": "Tz9mKpWx3Nq",
+    "name": "my-image.jpg",
+    "size": 1024000,
+    "url": "https://tempfile.org/Tz9mKpWx3Nq/",
+    "expiryTime": 1725208834567
+  }
+}</code></pre>
+            </div>
+
+            <h2>3. Get File Information</h2>
+            <p><strong>Endpoint:</strong> <code>GET /api/file/{fileId}</code></p>
+            
+            <h3>Example Request</h3>
+            
+                <div class="code-box">
+                <div class="code-box-header">
+                    <span class="code-box-lang">cURL</span>
+                    <button type="button" class="code-copy-btn" aria-label="Copy cURL code to clipboard"><svg class="code-copy-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg><span class="code-copy-label">Copy</span></button>
+                </div>
+                <pre><code>curl https://tempfile.org/api/file/kN8mP2xQvR7</code></pre>
+            </div>
+            
+            
+            <h3>Response</h3>
+            
+                <div class="code-box">
+                <div class="code-box-header">
+                    <span class="code-box-lang">JSON</span>
+                    <button type="button" class="code-copy-btn" aria-label="Copy JSON code to clipboard"><svg class="code-copy-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg><span class="code-copy-label">Copy</span></button>
+                </div>
+                <pre><code>{
+  "success": true,
+  "file": {
+    "id": "kN8mP2xQvR7",
+    "name": "document.pdf",
+    "size": 2048576,
+    "mimeType": "application/pdf",
+    "uploadTime": 1725187234567,
+    "expiryTime": 1725273634567,
+    "exists": true,
+    "downloadUrl": "/kN8mP2xQvR7/download",
+    "security": {
+      "hasWarning": false,
+      "warningLevel": "none",
+      "warningMessage": null,
+      "suspiciousPatterns": []
+    }
+  }
+}</code></pre>
+            </div>
+
+            <h2>4. Get File Security Information</h2>
+    <p><strong>Endpoint:</strong> <code>GET /api/file/{fileId}/security</code></p>
+    <p>Returns detailed security analysis including risk assessment, detected patterns, and safety recommendations.</p>
+    
+    <h3>Example Request</h3>
+    
+    <div class="code-box">
+                <div class="code-box-header">
+                    <span class="code-box-lang">cURL</span>
+                    <button type="button" class="code-copy-btn" aria-label="Copy cURL code to clipboard"><svg class="code-copy-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg><span class="code-copy-label">Copy</span></button>
+                </div>
+                <pre><code>curl https://tempfile.org/api/file/kN8mP2xQvR7/security</code></pre>
+            </div>
+    
+    <h3>Response</h3>
+    
+    <div class="code-box">
+                <div class="code-box-header">
+                    <span class="code-box-lang">JSON</span>
+                    <button type="button" class="code-copy-btn" aria-label="Copy JSON code to clipboard"><svg class="code-copy-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg><span class="code-copy-label">Copy</span></button>
+                </div>
+                <pre><code>{
+  "success": true,
+  "security": {
+    "fileId": "kN8mP2xQvR7",
+    "fileName": "project-build.zip",
+    "mimeType": "application/x-zip-compressed",
+
+    "hasWarning": true,
+    "suspiciousPatterns": [".exe", ".bat"],
+
+    "hash": "a1b2c3d4e5f6789...",
+    "size": 127133,
+
+    "uploadType": "local",
+    "uploadTime": 1725187234567,
+    "clientIP": "172.71.130.xxx",
+
+    "riskLevel": "medium",
+    "recommendations": [
+      "Scan file with antivirus before opening",
+      "Verify file source is trustworthy",
+      "Open in isolated/sandboxed environment if possible",
+      "Extract archive in secure location and inspect contents before execution"
+    ]
+  }
+}</code></pre>
+            </div>
+    
+    <h3>Security Fields</h3>
+    <ul>
+        <li><code>hasWarning</code> (boolean): Whether file triggered security alerts</li>
+        <li><code>suspiciousPatterns</code> (array): Detected patterns like <code>[".exe", "eval(", "shell_exec"]</code></li>
+        <li><code>riskLevel</code> (string): Overall risk assessment - <code>"safe"</code>, <code>"low"</code>, <code>"medium"</code>, <code>"high"</code>, or <code>"unknown"</code></li>
+        <li><code>recommendations</code> (array): Safety recommendations based on detected patterns</li>
+        <li><code>hash</code> (string): SHA-256 hash for file integrity verification</li>
+    </ul>
+    
+    <h3>Risk Levels</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>Level</th>
+                <th>Description</th>
+                <th>Example Patterns</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><strong>safe</strong></td>
+                <td>No security warnings detected</td>
+                <td>Clean files like images, PDFs, documents</td>
+            </tr>
+            <tr>
+                <td><strong>low</strong></td>
+                <td>Common development patterns</td>
+                <td><code>eval()</code>, <code>exec()</code> in scripts</td>
+            </tr>
+            <tr>
+                <td><strong>medium</strong></td>
+                <td>Contains executable files</td>
+                <td><code>.exe</code>, <code>.bat</code>, <code>.cmd</code> in archives</td>
+            </tr>
+            <tr>
+                <td><strong>high</strong></td>
+                <td>Potentially dangerous content</td>
+                <td><code>vbscript:</code>, <code>shell_exec</code>, root exploits</td>
+            </tr>
+            <tr>
+                <td><strong>unknown</strong></td>
+                <td>Warning exists but pattern unclear</td>
+                <td>Unclassified suspicious patterns</td>
+            </tr>
+        </tbody>
+    </table>
+    
+    <h3>Best Practices for API Consumers</h3>
+    <ul>
+        <li><strong>Check warnings before download:</strong> Always inspect <code>hasWarning</code> and <code>riskLevel</code></li>
+        <li><strong>Display warnings to users:</strong> Show <code>recommendations</code> array to end users</li>
+        <li><strong>Log suspicious downloads:</strong> Track files with <code>riskLevel</code> of "medium" or "high"</li>
+        <li><strong>Implement client-side scanning:</strong> Add additional antivirus checks for high-risk files</li>
+        <li><strong>Verify file integrity:</strong> Compare <code>hash</code> after download to detect tampering</li>
+    </ul>
+    
+    <h3>Example: Handling Security Warnings in Code</h3>
+    
+    <div class="code-box">
+                <div class="code-box-header">
+                    <span class="code-box-lang">JavaScript</span>
+                    <button type="button" class="code-copy-btn" aria-label="Copy JavaScript code to clipboard"><svg class="code-copy-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg><span class="code-copy-label">Copy</span></button>
+                </div>
+                <pre><code>// JavaScript example
+async function downloadFile(fileId) {
+  // Get security info first
+  const securityResponse = await fetch(`/api/file/${fileId}/security`);
+  const securityData = await securityResponse.json();
+
+  if (!securityData.success) {
+    console.error('Failed to get security info');
+    return;
+  }
+
+  const { riskLevel, recommendations, hasWarning } = securityData.security;
+
+  // Warn user if file has security concerns
+  if (hasWarning) {
+    const proceed = confirm(
+      `Security Warning (${riskLevel.toUpperCase()} risk):\n\n` +
+      recommendations.join('\n') +
+      '\n\nDo you want to proceed with download?'
+    );
+
+    if (!proceed) return;
+  }
+
+  // Proceed with download
+  window.location.href = `/${fileId}/download`;
+}</code></pre>
+            </div>
+
+            <h2>5. Delete File</h2>
+            <p><strong>Endpoint:</strong> <code>DELETE /api/file/{fileId}</code></p>
+            
+            <h3>Example Request</h3>
+            
+                <div class="code-box">
+                <div class="code-box-header">
+                    <span class="code-box-lang">cURL</span>
+                    <button type="button" class="code-copy-btn" aria-label="Copy cURL code to clipboard"><svg class="code-copy-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg><span class="code-copy-label">Copy</span></button>
+                </div>
+                <pre><code>curl -X DELETE https://tempfile.org/api/file/kN8mP2xQvR7</code></pre>
+            </div>
+            
+            
+            <h3>Response</h3>
+            
+                <div class="code-box">
+                <div class="code-box-header">
+                    <span class="code-box-lang">JSON</span>
+                    <button type="button" class="code-copy-btn" aria-label="Copy JSON code to clipboard"><svg class="code-copy-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg><span class="code-copy-label">Copy</span></button>
+                </div>
+                <pre><code>{
+  "success": true,
+  "message": "File deleted successfully"
+}</code></pre>
+            </div>
+
+            <h2 class="sb-h2"><span>6. Direct File Download</span><a class="sb-chip" href="https://status.tempfile.org/?utm_source=tempfile.org&amp;utm_medium=status_pill" title="File downloads status"><picture><source media="(max-width: 600px)" srcset="https://status.tempfile.org/badge/dot/downloads.svg"><img src="https://status.tempfile.org/badge/service/downloads.svg" height="20" alt="File downloads status" loading="lazy" onerror="this.closest('.sb-chip').remove()"></picture></a></h2>
+            <p><strong>Endpoint:</strong> <code>GET /{fileId}/download</code></p>
+            <p>Returns the actual file content with appropriate headers for download.</p>
+            
+            <h3>Example Request</h3>
+            
+                <div class="code-box">
+                <div class="code-box-header">
+                    <span class="code-box-lang">cURL</span>
+                    <button type="button" class="code-copy-btn" aria-label="Copy cURL code to clipboard"><svg class="code-copy-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg><span class="code-copy-label">Copy</span></button>
+                </div>
+                <pre><code>curl -L https://tempfile.org/kN8mP2xQvR7/download \
+  -o downloaded_file.pdf</code></pre>
+            </div>
+
+            <h2>File URLs and Access</h2>
+            <p>Uploaded files are accessible via multiple URL formats:</p>
+            <ul>
+                <li><strong>File Info Page:</strong> <code>/{fileId}/</code> - Shows file info with download link (e.g., <code>/kN8mP2xQvR7/</code>)</li>
+                <li><strong>Direct Download:</strong> <code>/{fileId}/download</code> - Immediate file download (e.g., <code>/kN8mP2xQvR7/download</code>)</li>
+                <li><strong>Image Preview:</strong> <code>/{fileId}/preview</code> - For image files only (e.g., <code>/kN8mP2xQvR7/preview</code>)</li>
+            </ul>
+            <p><strong>Expiry:</strong> when a file expires it is deleted. From that moment the file info, security, download and preview endpoints (and the file page) return <code>404</code>, and image previews show the expired-image placeholder.</p>
+
+            <h2 id="response-formats-ref">Response Formats</h2>
+            <p>All API responses use JSON format with consistent structure:</p>
+            
+            <h3>Success Response</h3>
+            
+            <div class="code-box">
+                <div class="code-box-header">
+                    <span class="code-box-lang">JSON</span>
+                    <button type="button" class="code-copy-btn" aria-label="Copy JSON code to clipboard"><svg class="code-copy-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg><span class="code-copy-label">Copy</span></button>
+                </div>
+                <pre><code>{
+  "success": true,
+  "files": [...],     // For upload endpoints
+  "file": {...},      // For single file operations
+  "message": "..."    // Human-readable message
+}</code></pre>
+            </div>
+            
+            <h3>Error Response</h3>
+            
+            <div class="code-box">
+                <div class="code-box-header">
+                    <span class="code-box-lang">JSON</span>
+                    <button type="button" class="code-copy-btn" aria-label="Copy JSON code to clipboard"><svg class="code-copy-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg><span class="code-copy-label">Copy</span></button>
+                </div>
+                <pre><code>{
+  "success": false,
+  "error": "Descriptive error message"
+}</code></pre>
+            </div>
+
+            <h2>Error Responses</h2>
+            <p>All endpoints return errors in the format shown under <a href="#response-formats-ref">Response Formats</a> above (<code>success: false</code> plus a descriptive <code>error</code> message).</p>
+            
+            <h3>Common Error Codes</h3>
+            <ul>
+                <li><strong>400</strong> - Bad request (invalid parameters, or a file sent under a field name other than <code>files</code>)</li>
+                <li><strong>404</strong> - File not found or expired</li>
+                <li><strong>413</strong> - File too large (max 100MB)</li>
+                <li><strong>429</strong> - Rate limit exceeded. Wait for the number of seconds in the <code>Retry-After</code> header, then retry (see <a href="#rate-limits">Rate Limits &amp; Fair Usage</a>)</li>
+                <li><strong>500</strong> - Server error</li>
+            </ul>
+
+            <h2 id="rate-limits">Rate Limits &amp; Fair Usage</h2>
+            <p>Our API implements fair usage policies to ensure service quality for all users:</p>
+            
+            <ul>
+                <li><strong>Upload Limit:</strong> 200 requests per hour per IP address, up to 20 files per request</li>
+                <li><strong>Download Limit:</strong> 5000 downloads per 15 minutes</li>
+                <li><strong>Global Limit:</strong> 10000 API requests per 15 minutes</li> 
+                <li><strong>File Size:</strong> 100MB maximum per file</li>
+                <li><strong>Retention:</strong> 48 hours maximum</li>
+            </ul>
+
+            <div class="api-callout">
+                <h4>Send multiple files per request</h4>
+                <p>The upload limit counts <strong>requests</strong>, not files. Uploading one file per request uses up the 200 requests after only 200 files and then returns <code>429</code>. Sending 20 files per request lets the same 200 requests carry up to <strong>4,000 files per hour</strong>. Batching is the intended way to use the API and is not a way around the limit. See <a href="#multi-upload">Upload Multiple Files in One Request</a>.</p>
+            </div>
+            
+            <h3>Rate Limit Headers</h3>
+            <p>Upload responses include these headers, so your code can see how much quota is left:</p>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Header</th>
+                        <th>Description</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>X-RateLimit-Limit</code></td>
+                        <td>Maximum requests allowed in the current window (e.g. <code>200</code>)</td>
+                    </tr>
+                    <tr>
+                        <td><code>X-RateLimit-Remaining</code></td>
+                        <td>Requests left in the current window</td>
+                    </tr>
+                    <tr>
+                        <td><code>X-RateLimit-Reset</code></td>
+                        <td>Unix timestamp (in seconds) when the window resets</td>
+                    </tr>
+                    <tr>
+                        <td><code>Retry-After</code></td>
+                        <td>Only sent with a <code>429</code> response: seconds to wait before trying again</td>
+                    </tr>
+                </tbody>
+            </table>
+            
+            <div class="code-box">
+                <div class="code-box-header">
+                    <span class="code-box-lang">HTTP headers</span>
+                    <button type="button" class="code-copy-btn" aria-label="Copy HTTP headers code to clipboard"><svg class="code-copy-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg><span class="code-copy-label">Copy</span></button>
+                </div>
+                <pre><code>X-RateLimit-Limit: 200
+X-RateLimit-Remaining: 187
+X-RateLimit-Reset: 1735467634</code></pre>
+            </div>
+            
+            <p>A rate-limited request returns <code>429 Too Many Requests</code> with the headers below and the usual error body (<code>success: false</code> and an <code>error</code> message).</p>
+            
+            <div class="code-box">
+                <div class="code-box-header">
+                    <span class="code-box-lang">HTTP headers</span>
+                    <button type="button" class="code-copy-btn" aria-label="Copy HTTP headers code to clipboard"><svg class="code-copy-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg><span class="code-copy-label">Copy</span></button>
+                </div>
+                <pre><code>HTTP/1.1 429 Too Many Requests
+Retry-After: 1423
+X-RateLimit-Limit: 200
+X-RateLimit-Remaining: 0
+X-RateLimit-Reset: 1735467634</code></pre>
+            </div>
+            
+            <h3>Handling Rate Limits in Your Code</h3>
+            <ol>
+                <li><strong>Batch your files:</strong> send up to 20 files per request.</li>
+                <li><strong>Watch <code>X-RateLimit-Remaining</code>:</strong> when it reaches <code>0</code>, wait until <code>X-RateLimit-Reset</code> before the next request.</li>
+                <li><strong>On a <code>429</code>, wait <code>Retry-After</code> seconds</strong> and retry the same request.</li>
+                <li><strong>No headers available?</strong> (for example a proxy removed them, or the request failed at network level) Fall back to exponential backoff with jitter (1s, 2s, 4s, ... up to 60s).</li>
+                <li><strong>Limit your retries</strong> (5 is plenty) and do not retry other errors such as <code>400</code> or <code>413</code>.</li>
+            </ol>
+            <p>The <a href="#multi-upload">multi-file examples below</a> implement all of this in cURL/Bash, JavaScript, Python and PHP.</p>
+
+            <h2>Code Examples</h2>
+            <p>Examples in cURL/Bash, JavaScript, Python and PHP. Start with a single file, then see how to upload many files efficiently and handle rate limits.</p>
+
+            <h3>Upload a Single File</h3>
+            <p>Good for one-off uploads. If you have more than one file, use the multi-file approach below instead of calling this once per file.</p>
+
+            <div class="code-box">
+                <div class="code-box-header">
+                    <span class="code-box-lang">JavaScript</span>
+                    <button type="button" class="code-copy-btn" aria-label="Copy JavaScript code to clipboard"><svg class="code-copy-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg><span class="code-copy-label">Copy</span></button>
+                </div>
+                <pre><code>// Upload file
+const formData = new FormData();
+formData.append('files', fileInput.files[0]);
+formData.append('expiryHours', '24');
+
+try {
+  const response = await fetch('https://tempfile.org/api/upload/local', {
+    method: 'POST',
+    body: formData
+  });
+
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+  }
+
+  const result = await response.json();
+  
+  if (result.success) {
+    console.log('Upload URL:', result.files[0].url);
+    console.log('File ID:', result.files[0].id);
+    console.log('Expires at:', new Date(result.files[0].expiryTime));
+  } else {
+    throw new Error(result.error);
+  }
+} catch (error) {
+  console.error('Upload failed:', error.message);
+}</code></pre>
+            </div>
+
+            <div class="code-box">
+                <div class="code-box-header">
+                    <span class="code-box-lang">Python</span>
+                    <button type="button" class="code-copy-btn" aria-label="Copy Python code to clipboard"><svg class="code-copy-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg><span class="code-copy-label">Copy</span></button>
+                </div>
+                <pre><code>import requests
+
+# Upload file
+with open('document.pdf', 'rb') as f:
+    files = {'files': f}
+    data = {'expiryHours': '24'}
+    response = requests.post(
+        'https://tempfile.org/api/upload/local',
+        files=files,
+        data=data
+    )
+    
+result = response.json()
+print(f"Upload URL: {result['files'][0]['url']}")</code></pre>
+            </div>
+
+            <div class="code-box">
+                <div class="code-box-header">
+                    <span class="code-box-lang">PHP</span>
+                    <button type="button" class="code-copy-btn" aria-label="Copy PHP code to clipboard"><svg class="code-copy-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg><span class="code-copy-label">Copy</span></button>
+                </div>
+                <pre><code>&lt;?php
+$curl = curl_init();
+curl_setopt_array($curl, [
+    CURLOPT_URL => 'https://tempfile.org/api/upload/local',
+    CURLOPT_POST => true,
+    CURLOPT_POSTFIELDS => [
+        'files' => new CURLFile('document.pdf'),
+        'expiryHours' => '24'
+    ],
+    CURLOPT_RETURNTRANSFER => true,
+    CURLOPT_TIMEOUT => 60,
+    CURLOPT_FOLLOWLOCATION => true
+]);
+
+$response = curl_exec($curl);
+$httpCode = curl_getinfo($curl, CURLINFO_HTTP_CODE);
+
+if (curl_error($curl)) {
+    echo "Error: " . curl_error($curl);
+} else {
+    $result = json_decode($response, true);
+    if ($result && $result['success']) {
+        echo "Upload URL: " . $result['files'][0]['url'];
+    } else {
+        echo "Upload failed: " . ($result['error'] ?? 'Unknown error');
+    }
+}
+
+curl_close($curl);
+</code></pre>
+            </div>
+
+            <h3 id="multi-upload">Upload Multiple Files in One Request <span class="recommended-badge">Recommended</span></h3>
+            <p>Add one <code>files</code> field per file (up to 20). The response contains one entry per file in the <code>files</code> array.</p>
+
+            <div class="code-box">
+                <div class="code-box-header">
+                    <span class="code-box-lang">cURL</span>
+                    <button type="button" class="code-copy-btn" aria-label="Copy cURL code to clipboard"><svg class="code-copy-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg><span class="code-copy-label">Copy</span></button>
+                </div>
+                <pre><code>curl -X POST https://tempfile.org/api/upload/local \
+  -F "<a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="197f70757c6a24596971766d76283773697e">[email&#160;protected]</a>" \
+  -F "<a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="0b6d62676e78364b7b63647f643925617b6c">[email&#160;protected]</a>" \
+  -F "<a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="0b6d62676e78364b796e7b64797f257b6f6d">[email&#160;protected]</a>" \
+  -F "expiryHours=24"</code></pre>
+            </div>
+
+            <h4>Response</h4>
+
+            <div class="code-box">
+                <div class="code-box-header">
+                    <span class="code-box-lang">JSON</span>
+                    <button type="button" class="code-copy-btn" aria-label="Copy JSON code to clipboard"><svg class="code-copy-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg><span class="code-copy-label">Copy</span></button>
+                </div>
+                <pre><code>{
+  "success": true,
+  "files": [
+    { "id": "kN8mP2xQvR7", "name": "photo1.jpg", "size": 482113, "url": "https://tempfile.org/kN8mP2xQvR7/", "expiryTime": 1725273634567 },
+    { "id": "Tz9mKpWx3Nq", "name": "photo2.jpg", "size": 391204, "url": "https://tempfile.org/Tz9mKpWx3Nq/", "expiryTime": 1725273634567 },
+    { "id": "Wb4hRs7LcY2", "name": "report.pdf", "size": 2048576, "url": "https://tempfile.org/Wb4hRs7LcY2/", "expiryTime": 1725273634567 }
+  ],
+  "message": "3 file(s) uploaded successfully"
+}</code></pre>
+            </div>
+
+            <h4>Many files, with rate limit handling</h4>
+            <p>The examples below take any number of files and:</p>
+            <ul>
+                <li>Split them into batches of 20 - one request per batch (45 files = 3 requests, not 45).</li>
+                <li>Check <code>X-RateLimit-Remaining</code> and pause until <code>X-RateLimit-Reset</code> when the quota is used up, so they never hit a <code>429</code> in the first place.</li>
+                <li>If a <code>429</code> still happens, wait for <code>Retry-After</code> (or <code>X-RateLimit-Reset</code>), then retry. With no headers they use exponential backoff with jitter.</li>
+                <li>Retry only <code>429</code>, <code>502</code>, <code>503</code>, <code>504</code> and network errors (up to 5 times). Other errors such as <code>400</code> or <code>413</code> fail immediately.</li>
+                <li>Rebuild the request body on every attempt, because a request body or open file can only be sent once.</li>
+            </ul>
+
+            <div class="code-box">
+                <div class="code-box-header">
+                    <span class="code-box-lang">Bash</span>
+                    <button type="button" class="code-copy-btn" aria-label="Copy Bash code to clipboard"><svg class="code-copy-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg><span class="code-copy-label">Copy</span></button>
+                </div>
+                <pre><code>#!/usr/bin/env bash
+# Upload many files, 20 per request, backing off when rate limited
+API="https://tempfile.org/api/upload/local"
+MAX_FILES_PER_REQUEST=20
+MAX_RETRIES=5
+
+upload_batch() {
+  local args=() f
+  for f in "$@"; do args+=(-F "files=@$f"); done
+
+  for ((attempt = 0; attempt &lt;= MAX_RETRIES; attempt++)); do
+    # -D saves response headers, -w prints the HTTP status
+    status=$(curl -s -o response.json -D headers.txt -w '%{http_code}' \
+      -X POST "$API" "${args[@]}" -F "expiryHours=24")
+
+    if [[ $status == 2* ]]; then
+      cat response.json; echo
+      # Quota used up? Wait for the window to reset instead of earning a 429
+      remaining=$(grep -i '^x-ratelimit-remaining:' headers.txt | tr -d '\r' | awk '{print $2}')
+      reset=$(grep -i '^x-ratelimit-reset:' headers.txt | tr -d '\r' | awk '{print $2}')
+      if [[ $remaining == 0 &amp;&amp; -n $reset ]]; then
+        wait=$(( reset - $(date +%s) ))
+        (( wait &gt; 0 )) &amp;&amp; { echo "Rate limit reached - waiting ${wait}s" &gt;&amp;2; sleep "$wait"; }
+      fi
+      return 0
+    fi
+
+    # Only retry 429 and temporary gateway errors
+    if [[ $status != 429 &amp;&amp; $status != 502 &amp;&amp; $status != 503 &amp;&amp; $status != 504 ]]; then
+      echo "HTTP $status: $(cat response.json)" &gt;&amp;2
+      return 1
+    fi
+
+    # Prefer the server's Retry-After, otherwise exponential backoff
+    delay=$(grep -i '^retry-after:' headers.txt | tr -d '\r' | awk '{print $2}')
+    [[ $delay =~ ^[0-9]+$ ]] || delay=$(( 2 ** attempt ))
+    echo "HTTP $status - retrying in ${delay}s" &gt;&amp;2
+    sleep "$delay"
+  done
+  echo "Gave up after $MAX_RETRIES retries" &gt;&amp;2
+  return 1
+}
+
+# Usage: ./upload.sh *.jpg
+files=("$@")
+for ((i = 0; i &lt; ${#files[@]}; i += MAX_FILES_PER_REQUEST)); do
+  upload_batch "${files[@]:i:MAX_FILES_PER_REQUEST}" || exit 1
+done</code></pre>
+            </div>
+
+            <div class="code-box">
+                <div class="code-box-header">
+                    <span class="code-box-lang">JavaScript (Node.js 18+)</span>
+                    <button type="button" class="code-copy-btn" aria-label="Copy JavaScript (Node.js 18+) code to clipboard"><svg class="code-copy-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg><span class="code-copy-label">Copy</span></button>
+                </div>
+                <pre><code>// Usage: node upload.mjs file1.pdf file2.png file3.zip ...
+// Node.js 18+ (ES module) - uses the built-in fetch, FormData and Blob
+import { readFile } from 'node:fs/promises';
+import path from 'node:path';
+
+const API = 'https://tempfile.org/api/upload/local';
+const MAX_FILES_PER_REQUEST = 20; // the API accepts up to 20 files per request
+const MAX_RETRIES = 5;
+
+const sleep = (ms) =&gt; new Promise((resolve) =&gt; setTimeout(resolve, ms));
+
+// How long to wait before retrying? Prefer what the server tells us.
+function retryDelayMs(res, attempt) {
+  const retryAfter = Number(res?.headers.get('retry-after'));   // seconds
+  if (retryAfter &gt; 0) return retryAfter * 1000;
+
+  const reset = Number(res?.headers.get('x-ratelimit-reset'));  // unix timestamp (seconds)
+  if (reset &gt; 0) return Math.max(reset * 1000 - Date.now(), 1000);
+
+  // No headers (network error, or a proxy removed them): exponential backoff + jitter
+  return Math.min(2 ** attempt * 1000, 60000) + Math.random() * 1000;
+}
+
+// If this response used up our last request, how long until the window resets?
+function quotaWaitMs(res) {
+  if (res.headers.get('x-ratelimit-remaining') !== '0') return 0;
+  const reset = Number(res.headers.get('x-ratelimit-reset'));
+  return reset &gt; 0 ? Math.max(reset * 1000 - Date.now(), 0) : 0;
+}
+
+// Upload up to 20 files in ONE request, retrying when rate limited
+async function uploadBatch(filePaths, expiryHours = 24) {
+  for (let attempt = 0; attempt &lt;= MAX_RETRIES; attempt++) {
+    // Rebuild the form on every attempt - a request body can only be sent once
+    const form = new FormData();
+    for (const filePath of filePaths) {
+      form.append('files', new Blob([await readFile(filePath)]), path.basename(filePath));
+    }
+    form.append('expiryHours', String(expiryHours));
+
+    let res;
+    try {
+      res = await fetch(API, { method: 'POST', body: form });
+    } catch (err) {
+      // Network error - back off and try again
+      if (attempt === MAX_RETRIES) throw err;
+      await sleep(retryDelayMs(null, attempt));
+      continue;
+    }
+
+    if (res.ok) {
+      const result = await res.json();
+      if (!result.success) throw new Error(result.error);
+      return { files: result.files, waitMs: quotaWaitMs(res) };
+    }
+
+    // Retry on 429 (rate limited) and temporary gateway errors, fail on anything else
+    const retryable = res.status === 429 || [502, 503, 504].includes(res.status);
+    if (!retryable || attempt === MAX_RETRIES) {
+      const body = await res.json().catch(() =&gt; ({}));
+      throw new Error(`HTTP ${res.status}: ${body.error || res.statusText}`);
+    }
+
+    const delay = retryDelayMs(res, attempt);
+    console.log(`HTTP ${res.status} - retrying in ${Math.ceil(delay / 1000)}s`);
+    await sleep(delay);
+  }
+}
+
+// Upload any number of files, 20 per request
+async function uploadMany(filePaths, expiryHours = 24) {
+  const uploaded = [];
+  for (let i = 0; i &lt; filePaths.length; i += MAX_FILES_PER_REQUEST) {
+    const batch = filePaths.slice(i, i + MAX_FILES_PER_REQUEST);
+    const { files, waitMs } = await uploadBatch(batch, expiryHours);
+    uploaded.push(...files);
+    console.log(`Uploaded ${uploaded.length}/${filePaths.length} files`);
+
+    // Quota used up? Wait for the window to reset instead of earning a 429
+    if (waitMs &gt; 0 &amp;&amp; i + MAX_FILES_PER_REQUEST &lt; filePaths.length) {
+      console.log(`Rate limit reached - waiting ${Math.ceil(waitMs / 1000)}s`);
+      await sleep(waitMs);
+    }
+  }
+  return uploaded;
+}
+
+const files = await uploadMany(process.argv.slice(2));
+for (const f of files) console.log(f.name, '-&gt;', f.url);</code></pre>
+            </div>
+
+            <div class="code-box">
+                <div class="code-box-header">
+                    <span class="code-box-lang">Python</span>
+                    <button type="button" class="code-copy-btn" aria-label="Copy Python code to clipboard"><svg class="code-copy-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg><span class="code-copy-label">Copy</span></button>
+                </div>
+                <pre><code># Usage: python upload.py file1.pdf file2.png file3.zip ...
+import os
+import random
+import sys
+import time
+
+import requests
+
+API = "https://tempfile.org/api/upload/local"
+MAX_FILES_PER_REQUEST = 20  # the API accepts up to 20 files per request
+MAX_RETRIES = 5
+
+
+def retry_delay(response, attempt):
+    """Seconds to wait before retrying. Prefer what the server tells us."""
+    if response is not None:
+        retry_after = response.headers.get("Retry-After")
+        if retry_after and retry_after.isdigit():
+            return int(retry_after)
+
+        reset = response.headers.get("X-RateLimit-Reset")  # unix timestamp (seconds)
+        if reset and reset.isdigit():
+            return max(int(reset) - time.time(), 1)
+
+    # No headers (network error): exponential backoff + jitter
+    return min(2 ** attempt, 60) + random.random()
+
+
+def quota_wait(response):
+    """If this response used up our last request, seconds until the window resets."""
+    if response.headers.get("X-RateLimit-Remaining") != "0":
+        return 0
+    reset = response.headers.get("X-RateLimit-Reset", "")
+    return max(int(reset) - time.time(), 0) if reset.isdigit() else 0
+
+
+def upload_batch(paths, expiry_hours=24):
+    """Upload up to 20 files in ONE request, retrying when rate limited."""
+    for attempt in range(MAX_RETRIES + 1):
+        # Re-open the files on every attempt - a file that was already read can't be re-sent
+        handles = [open(p, "rb") for p in paths]
+        try:
+            files = [("files", (os.path.basename(p), h)) for p, h in zip(paths, handles)]
+            response = requests.post(
+                API, files=files, data={"expiryHours": str(expiry_hours)}, timeout=300
+            )
+        except (requests.ConnectionError, requests.Timeout):
+            response = None  # network error - back off and try again
+        finally:
+            for h in handles:
+                h.close()
+
+        if response is not None and response.ok:
+            result = response.json()
+            if not result.get("success"):
+                raise RuntimeError(result.get("error", "Upload failed"))
+            return result["files"], quota_wait(response)
+
+        # Retry on 429 (rate limited) and temporary gateway errors, fail on anything else
+        status = response.status_code if response is not None else None
+        if status is not None and status not in (429, 502, 503, 504):
+            raise RuntimeError(f"HTTP {status}: {response.text}")
+        if attempt == MAX_RETRIES:
+            raise RuntimeError(f"Gave up after {MAX_RETRIES} retries (last status: {status})")
+
+        delay = retry_delay(response, attempt)
+        print(f"HTTP {status} - retrying in {delay:.0f}s")
+        time.sleep(delay)
+
+
+def upload_many(paths, expiry_hours=24):
+    """Upload any number of files, 20 per request."""
+    uploaded = []
+    for i in range(0, len(paths), MAX_FILES_PER_REQUEST):
+        batch = paths[i:i + MAX_FILES_PER_REQUEST]
+        files, wait = upload_batch(batch, expiry_hours)
+        uploaded.extend(files)
+        print(f"Uploaded {len(uploaded)}/{len(paths)} files")
+
+        # Quota used up? Wait for the window to reset instead of earning a 429
+        if wait &gt; 0 and i + MAX_FILES_PER_REQUEST &lt; len(paths):
+            print(f"Rate limit reached - waiting {wait:.0f}s")
+            time.sleep(wait)
+    return uploaded
+
+
+if __name__ == "__main__":
+    for f in upload_many(sys.argv[1:]):
+        print(f["name"], "-&gt;", f["url"])</code></pre>
+            </div>
+
+            <div class="code-box">
+                <div class="code-box-header">
+                    <span class="code-box-lang">PHP</span>
+                    <button type="button" class="code-copy-btn" aria-label="Copy PHP code to clipboard"><svg class="code-copy-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg><span class="code-copy-label">Copy</span></button>
+                </div>
+                <pre><code>&lt;?php
+// Usage: php upload.php file1.pdf file2.png file3.zip ...
+$API = 'https://tempfile.org/api/upload/local';
+const MAX_FILES_PER_REQUEST = 20; // the API accepts up to 20 files per request
+const MAX_RETRIES = 5;
+
+// Seconds to wait before retrying. Prefer what the server tells us.
+function retryDelay(?array $headers, int $attempt): float {
+    if ($headers !== null) {
+        if (isset($headers['retry-after']) &amp;&amp; ctype_digit($headers['retry-after'])) {
+            return (float) $headers['retry-after'];
+        }
+        // unix timestamp (seconds)
+        if (isset($headers['x-ratelimit-reset']) &amp;&amp; ctype_digit($headers['x-ratelimit-reset'])) {
+            return (float) max((int) $headers['x-ratelimit-reset'] - time(), 1);
+        }
+    }
+    // No headers (network error): exponential backoff + jitter
+    return min(2 ** $attempt, 60) + mt_rand() / mt_getrandmax();
+}
+
+// If this response used up our last request, seconds until the window resets
+function quotaWait(array $headers): float {
+    if (($headers['x-ratelimit-remaining'] ?? '') !== '0') return 0;
+    $reset = $headers['x-ratelimit-reset'] ?? '';
+    return ctype_digit($reset) ? (float) max((int) $reset - time(), 0) : 0;
+}
+
+// Upload up to 20 files in ONE request, retrying when rate limited
+function uploadBatch(string $api, array $paths, int $expiryHours = 24): array {
+    for ($attempt = 0; $attempt &lt;= MAX_RETRIES; $attempt++) {
+        // One CURLFile per file, named files[0], files[1], ... (the API accepts this PHP-style naming)
+        $fields = ['expiryHours' =&gt; (string) $expiryHours];
+        foreach (array_values($paths) as $i =&gt; $path) {
+            $fields["files[$i]"] = new CURLFile($path, mime_content_type($path) ?: 'application/octet-stream', basename($path));
+        }
+        $headers = [];
+
+        $curl = curl_init($api);
+        curl_setopt_array($curl, [
+            CURLOPT_POST =&gt; true,
+            CURLOPT_POSTFIELDS =&gt; $fields,
+            CURLOPT_RETURNTRANSFER =&gt; true,
+            CURLOPT_TIMEOUT =&gt; 300,
+            // Collect the response headers so we can read X-RateLimit-* and Retry-After
+            CURLOPT_HEADERFUNCTION =&gt; function ($ch, $line) use (&amp;$headers) {
+                $parts = explode(':', $line, 2);
+                if (count($parts) === 2) {
+                    $headers[strtolower(trim($parts[0]))] = trim($parts[1]);
+                }
+                return strlen($line);
+            },
+        ]);
+
+        $response = curl_exec($curl);
+        $status = curl_getinfo($curl, CURLINFO_RESPONSE_CODE);
+        $networkError = $response === false;
+        curl_close($curl);
+
+        if (!$networkError &amp;&amp; $status &gt;= 200 &amp;&amp; $status &lt; 300) {
+            $result = json_decode($response, true);
+            if (!($result['success'] ?? false)) {
+                throw new RuntimeException($result['error'] ?? 'Upload failed');
+            }
+            return [$result['files'], quotaWait($headers)];
+        }
+
+        // Retry on 429 (rate limited), temporary gateway errors and network errors
+        $retryable = $networkError || in_array($status, [429, 502, 503, 504], true);
+        if (!$retryable || $attempt === MAX_RETRIES) {
+            throw new RuntimeException("HTTP $status: " . ($response ?: 'no response'));
+        }
+
+        $delay = retryDelay($networkError ? null : $headers, $attempt);
+        echo "HTTP $status - retrying in " . ceil($delay) . "s\n";
+        usleep((int) ($delay * 1000000));
+    }
+}
+
+// Upload any number of files, 20 per request
+function uploadMany(string $api, array $paths, int $expiryHours = 24): array {
+    $uploaded = [];
+    foreach (array_chunk($paths, MAX_FILES_PER_REQUEST) as $i =&gt; $batch) {
+        [$files, $wait] = uploadBatch($api, $batch, $expiryHours);
+        $uploaded = array_merge($uploaded, $files);
+        echo 'Uploaded ' . count($uploaded) . '/' . count($paths) . " files\n";
+
+        // Quota used up? Wait for the window to reset instead of earning a 429
+        $isLast = ($i + 1) * MAX_FILES_PER_REQUEST &gt;= count($paths);
+        if ($wait &gt; 0 &amp;&amp; !$isLast) {
+            echo 'Rate limit reached - waiting ' . ceil($wait) . "s\n";
+            usleep((int) ($wait * 1000000));
+        }
+    }
+    return $uploaded;
+}
+
+foreach (uploadMany($API, array_slice($argv, 1)) as $f) {
+    echo $f['name'] . ' -&gt; ' . $f['url'] . "\n";
+}</code></pre>
+            </div>
+
+            <h3>Integration Examples</h3>
+
+            <h4>Browser Upload Widget (multiple files)</h4>
+            <p>Uploads everything the user picked, 20 files per request, with automatic retry when rate limited.</p>
+
+            <div class="code-box">
+                <div class="code-box-header">
+                    <span class="code-box-lang">JavaScript</span>
+                    <button type="button" class="code-copy-btn" aria-label="Copy JavaScript code to clipboard"><svg class="code-copy-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg><span class="code-copy-label">Copy</span></button>
+                </div>
+                <pre><code>const sleep = (ms) =&gt; new Promise((resolve) =&gt; setTimeout(resolve, ms));
+
+// fetch() that waits and retries when rate limited (HTTP 429) or on temporary gateway errors
+async function fetchWithBackoff(url, makeOptions, maxRetries = 5) {
+  for (let attempt = 0; ; attempt++) {
+    let res = null;
+    try {
+      // makeOptions() builds a fresh body each attempt - a request body can only be sent once
+      res = await fetch(url, makeOptions());
+      if (res.status !== 429 &amp;&amp; ![502, 503, 504].includes(res.status)) return res; // done
+    } catch (err) {
+      if (attempt &gt;= maxRetries) throw err; // network error, out of retries
+    }
+    if (attempt &gt;= maxRetries) return res; // out of retries - let the caller handle the 429
+
+    // Prefer the server's instructions, otherwise exponential backoff with jitter.
+    // (The API exposes these headers to browsers via CORS; the fallback covers network errors.)
+    const retryAfter = Number(res?.headers.get('Retry-After'));      // seconds
+    const reset = Number(res?.headers.get('X-RateLimit-Reset'));     // unix timestamp (seconds)
+    const delay = retryAfter &gt; 0 ? retryAfter * 1000
+      : reset &gt; 0 ? Math.max(reset * 1000 - Date.now(), 1000)
+      : Math.min(2 ** attempt * 1000, 60000) + Math.random() * 1000;
+    await sleep(delay);
+  }
+}
+
+// Upload everything the user picked, 20 files per request
+async function uploadFiles(fileList, expiryHours = 24) {
+  const files = Array.from(fileList);
+  const uploaded = [];
+
+  for (let i = 0; i &lt; files.length; i += 20) {
+    const batch = files.slice(i, i + 20);
+    const res = await fetchWithBackoff('/api/upload/local', () =&gt; {
+      const formData = new FormData();
+      batch.forEach((file) =&gt; formData.append('files', file));
+      formData.append('expiryHours', String(expiryHours));
+      return { method: 'POST', body: formData };
+    });
+
+    const result = await res.json().catch(() =&gt; ({}));
+    if (!res.ok || !result.success) throw new Error(result.error || `HTTP ${res.status}`);
+    uploaded.push(...result.files);
+  }
+  return uploaded; // [{ id, name, size, url, expiryTime }, ...]
+}
+
+// Usage with &lt;input type="file" id="picker" multiple&gt;:
+// const uploaded = await uploadFiles(document.getElementById('picker').files);
+// uploaded.forEach((f) =&gt; console.log(f.name, f.url));</code></pre>
+            </div>
+
+            <h4>Batch URL Processing</h4>
+            <p><code>POST /api/upload/url</code> accepts a single URL per request, so these run one after another (firing them all at once with <code>Promise.all</code> would trigger <code>429</code> errors). Each URL uses one request from your hourly 200. When you have many files, download them yourself and upload them in batches of 20 with <code>/api/upload/local</code> instead. This example reuses <code>fetchWithBackoff</code> from the widget above.</p>
+
+            <div class="code-box">
+                <div class="code-box-header">
+                    <span class="code-box-lang">JavaScript</span>
+                    <button type="button" class="code-copy-btn" aria-label="Copy JavaScript code to clipboard"><svg class="code-copy-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg><span class="code-copy-label">Copy</span></button>
+                </div>
+                <pre><code>// Import several remote files by URL.
+// The URL endpoint takes ONE url per request, so go one at a time (not Promise.all)
+// and let fetchWithBackoff (above) handle rate limits.
+async function uploadFromUrls(urls, expiryHours = 12) {
+  const uploaded = [];
+
+  for (const url of urls) {
+    const res = await fetchWithBackoff('/api/upload/url', () =&gt; ({
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url, expiryHours })
+    }));
+
+    const result = await res.json().catch(() =&gt; ({}));
+    if (res.ok &amp;&amp; result.success) {
+      uploaded.push(result.file.url);
+    } else {
+      console.error(`Failed to import ${url}:`, result.error || `HTTP ${res.status}`);
+    }
+  }
+  return uploaded;
+}
+
+const links = await uploadFromUrls([
+  'https://example.com/doc1.pdf',
+  'https://example.com/doc2.pdf'
+]);</code></pre>
+            </div>
+
+            <h2>Best Practices</h2>
+            <ul>
+                <li><strong>Error Handling:</strong> Always check the <code>success</code> field in responses</li>
+                <li><strong>File Validation:</strong> Validate file types and sizes before uploading</li>
+                <li><strong>Batch Uploads:</strong> Send up to 20 files per request instead of one file per request - 200 requests then covers up to 4,000 files per hour</li>
+                <li><strong>Rate Limiting:</strong> Respect the 200 requests per hour limit. Read the <code>X-RateLimit-*</code> headers and, on a <code>429</code>, wait for <code>Retry-After</code> before retrying</li>
+                <li><strong>Security:</strong> Only upload files you have rights to share</li>
+                <li><strong>Expiry Planning:</strong> Choose appropriate deletion times for your use case</li>
+                <li><strong>URL Downloads:</strong> Ensure URLs are publicly accessible and safe</li>
+            </ul>
+
+            <h2>Common Use Cases</h2>
+            <ul>
+                <li><strong>Temporary File Sharing:</strong> Share documents between team members</li>
+                <li><strong>Application Integration:</strong> Add file upload to web/mobile apps</li>
+                <li><strong>Backup Solutions:</strong> Temporary backups with auto-cleanup</li>
+                <li><strong>Development Testing:</strong> Test file uploads in development environments</li>
+                <li><strong>Content Distribution:</strong> Temporary hosting for digital assets</li>
+                <li><strong>Data Processing:</strong> Temporary storage for file processing workflows</li>
+            </ul>
+
+            <h2>Security & Content Scanning</h2>
+            <p>All files uploaded through the API are automatically:</p>
+            <ul>
+                <li><strong>Virus Scanned:</strong> Malware detection before storage</li>
+                <li><strong>Content Validated:</strong> File type verification</li>
+                <li><strong>Size Checked:</strong> Enforcement of 100MB limit</li>
+                <li><strong>HTTPS Encrypted:</strong> Secure transmission and storage</li>
+                <li><strong>Auto-Deleted:</strong> Guaranteed removal after expiry</li>
+            </ul>
+
+                        <div class="prohibited-highlight">
+                <h4>
+                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line>
+                    </svg>
+                    Prohibited API Usage
+                </h4>
+                <ul>
+                    <li>Uploading copyrighted content without permission</li>
+                    <li>Hosting malware, viruses, or malicious files</li>
+                    <li>Adult content or inappropriate material</li>
+                    <li>Automated bulk uploading or spam</li>
+                    <li>Using the API to circumvent rate limits</li>
+                    <li>Commercial usage without permission</li>
+                </ul>
+            </div>
+
+            <h2>Webhooks & Notifications</h2>
+            <p>Currently, the API operates on a pull-based model. For file status updates:</p>
+            <ul>
+                <li>Poll the file info endpoint to check file status</li>
+                <li>Monitor the <code>exists</code> field to detect deletion</li>
+                <li>Track <code>expiryTime</code> for proactive cleanup</li>
+            </ul>
+            <p><strong>Service status:</strong> to know when the API itself is degraded, poll <code>https://status.tempfile.org/status.json</code> or subscribe to the <a href="https://status.tempfile.org/feed.xml">status feed</a>.</p>
+
+            <h2>Terms of Use</h2>
+            <p>API usage is subject to our <a href="/terms">Terms of Service</a>. Key points:</p>
+            <ul>
+                <li>No prohibited content (malware, adult content, illegal material)</li>
+                <li>Respect rate limits and fair usage policies</li>
+                <li>Do not use for permanent file storage</li>
+                <li>Commercial usage requires explicit permission</li>
+                <li>Users are responsible for content they upload</li>
+            </ul>
+            
+            <div class="contact-info">
+                <h3>
+                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"></path>
+                    </svg>
+                    API Support & Feedback
+                </h3>
+                <p><strong>Developer Support:</strong> <a href="/cdn-cgi/l/email-protection#c6a7b6af86b2a3abb6a0afaaa3e8a9b4a1"><span class="__cf_email__" data-cfemail="6405140d2410010914020d08014a0b1603">[email&#160;protected]</span></a></p>
+                <p><strong>Feature Requests:</strong> <a href="/cdn-cgi/l/email-protection#a5c3c0c0c1c7c4c6cee5d1c0c8d5c3ccc9c08bcad7c2"><span class="__cf_email__" data-cfemail="6c0a0909080e0d0f072c1809011c0a05000942031e0b">[email&#160;protected]</span></a></p>
+                <p><strong>Bug Reports:</strong> <a href="/cdn-cgi/l/email-protection#03617664704377666e73656a6f662d6c7164"><span class="__cf_email__" data-cfemail="9cfee9fbefdce8f9f1ecfaf5f0f9b2f3eefb">[email&#160;protected]</span></a></p>
+                <p><strong>Response Time:</strong> 24-48 hours</p>
+                <p>Include your use case and sample code when reporting issues for faster resolution.</p>
+            </div>
+
+        </div>
+        
+        <!-- Footer -->
+        <footer class="footer">
+            <p>Files auto-delete • No signup • Secure hosting</p>
+        </footer>
+    </div>
+
+
+<div class="floating-actions">
+    <div class="ask-ai-wrapper">
+        <button class="theme-toggle ask-ai-btn" onclick="toggleAskAiMenu()" id="ask-ai-btn">
+            <svg class="theme-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2z"></path>
+                <path d="M12 8v4l3 3"></path>
+            </svg>
+            <span>Ask AI</span>
+        </button>
+        <div class="ask-ai-menu" id="ask-ai-menu">
+            <button onclick="askAI('chatgpt', this)"><span class="btn-label">Ask ChatGPT</span></button>
+            <button onclick="askAI('claude', this)"><span class="btn-label">Ask Claude</span></button>
+            <button onclick="askAI('copy', this)"><span class="btn-label">Copy prompt</span></button>
+        </div>
+    </div>
+    <!-- Theme Toggle Button -->
+    <button type="button" class="theme-toggle" id="themeToggle" aria-label="Switch to dark mode" hidden>
+        <svg class="theme-icon ic-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        <svg class="theme-icon ic-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+        <span class="lbl-dark">Dark</span><span class="lbl-light">Light</span>
+    </button>
+</div>
+
+    <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script src="/js/api.js?ver=2.5.0"></script>
+        <script defer src="/js/pwa.js?ver=1.0.1"></script>
+    <script defer src="/js/support.js?ver=1.0.0"></script>
+</body>
+</html>

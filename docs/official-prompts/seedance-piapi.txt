@@ -1,0 +1,1001 @@
+Seedance 2.5 - Seedance API - PiAPI docs
+PiAPI
+Home
+Workspace
+Home
+Workspace
+Seedance
+Copy Page
+Get Started
+Overview
+Quickstart
+Make Instruction: How to Use PiAPI to Build a Workflow on Make?
+Endpoints
+Seedance
+Less-Restriction Models Guide
+Private Asset Library
+Seedance 2.5
+POST
+Seedance 2
+POST
+Video Watermark Remover
+POST
+Get task
+GET
+Seedream
+Seedream 5
+Get Task
+Byteaudio
+Seed-audio
+Get Task
+Kling
+Lipsync With PiAPI Kling API Examples
+Motion Brush With PiAPI Kling API Example
+Kling Elements Video Generation API
+Kling Effects Video Generation
+Cancel Task
+Cancel Task
+Cancel Tasks
+Get Task
+Create Task
+Kling Virtual Try-On
+Kling Effects
+Kling Sound
+Kling Avatar
+Kling Motion Control
+Kling Turbo
+Kling 3.0
+Kling omni
+Kling o1
+Kling 3.0 omni
+Get Task
+Minimax
+Generate Video
+Get Task
+Sora2
+Sora2-preview Text to Video
+Sora2 Text to Video
+Sora2-Pro Text to Video
+Sora2 Remove Watermark
+Get task
+Tools
+File Upload API
+Remove Background API
+Remove Background-Get Task
+Segment With Prompt API
+Segment With Prompt API-Get Task
+Image Upscale(Super Resolution) API
+Image Upscale-Get Task
+Video Upscale
+Video Upscale-Get Task
+Video Remove Background
+Video Remove Background-Get task
+Skin Tokens
+Skin Tokens-Get task
+Gemini
+Gemini-2.5-flash-image
+Nano Banana Pro
+Nano Banana 2
+Get task
+GPT image
+GPT-image API
+LLM
+How To Avoid Timeouts in Completion API
+LLM API | Basic Completions
+Omni Human
+OmniHuman 1.5
+Get task
+Flux
+Flux with LoRA and Controlnet
+Available LoRA and Controlnet
+Flux API with Redux Variation, Fill, Inpaint and Outpaint
+Create Task
+Text to Image
+Image to Image
+Kontext
+Get task
+Qwen Image
+Text to Image
+Image Edit
+Get task
+Z-Image
+Text to Image
+Get task
+Faceswap
+Multi Faceswap
+Image Faceswap
+Video Faceswap
+Get Task
+WanX
+Generate WanX Task with LoRA Using PiAPI
+Available LoRA Types for Wanx
+Use Cases for Wanx LoRA
+Use Cases for Wanx Control Camera
+Create Task
+Get Task
+Wan
+Wan2.6 Text to Video
+Wan2.6 Image to Video
+Get task
+Hailuo
+Generate Video
+Get Task
+Veo3
+Veo3 Text to Video
+Veo3 Image to Video
+Veo3.1 Text to Video
+Veo3.1 Image to Video
+Get task
+Skyreels
+Create Task
+Get Task
+Framepack
+Create Task
+Get Task
+Hunyuan Video
+How to Make a Hunyuan API Call
+Available Hunyuan Lora models
+Get Task
+Generate Video
+Luma Dream Machine
+Create Task
+Get Task
+Suno(service stopped)
+Music(service stopped)
+Lyrics(service stopped)
+Get task
+Song(Udio)
+Song API Task Creation Examples
+[Udio] Song Extend
+Get Task
+Create Task
+[Udio] Generate Lyrics
+Mmaudio
+Get Task
+Generate Audio
+DiffRhythm
+Generate Audio
+Get Task
+Ace Step
+Create Task
+Text to Audio
+Audio to Audio
+Audio Edit
+Audio Extend
+Get Task
+TTS
+Zeroshot Text-to-Speech F5-TTS
+Get Task
+Trellis
+Trellis Create Task
+Trellis2 Create Task
+Get Task
+Meshy
+Meshy Create Task
+Get Task
+Pixal3D
+Pixal3D Create Task
+Get Task
+Joycaption
+Image Caption
+Get Task
+Midjourney
+PiAPI Penalties on Midjourney Usage
+Detailed Explaination on Midjourney Task Result
+Midjourney V7 API Instructions
+Create Task
+Imagine
+Upscale
+Variation
+Reroll
+Describe
+Seed
+Blend
+Inpaint
+Outpaint
+Pan
+Cancel Task
+Cancel Task
+Cancel Tasks
+Get Task
+AI Hug
+Get Task
+Create Task
+PiAPI Account Management
+PiAPI Account Info
+Task List Info
+User Task History
+Resources
+Change Log
+Output Storage
+Unified API Schema
+Webhook
+Bulk Generation Service
+Billings
+PiAPI MCP Server
+Workspace Manual
+Host-your-account (HYA) | Back-up Account
+Host-your-account (HYA) | Debug Checklist
+Host-your-account (HYA) | Connected Account Status
+Announcements
+PiAPI 2025 January 1st Pricing Update
+The discontinued support for midjourney
+Sunsetting Suno
+Schemas
+Schemas
+motion brush
+Create Task
+camera control
+Cancel Params
+Float2 Point
+Control Points
+txt2video-1.3b
+txt2video-14b
+txt2video-14b-lora
+img2video-14b
+img2video-14b-lora
+img2video-14b-keyframe
+img2video-14b-control-camera
+wan22-txt2video-14b
+wan22-img2video-14b
+hunyuan-txt2video-lora
+Trellis API/text-to-3D
+Trellis API/image-to-3D
+Trellis2 API/image-to-3D
+Kling omni multi shot
+VideoGenerationRequest
+TaskRequest
+TaskConfig
+TaskInput
+TaskResponse
+ErrorResponse
+Response
+Unified-Task-Response
+RequestBodies
+Unified-Task-Request-Body
+config
+control_net_setting
+lora_setting
+VideoGenerationResponse
+Pixal3D API/image-to-3D
+Seedance
+Copy Page
+Seedance 2.5
+POST
+https://api.piapi.ai
+/api/v1/task
+Try it
+Overview
+#
+Seedance 2.5 is the new flagship Seedance model, providing high-quality video generation from text prompts, with optional image references to control subject appearance or style, plus video and audio references — all supported on the single
+seedance-2.5
+task type (no VIP split).
+Currently available models:
+seedance-2.5
+seedance-2.5-less-restriction
+Pricing
+#
+Price per second(USD)
+Model
+480p
+720p
+1080p
+seedance-2.5
+0.15
+0.35
+0.80
+seedance-2.5-less-restriction
+0.165
+0.385
+0.88
+With video references, billing is based on input video duration × (price per second / 2) + output duration × price per second.
+Video editing tasks (
+omni_reference_task_type: edit
+,
+duration: -1
+) let the model choose the output length. Credits are reserved from your source video duration when the task is submitted, then
+settled against the duration of the video actually produced
+— if the result is shorter than the reservation, the difference is returned to your balance.
+4K (2160p) is not available for seedance-2.5.
+Draft mode: the draft is billed at the 480p price and the final video at the 1080p price — see Draft Mode below.
+Note
+#
+Peak hours: during high-traffic periods, queue times may be extended.
+Resolution:
+480p
+,
+720p
+or
+1080p
+; defaults to
+720p
+when omitted.
+4K
+is not supported and will be rejected.
+Duration: any integer from 4 to 30 seconds (default 5).
+Reference images: the API supports using one or more images as references in your prompts. See Using Image References for syntax. Maximum 30 images.
+Video/Audio references: maximum 10 videos, maximum 10 audios; total audio reference duration and total video reference duration must each not exceed 30s. Audio-only references are allowed.
+Aspect ratio:
+16:9
+(default),
+9:16
+,
+4:3
+,
+3:4
+,
+21:9
+,
+1:1
+, or
+adaptive
+. With
+adaptive
+the model selects the aspect ratio from the task type and the inputs. For video editing and video extension tasks
+adaptive
+is the only accepted value — see Video Editing and Video Extension below. For other tasks, the aspect ratio of the reference image takes precedence over the aspect ratio specified in the request parameters.
+Video Editing and Video Extension
+#
+Besides reference-guided generation,
+seedance-2.5
+can edit an existing video or extend one forward or backward. The model classifies the task from your prompt intent (for example "extend forward", "continue", or an instruction to change something in the source video), so these tasks have parameter requirements that differ from ordinary generation.
+Declare the task with
+omni_reference_task_type
+to have those requirements validated when the task is submitted, instead of the task failing later.
+omni_reference_task_type
+Meaning
+Requirements
+auto
+(default)
+The model infers the task from your prompt and the supplied references.
+Parameters that do not match the task the model actually selects cause the task to fail after submission.
+reference
+Reference-guided generation from images, videos or audio.
+No special
+aspect_ratio
+or
+duration
+requirement.
+edit
+Edits the visuals or audio of a source video.
+At least one entry in
+video_urls
+; the source video must be 4–30 seconds;
+aspect_ratio
+must be
+adaptive
+;
+duration
+must be
+-1
+.
+extend
+Extends a source video forward or backward.
+At least one entry in
+video_urls
+;
+aspect_ratio
+must be
+adaptive
+.
+duration
+is the requested output length (4–30 seconds).
+Why
+adaptive
+is required
+#
+For editing and extension the model picks the source video to work from, and the output keeps that video's aspect ratio — so no fixed ratio can be honoured.
+adaptive
+is therefore the only accepted value for these two task types. For
+edit
+the output length also follows the source video, which is why
+duration
+must be
+-1
+.
+If you declare
+edit
+or
+extend
+and omit
+aspect_ratio
+(and, for
+edit
+,
+duration
+), the required values are filled in for you. Supplying a conflicting fixed value is rejected with 400 rather than silently overridden.
+Notes
+#
+The model re-checks the task type from the prompt while processing. If the task it identifies does not match the value you declared, the task fails — keep the prompt consistent with
+omni_reference_task_type
+.
+For
+seedance-2.5-less-restriction
+editing requests, set
+auto_upload_assets
+to
+false
+so the source video URL stays directly readable; the source duration has to be measured to reserve credits.
+Billing for editing follows the reservation-and-settlement rule described under Pricing above.
+Example — extend a video forward
+#
+{
+"model"
+:
+"seedance"
+,
+"task_type"
+:
+"seedance-2.5"
+,
+"input"
+:
+{
+"prompt"
+:
+"Extend @video1 forward: the camera keeps drifting over the water as the sun sets"
+,
+"mode"
+:
+"omni_reference"
+,
+"omni_reference_task_type"
+:
+"extend"
+,
+"video_urls"
+:
+[
+"https://example.com/source.mp4"
+]
+,
+"aspect_ratio"
+:
+"adaptive"
+,
+"duration"
+:
+8
+,
+"resolution"
+:
+"720p"
+}
+}
+Example — edit a video
+#
+{
+"model"
+:
+"seedance"
+,
+"task_type"
+:
+"seedance-2.5"
+,
+"input"
+:
+{
+"prompt"
+:
+"In @video1, change the lighting to a warm golden hour"
+,
+"mode"
+:
+"omni_reference"
+,
+"omni_reference_task_type"
+:
+"edit"
+,
+"video_urls"
+:
+[
+"https://example.com/source.mp4"
+]
+,
+"aspect_ratio"
+:
+"adaptive"
+,
+"duration"
+:
+-1
+,
+"resolution"
+:
+"720p"
+}
+}
+Draft Mode
+#
+Draft mode is a two-step workflow for
+seedance-2.5
+and
+seedance-2.5-less-restriction
+. First generate a low-cost 480p draft to check the composition, camera movement, subject motion and prompt intent; then turn an approved draft into a 1080p final video that keeps the draft's content.
+Step 1 — generate a draft
+#
+Set
+draft
+to
+true
+.
+resolution
+must be
+480p
+; any other value is rejected with 400. All other parameters (prompt, image/video/audio references,
+duration
+,
+aspect_ratio
+,
+omni_reference_task_type
+) work exactly as in a normal task. The
+task_id
+returned by this request is the draft ID used in step 2.
+Step 2 — generate the final video
+#
+Create a new task with
+draft_task_id
+set to the draft's
+task_id
+and
+resolution
+set to
+1080p
+(the only accepted value). Use the same
+task_type
+as the draft.
+Omit
+prompt
+,
+image_urls
+,
+video_urls
+,
+audio_urls
+,
+duration
+,
+aspect_ratio
+,
+seed
+,
+audio
+and
+omni_reference_task_type
+. They are reused from the draft automatically; supplying any of them — even with the same value — is rejected with 400.
+draft
+and
+draft_task_id
+cannot be used in the same request.
+Requirements
+#
+The draft must belong to your account, use the same
+task_type
+, and have completed successfully.
+A draft can be used for step 2 for 7 days after it was created.
+Draft mode is available only for
+seedance-2.5
+and
+seedance-2.5-less-restriction
+. Other task types reject
+draft
+and
+draft_task_id
+.
+Billing
+#
+Each step is billed separately at the per-second price of its resolution (see Pricing above).
+Step
+Resolution
+Example: 4-second
+seedance-2.5
+video
+Step 1 — draft
+480p
+$0.60
+Step 2 — final video
+1080p
+$3.20
+If the draft used video references, step 2 is also billed for the same input video duration at half the 1080p price per second. The draft video itself is not billed as an input.
+Example — step 1 (draft)
+#
+{
+"model"
+:
+"seedance"
+,
+"task_type"
+:
+"seedance-2.5"
+,
+"input"
+:
+{
+"prompt"
+:
+"A red paper boat drifts slowly across a calm pond at sunrise, gentle ripples, soft morning light."
+,
+"mode"
+:
+"text_to_video"
+,
+"duration"
+:
+4
+,
+"aspect_ratio"
+:
+"16:9"
+,
+"resolution"
+:
+"480p"
+,
+"draft"
+:
+true
+}
+}
+Example — step 2 (final video from the draft)
+#
+{
+"model"
+:
+"seedance"
+,
+"task_type"
+:
+"seedance-2.5"
+,
+"input"
+:
+{
+"draft_task_id"
+:
+"<task_id returned by step 1>"
+,
+"resolution"
+:
+"1080p"
+}
+}
+Using References in Prompts
+#
+When you include media in your request, you can reference them directly in the text prompt using @typeN placeholders, where N is the 1-based position within that media type.
+Syntax
+#
+@image1, @image2, … – reference images
+@video1, @video2, … – reference videos
+@audio1, @audio2, … – reference audios
+You can use multiple references in a single prompt to indicate different subjects or transitions.
+The engine automatically converts @imageN / @videoN / @audioN to the upstream API format for compatibility. You may also use the Chinese format (@图片N / @视频N / @音频N) directly if preferred.
+Examples
+#
+Single image reference
+#
+The cat in @image1 walks through a garden
+Morphing effect
+#
+@image1 transforms into @image2
+Multi-subject scene
+#
+The whale in @image1 meets the ninja in @image2
+Video + Audio reference
+#
+The character in @image1 dances to @audio1 in the scene from @video1
+Validation
+#
+If your prompt references media that was not provided (e.g., you use @image3 but only two images are supplied), the request will be rejected with a 400 Bad Request error.
+Video References
+#
+seedance-2.5 supports video references via the
+video_urls
+array. You can provide up to 10 video URLs. The input videos are used as references for the generation.
+How it works
+#
+Provide video URLs in the
+video_urls
+array (maximum 10; MP4/MOV only; maximum file size 200 MB per video).
+Total video reference duration must not exceed 30 seconds.
+Billing: input video duration × (price per second / 2) + output duration × price per second.
+You may combine video references with image references (via
+image_urls
+) and audio references (via
+audio_urls
+).
+Supported video formats: MP4 and MOV; each video must be 2–30 seconds and no larger than 200 MB. The input video must pass a content safety review.
+Audio References
+#
+seedance-2.5 supports audio references via the
+audio_urls
+array. You can provide up to 10 audio URLs (MP3/WAV only; maximum file size 15 MB per audio).
+How it works
+#
+Provide audio URLs in the
+audio_urls
+array (maximum 10; MP3/WAV only; maximum file size 15 MB per audio).
+Total audio reference duration must not exceed 30 seconds.
+Audio-only submissions are supported; audio references do not require an image or video reference.
+Supported formats: mp3, wav.
+Tips
+#
+Use publicly accessible media URLs (e.g., hosted on a CDN or cloud storage).
+Keep reference media short (5–15 seconds) for best results.
+Describe the desired output clearly in your prompt.
+Request
+Header Params
+Generate Code
+Body Params
+application/json
+Generate Code
+Examples
+text to video
+image to video
+video reference
+audio + image reference
+draft step 1 (480p draft)
+draft step 2 (1080p final from draft)
+{
+"model"
+:
+"seedance"
+,
+"task_type"
+:
+"seedance-2.5"
+,
+"input"
+:
+{
+"prompt"
+:
+"A woman sings and strums her guitar"
+,
+"duration"
+:
+5
+,
+"aspect_ratio"
+:
+"16:9"
+,
+"resolution"
+:
+"720p"
+}
+,
+"config"
+:
+{
+"webhook_config"
+:
+{
+"endpoint"
+:
+"https://webhook.site/440dc876-c92a-4ef7-a3c5-2f4a8f528601"
+,
+"secret"
+:
+""
+}
+}
+}
+Request Code Samples
+Shell
+JavaScript
+Java
+Swift
+Go
+PHP
+Python
+HTTP
+C
+C#
+Objective-C
+Ruby
+OCaml
+Dart
+R
+Request
+Request Example
+Shell
+JavaScript
+Java
+Swift
+cURL
+text to video
+image to video
+video reference
+audio + image reference
+draft step 1 (480p draft)
+draft step 2 (1080p final from draft)
+curl
+--location
+'https://api.piapi.ai/api/v1/task'
+\
+--header
+'X-API-Key;'
+\
+--header
+'Content-Type: application/json'
+\
+--data
+'{
+    "model": "seedance",
+    "task_type": "seedance-2.5",
+    "input": {
+        "prompt": "A woman sings and strums her guitar",
+        "duration": 5,
+        "aspect_ratio": "16:9",
+        "resolution": "720p"
+    },
+    "config": {
+        "webhook_config": {
+            "endpoint": "https://webhook.site/440dc876-c92a-4ef7-a3c5-2f4a8f528601",
+            "secret": ""
+        }
+    }
+}'
+Responses
+🟢
+200
+Success
+application/json
+Generate Code
+Body
+application/json
+Generate Code
+Examples
+Task created (pending)
+Task completed
+{
+"code"
+:
+200
+,
+"data"
+:
+{
+"task_id"
+:
+"07ed43de-465d-43b1-b62c-44249b14d818"
+,
+"model"
+:
+"seedance"
+,
+"task_type"
+:
+"seedance-2.5"
+,
+"status"
+:
+"pending"
+,
+"config"
+:
+{
+"service_mode"
+:
+""
+,
+"webhook_config"
+:
+{
+"endpoint"
+:
+""
+,
+"secret"
+:
+""
+}
+}
+,
+"input"
+:
+{
+"prompt"
+:
+"A woman sings and strums her guitar"
+,
+"mode"
+:
+"text_to_video"
+,
+"duration"
+:
+5
+,
+"aspect_ratio"
+:
+"16:9"
+,
+"resolution"
+:
+"720p"
+}
+,
+"output"
+:
+null
+,
+"meta"
+:
+{
+"created_at"
+:
+"2026-02-27T13:33:26.10346684Z"
+,
+"started_at"
+:
+"0001-01-01T00:00:00Z"
+,
+"ended_at"
+:
+"0001-01-01T00:00:00Z"
+,
+"usage"
+:
+{
+"type"
+:
+"point"
+,
+"frozen"
+:
+30000000
+,
+"consume"
+:
+0
+}
+,
+"is_using_private_pool"
+:
+false
+}
+,
+"detail"
+:
+null
+,
+"logs"
+:
+[
+]
+,
+"error"
+:
+{
+"code"
+:
+0
+,
+"raw_message"
+:
+""
+,
+"message"
+:
+""
+,
+"detail"
+:
+null
+}
+}
+,
+"message"
+:
+"success"
+}
+Modified at
+2026-09-29 07:44:39
+Previous
+Private Asset Library
+Next
+Seedance 2
+LLMs.txt

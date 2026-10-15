@@ -1,0 +1,290 @@
+{
+  "version": "2026-10-15.1",
+  "groups": [
+    {
+      "id": "render_style",
+      "title": "Визуальный стиль",
+      "icon": "◈",
+      "options": [
+        {
+          "id": "animation-3d",
+          "title": "Авторская 3D-анимация",
+          "description": "Выразительные формы, аккуратные материалы, единый дизайн.",
+          "instruction": "Use polished stylized 3D animation with coherent sculpted forms, expressive readable silhouettes and carefully differentiated materials. Preserve reference character design."
+        },
+        {
+          "id": "cinematic-realism",
+          "title": "Кинематографичный реализм",
+          "description": "Естественная фактура и правдоподобный свет.",
+          "instruction": "Use cinematic realism with believable material response, restrained surface detail and physically coherent lighting. Preserve identity and proportions from references."
+        },
+        {
+          "id": "illustration",
+          "title": "Объёмная иллюстрация",
+          "description": "Рисованная фактура и читаемые планы.",
+          "instruction": "Use a dimensional illustration with deliberate shape design, controlled painterly texture and clear foreground/background separation. Preserve reference design."
+        },
+        {
+          "id": "graphic",
+          "title": "Графичная анимация",
+          "description": "Чистые контуры, крупные цветовые массы.",
+          "instruction": "Use clean graphic animation with controlled contours and deliberate color shapes; keep identity and staging recognizable."
+        }
+      ]
+    },
+    {
+      "id": "genre",
+      "title": "Жанр",
+      "icon": "◇",
+      "options": [
+        {
+          "id": "comedy",
+          "title": "Комедия",
+          "description": "Реакции и ясная постановка без карикатурной деформации.",
+          "instruction": "Support situational comedy through clear staging and readable reactions, without deforming faces or inventing comic props."
+        },
+        {
+          "id": "drama",
+          "title": "Драма",
+          "description": "Внимание к взгляду, паузе и отношениям героев.",
+          "instruction": "Use restrained dramatic staging, subtle expression and attention to the existing characters relationship; do not invent a new plot."
+        },
+        {
+          "id": "documentary",
+          "title": "Наблюдение",
+          "description": "Естественная жизнь сцены без постановочной вычурности.",
+          "instruction": "Use an observational documentary sensibility, natural body language and an unforced relationship to the existing environment."
+        },
+        {
+          "id": "noir",
+          "title": "Нуар",
+          "description": "Сдержанное напряжение и выразительное разделение света.",
+          "instruction": "Use restrained noir tension and deliberate tonal separation. Preserve explicitly selected light sources and time of day; do not automatically turn the scene into night."
+        },
+        {
+          "id": "epic",
+          "title": "Масштаб",
+          "description": "Выразительная среда и ясный главный акцент.",
+          "instruction": "Emphasize the scale of the existing environment with clear visual hierarchy; do not add crowds or objects to manufacture scale."
+        }
+      ]
+    },
+    {
+      "id": "capture",
+      "title": "Камера",
+      "icon": "▣",
+      "options": [
+        {
+          "id": "modern",
+          "title": "Современная цифровая",
+          "description": "Чистое изображение и спокойная передача цвета.",
+          "instruction": "Use a clean modern digital capture character, controlled highlights and stable color, without artificial sharpening halos."
+        },
+        {
+          "id": "film-35",
+          "title": "Киноплёнка 35 мм",
+          "description": "Деликатная фактура и мягкий переход светов.",
+          "instruction": "Suggest a restrained 35mm film capture character with fine texture and gentle highlight roll-off. This is a look, not a focal-length or output-resolution setting."
+        },
+        {
+          "id": "film-8",
+          "title": "Плёнка 8 мм",
+          "description": "Выраженная фактура для ретро-вставок.",
+          "instruction": "Suggest an intentional small-gauge 8mm film texture. Preserve the existing scene period, wardrobe, identity and composition; do not add borders or date stamps."
+        },
+        {
+          "id": "dv",
+          "title": "DV-камера",
+          "description": "Характер бытовой цифровой записи.",
+          "instruction": "Suggest the tonal and texture character of a consumer DV recording while retaining readable identity. Do not add timestamps, camera UI, black borders or change delivered resolution."
+        }
+      ]
+    },
+    {
+      "id": "lens",
+      "title": "Объектив",
+      "icon": "◎",
+      "options": [
+        {
+          "id": "clean",
+          "title": "Чистая резкость",
+          "description": "Минимум аберраций, читаемые лица.",
+          "instruction": "Use clean lens rendering with restrained aberration, natural facial proportions and readable fine detail. Avoid over-sharpening."
+        },
+        {
+          "id": "anamorphic",
+          "title": "Анаморфотная",
+          "description": "Характерные блики и мягкое боке.",
+          "instruction": "Suggest restrained anamorphic optical character with subtle horizontal flare only from existing bright sources and oval bokeh where defocus exists. Do not stretch faces, change aspect ratio or add black bars."
+        },
+        {
+          "id": "vintage-anamorphic",
+          "title": "Винтажная анаморфотная",
+          "description": "Мягкий контраст и лёгкие оптические несовершенства.",
+          "instruction": "Use restrained vintage anamorphic rendering, gentler contrast and subtle edge aberration. Keep faces readable; do not alter aspect ratio or identity."
+        },
+        {
+          "id": "warm-vintage",
+          "title": "Тёплая винтажная",
+          "description": "Мягкие переходы и деликатная теплота.",
+          "instruction": "Use subtly warm vintage lens rendering with gentle diffusion and restrained highlight bloom. Preserve explicitly selected light direction, scene time and recognizable material colors."
+        },
+        {
+          "id": "halation",
+          "title": "Ореолы светов",
+          "description": "Нежное свечение вокруг ярких огней.",
+          "instruction": "Suggest subtle film-like halation only around existing bright highlights. Do not haze the whole image or obscure eyes, face contours or cabin geometry."
+        }
+      ]
+    },
+    {
+      "id": "view",
+      "title": "Угол обзора",
+      "icon": "⌖",
+      "options": [
+        {
+          "id": "wide",
+          "title": "Умеренно широкий",
+          "description": "Показать пространство, сохранить лица по краям.",
+          "instruction": "Use a moderately wide field of view that reveals the existing space without fisheye distortion or stretched edge faces. Preserve the selected physical camera station."
+        },
+        {
+          "id": "natural",
+          "title": "Естественный",
+          "description": "Сбалансированное соотношение героя и среды.",
+          "instruction": "Use a natural balanced field of view, keeping the selected crop and camera station physically plausible; avoid exaggerated perspective."
+        },
+        {
+          "id": "portrait",
+          "title": "Портретный",
+          "description": "Спокойная передача лица и отделение от фона.",
+          "instruction": "Prefer a portrait-like field of view when physically possible at the selected camera station. Preserve assigned seats and cabin geometry; never move the camera through a wall to imitate a long lens."
+        }
+      ]
+    },
+    {
+      "id": "focus",
+      "title": "Фокус",
+      "icon": "◉",
+      "options": [
+        {
+          "id": "subject",
+          "title": "Главный герой",
+          "description": "Акцент на выбранном герое, мягкое отделение фона.",
+          "instruction": "Keep the focal subject eyes and face readable with gentle background separation. Do not invent a new focal subject."
+        },
+        {
+          "id": "both",
+          "title": "Оба собеседника",
+          "description": "Читаемые лица водителя и гостя.",
+          "instruction": "Keep both existing conversation participants faces readable within the chosen view. Use sufficient depth of field instead of arbitrarily blurring the second person. Do not add a second person if absent."
+        },
+        {
+          "id": "deep",
+          "title": "Вся сцена",
+          "description": "Герои и важная геометрия окружения.",
+          "instruction": "Use sufficient depth of field for the existing subjects and relevant environment to remain legible, without artificial edge enhancement."
+        },
+        {
+          "id": "detail",
+          "title": "Выбранная деталь",
+          "description": "Акцент на детали, уже указанной в задании.",
+          "instruction": "Focus on the existing detail explicitly named in the brief or selected shot. Do not invent a prop or simultaneously demand multiple competing focal planes."
+        }
+      ]
+    },
+    {
+      "id": "palette",
+      "title": "Палитра",
+      "icon": "◐",
+      "options": [
+        {
+          "id": "natural",
+          "title": "Естественная",
+          "description": "Сдержанные цвета с сохранением канона.",
+          "instruction": "Use balanced restrained color, preserving canonical costume and object colors; do not recolor identity references."
+        },
+        {
+          "id": "amber-blue",
+          "title": "Янтарь и синий",
+          "description": "Тёплые акценты в прохладной среде.",
+          "instruction": "Use restrained amber accents against cooler blue surroundings while preserving the selected lighting geometry and canonical colors."
+        },
+        {
+          "id": "muted",
+          "title": "Приглушённая",
+          "description": "Сдержанная насыщенность и аккуратные акценты.",
+          "instruction": "Use restrained saturation with deliberate existing color accents, preserving readable face and material color relationships."
+        },
+        {
+          "id": "warm",
+          "title": "Тёплая",
+          "description": "Мягкая тёплая обработка без замены освещения.",
+          "instruction": "Use a restrained warm grade while retaining natural facial colors and the selected source-light directions. Do not imply a new sunset or time of day."
+        },
+        {
+          "id": "cool",
+          "title": "Прохладная",
+          "description": "Прохладная среда, узнаваемые цвета персонажей.",
+          "instruction": "Use a controlled cool grade while preserving face color separation and canonical wardrobe colors; do not turn skin uniformly blue."
+        }
+      ]
+    },
+    {
+      "id": "mood",
+      "title": "Настроение",
+      "icon": "✧",
+      "options": [
+        {
+          "id": "calm",
+          "title": "Спокойное",
+          "description": "Наблюдение и естественные реакции.",
+          "instruction": "Use calm understated staging and natural expression; keep the action from the brief."
+        },
+        {
+          "id": "intimate",
+          "title": "Доверительное",
+          "description": "Внимание к собеседникам и небольшим жестам.",
+          "instruction": "Support an intimate conversational mood through readable gaze and small natural gestures, without inventing dialogue or relationships."
+        },
+        {
+          "id": "tense",
+          "title": "Напряжённое",
+          "description": "Сдержанное напряжение без гротеска.",
+          "instruction": "Suggest controlled tension through the existing subjects gaze and posture, without exaggerated grimaces or unrequested threats."
+        },
+        {
+          "id": "playful",
+          "title": "Ироничное",
+          "description": "Тонкая комическая реакция без потери образа.",
+          "instruction": "Use subtle playful irony in readable expression and staging; preserve identity, anatomy and the intended action."
+        }
+      ]
+    },
+    {
+      "id": "finish",
+      "title": "Фактура и детализация",
+      "icon": "✦",
+      "options": [
+        {
+          "id": "balanced",
+          "title": "Чистая проработка",
+          "description": "Материалы, контактные тени, ясный главный акцент.",
+          "instruction": "Differentiate materials through their surface response, retain coherent contact shadows and prioritize readable focal detail. Avoid waxy skin, oversharpening and indiscriminate microtexture."
+        },
+        {
+          "id": "soft",
+          "title": "Мягкая отделка",
+          "description": "Деликатные переходы без потери лица.",
+          "instruction": "Use gentle tonal transitions and restrained surface detail while retaining recognizable eyes, face contours and clothing structure."
+        },
+        {
+          "id": "textured",
+          "title": "Материальная фактура",
+          "description": "Ткань, стекло и металл различаются по поверхности.",
+          "instruction": "Make existing fabric, glass, metal and skin respond distinctly to the chosen light. Texture must follow material and scale, never replace identity or add dirt everywhere."
+        }
+      ]
+    }
+  ]
+}

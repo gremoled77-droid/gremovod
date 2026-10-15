@@ -1,0 +1,57 @@
+{
+  "seedance-2.5": {
+    "order": "Reference roles, scene and subject, chronological action, camera path, physical secondary motion, requested audio, invariants.",
+    "rules": "Use @imageN only for supplied image array positions. Other media tags need actual supported inputs. Our adapter accepts images only. Keep duration/resolution outside the prose.",
+    "sources": ["seedance-piapi"]
+  },
+  "wan-3.0": {
+    "order": "Overall scene, reference roles, shot timing when needed, subject action and aesthetics, quoted speech, sound and style, exclusions.",
+    "rules": "Refer naturally to Image N, Video N or Audio N only when supplied. Use Shot N with time ranges only for requested multi-shot scenes. Attribute dialogue to a speaker. Do not invent audio inputs. This is prompt support; a Wan provider adapter is not connected.",
+    "sources": ["wan3-prompting"]
+  },
+  "ltx-2.5": {
+    "order": "Shot scale, scene and lighting, action in present tense, character details, camera movement relative to subject, requested audio.",
+    "rules": "Prefer a flowing paragraph for one take. Describe visible physical emotion and chronological verbs. For multiple shots describe cuts in prose, not borrowed tag syntax. Quote exact dialogue. Local prompt-enhancer flags are not API parameters. The provider adapter is not connected.",
+    "sources": ["ltx25-prompting"]
+  },
+  "kling-3.0": {
+    "order": "Subject and setting, physical action, camera and shot progression, requested dialogue and sound, appearance continuity.",
+    "rules": "Distinguish a single shot from an explicitly requested multi-shot storyboard. Elements require real bindings; plain reference metadata does not create an Element. Never fabricate @Element names or copy Seedance tags. Standard Kling 3.0 and Omni have separate interfaces. The provider adapter is not connected.",
+    "sources": ["kling3-guide", "kling3-omni-guide"]
+  },
+  "gpt-image-2": {
+    "order": "Image purpose, subject, scene composition, visual treatment and light, exact quoted text if requested, constraints and reference roles.",
+    "rules": "Write concrete natural language. For edits name the requested change and what must remain. Give each image a role and ordinal. Keep resolution and quality as tool settings; do not claim a hidden tool parameter can be selected.",
+    "sources": ["openai-image-prompting", "openai-image-api"]
+  },
+  "gpt-image-2.5": {
+    "order": "Image purpose, subject, scene composition, visual treatment and light, exact quoted text if requested, constraints and reference roles.",
+    "rules": "Use specific descriptions and explicit preservation constraints for edits. State reference roles and ordinals. Sunburst and Flare API options do not prove the native chat tool exposes that model, size or quality. Request the best native output, report actual dimensions, and do not upscale merely to claim higher resolution.",
+    "sources": ["openai-image-prompting", "openai-image-api"]
+  },
+  "seedream-5-lite": {
+    "order": "Subject, scene and action, composition, visual style and light, exact text and reference roles, preservation constraints.",
+    "rules": "Use clear natural language and precise local editing instructions. Keep image references in actual supplied order. General 4.0–5.0 prompting guidance is shared; direct BytePlus limits must not replace PiAPI limits. Batch, size and output format belong in verified provider settings.",
+    "sources": ["seedream5-guide", "seedream5-api", "seedream5-piapi"]
+  },
+  "seedream-5-pro": {
+    "order": "Subject, scene and action, composition, visual style and light, exact text and reference roles, preservation constraints.",
+    "rules": "Describe edits precisely and preserve unrelated details. Position and region instructions should be unambiguous. Pro has its own capability and pricing schema; do not inherit Lite batch behavior. Shared family guidance is not proof of provider-specific Pro parameters.",
+    "sources": ["seedream5-pro", "seedream5-api", "seedream5-piapi"]
+  },
+  "nano-banana-2.1": {
+    "order": "Purpose and context, subject and action, location, composition, lighting and visual style, exact text and reference roles.",
+    "rules": "Write descriptive sentences rather than keyword piles. For edits specify the change and preserve the rest. Quote required lettering and describe placement. Explain the desired visible result instead of arbitrary weighting syntax. Gemini direct model parameters and limits do not imply PiAPI support.",
+    "sources": ["banana21-model", "banana-prompting", "banana-framework"]
+  },
+  "qwen-image-2.1": {
+    "order": "Task or edit, subject, composition and setting, visual style and text, input-image roles, preserved features.",
+    "rules": "Use ordinal references such as Image 1 and Image 2 with explicit roles. Separate appearance, clothing and pose sources. The 2.1 pro/turbo models do not accept negative_prompt; state constraints in the instruction. Provider adapter is not connected.",
+    "sources": ["qwen-edit-guide"]
+  },
+  "qwen-image-3.0": {
+    "order": "Task or edit, subject, composition and setting, visual style and text, input-image roles, preserved features.",
+    "rules": "Use natural language and explicit image roles. Preserve identity and change only requested elements during edits. 3.0 standard and pro are separate variants; do not silently substitute one. Do not inherit 2.1 reference limits or unsupported parameters. Provider adapter is not connected.",
+    "sources": ["qwen-edit-guide"]
+  }
+}
