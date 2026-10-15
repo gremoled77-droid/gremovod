@@ -1,5 +1,16 @@
 # Пожелания и задачи AI Workflow Studio
 
+## Модели PiAPI — решения 16.10.2026 и уточнение на следующем этапе
+
+Сверка и каталог: docs/PIAPI_MODELS_2026-10-16.md. Решения владельца: Seedream 5.0 Fast = seedream-5-lite; GPT Image 2.5 — на выбор без суффикса и flare, для правок sunburst; видео — добавить MiniMax H3; Qwen Image 2.1 — Qubico/qwen-image-2.1 (txt2img).
+
+- [ ] **Уточнить всю информацию по моделям на следующем этапе** (этап «единый движок»): на реальном вызове проверить model/task_type, допустимые значения, форматы ответа и цены каждой модели; поставить verified_at; не включать в запуск непроверенное.
+- [ ] Сверить неподтверждённое: регистр и значения resolution у MiniMax H3 (480P / «512p»); формат ответа Qwen 2.1; доплата за референсы Seedream Pro ($0.003 или $0.006); список aspect_ratio у Nano Banana 2.1; длительность Seedance 2.5; число референсов у моделей изображений.
+- [ ] Адаптеры первой очереди: seedream-5-lite, seedream-5-pro, nano-banana-2.1, GPT Image (2.0, 2.5 / 2.5-flare для создания, 2.5-sunburst для правок; async-эндпоинты), qwen-image-2.1; видео: seedance-2.5, minimax-h3.
+- [ ] В режиме «Допилить» (правки) по умолчанию использовать gpt-image-2.5-sunburst, в обычной генерации — выбор между 2.5 и 2.5-flare.
+- [ ] Рассмотреть добавление (предложено по каталогу PiAPI): Seedance 2 с Private Asset Library и omni-референсом, Kling 3.0 / Omni / Elements, Veo 3.1, Wan 2.6, OmniHuman 1.5 и Kling Avatar (говорящий персонаж по аудио), Nano Banana Pro, Flux Kontext, Z-Image Turbo, апскейл изображений и видео, Remove Background, JoyCaption, File Upload PiAPI вместо TempFile.
+- [ ] Решить по Qwen: 2.1 — только текст в изображение; для правок и референсов нужен старый qwen-image (image-edit).
+
 ## Воркфлоу (узлы и связи) и временные результаты — 16.10.2026
 
 Макет: четвёртый экран в дизайн-холсте «GremoVOD Studio — макет интерфейса». Решения владельца ниже; добавление в список не запускает разработку.
