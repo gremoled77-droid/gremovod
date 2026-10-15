@@ -329,6 +329,7 @@ class ModelJobRequest(BaseModel):
     max_cost_usd:float=Field(default=0,ge=0,le=100,allow_inf_nan=False)
     request_id:str|None=None
     quote_token:str=''
+    node_id:str|None=Field(default=None,max_length=100)
 
 def image_payload(body:ModelJobRequest,enforce_launch:bool=True):
     spec=MODEL_SPECS.get(body.model_id)
@@ -409,7 +410,7 @@ async def model_job(body:ModelJobRequest,x_api_key:str|None=Header(default=None)
     if not body.project_id: raise HTTPException(400,'Сначала сохрани проект')
     project(body.project_id)
     if not body.request_id or not re.fullmatch(r'[a-zA-Z0-9_-]{16,100}',body.request_id): raise HTTPException(400,'Нужен уникальный request_id')
-    request_data=json.dumps({'project_id':body.project_id,'model_id':body.model_id,'payload':payload},ensure_ascii=False,sort_keys=True)
+    request_data=json.dumps({'project_id':body.project_id,'model_id':body.model_id,'payload':payload,**({'node_id':body.node_id} if body.node_id else {})},ensure_ascii=False,sort_keys=True)
     with connect() as db:
         previous=db.execute('SELECT * FROM jobs WHERE id=?',(body.request_id,)).fetchone()
     if previous:

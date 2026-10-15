@@ -1,6 +1,6 @@
 import ProductionStoryboard from './ProductionStoryboard';
 const StoryboardDemo = lazy(() => import('./StoryboardDemo'));
-const GraphPanel = lazy(() => import('./GraphPanel'));
+const GraphPanel = lazy(() => import('./WorkflowPanel'));
 import CharacterReferences from './CharacterReferences';
 import SettingsPanel from './SettingsPanel';
 import ProjectHeader from './ProjectHeader';
@@ -1836,6 +1836,7 @@ function App() {
             ) : (
               <Suspense fallback={<p>Открываем редактор узлов…</p>}>
                 <GraphPanel
+                  projectId={projectId}
                   nodes={state.nodes}
                   edges={state.edges}
                   onChange={update => setState(s => ({...s, ...update(s)}))}

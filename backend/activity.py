@@ -45,7 +45,7 @@ def collect(studio, project_id):
             items.append({'id': r['id'], 'source': 'api', 'kind': r['kind'], 'provider': r['provider'],
                           'model': request.get('model_id') or (request.get('payload') or {}).get('task_type') or r['kind'],
                           'status': status, 'raw_status': r['status'], 'created_at': r['created_at'],
-                          'prompt': _prompt_of(r['request']), 'asset_ids': assets.get(r['id'], []),
+                          'node_id': request.get('node_id'), 'prompt': _prompt_of(r['request']), 'asset_ids': assets.get(r['id'], []),
                           'delivery': dict(d) if d else None})
         for r in db.execute('SELECT * FROM external_jobs WHERE project_id=?', (project_id,)):
             items.append({'id': r['id'], 'source': 'external', 'kind': 'image', 'provider': 'external:' + r['service'],

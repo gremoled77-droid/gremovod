@@ -7,6 +7,7 @@ export type GenerationRequest = {
   prompt: string;
   options: Record<string, string | number>;
   reference_urls: string[];
+  node_id?: string;
 };
 type Estimate = {
   quote_token: string;
