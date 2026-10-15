@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState } from "react";
-import { apiFetch } from "./api";
+import {useEffect, useRef, useState} from 'react';
+import {apiFetch} from './api';
 
 export type ActivityItem = {
   id: string;
-  source: "api" | "external" | "native";
+  source: 'api' | 'external' | 'native';
   kind: string;
   provider: string;
   model: string;
@@ -13,13 +13,13 @@ export type ActivityItem = {
   prompt: string;
   asset_ids: string[];
   node_id?: string | null;
-  delivery?: { state: string } | null;
+  delivery?: {state: string} | null;
 };
 
 /** Один долгий запрос вместо набора таймеров: сервер отвечает при изменении или через ~25 с. */
 export default function useActivity(projectId: string) {
   const [items, setItems] = useState<ActivityItem[]>([]);
-  const [error, setError] = useState("");
+  const [error, setError] = useState('');
   const kick = useRef<() => void>(() => undefined);
   useEffect(() => {
     if (!projectId) {
@@ -27,30 +27,30 @@ export default function useActivity(projectId: string) {
       return;
     }
     let alive = true;
-    let version = "";
+    let version = '';
     const controller = new AbortController();
     const loop = async () => {
       while (alive) {
         try {
           const r = await apiFetch(
             `/api/activity?project_id=${encodeURIComponent(projectId)}&since=${version}&wait=20`,
-            { signal: controller.signal },
+            {signal: controller.signal}
           );
-          if (!r.ok) throw Error("Лента заданий недоступна");
+          if (!r.ok) throw Error('Лента заданий недоступна');
           const d = await r.json();
           if (!alive) return;
           version = d.version;
           if (d.changed) setItems(d.items);
-          setError("");
+          setError('');
         } catch (e) {
           if (!alive) return;
           setError(e instanceof Error ? e.message : String(e));
-          await new Promise((res) => window.setTimeout(res, 4000));
+          await new Promise(res => window.setTimeout(res, 4000));
         }
       }
     };
     kick.current = () => {
-      version = "";
+      version = '';
     };
     void loop();
     return () => {
@@ -58,5 +58,5 @@ export default function useActivity(projectId: string) {
       controller.abort();
     };
   }, [projectId]);
-  return { items, error, reset: () => kick.current() };
+  return {items, error, reset: () => kick.current()};
 }
