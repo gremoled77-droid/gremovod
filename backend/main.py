@@ -742,6 +742,8 @@ from backend.external_generation import register as register_external
 register_external(app,sys.modules[__name__])
 from backend.activity import register as register_activity
 register_activity(app,sys.modules[__name__])
+from backend.send_to_reference import register as register_send_to_reference
+register_send_to_reference(app,sys.modules[__name__])
 from backend.character_versions import register as register_character_versions
 register_character_versions(app,sys.modules[__name__])
 from backend import security
