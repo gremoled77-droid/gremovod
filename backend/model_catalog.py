@@ -24,3 +24,45 @@ for _id, _kind, _docs in [
     ('kling-3.0','video','https://kling.ai/quickstart/klingai-video-3-model-user-guide')]:
     MODEL_SPECS[_id]={'launch_enabled':False,'kind':_kind,'model':_id,'task_type':_id,
                       'max_refs':10,'docs':_docs,'prompt_only':True}
+
+
+# --- Адаптеры (16.10.2026). launch_enabled=False: только предпросмотр, пока параметры и цена
+# --- не проверены реальным вызовом (см. TODO.md и docs/PIAPI_MODELS_2026-10-16.md).
+_ASPECT=['16:9','9:16','1:1','4:3','3:4','3:2','2:3','4:5','5:4','21:9']
+MODEL_SPECS['seedream-5-pro'].update({
+    'adapter':'unified_image','api_refs':10,'ref_field':'image_urls',
+    'price_by_size':{'1K':0.068,'2K':0.136},'extra_ref_usd':0.006,
+    'options':{'size':{'values':['1K','2K'],'default':'1K'},
+               'aspect_ratio':{'values':_ASPECT,'default':'1:1'},
+               'output_format':{'values':['png','jpeg','webp'],'default':'png'}}})
+MODEL_SPECS['nano-banana-2.1'].update({
+    'adapter':'unified_image','api_refs':10,'ref_field':'image_urls',
+    'price_by_size':{'1K':0.03,'2K':0.04,'4K':0.09},
+    'options':{'resolution':{'values':['1K','2K','4K'],'default':'1K'},
+               'aspect_ratio':{'values':['16:9','9:16','1:1','4:3','3:4'],'default':'16:9'},
+               'output_format':{'values':['png','jpg','webp'],'default':'png'}}})
+MODEL_SPECS['qwen-image-2.1'].update({
+    'adapter':'unified_image','model':'Qubico/qwen-image-2.1','task_type':'txt2img','api_refs':0,
+    'price_usd':0.015,'max_pixels':1763584,
+    'options':{'width':{'min':64,'max':4096,'default':1024},'height':{'min':64,'max':4096,'default':1024},
+               'steps':{'min':1,'max':16,'default':8},'seed':{'min':-1,'max':2147483647,'default':-1}}})
+_GPT_COMMON={'adapter':'gpt_image','submit_path':'/api/v1/images/generations/async',
+             'price_by_quality':{'gpt-image-2':{'medium':0.032},
+                                 'gpt-image-2.5-flare':{'low':0.004,'medium':0.010,'high':0.040},
+                                 'gpt-image-2.5-sunburst':{'low':0.004,'medium':0.010,'high':0.040}}}
+MODEL_SPECS['gpt-image-2'].update({**_GPT_COMMON,'options':{
+    'size':{'values':['1024x1024','1024x1536','1536x1024'],'default':'1024x1024'},
+    'quality':{'values':['medium'],'default':'medium'}}})
+MODEL_SPECS['gpt-image-2.5'].update({**_GPT_COMMON,'price_standard_max_usd':0.012,
+    'variants':{'flare':'gpt-image-2.5-flare','standard':'gpt-image-2.5','sunburst':'gpt-image-2.5-sunburst'},
+    'edit_variant':'sunburst','options':{
+    'variant':{'values':['flare','standard','sunburst'],'default':'flare'},
+    'size':{'values':['1024x1024','1024x1536','1536x1024'],'default':'1024x1024'},
+    'quality':{'values':['low','medium','high'],'default':'medium'}}})
+MODEL_SPECS['minimax-h3']={
+    'launch_enabled':False,'kind':'video','model':'Qubico/minimax-h3','task_type':'txt2video','adapter':'minimax_h3',
+    'max_refs':1,'ref_field':'image','docs':'https://piapi.ai/minimax-h3',
+    'price_per_second_usd':{'480P':0.03,'768P':0.05,'1080P':0.07},
+    'options':{'resolution':{'values':['480P','768P','1080P'],'default':'480P'},
+               'duration':{'min':5,'max':15,'default':5},
+               'aspect_ratio':{'values':['16:9','9:16','1:1'],'default':'16:9'}}}

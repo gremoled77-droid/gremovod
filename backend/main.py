@@ -13,6 +13,7 @@ from backend.connections import router as connections_router, credential, provid
 from backend.image_assets import download_image, inspect_image, output_urls, download_video
 from backend.prompt_rules import RULES_VERSION, system_rules, PROFILES, reference_label, validate_prompt
 from backend.model_catalog import MODEL_SPECS, ALLOWED_CHAT, IMAGE_TASKS, VIDEO_MODELS
+from backend import adapters
 from backend import camera_movements
 from backend import frame_composition
 
@@ -329,10 +330,10 @@ class ModelJobRequest(BaseModel):
     request_id:str|None=None
     quote_token:str=''
 
-def image_payload(body:ModelJobRequest):
+def image_payload(body:ModelJobRequest,enforce_launch:bool=True):
     spec=MODEL_SPECS.get(body.model_id)
     if not spec: raise HTTPException(400,'Модель отсутствует в каталоге')
-    if not spec.get('launch_enabled'): raise HTTPException(400,'Запуск этой модели отключён до проверки схемы и стоимости.')
+    if enforce_launch and not spec.get('launch_enabled'): raise HTTPException(400,'Запуск этой модели отключён до проверки схемы и стоимости.')
     if not body.prompt.strip(): raise HTTPException(400,'Промпт не может быть пустым')
     if len(body.reference_urls)>spec['max_refs']: raise HTTPException(400,'Превышено число референсов')
     from urllib.parse import urlsplit
@@ -344,6 +345,7 @@ def image_payload(body:ModelJobRequest):
     if is_video:
         from backend import production_entities
         production_entities.video_anchor(sys.modules[__name__],body.project_id,body.reference_urls)
+    if adapters.handles(spec): return adapters.build(spec,body)
     if spec.get('adapter')=='hunyuan_i2v':
         if body.options:raise HTTPException(400,'В этом тестовом адаптере Hunyuan используются длительность и разрешение провайдера по умолчанию')
         if len(body.reference_urls)!=1:raise HTTPException(400,'Hunyuan I2V требует один исходный кадр')
@@ -375,6 +377,7 @@ def image_payload(body:ModelJobRequest):
 
 def generation_cost(body,payload):
     spec=MODEL_SPECS[body.model_id]
+    if adapters.handles(spec): return adapters.cost(spec,payload)
     if spec['kind']=='video' and 'price_per_second_usd' in spec: return round(spec['price_per_second_usd'][payload['input']['resolution']]*payload['input']['duration'],3)
     return spec['price_usd']
 
@@ -385,8 +388,20 @@ def estimate_image(body:ModelJobRequest):
     if not body.project_id:raise HTTPException(400,'Сначала сохрани проект')
     project(body.project_id)
     return {'quote_token':security.quote(body.project_id,payload,cost),'expires_in_seconds':600,'model_id':body.model_id,'kind':MODEL_SPECS[body.model_id]['kind'],'estimated_usd':cost,'images':0 if MODEL_SPECS[body.model_id]['kind']=='video' else 1,'payload':payload,
-            'source':MODEL_SPECS[body.model_id]['docs'],'verified_at':'2026-10-15',
+            'source':MODEL_SPECS[body.model_id]['docs'],'verified_at':MODEL_SPECS[body.model_id].get('verified_at','2026-10-15'),
             'note':'Оценка по документации провайдера; фактическое списание определяется PiAPI. Лимит относится к одному запуску.'}
+
+@app.post('/api/model-jobs/preview')
+def preview_model_job(body:ModelJobRequest):
+    """Сухой прогон: параметры, тело запроса и цена без сетевых вызовов. Работает и для непроверенных моделей."""
+    spec=MODEL_SPECS.get(body.model_id)
+    if not spec: raise HTTPException(400,'Модель отсутствует в каталоге')
+    payload=image_payload(body,enforce_launch=False)
+    cost=generation_cost(body,payload)
+    return {'model_id':body.model_id,'kind':spec['kind'],'launch_enabled':bool(spec.get('launch_enabled')),
+            'verified_at':spec.get('verified_at'),'path':adapters.submit_path(spec),
+            'wire_body':adapters.wire_body(spec,payload),'estimated_usd':cost,'external_calls':0,
+            'note':'Сухой прогон. Запуск выключен, пока параметры и цена не проверены реальным вызовом.' if not spec.get('launch_enabled') else 'Сухой прогон.'}
 
 @app.post('/api/model-jobs')
 async def model_job(body:ModelJobRequest,x_api_key:str|None=Header(default=None)):
@@ -414,7 +429,8 @@ async def model_job(body:ModelJobRequest,x_api_key:str|None=Header(default=None)
             db.execute('INSERT INTO generation_approvals VALUES(?,?,?,?,?)',(jid,cost,body.max_cost_usd,now(),'documentation_estimate'))
         except sqlite3.IntegrityError: raise HTTPException(409,'Заявка уже отправляется; обнови очередь')
     try:
-        result=await request_piapi('POST','/api/v1/task',key,payload)
+        spec=MODEL_SPECS[body.model_id]
+        result=await request_piapi('POST',adapters.submit_path(spec),key,adapters.wire_body(spec,payload))
         task=result.get('data') or {}
         if not isinstance(task,dict) or not task.get('task_id'):
             raise HTTPException(502,'Провайдер не вернул task_id. Не повторяй оплату; проверь историю PiAPI.')

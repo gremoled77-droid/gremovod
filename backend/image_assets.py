@@ -54,7 +54,7 @@ def output_urls(response,kind='image'):
             for item in value: collect(item)
         elif isinstance(value,dict): collect(value.get('url'))
         elif isinstance(value,str) and value.startswith('https://') and value not in result: result.append(value)
-    fields=('video_urls','videos','video_url','url','video') if kind=='video' else ('image_urls','images','image_url','url','image')
+    fields=('video_urls','videos','video_url','url','video') if kind=='video' else ('image_urls','images','image_url','url','image','data')
     for field in fields: collect(output.get(field))
     return result
 
