@@ -1,10 +1,10 @@
-# AI Workflow Studio — prototype v0.2
+# AI Workflow Studio — v0.2 (проект GremoVOD)
 
 React + TypeScript + React Flow, FastAPI, SQLite. Windows-first / local-first.
 
 ## Windows startup
 
-1. If installing `python-manager-26.4.msix` fails with `0x80070005`, **do not require MSIX**. Install **classic Python 3.12 x64 executable installer** from https://www.python.org/downloads/release/python-31210/ (Windows installer (64-bit)); check **Add Python to PATH**. Python 3.12.10 is the final full maintenance release with an executable installer in the 3.12 line. A newer 3.13 executable installer is also acceptable. Do not download Windows embeddable ZIP for this project.
+1. If installing `python-manager-26.4.msix` fails with `0x80070005`, **do not require MSIX**. Install **classic Python 3.12+ (3.13 тоже подходит) x64 executable installer** from https://www.python.org/downloads/release/python-31210/ (Windows installer (64-bit)); check **Add Python to PATH**. Python 3.12.10 is the final full maintenance release with an executable installer in the 3.12 line. A newer 3.13 executable installer is also acceptable. Do not download Windows embeddable ZIP for this project.
 2. Install Node.js LTS (includes npm): https://nodejs.org/en/download
 3. For Audio Lab install FFmpeg, ensure `ffmpeg` works in a fresh terminal.
 4. Unzip project to e.g. `C:\AI_Workflow_Studio` (avoid protected `Program Files` folder).
@@ -24,7 +24,7 @@ The Windows script creates `.venv`, installs Python requirements and npm package
 ## Limitations / safety
 
 - **PiAPI Cloudflare 1010** on your network requires PiAPI support. The app does not bypass Cloudflare or spoof User-Agent. Other models/APIs are not proven working until tested with your authorized credentials.
-- ElevenLabs and Fish Audio are **planned connectors**, not a working API integration in v0.1. Export WAV for manual use; voice ownership/consent required.
+- ElevenLabs and Fish Audio подключены (проверка ключей и карточка голоса персонажа); генерация озвучки требует ручного запуска. Права на голос и согласие обязательны.
 - The world Style Library is editable and saved with each project; real / approved / rejected / model-specific reference uploads are available in Character Vault. These assets are not yet automatically scored for visual continuity.
 - Model schemas in `backend/main.py` are an initial *limited allowlist*; verify each against vendor docs before production, especially version changes and paid-generation settings.
 - Keys are entered in the app and passed to the **local** backend per request; they are not written to SQLite. Do not expose port 8000 on a public interface. In cloud, use a server-side secrets vault and authentication.
