@@ -11,6 +11,14 @@ import {
   buildReplaceInVideoPrompt,
   replacementRefs,
 } from './replaceCharacterPrompt';
+import {
+  DIRECTOR_GROUPS,
+  DIRECTOR_PRESETS,
+  DIRECTOR_TEMPLATE,
+  appendDirectorBlock,
+  findDirectorPreset,
+  type DirectorGroup,
+} from './directorPresets';
 
 type OptionSpec = {
   values?: (string | number)[];
@@ -64,6 +72,14 @@ function CreateScreenBody({projectId, heroes}: {projectId: string; heroes: Hero[
   const [specs, setSpecs] = useState<Record<string, Spec>>({});
   const [library, setLibrary] = useState<LibAsset[]>([]);
   const [prompt, setPrompt] = useState(restored.prompt);
+  /** «Режиссёрский каркас» и заготовки: блок добавляется в конец промпта, строки читает prompt_rules.py. */
+  function addDirectorBlock(text: string, what: string) {
+    setError('');
+    setPrompt(current => appendDirectorBlock(current, text));
+    setNotice(
+      `${what} добавлен в промпт. Заполни пустые строки; для прямой генерации сведи их в один промпт.`
+    );
+  }
   async function addVisualRules() {
     setError('');
     try {
@@ -856,6 +872,33 @@ function CreateScreenBody({projectId, heroes}: {projectId: string; heroes: Hero[
             >
               ＋ Визуальные правила
             </button>
+            <button
+              type="button"
+              title="Шесть режиссёрских строк: суть кадра, доминанта, символ, сдвиг, камера, свет (пять столпов киноязыка)"
+              onClick={() => addDirectorBlock(DIRECTOR_TEMPLATE, 'Режиссёрский каркас')}
+            >
+              ＋ Режиссёрский каркас
+            </button>
+            <select
+              value=""
+              aria-label="Заготовки с Грэмом и ВАЗ-2106"
+              title="Готовые заготовки кадра, камеры и истории с Грэмом и ВАЗ-2106"
+              onChange={e => {
+                const preset = findDirectorPreset(e.target.value);
+                if (preset) addDirectorBlock(preset.text, `Заготовка «${preset.title}»`);
+              }}
+            >
+              <option value="">Заготовки ▾</option>
+              {(Object.keys(DIRECTOR_GROUPS) as DirectorGroup[]).map(group => (
+                <optgroup key={group} label={DIRECTOR_GROUPS[group]}>
+                  {DIRECTOR_PRESETS.filter(p => p.group === group).map(p => (
+                    <option key={p.id} value={p.id}>
+                      {p.title}
+                    </option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
             <button disabled={!projectId} onClick={() => void external()}>
               Скопировать для ChatGPT
             </button>
