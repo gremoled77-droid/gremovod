@@ -48,3 +48,11 @@ class ActivityTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class RefreshTests(unittest.TestCase):
+    setUp = test_smoke.StudioSmokeTests.setUp
+    tearDown = test_smoke.StudioSmokeTests.tearDown
+
+    def test_refresh_unknown_job_is_404_and_done_job_is_noop(self):
+        self.assertEqual(self.client.post('/api/activity/refresh/nope').status_code, 404)

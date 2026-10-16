@@ -69,6 +69,22 @@ def version_of(items):
 
 
 def register(app, studio):
+    @app.post('/api/activity/refresh/{job_id}')
+    async def refresh(job_id: str):
+        """Опрос провайдера по одному заданию и сохранение готового результата в библиотеку.
+        Только чтение у провайдера (GET): новых платных запусков не создаёт."""
+        from backend import job_delivery
+        with studio.connect() as db:
+            job = db.execute('SELECT status,task_id FROM jobs WHERE id=?', (job_id,)).fetchone()
+        if not job:
+            raise HTTPException(404, 'Задание не найдено')
+        if job['task_id'] and job['status'] not in {'completed', 'failed', 'submission_unknown'}:
+            await studio.job_status(job_id, None)
+        await job_delivery.deliver(studio, job_id)
+        with studio.connect() as db:
+            row = db.execute('SELECT status FROM jobs WHERE id=?', (job_id,)).fetchone()
+        return {'job_id': job_id, 'status': API_STATUS.get(row['status'], 'running'), 'raw_status': row['status']}
+
     @app.get('/api/activity')
     async def activity(project_id: str, since: str = '', wait: float = 0):
         studio.project(project_id)

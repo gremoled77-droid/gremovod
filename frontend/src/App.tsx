@@ -33,6 +33,7 @@ import ConnectionsPanel from './ConnectionsPanel';
 import GenerationReview, {type GenerationRequest} from './GenerationReview';
 import AssetLibrary from './AssetLibrary';
 import CreateScreen from './CreateScreen';
+import GenerationWatcher from './GenerationWatcher';
 import AgentPanel from './AgentPanel';
 import {lazy, Suspense, useCallback, useEffect, useRef, useState} from 'react';
 import type {Node, Edge} from '@xyflow/react';
@@ -1936,6 +1937,7 @@ function App() {
           }}
         />
       )}
+      {projectId && <GenerationWatcher projectId={projectId} onOpen={() => setMode('create')} />}
       {generationRequest && (
         <GenerationReview
           request={generationRequest}

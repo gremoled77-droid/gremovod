@@ -64,3 +64,59 @@
     gap: 12px;
   }
 }
+
+/* Пузырьки о готовности генерации */
+.toast-stack {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  display: grid;
+  gap: 10px;
+  z-index: 50;
+  max-width: min(360px, calc(100vw - 32px));
+}
+.toast {
+  position: relative;
+  display: grid;
+  gap: 2px;
+  padding: 12px 34px 12px 14px;
+  border-radius: 12px;
+  background: #16181d;
+  border: 1px solid #2a2e37;
+  color: #ece8df;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  cursor: pointer;
+  animation: toast-in 0.25s ease-out;
+}
+.toast span {
+  color: #8b8f99;
+  font-size: 13px;
+}
+.toast-ok {
+  border-left: 4px solid #5ec27a;
+}
+.toast-bad {
+  border-left: 4px solid #e27b7b;
+}
+.toast button {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  min-height: 28px;
+  width: 28px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  color: #8b8f99;
+}
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .toast {
+    animation: none;
+  }
+}
