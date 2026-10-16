@@ -17,6 +17,8 @@ export default function WorldFromBrief({
   brief,
   style,
   ensureProject,
+  conflicts,
+  onConflicts,
   onApply,
   onDone,
 }: {
@@ -24,6 +26,8 @@ export default function WorldFromBrief({
   brief: string;
   style: Partial<World> | undefined;
   ensureProject?: () => Promise<string>;
+  conflicts: Partial<World>;
+  onConflicts: (fields: Partial<World>) => void;
   onApply: (fields: Partial<World>) => void;
   onDone?: () => void;
 }) {
@@ -31,7 +35,6 @@ export default function WorldFromBrief({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [note, setNote] = useState('');
-  const [conflicts, setConflicts] = useState<Partial<World>>({});
   const messages = [
     {role: 'system', content: WORLD_SYSTEM},
     {role: 'user', content: `Задание ролика:\n${brief.trim()}`},
@@ -84,7 +87,7 @@ export default function WorldFromBrief({
       const world = parseWorld(String(answer.choices?.[0]?.message?.content || ''));
       const {fill, conflicts: busyFields} = mergeWorld(style, world);
       if (Object.keys(fill).length) onApply(fill);
-      setConflicts(busyFields);
+      onConflicts(busyFields);
       const cost = Number(answer.cost_usd);
       setNote(
         `Мир заполнен: ${Object.keys(fill).length} пустых полей` +
@@ -126,11 +129,9 @@ export default function WorldFromBrief({
               <button
                 onClick={() => {
                   onApply({[k]: conflicts[k]});
-                  setConflicts(c => {
-                    const n = {...c};
-                    delete n[k];
-                    return n;
-                  });
+                  const rest = {...conflicts};
+                  delete rest[k];
+                  onConflicts(rest);
                 }}
               >
                 Заменить
@@ -139,7 +140,7 @@ export default function WorldFromBrief({
           ))}
           <button
             onClick={() => {
-              setConflicts({});
+              onConflicts({});
               onDone?.();
             }}
           >

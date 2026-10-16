@@ -149,3 +149,71 @@
   margin: 2px 0 6px;
   white-space: pre-wrap;
 }
+
+.att {
+  margin-top: 12px;
+  display: grid;
+  gap: 8px;
+}
+.att-bar {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.att-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 5;
+  display: grid;
+  min-width: 220px;
+  gap: 2px;
+  padding: 6px;
+  border-radius: 10px;
+  background: var(--panel, #1b1b1f);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+.att-menu button {
+  text-align: left;
+}
+.att-pick,
+.att-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.att-tile {
+  display: grid;
+  gap: 4px;
+  width: 92px;
+  padding: 4px;
+}
+.att-tile img {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border-radius: 8px;
+}
+.att-chip {
+  display: grid;
+  grid-template-columns: 56px 1fr auto;
+  align-items: center;
+  gap: 6px;
+  padding: 4px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+.att-chip img {
+  width: 56px;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border-radius: 8px;
+}
+.att-ro .att-chip {
+  grid-template-columns: 56px auto;
+}

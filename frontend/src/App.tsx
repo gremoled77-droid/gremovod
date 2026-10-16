@@ -30,6 +30,7 @@ import {type CharacterVersion} from './ReplaceCharacterButton';
 import RefinePanel, {EMPTY_REFINE, type RefineDraft} from './RefinePanel';
 import ChatGPTPanel from './ChatGPTPanel';
 import WorldFromBrief from './WorldFromBrief';
+import AttachmentMenu, {AttachmentStrip} from './AttachmentMenu';
 import ScenePanel, {EMPTY_SCENE, type Scene} from './ScenePanel';
 import EconomicsPanel from './EconomicsPanel';
 import PromptComposer, {type PromptRequest} from './PromptComposer';
@@ -115,6 +116,7 @@ type Studio = {
   scene?: Scene;
   style: StyleBible;
   brief: string;
+  worldDraft?: Partial<StyleBible>;
   prompts: Record<string, string>;
   parameters: Record<string, Record<string, string | number>>;
   characters: Character[];
@@ -1824,6 +1826,7 @@ function App() {
                     Единый стиль сохраняется вместе с проектом и держит все кадры серии в одном мире. Заполни
                     коротко и по делу: эти поля подставляются в промпты и проверку результатов.
                   </p>
+                  <AttachmentStrip items={(state.scene || EMPTY_SCENE).assets} />
                   <div className="world-fields">
                     {(
                       [
@@ -1928,43 +1931,29 @@ function App() {
                         </label>
                         <div className="idea-brief-actions">
                           <button className="primary" onClick={() => setMode('styles')}>
-                            Дальше: мир и герои →
+                            Дальше: мир →
                           </button>
-                          <button onClick={() => setMode('scene')}>Собрать сцену из исходников</button>
                         </div>
+                        <AttachmentMenu
+                          projectId={projectId}
+                          ensureProject={ensureProject}
+                          heroes={state.characters}
+                          items={(state.scene || EMPTY_SCENE).assets}
+                          revision={libraryRevision}
+                          onChange={assets =>
+                            setState(s => ({...s, scene: {...(s.scene || EMPTY_SCENE), assets}}))
+                          }
+                          onAsset={() => setLibraryRevision(x => x + 1)}
+                        />
                         <WorldFromBrief
                           projectId={projectId}
                           brief={state.brief}
                           style={state.style}
+                          conflicts={state.worldDraft || {}}
+                          onConflicts={worldDraft => setState(s => ({...s, worldDraft}))}
                           ensureProject={ensureProject}
                           onApply={fields => setState(s => ({...s, style: {...s.style, ...fields}}))}
                           onDone={() => setMode('styles')}
-                        />
-                      </section>
-                      <section className="panel photo-setup" aria-label="Фото">
-                        <h2>Фото · постановка и промпт</h2>
-                        <FrameSelector
-                          catalogue={frameCatalogue}
-                          value={state.composition}
-                          onChange={chooseComposition}
-                          onCatalogue={() => setCatalogue('frame')}
-                        />
-                        {frameError && <p role="alert">{frameError}</p>}
-                        <ChatGPTPanel
-                          {...replacementControls}
-                          projectId={projectId}
-                          ensureProject={ensureProject}
-                          onPrompt={(prompt, target, _movement, frame) =>
-                            setState(s => ({
-                              ...s,
-                              prompts: {...s.prompts, [target]: prompt},
-                              compositionPromptBasis: {
-                                ...s.compositionPromptBasis,
-                                [target]: frameBasis(frame),
-                              },
-                            }))
-                          }
-                          onAsset={() => setLibraryRevision(x => x + 1)}
                         />
                       </section>
                     </div>
