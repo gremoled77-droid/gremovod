@@ -5,6 +5,7 @@ import GenerationReview, {type GenerationRequest} from './GenerationReview';
 import {type ActivityItem} from './useActivity';
 import {useSharedActivity} from './ActivityContext';
 import Lightbox, {type LightboxItem} from './Lightbox';
+import {withoutMediaItem, type MediaChange} from './mediaAsset';
 import {DEFAULT_CHAT_URL, copyTextFor, getChatUrl} from './chatLink';
 
 type OptionSpec = {
@@ -397,6 +398,7 @@ function CreateScreenBody({projectId, heroes}: {projectId: string; heroes: Hero[
         .filter(x => byId[x])
         .map(x => ({
           id: x,
+          assetId: x,
           url: byId[x].url,
           kind: it.kind,
           title: LABELS[it.model] || it.model,
@@ -514,7 +516,7 @@ function CreateScreenBody({projectId, heroes}: {projectId: string; heroes: Hero[
                 onClick={() => {
                   const list = shownImages.slice(0, 60);
                   setView({
-                    items: list.map(x => ({url: x.url, title: x.id})),
+                    items: list.map(x => ({url: x.url, title: 'Референс', assetId: x.id})),
                     index: list.findIndex(x => x.id === a.id),
                   });
                 }}
@@ -763,6 +765,26 @@ function CreateScreenBody({projectId, heroes}: {projectId: string; heroes: Hero[
           index={view.index}
           onIndex={i => setView(v => (v ? {...v, index: i} : v))}
           onClose={() => setView(null)}
+          onAssetChanged={(id: string, change: MediaChange) => {
+            if (change.trashed) {
+              setLibrary(current => current.filter(a => a.id !== id));
+              setRefs(current => current.filter(ref => ref !== id));
+              setView(current => (current ? withoutMediaItem(current, id) : null));
+              setNotice('Файл перемещён в корзину на 30 дней.');
+              reset();
+            } else if (change.favorite !== undefined) {
+              setLibrary(current =>
+                current.map(a =>
+                  a.id === id ? {...a, metadata: {...a.metadata, favorite: change.favorite}} : a
+                )
+              );
+            }
+          }}
+          onReference={id => setRefs(current => (current.includes(id) ? current : [...current, id]))}
+          onAnimate={id => {
+            setView(null);
+            setAnimate(id);
+          }}
         />
       )}
       {animate && (

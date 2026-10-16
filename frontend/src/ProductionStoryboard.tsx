@@ -6,6 +6,7 @@ import {useEffect, useRef, useState} from 'react';
 import {apiFetch} from './api';
 import {responseJson} from './ChatGPTPanel';
 import Lightbox, {type LightboxItem} from './Lightbox';
+import {withoutMediaItem} from './mediaAsset';
 import {analyzeAsset, shotPoints, TensionGraph, useVisualPlans, VisualPlanForm} from './VisualPlanPanel';
 import {emptyPlan, planFromAnalysis} from './visualPlan';
 import VisualRulesForm from './VisualRulesForm';
@@ -583,6 +584,7 @@ export default function ProductionStoryboard({
                                   return im
                                     ? {
                                         url: im.asset_id ? `/api/library/${im.asset_id}/file` : im.url,
+                                        assetId: im.asset_id || undefined,
                                         title: `${scene.number}.${fr.number} · ${fr.title}`,
                                         id: fr.id,
                                       }
@@ -684,6 +686,12 @@ export default function ProductionStoryboard({
           index={view.index}
           onIndex={i => setView(v => (v ? {...v, index: i} : v))}
           onClose={() => setView(null)}
+          onAssetChanged={(id, change) => {
+            if (change.trashed) {
+              setView(current => (current ? withoutMediaItem(current, id) : null));
+              setTick(value => value + 1);
+            }
+          }}
         />
       )}
       {editorStack.length > 0 && (

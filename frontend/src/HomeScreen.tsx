@@ -2,7 +2,8 @@ import {useEffect, useState} from 'react';
 import {apiFetch} from './api';
 import {useSharedActivity} from './ActivityContext';
 import type {Mode} from './StageNav';
-import Lightbox from './Lightbox';
+import Lightbox, {type LightboxItem} from './Lightbox';
+import {withoutMediaItem} from './mediaAsset';
 
 type Budget = {
   project_limit_usd: number;
@@ -49,22 +50,41 @@ export default function HomeScreen({
 }) {
   const {items} = useSharedActivity();
   const [budget, setBudget] = useState<Budget | null>(null);
-  const [view, setView] = useState(-1);
+  const [view, setView] = useState<{items: LightboxItem[]; index: number} | null>(null);
+  const [mediaNotice, setMediaNotice] = useState('');
   const [images, setImages] = useState<{id: string; url: string; thumbnail_url: string | null}[]>([]);
 
   useEffect(() => {
+    let active = true;
     if (!projectId) return;
     void apiFetch('/api/budgets/' + encodeURIComponent(projectId))
       .then(r => (r.ok ? r.json() : null))
-      .then(setBudget)
+      .then(data => {
+        if (active) setBudget(data);
+      })
       .catch(() => undefined);
+    return () => {
+      active = false;
+    };
   }, [projectId, items]);
   useEffect(() => {
+    setView(null);
+    setMediaNotice('');
+    setImages([]);
+    setBudget(null);
+  }, [projectId]);
+  useEffect(() => {
+    let active = true;
     if (!projectId) return;
     void apiFetch('/api/library?project_id=' + encodeURIComponent(projectId))
       .then(r => (r.ok ? r.json() : []))
-      .then(list => setImages(list.filter((a: any) => (a.metadata?.kind || 'image') === 'image').slice(0, 8)))
+      .then(list => {
+        if (active) setImages(list.filter((a: any) => (a.metadata?.kind || 'image') === 'image').slice(0, 8));
+      })
       .catch(() => undefined);
+    return () => {
+      active = false;
+    };
   }, [projectId, items]);
 
   const waiting = items.filter(i => i.status === 'waiting_external');
@@ -164,7 +184,18 @@ export default function HomeScreen({
         <div className="home-perf" aria-hidden="true" />
         <div className="home-frames">
           {images.slice(0, 6).map((a, i) => (
-            <button key={a.id} onClick={() => setView(i)} aria-label={'Открыть кадр ' + (i + 1)}>
+            <button
+              key={a.id}
+              onClick={() =>
+                setView({
+                  items: images
+                    .slice(0, 6)
+                    .map((asset, n) => ({url: asset.url, assetId: asset.id, title: 'Кадр ' + (n + 1)})),
+                  index: i,
+                })
+              }
+              aria-label={'Открыть кадр ' + (i + 1)}
+            >
               <img src={a.thumbnail_url || a.url} alt="" />
               <span>{String(i + 1).padStart(2, '0')}</span>
             </button>
@@ -236,12 +267,24 @@ export default function HomeScreen({
           </div>
         </aside>
       </div>
-      {view >= 0 && (
+      {mediaNotice && (
+        <p role="status" className="notice">
+          {mediaNotice}
+        </p>
+      )}
+      {view && (
         <Lightbox
-          items={images.slice(0, 6).map((a, i) => ({url: a.url, title: 'Кадр ' + (i + 1)}))}
-          index={view}
-          onIndex={setView}
-          onClose={() => setView(-1)}
+          items={view.items}
+          index={view.index}
+          onIndex={index => setView(current => (current ? {...current, index} : null))}
+          onClose={() => setView(null)}
+          onAssetChanged={(id, change) => {
+            if (change.trashed) {
+              setImages(current => current.filter(asset => asset.id !== id));
+              setView(current => (current ? withoutMediaItem(current, id) : null));
+              setMediaNotice('Файл перемещён в корзину на 30 дней.');
+            }
+          }}
         />
       )}
     </section>

@@ -159,6 +159,15 @@ def purge_trash(studio, now):
 
 
 def register(app, studio):
+    @app.get('/api/library/{asset_id}/details')
+    def details(asset_id: str):
+        studio.checked_id(asset_id)
+        with studio.connect() as db:
+            row = db.execute('SELECT * FROM library_assets WHERE id=?', (asset_id,)).fetchone()
+        if not row:
+            raise HTTPException(404, 'Файл не найден в библиотеке')
+        return studio.library_record(row)
+
     @app.post('/api/library/{asset_id}/favorite')
     def favorite(asset_id: str, body: Favorite):
         with studio.connect() as db:
