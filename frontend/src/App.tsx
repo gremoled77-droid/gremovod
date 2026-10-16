@@ -31,6 +31,7 @@ import RefinePanel, {EMPTY_REFINE, type RefineDraft} from './RefinePanel';
 import ChatGPTPanel from './ChatGPTPanel';
 import WorldFromBrief from './WorldFromBrief';
 import AttachmentMenu, {AttachmentStrip} from './AttachmentMenu';
+import CharactersScreen from './CharactersScreen';
 import ScenePanel, {EMPTY_SCENE, type Scene} from './ScenePanel';
 import EconomicsPanel from './EconomicsPanel';
 import PromptComposer, {type PromptRequest} from './PromptComposer';
@@ -1385,7 +1386,7 @@ function App() {
                         ? 'workflow-main'
                         : mode === 'reels'
                           ? 'reels-main'
-                          : mode === 'styles'
+                          : mode === 'styles' || mode === 'characters'
                             ? 'world-main'
                             : mode === 'studio'
                               ? 'idea-main'
@@ -1858,7 +1859,7 @@ function App() {
                     <button className="primary" disabled={!!busy} onClick={save}>
                       Сохранить стиль проекта
                     </button>
-                    <button onClick={() => setMode('storyboard')}>Дальше: раскадровка →</button>
+                    <button onClick={() => setMode('characters')}>Дальше: персонажи →</button>
                   </div>
                   <p className="muted">
                     Герои справа: добавь утверждённые референсы в Character Vault. Библия мира не заменяет
@@ -1872,6 +1873,31 @@ function App() {
                   projects={projects}
                   onMode={setMode}
                   onOpenProject={id => void load(id, 'home')}
+                />
+              ) : mode === 'characters' ? (
+                <CharactersScreen
+                  projectId={projectId}
+                  ensureProject={ensureProject}
+                  heroes={state.characters}
+                  selectedId={state.selectedCharacter}
+                  world={state.style}
+                  onSelect={id => change({selectedCharacter: id})}
+                  onCreate={mkChar}
+                  onToWorld={() => setMode('styles')}
+                  onNext={() => setMode('storyboard')}
+                  results={
+                    <AssetLibrary
+                      {...replacementControls}
+                      onRefine={refineAsset}
+                      onScene={addToScene}
+                      projectId={projectId}
+                      revision={libraryRevision}
+                      onUse={(link, id) => {
+                        change({videoReference: link, videoAssetId: id});
+                        setNotice('Изображение из библиотеки выбрано для Video Lab');
+                      }}
+                    />
+                  }
                 />
               ) : mode === 'reels' ? (
                 <ReelsScreen onUse={useReelRecipe} />
