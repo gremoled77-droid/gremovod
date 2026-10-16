@@ -16,6 +16,7 @@ export type Mode =
   | 'home'
   | 'video'
   | 'audio'
+  | 'reels'
   | 'archive';
 
 type Item = {key: string; mode: Mode; label: string; hint?: string; icon: ReactNode};
@@ -39,6 +40,7 @@ const TABS: {mode: Mode; label: string; icon: string}[] = [
   {mode: 'economics', label: 'Бюджет', icon: '$'},
 ];
 const TOOLS: Item[] = [
+  {key: 'reels', mode: 'reels', label: 'Рилсы', hint: 'рецепты сценариев', icon: '▶'},
   {key: 'graph', mode: 'graph', label: 'Узлы', icon: '⌁'},
   {key: 'scene', mode: 'scene', label: 'Сцена', icon: '▣'},
   {key: 'refine', mode: 'refine', label: 'Допилить', icon: '✎'},

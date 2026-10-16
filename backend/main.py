@@ -211,6 +211,7 @@ class ComposeRequest(BaseModel):
     target:str
     approved:bool=False
     use_scene:bool=False
+    scene_override:dict[str,Any]|None=None  # готовая «сцена» вместо сохранённой: промпт и референсы из «Кадров»
 
 class PromptDraftRequest(BaseModel):
     brief:str=Field(min_length=1,max_length=12000)
@@ -248,7 +249,7 @@ def compose_context(body:ComposeRequest):
     spec=MODEL_SPECS.get(body.target)
     if not spec: raise HTTPException(400,'Модель отсутствует в каталоге')
     state=project(body.project_id)['state']
-    scene=state.get('scene',{}) if body.use_scene else {}
+    scene=(body.scene_override if body.scene_override is not None else state.get('scene',{})) if body.use_scene else {}
     brief=(scene.get('brief','') if body.use_scene else state.get('brief','')).strip()
     if not brief: raise HTTPException(400,'Заполни режиссёрское задание')
     char=next((c for c in state.get('characters',[]) if c.get('id')==state.get('selectedCharacter')), {})
@@ -797,6 +798,8 @@ from backend import character_voice
 character_voice.register(app,sys.modules[__name__])
 camera_movements.register(app)
 frame_composition.register(app)
+from backend import reel_recipes
+reel_recipes.register(app,sys.modules[__name__])
 from backend.temp_cleanup import register as register_temp_cleanup
 register_temp_cleanup(app,sys.modules[__name__])
 from backend import remote_access

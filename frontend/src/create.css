@@ -560,3 +560,40 @@
 .cs-steps li button {
   align-self: flex-start;
 }
+
+/* Отправка промпта в ветку Codex */
+.cs-send-codex {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.cs-codex-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  font-size: 13px;
+}
+.cs-codex-status.st-completed {
+  border-color: #2f5a3a;
+}
+.cs-codex-status.st-failed {
+  border-color: #6a3434;
+}
+.cs-codex-status button {
+  margin-left: auto;
+  padding: 3px 12px;
+  font-size: 12px;
+}
+@media (max-width: 700px) {
+  .cs-send-codex {
+    order: -2;
+    flex: 1 1 100%;
+    background: var(--accent);
+    color: var(--accent-ink);
+    font-weight: 600;
+  }
+}
