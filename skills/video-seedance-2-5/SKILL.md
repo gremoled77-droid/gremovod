@@ -52,7 +52,13 @@ Stable character identity and car geometry across the full 30 seconds. No morphi
 
 ## Звук
 
-Один аудиофайл может вести темп всего ролика: `video cuts and camera moves synced precisely to @Audio1's beat drops`. Развитие по актам: `music builds from minimal ambient tension to full arrangement by the climax at 24s`. Русская озвучка: проверять лип-синк на малом отрезке до полной генерации (в инструкции язык не уточняется).
+Один аудиофайл может вести темп всего ролика: `video cuts and camera moves synced precisely to @Audio1's beat drops`. Развитие по актам: `music builds from minimal ambient tension to full arrangement by the climax at 24s`.
+
+**Русская речь.** Реплики писать кириллицей дословно, с именем говорящего, повторяя их внутри нужного `CUT`. Если слова, паузы или лип-синк должны быть точными, подключать готовую дорожку и назначать её единственным авторитетом по речи. Готовые формулировки и правила: `references/directing-and-dialogue.md`. Работоспособность на PiAPI проверить на коротком отрезке до полной генерации.
+
+## Режиссура, референсы, непрерывность
+
+Каркас промпта (`Format … 24 fps, exactly N seconds` → Style → References → Characters → Scene → Audio → `CUT n - 00.00-04.20` → Negative), стратегия длительности, референс-иерархия, журнал непрерывности и чек-лист проверки: `references/directing-and-dialogue.md`.
 
 ## Чего избегать
 
