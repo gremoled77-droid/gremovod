@@ -1,6 +1,7 @@
 import {useState, type CSSProperties} from 'react';
 import PromptStartMenu, {setupBasis, hasSetup, type PromptSetup} from './PromptStartMenu';
 import {ChoiceGroup, PresetTile} from './StudioControls';
+import CinemaInfo from './CinemaInfo';
 
 export type CameraSelection = {
   preset_id: string;
@@ -133,6 +134,7 @@ export function CameraSelector({
         <div>
           <span className="director-eyebrow">DIRECTOR / VIDEO</span>
           <h3>Стартовое меню видео</h3>
+          <CinemaInfo topic="camera" />
         </div>
         {onCatalogue && (
           <button type="button" disabled={disabled} onClick={onCatalogue}>

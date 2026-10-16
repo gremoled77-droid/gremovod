@@ -17,6 +17,12 @@ def check_public_url(url):
     except (ValueError,OSError): raise HTTPException(400,'Изображение должно находиться на публичном HTTPS-сервере')
 
 async def download_image(url, max_bytes=20*1024*1024):
+    if url.startswith('data:image/'):  # GPT Image отдаёт base64 прямо в ответе
+        import base64, binascii
+        try: content=base64.b64decode(url.split(',',1)[1],validate=True)
+        except (IndexError,binascii.Error): raise HTTPException(502,'Результат base64 повреждён')
+        if len(content)>max_bytes: raise HTTPException(413,'Превышен лимит размера медиа')
+        return content
     for _ in range(4):
         check_public_url(url)
         try:
@@ -56,6 +62,13 @@ def output_urls(response,kind='image'):
         elif isinstance(value,str) and value.startswith('https://') and value not in result: result.append(value)
     fields=('video_urls','videos','video_url','url','video') if kind=='video' else ('image_urls','images','image_url','url','image','data')
     for field in fields: collect(output.get(field))
+    if kind!='video':
+        items=output.get('data')
+        for item in items if isinstance(items,list) else []:
+            if isinstance(item,dict) and isinstance(item.get('b64_json'),str) and item['b64_json']:
+                result.append('data:image/png;base64,'+item['b64_json'])
+        if not result and isinstance(output.get('image_base64'),str) and output['image_base64']:
+            result.append('data:image/png;base64,'+output['image_base64'].split(',')[-1])
     return result
 
 async def download_video(url):

@@ -434,6 +434,7 @@ async def model_job(body:ModelJobRequest,x_api_key:str|None=Header(default=None)
     try:
         spec=MODEL_SPECS[body.model_id]
         result=await request_piapi('POST',adapters.submit_path(spec),key,adapters.wire_body(spec,payload))
+        if isinstance(result,dict) and not result.get('data') and result.get('task_id'): result={'code':200,'data':result,'message':'success'}  # async GPT-эндпоинт отвечает без обёртки data
         task=result.get('data') or {}
         if not isinstance(task,dict) or not task.get('task_id'):
             raise HTTPException(502,'Провайдер не вернул task_id. Не повторяй оплату; проверь историю PiAPI.')
@@ -724,7 +725,7 @@ async def _save_job_output(job_id:str,output_index:int):
     metadata={'request':json.loads(row['request']),'provider':row['provider'],'kind':row['kind'],**image}
     try:
         with connect() as db:
-            db.execute('INSERT INTO library_assets VALUES(?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET metadata=excluded.metadata',(aid,job_id,row['project_id'],output_index,filename,urls[output_index],json.dumps(metadata,ensure_ascii=False),now()))
+            db.execute('INSERT INTO library_assets VALUES(?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET metadata=excluded.metadata',(aid,job_id,row['project_id'],output_index,filename,('inline-base64' if urls[output_index].startswith('data:') else urls[output_index]),json.dumps(metadata,ensure_ascii=False),now()))
     except sqlite3.IntegrityError:
         path.unlink(missing_ok=True)
         with connect() as db: result=db.execute('SELECT * FROM library_assets WHERE job_id=? AND output_index=?',(job_id,output_index)).fetchone()

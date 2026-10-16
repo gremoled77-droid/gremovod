@@ -40,7 +40,7 @@ CASES = [  # от дешёвых к дорогим
     ('nano-banana-2.1', {'resolution': '1K', 'aspect_ratio': '16:9'}),
     ('gpt-image-2', {'quality': 'medium'}),
     ('seedream-5-pro', {'size': '1K', 'aspect_ratio': '16:9'}),
-    ('minimax-h3', {'resolution': '480P', 'duration': 5, 'aspect_ratio': '16:9'}),
+    ('minimax-h3', {'resolution': '480p', 'duration': 5, 'aspect_ratio': '16:9'}),
 ]
 
 
@@ -57,6 +57,15 @@ def load_key():
 def case_label(model, options):
     extra = options.get('variant') or options.get('quality') or options.get('size') or options.get('resolution') or ''
     return f'{model}{"-" + extra if extra else ""}'
+
+
+def unwrap(body):
+    """Единый и асинхронный GPT-эндпоинты отвечают по-разному: приводим к {'data': {...}}."""
+    if isinstance(body, dict) and 'data' not in body and 'task_id' in body:
+        return {'data': body}
+    if isinstance(body, dict) and isinstance(body.get('data'), dict) and 'task_id' not in body['data'] and 'task_id' in body:
+        return {'data': body}
+    return body
 
 
 def clean(text, key):
@@ -91,7 +100,8 @@ def run_case(client, key, directory, model, options, wait):
     except ValueError:
         record['error'] = clean(response.text[:300], key)
         return record
-    record['submit_keys'] = sorted((submitted.get('data') or {}).keys()) if isinstance(submitted, dict) else None
+    submitted = unwrap(submitted)
+    record['submit_keys'] = sorted(submitted['data'].keys()) if isinstance(submitted, dict) else None
     task_id = ((submitted.get('data') or {}) if isinstance(submitted, dict) else {}).get('task_id')
     if not task_id:
         record['error'] = clean(json.dumps(submitted, ensure_ascii=False)[:400], key)
@@ -106,7 +116,7 @@ def run_case(client, key, directory, model, options, wait):
             break
         time.sleep(5)
         poll = client.get(f'{BASE}/api/v1/task/{task_id}', headers=headers, timeout=60)
-        result = poll.json()
+        result = unwrap(poll.json())
     record['status'] = status or 'timeout'
     data = result.get('data') or {}
     output = data.get('output')
@@ -121,7 +131,12 @@ def run_case(client, key, directory, model, options, wait):
                 urls = [items[0]['b64_json']]
         record['output_urls_found'] = len(urls)
         if urls:
-            record['saved'] = save_output(directory, label, urls[0], spec['kind'] == 'video', client)
+            record['url_host'] = urls[0].split('/')[2] if urls[0].startswith('https://') else 'inline-base64'
+            try:
+                record['saved'] = save_output(directory, label, urls[0], spec['kind'] == 'video', client)
+            except Exception as exc:  # задача оплачена: сбой скачивания не должен терять task_id и ссылку
+                record['download_error'] = clean(f'{type(exc).__name__}: {exc}', key)
+                record['result_url'] = urls[0]
     return record
 
 

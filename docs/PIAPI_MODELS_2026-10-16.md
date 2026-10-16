@@ -88,3 +88,13 @@ LLM: единый OpenAI-совместимый эндпоинт (`/docs/llm-api
 - **Видео:** seedance-2.5, minimax-h3, **Seedance 2 (+ Private Asset Library, omni-референс)**, **Kling 3.0 / Omni / Elements**.
 - **Другое:** OmniHuman 1.5, Kling Avatar, Flux Kontext, Z-Image Turbo, апскейл изображений и видео.
 - **Изображения:** seedream-5-lite, seedream-5-pro, nano-banana-2.1, GPT Image (2.0; 2.5 / 2.5-flare; правки — 2.5-sunburst), qwen-image-2.1.
+
+## Результаты живой проверки (16.10.2026)
+Всего потрачено около $0.5 (лимит $5). Списание по `meta.usage` совпало с оценкой каталога.
+- **GPT Image 2.5 flare (low)** $0.004, **GPT Image 2.5 standard** $0.012, **GPT Image 2.0 medium** $0.032: эндпоинт `/api/v1/images/generations/async`, ответ на отправку приходит **без обёртки `data`** (task_id в корне), статус через `GET /api/v1/task/{id}` уже с обёрткой; результат — `output.data[].b64_json` (base64), URL нет. standard вернул 1536×1024.
+- **Qwen Image 2.1** $0.015: `output.image_url` и `image_base64`.
+- **Nano Banana 2.1 (1K)** $0.03: `output.image_urls`.
+- **Seedream 5 Pro (1K)** $0.068: `output.image_urls`.
+- **MiniMax H3 txt2video 480p / 5 с** $0.15: `resolution` принимается **только в нижнем регистре** (`480p`, `768p`, `1080p`); `480P` даёт `Invalid input`. Результат — `output.video_url`.
+- Картинки лежат на `img.theapi.app` (путь `/temp` или `/ephemeral`), домен должен быть доступен для скачивания.
+- Не проверялись: референсы и правки GPT Image (sunburst), референсы Seedream/Nano, img2video MiniMax.

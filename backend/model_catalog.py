@@ -62,7 +62,13 @@ MODEL_SPECS['gpt-image-2.5'].update({**_GPT_COMMON,'price_standard_max_usd':0.01
 MODEL_SPECS['minimax-h3']={
     'launch_enabled':False,'kind':'video','model':'Qubico/minimax-h3','task_type':'txt2video','adapter':'minimax_h3',
     'max_refs':1,'ref_field':'image','docs':'https://piapi.ai/minimax-h3',
-    'price_per_second_usd':{'480P':0.03,'768P':0.05,'1080P':0.07},
-    'options':{'resolution':{'values':['480P','768P','1080P'],'default':'480P'},
+    'price_per_second_usd':{'480p':0.03,'768p':0.05,'1080p':0.07},
+    'options':{'resolution':{'values':['480p','768p','1080p'],'default':'480p'},
                'duration':{'min':5,'max':15,'default':5},
                'aspect_ratio':{'values':['16:9','9:16','1:1'],'default':'16:9'}}}
+
+
+# --- Живая проверка 16.10.2026 (scripts/live_piapi_test.py): отправка, статус, результат и списание совпали с оценкой.
+# gpt-image-2.5-sunburst (правки) и референсы GPT Image не проверялись и остаются выключенными.
+for _id in ('seedream-5-pro','nano-banana-2.1','qwen-image-2.1','gpt-image-2','gpt-image-2.5','minimax-h3'):
+    MODEL_SPECS[_id].update({'launch_enabled':True,'verified_at':'2026-10-16','prompt_only':False})

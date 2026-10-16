@@ -3,6 +3,7 @@ const StoryboardDemo = lazy(() => import('./StoryboardDemo'));
 const GraphPanel = lazy(() => import('./WorkflowPanel'));
 import CharacterReferences from './CharacterReferences';
 import SettingsPanel from './SettingsPanel';
+import CinemaInfo from './CinemaInfo';
 import ProjectHeader from './ProjectHeader';
 import FramePanel, {
   FrameSelector,
@@ -840,6 +841,7 @@ function App() {
       <section className="panel">
         <div className="panel-title">
           <h2>{kind === 'image' ? '② Image Lab' : '③ Video Lab'}</h2>
+          {kind === 'video' && <CinemaInfo topic="editing" />}
           <a target="_blank" rel="noreferrer" href={specs[model]?.docs}>
             Мануал ↗
           </a>
@@ -1423,6 +1425,7 @@ function App() {
                   <section className="panel">
                     <div className="panel-title">
                       <h2>① Prompt Director + GPT</h2>
+                      <CinemaInfo topic="narrative" />
                       <MessageSquare size={20} />
                     </div>
                     <label>
@@ -1626,6 +1629,7 @@ function App() {
                 <section className="panel">
                   <div className="panel-title">
                     <h2>④ Audio Lab — референсы голоса</h2>
+                    <CinemaInfo topic="sound" />
                     <Music size={19} />
                   </div>
                   <p className="muted">

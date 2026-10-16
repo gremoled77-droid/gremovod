@@ -15,6 +15,7 @@ import {
   type FrameCatalogue,
   type FrameSelection,
 } from './FramePanel';
+import CinemaInfo from './CinemaInfo';
 
 export type Scene = {
   brief: string;
@@ -84,7 +85,10 @@ export default function ScenePanel({
   const model = models.find(x => x.id === scene.target);
   return (
     <section className="panel scene-panel">
-      <h2>Сцена</h2>
+      <div className="panel-title">
+        <h2>Сцена</h2>
+        <CinemaInfo topic="mise" />
+      </div>
       <p className="muted">
         Соедини персонажа, локацию и предметы в одном кадре. Роли исходников и инструкция сохраняются вместе с
         проектом ролика.

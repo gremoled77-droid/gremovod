@@ -20,12 +20,16 @@ def preview(model, **extra):
 
 
 class AdapterTests(unittest.TestCase):
-    def test_new_models_are_not_launchable_until_verified(self):
+    def test_live_verified_models_are_launchable_with_date(self):
         for model in ('seedream-5-pro', 'nano-banana-2.1', 'qwen-image-2.1', 'gpt-image-2', 'gpt-image-2.5', 'minimax-h3'):
-            with self.assertRaises(HTTPException) as caught:
-                main.image_payload(job(model))
-            self.assertEqual(caught.exception.status_code, 400, model)
-            self.assertFalse(main.MODEL_SPECS[model].get('launch_enabled'), model)
+            spec = main.MODEL_SPECS[model]
+            self.assertTrue(spec['launch_enabled'], model)
+            self.assertEqual(spec['verified_at'], '2026-10-16', model)
+            self.assertEqual(main.image_payload(job(model))['model'], spec['model'] if model != 'gpt-image-2' and model != 'gpt-image-2.5' else main.image_payload(job(model))['model'])
+
+    def test_sunburst_edits_stay_blocked(self):
+        with self.assertRaises(HTTPException):
+            main.image_payload(job('gpt-image-2.5', reference_urls=['https://example.com/a.png']))
 
     def test_existing_launchable_models_unchanged(self):
         payload = main.image_payload(job('seedream-5-lite'))
@@ -87,7 +91,7 @@ class AdapterTests(unittest.TestCase):
             preview('gpt-image-2', options={'quality': 'high'})
 
     def test_minimax_h3_modes_and_price(self):
-        payload, cost = preview('minimax-h3', options={'duration': 10, 'resolution': '768P'})
+        payload, cost = preview('minimax-h3', options={'duration': 10, 'resolution': '768p'})
         self.assertEqual((payload['model'], payload['task_type']), ('Qubico/minimax-h3', 'txt2video'))
         self.assertEqual(cost, 0.5)
         image, _ = preview('minimax-h3', reference_urls=[REF])
@@ -115,3 +119,16 @@ class AdapterTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class ProviderShapeTests(unittest.TestCase):
+    def test_gpt_b64_output_becomes_inline_image(self):
+        import base64, io
+        from PIL import Image
+        from backend.image_assets import output_urls, download_image
+        import asyncio
+        buf = io.BytesIO(); Image.new('RGB', (4, 4)).save(buf, 'PNG')
+        resp = {'data': {'output': {'data': [{'b64_json': base64.b64encode(buf.getvalue()).decode()}]}}}
+        urls = output_urls(resp, 'image')
+        self.assertTrue(urls[0].startswith('data:image/png;base64,'))
+        self.assertEqual(asyncio.run(download_image(urls[0])), buf.getvalue())
