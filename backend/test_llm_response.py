@@ -41,5 +41,27 @@ class ChatTextTests(unittest.TestCase):
             chat_text({'id': 'x', 'output': []})
 
 
+class AuthHeaderTests(unittest.IsolatedAsyncioTestCase):
+    async def test_llm_uses_bearer_and_tasks_use_x_api_key(self):
+        from unittest.mock import patch
+
+        import httpx
+
+        from backend import main
+
+        seen = []
+
+        async def fake(self, method, url, headers=None, json=None):
+            seen.append((url, headers))
+            return httpx.Response(200, json={'code': 200, 'data': {}, 'choices': [{'message': {'content': 'ok'}}]})
+
+        with patch.object(httpx.AsyncClient, 'request', fake):
+            await main.request_piapi('POST', '/v1/chat/completions', 'secret-key', {'model': 'm'})
+            await main.request_piapi('GET', '/api/v1/task/1', 'secret-key')
+        self.assertEqual(seen[0][1].get('Authorization'), 'Bearer secret-key')
+        self.assertNotIn('X-API-KEY', seen[0][1])
+        self.assertEqual(seen[1][1].get('X-API-KEY'), 'secret-key')
+        self.assertNotIn('Authorization', seen[1][1])
+
 if __name__ == '__main__':
     unittest.main()

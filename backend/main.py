@@ -127,7 +127,8 @@ def up_error(response:httpx.Response):
 async def request_piapi(method:str,path:str,key:str,payload:dict|None=None):
     try:
         async with httpx.AsyncClient(timeout=120.0) as client:
-            r=await client.request(method,BASE+path,headers={'X-API-KEY':key,'Content-Type':'application/json'},json=payload)
+            headers={'Authorization':'Bearer '+key,'Content-Type':'application/json'} if path.startswith('/v1/') else {'X-API-KEY':key,'Content-Type':'application/json'}  # LLM-эндпоинт PiAPI принимает только Bearer
+            r=await client.request(method,BASE+path,headers=headers,json=payload)
     except httpx.RequestError as e: raise HTTPException(502,f'Не удалось соединиться с PiAPI: {type(e).__name__}')
     if r.is_error: up_error(r)
     try: value=r.json()
