@@ -3,6 +3,7 @@ import CharacterReferences from './CharacterReferences';
 import SettingsPanel from './SettingsPanel';
 import StageFooter from './StageFooter';
 import Collapsible from './Collapsible';
+import {MontageSummary, ReleaseSummary} from './StageSummary';
 import CinemaInfo from './CinemaInfo';
 import ProjectHeader from './ProjectHeader';
 import FramePanel, {
@@ -1727,13 +1728,16 @@ function App() {
                   }}
                 />
               ) : mode === 'files' ? (
-                <ProductionPanel
-                  initialLocation={productionTarget}
-                  projectId={projectId}
-                  onOpenProject={(id, characterId) => {
-                    void load(id, 'studio', characterId);
-                  }}
-                />
+                <>
+                  <MontageSummary projectId={projectId} onMode={setMode} />
+                  <ProductionPanel
+                    initialLocation={productionTarget}
+                    projectId={projectId}
+                    onOpenProject={(id, characterId) => {
+                      void load(id, 'studio', characterId);
+                    }}
+                  />
+                </>
               ) : mode === 'connections' ? (
                 <ConnectionsPanel />
               ) : mode === 'agents' ? (
@@ -1781,7 +1785,10 @@ function App() {
                   onGenerate={(target, prompt) => void sceneGenerate(target, prompt)}
                 />
               ) : mode === 'economics' ? (
-                <EconomicsPanel projectId={projectId} revision={libraryRevision} />
+                <>
+                  <ReleaseSummary projectId={projectId} />
+                  <EconomicsPanel projectId={projectId} revision={libraryRevision} />
+                </>
               ) : mode === 'styles' ? (
                 <section className="panel">
                   <div className="panel-title">

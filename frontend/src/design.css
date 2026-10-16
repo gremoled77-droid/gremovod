@@ -618,3 +618,94 @@ section.panel {
     transition: none;
   }
 }
+
+/* Шапки «Монтажа» и «Выпуска» */
+.ss {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-bottom: 16px;
+  padding: 22px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: linear-gradient(135deg, #1b1a16, var(--surface) 55%);
+}
+.ss h2 {
+  margin: 2px 0 6px;
+  font-size: 22px;
+}
+.ss-eyebrow {
+  color: var(--accent);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.ss p {
+  margin: 0;
+  max-width: 62ch;
+}
+.ss-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 12px;
+}
+.ss-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  text-align: left;
+  background: var(--surface-2);
+}
+.ss-card small {
+  color: var(--muted);
+  font-size: 12px;
+}
+.ss-card b {
+  font-size: 32px;
+  line-height: 1;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.ss-card span {
+  color: var(--muted);
+  font-size: 12px;
+}
+.ss-note {
+  color: var(--muted);
+  font-size: 12px;
+}
+.ss-release {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 28px;
+}
+.ss-gauges {
+  display: flex;
+  gap: 24px;
+}
+.ss-totals {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--muted);
+}
+.ss-totals b {
+  color: var(--text);
+  font-size: 20px;
+  font-variant-numeric: tabular-nums;
+}
+@media (max-width: 700px) {
+  .ss {
+    padding: 16px;
+  }
+  .ss-gauges {
+    gap: 12px;
+  }
+}
