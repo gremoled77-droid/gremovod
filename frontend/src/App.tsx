@@ -37,6 +37,7 @@ import GenerationReview, {type GenerationRequest} from './GenerationReview';
 import AssetLibrary from './AssetLibrary';
 import CreateScreen from './CreateScreen';
 import HomeScreen from './HomeScreen';
+import ReelsScreen, {type ReelUse} from './ReelsScreen';
 import GenerationWatcher from './GenerationWatcher';
 import {ActivityProvider} from './ActivityContext';
 import StageNav, {type Mode} from './StageNav';
@@ -861,6 +862,25 @@ function App() {
     change({composition});
     setNotice('Ракурс и свет выбраны. Подготовь фотопромпт с этими настройками.');
   };
+  const useReelRecipe = (u: ReelUse) => {
+    setVideoModel('seedance-2.5');
+    change({
+      prompts: {...state.prompts, 'seedance-2.5': u.prompt},
+      parameters: {
+        ...state.parameters,
+        'seedance-2.5': {
+          ...state.parameters['seedance-2.5'],
+          duration: u.duration,
+          aspect_ratio: u.aspect_ratio,
+          resolution: u.resolution,
+        },
+      },
+    });
+    setMode('video');
+    setNotice(
+      'Рецепт перенесён в «Видео». Добавь референсы по слотам рецепта и проверь стоимость перед запуском.'
+    );
+  };
   const chooseCamera = (camera: CameraSelection) => {
     change({camera});
     setNotice('Камера выбрана. Подготовь новый видеопромпт с этим движением.');
@@ -1360,9 +1380,11 @@ function App() {
                       ? 'home-main'
                       : mode === 'graph'
                         ? 'workflow-main'
-                        : mode === 'styles'
-                          ? 'styles-main'
-                          : 'solo-main'
+                        : mode === 'reels'
+                          ? 'reels-main'
+                          : mode === 'styles'
+                            ? 'styles-main'
+                            : 'solo-main'
             }
           >
             <aside className="sidebar">
@@ -1839,6 +1861,8 @@ function App() {
                   onMode={setMode}
                   onOpenProject={id => void load(id, 'home')}
                 />
+              ) : mode === 'reels' ? (
+                <ReelsScreen onUse={useReelRecipe} />
               ) : mode === 'create' ? (
                 <CreateScreen
                   projectId={projectId}

@@ -55,6 +55,7 @@ export default function WorkspaceTrail({
     create: 'Кадры',
     video: 'Видео',
     audio: 'Звук',
+    reels: 'Рилсы',
     files: 'Файлы и монтаж',
     economics: 'Экономика',
     graph: 'Воркфлоу',

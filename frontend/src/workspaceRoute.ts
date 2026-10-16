@@ -7,6 +7,7 @@ export const MODES: Mode[] = [
   'create',
   'video',
   'audio',
+  'reels',
   'files',
   'economics',
   'graph',
