@@ -485,7 +485,7 @@ export default function WorkflowPanel({
           id: crypto.randomUUID(),
           type: 'studio',
           position: slot(kind, g.nodes),
-          data: {kind, title: label},
+          data: kind === 'llm' ? {kind, title: label, model: 'gpt-5.6-luna'} : {kind, title: label},
         },
       ],
     }));

@@ -11,8 +11,9 @@ def reply(content, finish='stop', **extra):
 
 
 class ChatTextTests(unittest.TestCase):
-    def test_astra_is_allowed(self):
-        self.assertIn('gpt-6-astra', ALLOWED_CHAT)
+    def test_only_cheap_models_are_allowed(self):
+        self.assertIn('gpt-5.6-luna', ALLOWED_CHAT)
+        self.assertNotIn('gpt-6-astra', ALLOWED_CHAT)
 
     def test_plain_string(self):
         self.assertEqual(chat_text(reply(' Привет ')), 'Привет')

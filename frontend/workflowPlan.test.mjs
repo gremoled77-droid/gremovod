@@ -42,7 +42,7 @@ test('LLM-узел: порядок, вход и промпт изображен�
   const nodes = [
     n('t', 0, {kind: 'text', text: 'Грэм у такси'}),
     n('l1', 100, {kind: 'llm', model: 'gpt-5.6-luna', title: 'LLM'}),
-    n('l2', 200, {kind: 'llm', model: 'gpt-6-astra', title: 'LLM 2'}),
+    n('l2', 200, {kind: 'llm', model: 'gpt-5.6-terra', title: 'LLM 2'}),
     n('i', 300, {kind: 'image', model: 'seedream-5-lite', title: 'Кадр'}),
   ];
   const edges = [e('t', 'l1'), e('l1', 'l2'), e('l2', 'i')];
