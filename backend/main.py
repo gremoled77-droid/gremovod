@@ -12,6 +12,7 @@ from fastapi.responses import FileResponse
 from backend.connections import router as connections_router, credential, provider_key
 from backend.image_assets import download_image, inspect_image, output_urls, download_video
 from backend.prompt_rules import RULES_VERSION, system_rules, PROFILES, reference_label, validate_prompt
+from backend.llm_response import chat_text, upstream_error
 from backend.model_catalog import MODEL_SPECS, ALLOWED_CHAT, IMAGE_TASKS, VIDEO_MODELS
 from backend import adapters
 from backend import camera_movements
@@ -131,7 +132,8 @@ async def request_piapi(method:str,path:str,key:str,payload:dict|None=None):
     if r.is_error: up_error(r)
     try: value=r.json()
     except ValueError: raise HTTPException(502,'PiAPI вернул не-JSON ответ')
-    if not isinstance(value,dict) or value.get('code',200) not in (0,200): raise HTTPException(502,'PiAPI вернул неожиданный ответ; проверь историю задач перед повторной оплатой')
+    if isinstance(value,dict) and upstream_error(value): raise HTTPException(502,'PiAPI вернул ошибку: '+upstream_error(value))
+    if not isinstance(value,dict) or ('choices' not in value and value.get('code',200) not in (0,200)): raise HTTPException(502,'PiAPI вернул неожиданный ответ; проверь историю задач перед повторной оплатой')
     return value
 
 class UnifiedChatRequest(BaseModel):
@@ -153,7 +155,8 @@ async def unified_chat(body:UnifiedChatRequest, x_api_key:str|None=Header(defaul
         content,usage=await agent_completion('openai',body.model,key,system,json.dumps(history,ensure_ascii=False))
         return {'choices':[{'message':{'role':'assistant','content':content}}],'usage':usage,'provider':'openai'}
     if body.model not in ALLOWED_CHAT: raise HTTPException(400,'Модель PiAPI отсутствует в списке')
-    return await request_piapi('POST','/v1/chat/completions',key,{'model':body.model,'messages':messages})
+    value=await request_piapi('POST','/v1/chat/completions',key,{'model':body.model,'messages':messages})
+    return {'choices':[{'message':{'role':'assistant','content':chat_text(value)}}],'usage':value.get('usage',{}),'provider':'piapi','model':body.model}
 
 class DiagnosticInfo(BaseModel):
     check_remote:bool=False
@@ -626,7 +629,7 @@ async def agent_completion(provider:str,model:str,key:str,system:str,prompt:str)
     if provider=='piapi':
         if model not in ALLOWED_CHAT: raise HTTPException(400,'Unknown PiAPI LLM model')
         value=await request_piapi('POST','/v1/chat/completions',key,{'model':model,'messages':[{'role':'system','content':system},{'role':'user','content':prompt}]})
-        return value.get('choices',[{}])[0].get('message',{}).get('content',''),value.get('usage',{})
+        return chat_text(value),value.get('usage',{})
     raise HTTPException(400,'Unknown provider')
 
 @app.post('/api/agents/run')
@@ -777,6 +780,8 @@ from backend import storyboard
 storyboard.register(app,sys.modules[__name__])
 from backend import production_entities
 production_entities.register(app,sys.modules[__name__])
+from backend import visual_plan
+visual_plan.register(app,sys.modules[__name__])
 from backend import series_economics
 series_economics.register(app,sys.modules[__name__])
 from backend import character_voice

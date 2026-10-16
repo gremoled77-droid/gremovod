@@ -128,3 +128,55 @@
     animation: none;
   }
 }
+
+/* Телефон: компактная верхняя панель в одну строку */
+@media (max-width: 700px) {
+  .topbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+  }
+  .topbar-project {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .topbar-project-picker {
+    flex: 1;
+    min-width: 0;
+  }
+  .topbar .status {
+    flex: none;
+    width: 1.1em;
+    overflow: hidden;
+    white-space: nowrap;
+  }
+  .topbar .top-actions {
+    width: auto;
+    flex: none;
+    flex-wrap: nowrap;
+    gap: 6px;
+  }
+  .topbar .top-actions > button:not(.dock-toggle) {
+    display: none;
+  }
+  .topbar .project-global-actions {
+    display: flex;
+    gap: 6px;
+  }
+  .topbar .project-global-actions > button:first-child {
+    font-size: 0;
+    padding: 0;
+    width: 44px;
+  }
+  .topbar .project-global-actions > button:first-child svg {
+    width: 20px;
+    height: 20px;
+  }
+  .topbar .project-global-actions > button {
+    display: inline-flex;
+  }
+}
