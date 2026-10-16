@@ -6,6 +6,7 @@ import ChatLinkSetting from './ChatLinkSetting';
 
 type Props = {
   children?: ReactNode;
+  projectHeader?: ReactNode;
   provider: 'openai' | 'piapi';
   model: string;
   busy: boolean;
@@ -18,6 +19,7 @@ type Props = {
 };
 
 export default function SettingsPanel({
+  projectHeader,
   provider,
   model,
   busy,
@@ -36,6 +38,14 @@ export default function SettingsPanel({
           <Settings size={21} /> Настройки
         </h2>
       </div>
+      {projectHeader && (
+        <>
+          <h3>Проект</h3>
+          <p className="muted">Название проекта и сохранение.</p>
+          {projectHeader}
+          <hr />
+        </>
+      )}
       <h3>Резервный API</h3>
       <p className="muted">Провайдер и модель для подготовки промптов через резервный API.</p>
       {!PAID_LLM_ENABLED && (

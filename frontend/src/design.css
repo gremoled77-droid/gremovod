@@ -571,3 +571,50 @@ section.panel {
     order: 2;
   }
 }
+
+/* Сворачиваемые разделы */
+.collapsible {
+  padding: 0;
+}
+.collapsible > summary {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 16px 20px;
+  cursor: pointer;
+  list-style: none;
+}
+.collapsible > summary::-webkit-details-marker {
+  display: none;
+}
+.collapsible > summary::before {
+  content: '▸';
+  color: var(--accent);
+  transition: transform 0.15s;
+}
+.collapsible[open] > summary::before {
+  transform: rotate(90deg);
+}
+.collapsible > summary b {
+  font-size: 17px;
+}
+.collapsible > summary small {
+  color: var(--muted);
+}
+.collapsible > .collapsible-body {
+  padding: 0 20px 20px;
+}
+.collapsible-body > .panel {
+  border: 0;
+  background: none;
+  padding: 0;
+  box-shadow: none;
+}
+.collapsible-body > .panel > h2:first-child {
+  display: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .collapsible > summary::before {
+    transition: none;
+  }
+}

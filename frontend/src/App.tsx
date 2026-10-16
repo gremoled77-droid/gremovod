@@ -2,6 +2,7 @@ import ProductionStoryboard from './ProductionStoryboard';
 import CharacterReferences from './CharacterReferences';
 import SettingsPanel from './SettingsPanel';
 import StageFooter from './StageFooter';
+import Collapsible from './Collapsible';
 import CinemaInfo from './CinemaInfo';
 import ProjectHeader from './ProjectHeader';
 import FramePanel, {
@@ -1637,6 +1638,22 @@ function App() {
               {notice && <div className="notice">{notice}</div>}
               {mode === 'settings' ? (
                 <SettingsPanel
+                  projectHeader={
+                    <ProjectHeader
+                      id={projectId}
+                      name={projectName}
+                      editing={titleEditing}
+                      dirty={projectDirty}
+                      busy={!!busy || saving.current}
+                      onName={setProjectName}
+                      onEdit={() => setTitleEditing(true)}
+                      onCancel={() => {
+                        setProjectName(baseProject.current?.title || projectName);
+                        setTitleEditing(false);
+                      }}
+                      onSave={() => void save()}
+                    />
+                  }
                   onProjectsChanged={() => void refresh()}
                   provider={provider}
                   model={llm}
@@ -1844,6 +1861,10 @@ function App() {
                 <>
                   <section className="panel">
                     <h2>Задание ролика</h2>
+                    <p className="muted">
+                      Опиши идею серии в одной-двух фразах. Дальше: «Мир» (стиль и герои), «Раскадровка»
+                      (кадры).
+                    </p>
                     <label>
                       Режиссёрское задание
                       <textarea
@@ -1881,8 +1902,7 @@ function App() {
                     />
                   </section>
 
-                  <section className="panel">
-                    <h2>⑤ Очередь и галерея</h2>
+                  <Collapsible title="Очередь и галерея" hint="задачи проекта и результаты из ChatGPT">
                     <NativeGallery {...replacementControls} projectId={projectId} onRefine={refineAsset} />
                     <button className="secondary" onClick={refresh}>
                       <RefreshCw size={14} /> Обновить список
@@ -1980,18 +2000,20 @@ function App() {
                         ))
                       )}
                     </div>
-                  </section>
-                  <AssetLibrary
-                    {...replacementControls}
-                    onRefine={refineAsset}
-                    onScene={addToScene}
-                    projectId={projectId}
-                    revision={libraryRevision}
-                    onUse={(link, id) => {
-                      change({videoReference: link, videoAssetId: id});
-                      setNotice('Изображение из библиотеки выбрано для Video Lab');
-                    }}
-                  />
+                  </Collapsible>
+                  <Collapsible title="Библиотека проекта" hint="все картинки и видео проекта">
+                    <AssetLibrary
+                      {...replacementControls}
+                      onRefine={refineAsset}
+                      onScene={addToScene}
+                      projectId={projectId}
+                      revision={libraryRevision}
+                      onUse={(link, id) => {
+                        change({videoReference: link, videoAssetId: id});
+                        setNotice('Изображение из библиотеки выбрано для Video Lab');
+                      }}
+                    />
+                  </Collapsible>
                 </>
               ) : (
                 <Suspense fallback={<p>Открываем редактор узлов…</p>}>
