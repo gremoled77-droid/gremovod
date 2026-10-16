@@ -65,13 +65,15 @@ def register(app, studio):
         raw_host=request.headers.get('host','')
         try:
             host=urlsplit('//'+raw_host)
-            valid=host.hostname in {'127.0.0.1','localhost','::1'} and host.username is None and host.password is None and not host.path and not host.query and not host.fragment and (host.port is None or 0<host.port<=65535)
+            from backend import remote_access
+            valid=(host.hostname in {'127.0.0.1','localhost','::1'} or remote_access.allowed_host(host.hostname)) and host.username is None and host.password is None and not host.path and not host.query and not host.fragment and (host.port is None or 0<host.port<=65535)
         except ValueError:valid=False
         if not valid:return JSONResponse({'detail':'Недопустимый Host: студия принимает только локальные запросы'},status_code=403)
         origin = request.headers.get('origin')
-        if origin and origin not in ORIGINS or request.headers.get('sec-fetch-site') == 'cross-site':
+        from backend import remote_access
+        if origin and origin not in ORIGINS and not remote_access.allowed_origin(origin) or request.headers.get('sec-fetch-site') == 'cross-site':
             return JSONResponse({'detail':'Запрос с постороннего сайта запрещён'}, status_code=403)
-        public = request.url.path in {'/api/health','/api/session'}
+        public = request.url.path in {'/api/health','/api/session','/api/login','/api/logout','/login'} or not (request.url.path.startswith('/api/') or request.url.path in {'/docs','/redoc','/openapi.json','/docs/oauth2-redirect'})
         worker = request.url.path.startswith('/api/chatgpt/worker/')
         supplied = request.headers.get('x-studio-session') or request.cookies.get('studio_session', '')
         if not public and not worker and not secrets.compare_digest(supplied.encode(), LAUNCH_TOKEN.encode()):
@@ -82,9 +84,9 @@ def register(app, studio):
 
 
     @app.get('/api/session')
-    def session():
+    def session(request: Request):
         response = JSONResponse({'token':LAUNCH_TOKEN}, headers={'Cache-Control':'no-store'})
-        response.set_cookie('studio_session', LAUNCH_TOKEN, httponly=True, samesite='strict', path='/')
+        response.set_cookie('studio_session', LAUNCH_TOKEN, httponly=True, samesite='strict', path='/', secure=request.headers.get('x-forwarded-proto')=='https')
         return response
 
     @app.on_event('startup')

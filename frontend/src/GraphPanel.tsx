@@ -1,0 +1,82 @@
+import {
+  ReactFlow,
+  Background,
+  Controls,
+  MiniMap,
+  addEdge,
+  applyNodeChanges,
+  applyEdgeChanges,
+  Handle,
+  Position,
+  type Node,
+  type Edge,
+} from '@xyflow/react';
+type Graph = {nodes: Node[]; edges: Edge[]};
+function Block({data}: {data: Record<string, unknown>}) {
+  return (
+    <div className="flow-node">
+      <Handle type="target" position={Position.Left} />
+      <b>{String(data.title || '')}</b>
+      <small>{String(data.description || '')}</small>
+      <Handle type="source" position={Position.Right} />
+    </div>
+  );
+}
+const types = {studio: Block};
+export default function GraphPanel({
+  nodes,
+  edges,
+  onChange,
+}: {
+  nodes: Node[];
+  edges: Edge[];
+  onChange: (update: (graph: Graph) => Graph) => void;
+}) {
+  return (
+    <section className="panel graph-panel">
+      <div className="panel-title">
+        <div>
+          <h2>Визуальный workflow</h2>
+          <p className="muted">
+            Узлы можно перемещать и соединять. Автоматическое выполнение веток будет добавлено позже.
+          </p>
+        </div>
+        <button
+          onClick={() =>
+            onChange(g => ({
+              ...g,
+              nodes: [
+                ...g.nodes,
+                {
+                  id: crypto.randomUUID(),
+                  type: 'studio',
+                  position: {x: 120 + Math.random() * 350, y: 150 + Math.random() * 250},
+                  data: {title: 'Новый шаг', description: 'Ручной этап'},
+                },
+              ],
+            }))
+          }
+        >
+          ＋ Узел
+        </button>
+      </div>
+      <div className="flow-wrap">
+        <ReactFlow
+          nodes={nodes}
+          edges={edges}
+          onNodesChange={changes => onChange(g => ({...g, nodes: applyNodeChanges(changes, g.nodes)}))}
+          onEdgesChange={changes => onChange(g => ({...g, edges: applyEdgeChanges(changes, g.edges)}))}
+          onConnect={connection =>
+            onChange(g => ({...g, edges: addEdge({...connection, animated: true}, g.edges)}))
+          }
+          nodeTypes={types}
+          fitView
+        >
+          <Background />
+          <Controls />
+          <MiniMap />
+        </ReactFlow>
+      </div>
+    </section>
+  );
+}

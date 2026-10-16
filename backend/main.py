@@ -18,12 +18,14 @@ from backend import camera_movements
 from backend import frame_composition
 
 ROOT=Path(__file__).resolve().parent
-PRODUCTIONS_ROOT=ROOT.parent/'projects'
+DATA=Path(os.environ['STUDIO_DATA_DIR']).resolve() if os.environ.get('STUDIO_DATA_DIR') else None  # облачный режим: все данные в одном томе
+if DATA:DATA.mkdir(parents=True,exist_ok=True)
+PRODUCTIONS_ROOT=(DATA or ROOT.parent)/'projects'
 LOCAL_MEDIA_BIN=ROOT.parent/'tools'/'ffmpeg'/'bin'
 if LOCAL_MEDIA_BIN.is_dir():
     os.environ['PATH']=str(LOCAL_MEDIA_BIN)+os.pathsep+os.environ.get('PATH','')
-DB=ROOT/'studio.sqlite3'
-MEDIA=ROOT/'media'
+DB=(DATA or ROOT)/'studio.sqlite3'
+MEDIA=(DATA or ROOT)/'media'
 MEDIA.mkdir(exist_ok=True)
 BASE='https://api.piapi.ai'
 PIAPI_KEY_FILE=ROOT.parent/'PIAPI_API_KEY.txt'
@@ -446,7 +448,7 @@ async def model_job(body:ModelJobRequest,x_api_key:str|None=Header(default=None)
 
 
 # Character library: project / character / references, approved, rejected, per-model.
-CHAR_ROOT=ROOT/'character_library'
+CHAR_ROOT=(DATA or ROOT)/'character_library'
 CHAR_ROOT.mkdir(exist_ok=True)
 CHAR_CATEGORIES={'real_references','approved_generations','rejected_generations','model_references','candidate_generations','archived_generations'}
 CHAR_EXTS={'.png','.jpg','.jpeg','.webp'}
@@ -644,7 +646,7 @@ def agent_runs(project_id:str|None=None):
 
 
 # Generated originals are stored locally with their request and model provenance.
-LIBRARY_ROOT=ROOT/'library'
+LIBRARY_ROOT=(DATA or ROOT)/'library'
 
 def library_record(row):
     metadata=json.loads(row['metadata'])
@@ -769,3 +771,6 @@ camera_movements.register(app)
 frame_composition.register(app)
 from backend.temp_cleanup import register as register_temp_cleanup
 register_temp_cleanup(app,sys.modules[__name__])
+from backend import remote_access
+remote_access.register(app,sys.modules[__name__])
+remote_access.mount_frontend(app,ROOT.parent)

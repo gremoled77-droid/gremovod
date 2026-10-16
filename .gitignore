@@ -40,3 +40,4 @@ projects/**/*.wav
 projects/**/*.mp3
 docs/*.png
 docs/*.jpg
+.env.cloud

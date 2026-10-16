@@ -1,0 +1,66 @@
+/* Телефон: крупные цели нажатия, прокрутка вкладок, сетка результатов в одну колонку. */
+@media (max-width: 700px) {
+  body {
+    -webkit-text-size-adjust: 100%;
+  }
+  button,
+  select,
+  input,
+  textarea {
+    min-height: 44px;
+    font-size: 16px; /* iOS не увеличивает страницу при фокусе */
+  }
+  header .top-actions,
+  header nav,
+  .mode-tabs {
+    display: flex;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    scrollbar-width: none;
+    gap: 6px;
+  }
+  header .top-actions > * {
+    flex: none;
+  }
+  main {
+    padding: 10px 12px;
+  }
+  .panel {
+    padding: 12px;
+  }
+  .create-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  .create-screen .chips {
+    gap: 8px;
+  }
+  .flow-layout {
+    flex-direction: column;
+  }
+  .flow-console {
+    display: flex;
+    overflow-x: auto;
+    gap: 6px;
+    min-width: 0;
+  }
+  .flow-console button {
+    flex: none;
+  }
+  .flow-wrap {
+    height: 60vh;
+  }
+  .generation-review {
+    width: calc(100vw - 24px);
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+}
+@media (min-width: 701px) {
+  .create-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 12px;
+  }
+}
