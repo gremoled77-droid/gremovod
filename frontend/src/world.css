@@ -209,3 +209,57 @@
   color: #1a1306;
   font-weight: 700;
 }
+
+.sheet {
+  display: grid;
+  gap: 10px;
+}
+.sheet-shots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+}
+.sheet-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 8px;
+}
+.sheet-results {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.sheet-tile {
+  position: relative;
+  width: 110px;
+  padding: 3px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  cursor: pointer;
+}
+.sheet-tile.on {
+  outline: 2px solid var(--accent, #f2b134);
+}
+.sheet-tile img {
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  object-fit: cover;
+  border-radius: 7px;
+}
+.sheet-tile input {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+}
+.batch-list {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.batch-list li {
+  display: flex;
+  justify-content: space-between;
+}

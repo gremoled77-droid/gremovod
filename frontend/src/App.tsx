@@ -1914,6 +1914,8 @@ function App() {
                   onCreate={mkChar}
                   onToWorld={() => setMode('styles')}
                   onNext={() => setMode('storyboard')}
+                  revision={libraryRevision}
+                  onLibrary={() => setLibraryRevision(x => x + 1)}
                   builder={
                     <FrameBuilder
                       projectId={projectId}

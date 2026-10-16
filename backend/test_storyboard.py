@@ -230,3 +230,53 @@ class StoryboardTests(unittest.TestCase):
         self.assertEqual(self.outline(fresh,[{'title':'двор','frames':frame}])[1].status_code,409)
         wrong=self.path.replace(self.pid,'wrong-project')+'/outline'
         self.assertEqual(self.client.post(wrong,json={'base_revision':fresh['revision'],'request_id':uuid.uuid4().hex,'scenes':[{'title':'Z','frames':frame}]}).status_code,404)
+
+    def put_cast(self,node_id,**cast):
+        editor=self.client.get(f'/api/productions/{self.pid}/nodes/{node_id}/editor').json()
+        body={'base_revision':editor['revision'],'notes':editor['node']['notes'],'character_node_ids':[],'location_node_id':None,'location_angle_file_id':None,
+              'selected_image_file_id':editor['data']['selected_image_file_id'],'selected_video_file_id':None,**cast}
+        return self.client.put(f'/api/productions/{self.pid}/nodes/{node_id}/editor',json=body)
+
+    def entity_participants(self,node_id):
+        from types import SimpleNamespace
+        from backend import production_entities
+        editor=self.client.get(f'/api/productions/{self.pid}/nodes/{node_id}/editor').json()
+        body=SimpleNamespace(production_id=self.pid,production_node_id=node_id,project_id=self.project,entity_revision=editor['revision'],target='gpt-image-2.5',entity_instruction='x')
+        result=production_entities.context(main,body)
+        return [p['id'] for p in result['scene']['participants']]
+
+    def location_with_image(self,title,color):
+        import io
+        from PIL import Image
+        place=self.new('location',title);content=io.BytesIO();Image.new('RGB',(32,48),color).save(content,format='PNG')
+        up=self.client.post(f'/api/productions/{self.pid}/nodes/{place["id"]}/upload',data={'category':'02_Изображения'},files={'file':(f'{title}.png',content.getvalue(),'image/png')})
+        self.assertEqual(up.status_code,200,up.text)
+        files=self.client.get(f'/api/productions/{self.pid}/nodes/{place["id"]}').json()['files']
+        return place,next(f['id'] for f in files if f['kind']=='image')
+
+    def test_frame_cast_overrides_scene_cast_and_validates_angle(self):
+        board=self.prepare();yard,yard_file=self.location_with_image('Двор','red');garage,garage_file=self.location_with_image('Гараж','blue')
+        _,done=self.send(board,scene_title='Двор',frames=[{'asset_id':self.image('green'),'title':'Общий'},{'asset_id':self.image('navy'),'title':'Крупный'}])
+        self.assertEqual(done.status_code,200,done.text);first,second=done.json()['frame_ids'];scene=done.json()['scene_id']
+        # Состав сцены наследуют кадры без своего состава.
+        self.assertEqual(self.put_cast(scene,character_node_ids=[self.char['id']],location_node_id=yard['id']).status_code,200)
+        self.assertIn(yard['id'],self.entity_participants(first));self.assertIn(self.char['id'],self.entity_participants(second))
+        # Свой состав кадра главнее: гараж вместо двора, без героя.
+        ok=self.put_cast(second,location_node_id=garage['id'],location_angle_file_id=garage_file)
+        self.assertEqual(ok.status_code,200,ok.text)
+        mine=self.entity_participants(second);self.assertIn(garage['id'],mine);self.assertNotIn(yard['id'],mine);self.assertNotIn(self.char['id'],mine)
+        self.assertIn(yard['id'],self.entity_participants(first))
+        saved=self.client.get(self.path).json()['scenes'][0]
+        frame=next(f for f in saved['frames'] if f['id']==second);self.assertEqual(frame['selection']['location_angle_file_id'],garage_file)
+        # Ракурс чужой локации, ракурс без локации и состав у серии отклоняются.
+        self.assertEqual(self.put_cast(second,location_node_id=garage['id'],location_angle_file_id=yard_file).status_code,400)
+        self.assertEqual(self.put_cast(second,location_angle_file_id=garage_file).status_code,400)
+        self.assertEqual(self.put_cast(self.series['id'],character_node_ids=[self.char['id']]).status_code,400)
+        self.assertEqual(self.put_cast(second,character_node_ids=[self.char['id'],self.char['id']]).status_code,400)
+
+    def test_send_frames_writes_cast_on_frames_too(self):
+        board=self.prepare();yard,_=self.location_with_image('Двор','red')
+        _,done=self.send(board,scene_title='Двор',frames=[{'asset_id':self.image('green'),'title':'Общий'}],character_node_ids=[self.char['id']],location_node_id=yard['id'])
+        self.assertEqual(done.status_code,200,done.text)
+        frame=self.client.get(self.path).json()['scenes'][0]['frames'][0]
+        self.assertEqual(frame['selection']['character_node_ids'],[self.char['id']]);self.assertEqual(frame['selection']['location_node_id'],yard['id'])

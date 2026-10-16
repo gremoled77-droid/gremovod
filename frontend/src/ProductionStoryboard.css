@@ -428,3 +428,36 @@ main.storyboard-main {
 .ol-close {
   justify-self: start;
 }
+
+.ps-fcast {
+  margin: 4px 0;
+  font-size: 12px;
+}
+.ps-fcast summary {
+  cursor: pointer;
+}
+.ps-fcast fieldset {
+  display: grid;
+  gap: 4px;
+  margin: 6px 0 0;
+}
+.ps-angles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.ps-angle {
+  width: 52px;
+  padding: 2px;
+  border-radius: 8px;
+  font-size: 11px;
+}
+.ps-angle img {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border-radius: 6px;
+}
+.ps-angle.on {
+  outline: 2px solid var(--accent, #f2b134);
+}

@@ -113,6 +113,10 @@ def rules_text(db, pid, nid):
     if scene:
         chain.append(('episode', scene['id']))
         cast = stored(db, 'production_entity_state', scene['id']) or {}
+        if frame:
+            own = stored(db, 'production_entity_state', frame['id']) or {}
+            if own.get('character_node_ids') or own.get('location_node_id'):
+                cast = own
         if cast.get('location_node_id'):
             chain.append(('location', cast['location_node_id']))
         chain += [('character', c) for c in cast.get('character_node_ids', [])]

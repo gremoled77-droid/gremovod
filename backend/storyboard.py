@@ -211,7 +211,7 @@ def register(app,studio):
             file_id=folders.copy_asset(studio,pid,frame['id'],item.asset_id)
             with studio.connect() as db:
                 db.execute('INSERT INTO production_entity_state(node_id,data,updated_at) VALUES(?,?,?) ON CONFLICT(node_id) DO UPDATE SET data=excluded.data,updated_at=excluded.updated_at',
-                           (frame['id'],json.dumps({'character_node_ids':[],'location_node_id':None,'selected_image_file_id':file_id,'selected_video_file_id':None}),studio.now()))
+                           (frame['id'],json.dumps({'character_node_ids':body.character_node_ids,'location_node_id':body.location_node_id,'location_angle_file_id':None,'selected_image_file_id':file_id,'selected_video_file_id':None}),studio.now()))
             frame_ids.append(frame['id'])
         with studio.connect() as db:
             db.execute('BEGIN IMMEDIATE')

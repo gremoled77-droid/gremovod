@@ -12,7 +12,7 @@ def state(db,pid,nid):
     if not row:raise HTTPException(404,'Карточка не найдена в этом проекте')
     node=dict(row)
     saved=db.execute('SELECT data FROM production_entity_state WHERE node_id=?',(nid,)).fetchone()
-    data={'character_node_ids':[],'location_node_id':None,'selected_image_file_id':None,'selected_video_file_id':None,**(json.loads(saved['data']) if saved else {})}
+    data={'character_node_ids':[],'location_node_id':None,'location_angle_file_id':None,'selected_image_file_id':None,'selected_video_file_id':None,**(json.loads(saved['data']) if saved else {})}
     parent_snapshot=None
     if node['kind']=='character':
         owner=db.execute('SELECT p.state FROM projects p JOIN productions c ON c.source_project_id=p.id WHERE c.id=?',(pid,)).fetchone()
@@ -37,12 +37,15 @@ class Update(BaseModel):
     notes:str=Field(max_length=30000)
     character_node_ids:list[str]=Field(default_factory=list,max_length=100)
     location_node_id:str|None=None
+    location_angle_file_id:str|None=None
     selected_image_file_id:str|None=None
     selected_video_file_id:str|None=None
 
 
 def validate(db,pid,node,body):
-    if node['kind']!='episode' and (body.character_node_ids or body.location_node_id):raise HTTPException(400,'Состав закрепляется за сценой')
+    if node['kind'] not in ('episode','frame') and (body.character_node_ids or body.location_node_id or body.location_angle_file_id):raise HTTPException(400,'Состав закрепляется за сценой или кадром')
+    if body.location_angle_file_id and (not body.location_node_id or not db.execute("SELECT 1 FROM production_files WHERE id=? AND node_id=? AND production_id=? AND kind='image'",(body.location_angle_file_id,body.location_node_id,pid)).fetchone()):
+        raise HTTPException(400,'Ракурс должен быть изображением выбранной локации')
     if len(set(body.character_node_ids))!=len(body.character_node_ids):raise HTTPException(400,'Персонаж выбран дважды')
     for nid,kind in [(nid,'character') for nid in body.character_node_ids]+([(body.location_node_id,'location')] if body.location_node_id else []):
         if not db.execute('SELECT 1 FROM production_nodes WHERE id=? AND production_id=? AND kind=?',(nid,pid,kind)).fetchone():raise HTTPException(400,'Персонаж или локация не принадлежат проекту')
@@ -63,6 +66,8 @@ def context(studio,body):
         if node['kind']=='frame':
             scene_node,scene_data,_=state(db,body.production_id,node['parent_id'])
             related.append(scene_node)
+            # Состав кадра главнее состава сцены; пустой состав кадра наследуется от сцены.
+            if data['character_node_ids'] or data['location_node_id']:scene_data=data
         for nid in scene_data['character_node_ids']+([scene_data['location_node_id']] if scene_data['location_node_id'] else []):
             item=db.execute('SELECT * FROM production_nodes WHERE id=? AND production_id=?',(nid,body.production_id)).fetchone()
             if item:related.append(dict(item))
@@ -72,6 +77,7 @@ def context(studio,body):
             files=db.execute("SELECT * FROM production_files WHERE node_id=? AND kind='image' ORDER BY created_at,id",(item['id'],)).fetchall()
             # Prefer the explicit approved image; older output variants are not identity references.
             primary=selection['selected_image_file_id']
+            if item['kind']=='location' and item['id']==scene_data.get('location_node_id') and scene_data.get('location_angle_file_id'):primary=scene_data['location_angle_file_id']
             imported={r['id'] for r in db.execute("SELECT f.id FROM production_files f JOIN library_assets a ON a.id=f.asset_id WHERE f.node_id=? AND json_extract(a.metadata,'$.provider')='local_import'",(item['id'],))}
             chosen=[f for f in files if f['id']==primary] if primary else [f for f in files if f['id'] in imported or any(part in Path(f['relative_path']).parts for part in ['01_Основной_образ','02_Референсы','01_Референсы','01_Исходники'])]
             for f in chosen:

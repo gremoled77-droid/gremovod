@@ -1,7 +1,16 @@
 import {useEffect, useMemo, useState, type ReactNode} from 'react';
 import {apiFetch} from './api';
 import {responseJson} from './ChatGPTPanel';
-import {buildCharacterPrompt, worldFilled, type Identity, type WorldFields} from './characterPrompt';
+import {
+  buildCharacterPrompt,
+  heroShotPrompt,
+  worldFilled,
+  type Identity,
+  type WorldFields,
+} from './characterPrompt';
+import LocationsTab from './LocationsTab';
+import SheetPanel from './SheetPanel';
+import {HERO_DEFAULT, HERO_SHOTS} from './sheetShots';
 import GenerationReview, {type GenerationRequest} from './GenerationReview';
 
 type Hero = {
@@ -26,8 +35,10 @@ export default function CharactersScreen({
   onCreate,
   onToWorld,
   onNext,
+  onLibrary,
   builder,
   results,
+  revision,
 }: {
   projectId: string;
   ensureProject: () => Promise<string>;
@@ -38,8 +49,10 @@ export default function CharactersScreen({
   onCreate: () => void;
   onToWorld: () => void;
   onNext: () => void;
+  onLibrary: () => void;
   builder: ReactNode;
   results: ReactNode;
+  revision: number;
 }) {
   const hero = heroes.find(h => h.id === selectedId);
   const [specs, setSpecs] = useState<Record<string, Spec>>({}),
@@ -49,7 +62,8 @@ export default function CharactersScreen({
     [request, setRequest] = useState<GenerationRequest | null>(null),
     [error, setError] = useState(''),
     [note, setNote] = useState(''),
-    [busy, setBusy] = useState(false);
+    [busy, setBusy] = useState(false),
+    [tab, setTab] = useState<'heroes' | 'locations'>('heroes');
   useEffect(() => {
     let active = true;
     void apiFetch('/api/model-specs')
@@ -98,8 +112,43 @@ export default function CharactersScreen({
       setBusy(false);
     }
   };
+  const tabs = (
+    <div className="chips" role="tablist" aria-label="Раздел">
+      {(
+        [
+          ['heroes', 'Герои'],
+          ['locations', 'Локации'],
+        ] as const
+      ).map(([id, label]) => (
+        <button
+          key={id}
+          role="tab"
+          aria-selected={tab === id}
+          className={tab === id ? 'primary' : ''}
+          onClick={() => setTab(id)}
+        >
+          {label}
+        </button>
+      ))}
+    </div>
+  );
+  if (tab === 'locations')
+    return (
+      <section className="chars">
+        {tabs}
+        <LocationsTab
+          projectId={projectId}
+          ensureProject={ensureProject}
+          world={world}
+          revision={revision}
+          onLibrary={onLibrary}
+        />
+        {results}
+      </section>
+    );
   return (
     <section className="chars">
+      {tabs}
       <div className="panel">
         <h2>Персонажи</h2>
         <p className="muted">
@@ -181,6 +230,58 @@ export default function CharactersScreen({
           библиотеке: выбери лучшую и нажми «Заменить персонажа».
         </p>
       </div>
+      {hero && (
+        <SheetPanel
+          key={hero.id}
+          kind="hero"
+          name={hero.name}
+          title="Лист героя"
+          shots={HERO_SHOTS}
+          defaults={HERO_DEFAULT}
+          aspect="3:4"
+          defaultModel={DEFAULT_MODEL}
+          projectId={projectId}
+          ensureProject={ensureProject}
+          referenceAssetId={hero.working_asset_id}
+          buildPrompt={shot => heroShotPrompt(hero.name, hero.identity, world, shot)}
+          revision={revision}
+          actions={(selected, done) => (
+            <>
+              <button
+                disabled={!selected.length}
+                onClick={() =>
+                  void (async () => {
+                    setError('');
+                    try {
+                      for (const id of selected)
+                        await responseJson(
+                          await apiFetch(`/api/library/${id}/to-character`, {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({
+                              project_id: projectId,
+                              character_id: hero.id,
+                              category: 'approved_generations',
+                            }),
+                          })
+                        );
+                      setNote(`В референсы героя отправлено: ${selected.length}.`);
+                      done();
+                    } catch (e) {
+                      setError(e instanceof Error ? e.message : String(e));
+                    }
+                  })()
+                }
+              >
+                В референсы героя ({selected.length})
+              </button>
+              <small className="muted">
+                Рабочим образом делай через «Заменить персонажа» в библиотеке ниже.
+              </small>
+            </>
+          )}
+        />
+      )}
       {builder}
       {results}
       {request && (

@@ -12,6 +12,7 @@ import VisualRulesForm from './VisualRulesForm';
 import EditListPanel from './EditListPanel';
 import FrameTakes from './FrameTakes';
 import SceneCast from './SceneCast';
+import FrameCast from './FrameCast';
 import {moveItem} from './boardOrder';
 import {patchEntity, putOrder, type EntityPatch} from './boardApi';
 import OutlineDialog, {type OutlineContext} from './OutlineDialog';
@@ -31,6 +32,7 @@ type Media = {id: string; asset_id: string | null; kind: string; filename: strin
 type Selection = {
   character_node_ids: string[];
   location_node_id: string | null;
+  location_angle_file_id?: string | null;
   selected_image_file_id: string | null;
   selected_video_file_id: string | null;
 };
@@ -558,7 +560,9 @@ export default function ProductionStoryboard({
           {!board.scenes.length && (
             <p>Сцен ещё нет. Вставь сценарий и проверь разбиение перед сохранением.</p>
           )}
-          {board.scenes.some(s => s.frames.length) && <EditListPanel key={sid} pid={pid} sid={sid} />}
+          {board.scenes.some(s => s.frames.length) && (
+            <EditListPanel key={'edit-' + sid} pid={pid} sid={sid} />
+          )}
           {board.scenes.some(s => s.frames.length) && (
             <TensionGraph
               points={shotPoints(board.scenes, visual.plans)}
@@ -698,6 +702,15 @@ export default function ProductionStoryboard({
                             : 'последнее фото · не утверждено'
                           : 'запланирован'}
                       </small>
+                      <FrameCast
+                        id={frame.id}
+                        pid={pid}
+                        catalogue={nodes}
+                        own={frame.selection}
+                        scene={scene.selection}
+                        busy={busy}
+                        onChange={(patch, message) => savePatch(frame.id, patch, message)}
+                      />
                       <FrameTakes
                         files={frame.files}
                         imageId={frame.selection.selected_image_file_id}

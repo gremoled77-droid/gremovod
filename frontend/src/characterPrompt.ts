@@ -17,11 +17,20 @@ export function worldFilled(world?: WorldFields) {
   return !!clean(world?.look);
 }
 
-export function buildCharacterPrompt(name: string, identity: Partial<Identity>, world?: WorldFields): string {
+/** purpose: если задан (листы по ракурсам), кадровку и позу в первой строке не навязываем: их задаёт строка «Ракурс». */
+export function buildCharacterPrompt(
+  name: string,
+  identity: Partial<Identity>,
+  world?: WorldFields,
+  purpose?: string
+): string {
   const line = (label: string, value?: string) => (clean(value) ? `${label}: ${clean(value)}.` : '');
   const forbidden = [clean(identity.negative), clean(world?.avoid)].filter(Boolean).join('; ');
+  const title = clean(name) || 'Герой';
   return [
-    `Лист персонажа «${clean(name) || 'Герой'}»: один герой в полный рост, вид спереди, нейтральная поза, чистый однотонный фон, без других людей и надписей.`,
+    purpose
+      ? `Лист персонажа «${title}» (${purpose}): один герой, чистый однотонный фон, без других людей и надписей.`
+      : `Лист персонажа «${title}»: один герой в полный рост, вид спереди, нейтральная поза, чистый однотонный фон, без других людей и надписей.`,
     line('Вид', identity.species),
     line('Лицо', identity.face),
     line('Причёска', identity.hair),
@@ -35,4 +44,16 @@ export function buildCharacterPrompt(name: string, identity: Partial<Identity>, 
   ]
     .filter(Boolean)
     .join('\n');
+}
+
+/** Запрос листа героя: описание и мир, ракурс или эмоция. Рабочий образ идёт референсом, лицо не меняется. */
+export function heroShotPrompt(
+  name: string,
+  identity: Partial<Identity>,
+  world: WorldFields | undefined,
+  shot: {label: string; prompt: string}
+): string {
+  return `${buildCharacterPrompt(name, identity, world, 'лист героя для сохранения внешности')}
+Ракурс: ${shot.label}. ${shot.prompt}
+Внешность как на референсе.`;
 }
