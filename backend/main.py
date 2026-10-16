@@ -269,7 +269,7 @@ def compose_context(body:ComposeRequest):
                 row=production_folders.accessible_asset(sys.modules[__name__],db,asset.get('asset_id'),body.project_id)
             if not row: raise HTTPException(400,'Исходник сцены отсутствует в библиотеке этого проекта')
             metadata=json.loads(row['metadata'])
-            if metadata.get('kind') in {'video','audio'}: raise HTTPException(400,'В этой версии сцены принимают изображения')
+            if metadata.get('kind') in {'video','audio','document'}: raise HTTPException(400,'В этой версии сцены принимают изображения')
             references.append({'label':reference_label(body.target,len(references)+1),'asset_id':row['id'],
                                'url':reference_upload.reference_url(sys.modules[__name__],row),'local_path':str((LIBRARY_ROOT/row['filename']).resolve()),
                                'role':asset.get('role','reference'),'note':str(asset.get('note',''))[:2000]})
@@ -671,7 +671,7 @@ LIBRARY_ROOT=(DATA or ROOT)/'library'
 
 def library_record(row):
     metadata=json.loads(row['metadata'])
-    return {**dict(row),'metadata':metadata,'url':f'/api/library/{row["id"]}/file','provider_reference_url':reference_upload.reference_url(sys.modules[__name__],row),'thumbnail_url':None if metadata.get('kind') in {'video','audio'} else f'/api/library/{row["id"]}/thumbnail'}
+    return {**dict(row),'metadata':metadata,'url':f'/api/library/{row["id"]}/file','provider_reference_url':reference_upload.reference_url(sys.modules[__name__],row),'thumbnail_url':None if metadata.get('kind') in {'video','audio','document'} else f'/api/library/{row["id"]}/thumbnail'}
 
 @app.get('/api/library')
 def list_library(project_id:str):
@@ -696,7 +696,7 @@ def library_thumbnail(asset_id:str):
     from PIL import Image,ImageOps
     checked_id(asset_id)
     with connect() as db:row=db.execute('SELECT * FROM library_assets WHERE id=?',(asset_id,)).fetchone()
-    if not row or json.loads(row['metadata']).get('kind') in {'video','audio'}:raise HTTPException(404,'Миниатюра изображения отсутствует')
+    if not row or json.loads(row['metadata']).get('kind') in {'video','audio','document'}:raise HTTPException(404,'Миниатюра изображения отсутствует')
     source=(LIBRARY_ROOT/row['filename']).resolve()
     if not source.is_relative_to(LIBRARY_ROOT.resolve()) or not source.is_file():raise HTTPException(404,'Оригинал отсутствует')
     directory=LIBRARY_ROOT/'.thumbnails';directory.mkdir(parents=True,exist_ok=True)
@@ -792,6 +792,8 @@ from backend import edit_list
 edit_list.register(app,sys.modules[__name__])
 from backend import clip_chain
 clip_chain.register(app,sys.modules[__name__])
+from backend import workflow_import
+workflow_import.register(app,sys.modules[__name__])
 from backend import series_economics
 series_economics.register(app,sys.modules[__name__])
 from backend import character_voice

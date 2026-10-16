@@ -29,7 +29,7 @@ def edit_context(studio,body):
             row=studio.production_folders.accessible_asset(studio,db,aid,body.project_id)
         if not row:raise HTTPException(404,'Исходник не найден в библиотеке этого проекта')
         metadata=json.loads(row['metadata'])
-        if metadata.get('kind') in {'video','audio'}:raise HTTPException(400,'В «Допилить» принимаются только изображения')
+        if metadata.get('kind') in {'video','audio','document'}:raise HTTPException(400,'В «Допилить» принимаются только изображения')
         path=(studio.LIBRARY_ROOT/row['filename']).resolve()
         if not path.is_relative_to(studio.LIBRARY_ROOT.resolve()) or not path.is_file():
             raise HTTPException(404,'Файл изображения отсутствует')

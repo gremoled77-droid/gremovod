@@ -129,7 +129,7 @@ def register(app, studio):
         studio.checked_id(asset_id)
         with studio.connect() as db:
             row = db.execute('SELECT * FROM library_assets WHERE id=?', (asset_id,)).fetchone()
-        if not row or json.loads(row['metadata']).get('kind') in {'video', 'audio'}:
+        if not row or json.loads(row['metadata']).get('kind') in {'video', 'audio', 'document'}:
             raise HTTPException(404, 'Изображение для анализа не найдено')
         path = (studio.LIBRARY_ROOT / row['filename']).resolve()
         if not path.is_relative_to(studio.LIBRARY_ROOT.resolve()) or not path.is_file():

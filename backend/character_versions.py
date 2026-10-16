@@ -26,7 +26,7 @@ def register(app, studio):
             if not asset:
                 raise HTTPException(404, 'Изображение не найдено в этом проекте')
             metadata = json.loads(asset['metadata'])
-            if metadata.get('kind') in {'video','audio'}:
+            if metadata.get('kind') in {'video','audio','document'}:
                 raise HTTPException(400, 'Выбери изображение персонажа')
             if metadata.get('character_id') not in (None, '', character_id):
                 raise HTTPException(409, 'Изображение связано с другим персонажем')

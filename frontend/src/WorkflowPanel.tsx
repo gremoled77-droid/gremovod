@@ -1,4 +1,4 @@
-import {useMemo, useRef, useState, type CSSProperties} from 'react';
+import {createContext, useContext, useMemo, useRef, useState, type CSSProperties} from 'react';
 import {
   ReactFlow,
   Background,
@@ -25,20 +25,35 @@ import {
   type LlmStep,
   type NodeKind,
   type Step,
+  VIDEO_MODELS,
 } from './workflowPlan';
 import {LLM_MAX_TOKENS, LLM_MODELS, llmEstimate} from './llmPricing';
 
 type Graph = {nodes: Node[]; edges: Edge[]};
-type Lib = {id: string; url: string; thumbnail_url: string | null; provider_reference_url?: string | null};
+type Lib = {
+  id: string;
+  url: string;
+  thumbnail_url: string | null;
+  provider_reference_url?: string | null;
+  metadata?: {kind?: string; original_name?: string; excerpt?: string; size?: number};
+};
+const libKind = (a: Lib) => a.metadata?.kind || 'image';
+const ACCEPT: Record<string, string> = {
+  image: '.png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp',
+  audio: '.mp3,.wav,.m4a,audio/mpeg,audio/wav,audio/mp4',
+  file: '.txt,.md,.srt,.json,.pdf',
+};
 
 const KINDS: {kind: NodeKind; label: string; enabled: boolean; hint: string; color: string}[] = [
-  {kind: 'text', label: 'Текст', enabled: true, hint: 'Промпт для узла «Изображение»', color: '#5ec4b6'},
+  {kind: 'video', label: 'Видео', enabled: true, hint: 'MiniMax H3, Seedance 2.5', color: '#b18cff'},
+  {kind: 'image', label: 'Image', enabled: true, hint: '6 моделей PiAPI', color: '#6ea8fe'},
+  {kind: 'audio', label: 'Аудио', enabled: true, hint: 'Аудио-референс', color: '#f2b134'},
+  {kind: 'text', label: 'Текст', enabled: true, hint: 'Промпт, реплика', color: '#5ec4b6'},
   {kind: 'llm', label: 'LLM', enabled: true, hint: 'ИИ пишет или улучшает текст', color: '#5ec4b6'},
   {kind: 'reference', label: 'Референс', enabled: true, hint: 'Картинка из библиотеки', color: '#6ea8fe'},
-  {kind: 'image', label: 'Изображение', enabled: true, hint: 'Генерация моделью', color: '#6ea8fe'},
-  {kind: 'video', label: 'Видео', enabled: false, hint: 'Появится на этапе видео', color: '#b18cff'},
-  {kind: 'audio', label: 'Аудио', enabled: false, hint: 'Появится на этапе видео', color: '#f2b134'},
+  {kind: 'file', label: 'Файл', enabled: true, hint: 'Документ: txt, md, srt, json, pdf', color: '#9aa4b2'},
 ];
+const MENU_KINDS: NodeKind[] = ['video', 'image', 'audio', 'text', 'llm'];
 const KIND_COLOR = Object.fromEntries(KINDS.map(k => [k.kind, k.color])) as Record<string, string>;
 const STATUS_LABEL: Record<string, string> = {
   done: 'готово',
@@ -61,10 +76,11 @@ const IMAGE_MODELS: Record<string, string> = {
 const COLUMN_X: Record<NodeKind, number> = {
   text: 40,
   reference: 40,
+  file: 40,
   llm: 330,
   image: 620,
   video: 900,
-  audio: 620,
+  audio: 40,
 };
 function slot(kind: NodeKind, nodes: Node[]) {
   const x = COLUMN_X[kind];
@@ -84,18 +100,22 @@ type Ctx = {
   status: Record<string, string>;
   library: Lib[];
   run: (ids: string[]) => void;
+  upload: (accept: string, done: (asset: Lib) => void) => void;
 };
-let ctxRef: Ctx | null = null;
+// Контекст, а не глобальная переменная: узлы перерисовываются, когда меняется библиотека или результаты.
+const WfCtx = createContext<Ctx | null>(null);
 
 function Block({id, data, selected}: {id: string; data: Record<string, any>; selected?: boolean}) {
-  const ctx = ctxRef!;
+  const ctx = useContext(WfCtx)!;
   const kind = String(data.kind) as NodeKind;
   const color = KIND_COLOR[kind] || '#8b8f99';
   const lib = ctx.library.find(a => a.id === data.asset_id);
   const out = ctx.results[id] ? ctx.library.find(a => a.id === ctx.results[id]) : undefined;
   const state = ctx.status[id] || (out || (kind === 'llm' && data.output) ? 'done' : '');
   const accepts = kind === 'image' || kind === 'video' || kind === 'llm';
-  const emits = kind === 'text' || kind === 'reference' || kind === 'image' || kind === 'llm';
+  const emits = ['text', 'reference', 'image', 'llm', 'audio', 'file'].includes(kind);
+  const images = ctx.library.filter(a => libKind(a) === 'image');
+  const audios = ctx.library.filter(a => libKind(a) === 'audio');
   return (
     <div
       className={'wf-node wf-' + kind + (selected ? ' sel' : '') + (state ? ' st-' + state : '')}
@@ -106,6 +126,9 @@ function Block({id, data, selected}: {id: string; data: Record<string, any>; sel
         <i className="wf-dot" />
         <b>{data.title}</b>
         {kind === 'image' && data.model && <span className="wf-model">{IMAGE_MODELS[data.model]}</span>}
+        {kind === 'video' && data.model && (
+          <span className="wf-model">{VIDEO_MODELS[data.model]?.label || data.model}</span>
+        )}
         {kind === 'llm' && data.model && (
           <span className="wf-model">{LLM_MODELS[data.model]?.label || data.model}</span>
         )}
@@ -165,9 +188,9 @@ function Block({id, data, selected}: {id: string; data: Record<string, any>; sel
               onChange={e => ctx.patch(id, {asset_id: e.target.value})}
             >
               <option value="">Выбери картинку</option>
-              {ctx.library.map(a => (
+              {images.map(a => (
                 <option key={a.id} value={a.id}>
-                  {a.id.slice(0, 8)}
+                  {a.metadata?.original_name || a.id.slice(0, 8)}
                 </option>
               ))}
             </select>
@@ -175,6 +198,80 @@ function Block({id, data, selected}: {id: string; data: Record<string, any>; sel
               <img className="wf-thumb" src={lib.thumbnail_url || lib.url} alt="" />
             ) : (
               <div className="wf-empty">нет картинки</div>
+            )}
+            <button
+              className="nodrag wf-up"
+              onClick={() =>
+                ctx.upload(ACCEPT.image, a =>
+                  ctx.patch(id, {asset_id: a.id, title: a.metadata?.original_name || data.title})
+                )
+              }
+            >
+              ＋ Загрузить картинку
+            </button>
+          </>
+        )}
+        {kind === 'audio' && (
+          <>
+            <select
+              className="nodrag"
+              value={data.asset_id || ''}
+              onChange={e => ctx.patch(id, {asset_id: e.target.value})}
+            >
+              <option value="">Выбери аудио</option>
+              {audios.map(a => (
+                <option key={a.id} value={a.id}>
+                  {a.metadata?.original_name || a.id.slice(0, 8)}
+                </option>
+              ))}
+            </select>
+            {lib ? (
+              <audio className="nodrag wf-audio" controls preload="none" src={lib.url} />
+            ) : (
+              <div className="wf-empty">нет аудио</div>
+            )}
+            <button
+              className="nodrag wf-up"
+              onClick={() =>
+                ctx.upload(ACCEPT.audio, a =>
+                  ctx.patch(id, {asset_id: a.id, title: a.metadata?.original_name || data.title})
+                )
+              }
+            >
+              ＋ Загрузить аудио
+            </button>
+            <small>Пока хранится как референс: модели студии звук на вход не принимают.</small>
+          </>
+        )}
+        {kind === 'file' && (
+          <>
+            <div className="wf-file">
+              <b>{data.name || 'файл не выбран'}</b>
+              <small>
+                {data.excerpt
+                  ? `${String(data.excerpt).length} симв. текста уйдут в LLM, если подключить`
+                  : 'текст не извлечён (PDF хранится как справочный файл)'}
+              </small>
+            </div>
+            <button
+              className="nodrag wf-up"
+              onClick={() =>
+                ctx.upload(ACCEPT.file, a =>
+                  ctx.patch(id, {
+                    asset_id: a.id,
+                    name: a.metadata?.original_name,
+                    excerpt: a.metadata?.excerpt || '',
+                    title: a.metadata?.original_name || data.title,
+                  })
+                )
+              }
+            >
+              ＋ Загрузить файл
+            </button>
+            {lib && (
+              <a className="nodrag" href={lib.url} target="_blank" rel="noreferrer">
+                Открыть ↗
+              </a>
             )}
           </>
         )}
@@ -199,9 +296,61 @@ function Block({id, data, selected}: {id: string; data: Record<string, any>; sel
             )}
           </>
         )}
-        {(kind === 'video' || kind === 'audio') && <small>Будет добавлено на этапе видео</small>}
+        {kind === 'video' && (
+          <>
+            <select
+              className="nodrag"
+              value={data.model || ''}
+              onChange={e => ctx.patch(id, {model: e.target.value, options: {}})}
+            >
+              <option value="">Модель…</option>
+              {Object.entries(VIDEO_MODELS).map(([k, v]) => (
+                <option key={k} value={k}>
+                  {v.label}
+                </option>
+              ))}
+            </select>
+            {VIDEO_MODELS[data.model] && (
+              <div className="wf-opts nodrag">
+                <select
+                  title="Разрешение"
+                  value={data.options?.resolution || VIDEO_MODELS[data.model].resolutions[0]}
+                  onChange={e => ctx.patch(id, {options: {...data.options, resolution: e.target.value}})}
+                >
+                  {VIDEO_MODELS[data.model].resolutions.map(v => (
+                    <option key={v}>{v}</option>
+                  ))}
+                </select>
+                <select
+                  title="Формат"
+                  value={data.options?.aspect_ratio || VIDEO_MODELS[data.model].aspects[0]}
+                  onChange={e => ctx.patch(id, {options: {...data.options, aspect_ratio: e.target.value}})}
+                >
+                  {VIDEO_MODELS[data.model].aspects.map(v => (
+                    <option key={v}>{v}</option>
+                  ))}
+                </select>
+                <input
+                  type="number"
+                  title="Секунд"
+                  min={VIDEO_MODELS[data.model].durationMin}
+                  max={VIDEO_MODELS[data.model].durationMax}
+                  value={data.options?.duration || VIDEO_MODELS[data.model].durationMin}
+                  onChange={e =>
+                    ctx.patch(id, {options: {...data.options, duration: Number(e.target.value)}})
+                  }
+                />
+              </div>
+            )}
+            {out ? (
+              <video className="wf-thumb nodrag" controls preload="metadata" src={out.url} />
+            ) : (
+              <div className="wf-empty">ролик появится здесь</div>
+            )}
+          </>
+        )}
       </div>
-      {(kind === 'image' || kind === 'llm') && (
+      {(kind === 'image' || kind === 'llm' || kind === 'video') && (
         <footer className="wf-node-foot">
           <span className={'wf-chip ' + (state ? 'st-' + state : '')}>
             {STATUS_LABEL[state] || state || 'не запускался'}
@@ -245,6 +394,8 @@ export default function WorkflowPanel({
     total: number;
   } | null>(null);
   const [limit, setLimit] = useState('');
+  const [plusOpen, setPlusOpen] = useState(false);
+  const [search, setSearch] = useState('');
   const [approved, setApproved] = useState(false);
   const [highOk, setHighOk] = useState(false);
   const [llmState, setLlmState] = useState<Record<string, string>>({});
@@ -326,7 +477,8 @@ export default function WorkflowPanel({
       p => !onlyIds || selected.some(id => p.includes(titleOf(id)))
     );
     if (problems.length) return setError(problems.join(' · '));
-    if (!steps.length && !llmSteps.length) return setError('Нет узлов «Изображение» или «LLM» для запуска');
+    if (!steps.length && !llmSteps.length)
+      return setError('Нет узлов «Image», «Видео» или «LLM» для запуска');
     try {
       const estimates: Record<string, number> = {};
       for (const s of llmSteps) {
@@ -405,7 +557,7 @@ export default function WorkflowPanel({
       }
       const fresh = buildSteps(graph.current.nodes, graph.current.edges, live.current.results, {llm: outs});
       const pending = review.steps.map(s => fresh.steps.find(f => f.nodeId === s.nodeId) ?? s);
-      if (pending.some(s => !s.prompt)) throw Error('У узла «Изображение» пустой промпт после LLM');
+      if (pending.some(s => !s.prompt)) throw Error('У узла «Image» или «Видео» пустой промпт после LLM');
       const finished = new Set<string>();
       let guard = 0;
       while (pending.length && guard++ < 50) {
@@ -464,7 +616,79 @@ export default function WorkflowPanel({
       edges: g.edges.filter(e => e.source !== id && e.target !== id),
     }));
 
-  ctxRef = {patch, remove, results, status: {...status, ...llmState}, library, run: ids => void prepare(ids)};
+  const fileInput = useRef<HTMLInputElement>(null);
+  const pending = useRef<{done: (asset: Lib) => void} | null>(null);
+  const importFile = async (file: File): Promise<Lib> => {
+    const form = new FormData();
+    form.append('project_id', projectId);
+    form.append('file', file);
+    return json(await apiFetch('/api/library/import-reference', {method: 'POST', body: form}));
+  };
+  /** Выбор файла для конкретного узла: загрузка, затем колбэк с готовым ассетом. */
+  const upload = (accept: string, done: (asset: Lib) => void) => {
+    if (!fileInput.current || !projectId) return;
+    pending.current = {done};
+    fileInput.current.accept = accept;
+    fileInput.current.multiple = false;
+    fileInput.current.click();
+  };
+  /** Кнопка «＋» сверху справа: любые файлы, для каждого появляется свой узел. */
+  const addUploaded = (asset: Lib, fallbackTitle: string) => {
+    const kind = libKind(asset);
+    const title = asset.metadata?.original_name || fallbackTitle;
+    const node: Record<string, unknown> =
+      kind === 'audio'
+        ? {kind: 'audio', title, asset_id: asset.id}
+        : kind === 'document'
+          ? {kind: 'file', title, asset_id: asset.id, name: title, excerpt: asset.metadata?.excerpt || ''}
+          : {kind: 'reference', title, asset_id: asset.id};
+    onChange(g => ({
+      ...g,
+      nodes: [
+        ...g.nodes,
+        {id: crypto.randomUUID(), type: 'studio', position: slot(node.kind as NodeKind, g.nodes), data: node},
+      ],
+    }));
+  };
+  const onFiles = async (files: File[]) => {
+    setError('');
+    let added = 0;
+    for (const file of files) {
+      try {
+        const asset = await importFile(file);
+        const target = pending.current;
+        if (target) target.done(asset);
+        else addUploaded(asset, file.name);
+        added++;
+      } catch (e) {
+        setError(`${file.name}: ${e instanceof Error ? e.message : String(e)}`);
+        break;
+      }
+    }
+    pending.current = null;
+    if (added) {
+      setNotice(`Загружено файлов: ${added}`);
+      await refreshLibrary();
+    }
+  };
+  const pickMany = (accept: string) => {
+    if (!fileInput.current || !projectId) return;
+    pending.current = null;
+    fileInput.current.accept = accept;
+    fileInput.current.multiple = true;
+    fileInput.current.click();
+    setPlusOpen(false);
+  };
+
+  const ctxValue: Ctx = {
+    patch,
+    remove,
+    results,
+    status: {...status, ...llmState},
+    library,
+    run: ids => void prepare(ids),
+    upload,
+  };
 
   // Цвет связи — по типу узла-источника (только для показа, в схему не пишется)
   const shownEdges = useMemo(
@@ -485,158 +709,246 @@ export default function WorkflowPanel({
           id: crypto.randomUUID(),
           type: 'studio',
           position: slot(kind, g.nodes),
-          data: kind === 'llm' ? {kind, title: label, model: 'gpt-5.6-luna'} : {kind, title: label},
+          data:
+            kind === 'llm'
+              ? {kind, title: label, model: 'gpt-5.6-luna'}
+              : kind === 'video'
+                ? {kind, title: label, model: 'minimax-h3'}
+                : {kind, title: label},
         },
       ],
     }));
 
   return (
-    <section className="wf">
-      <aside className="wf-console">
-        <div className="wf-console-head">
-          <h2>Воркфлоу</h2>
-          <p>Собери цепочку: текст (или ответ LLM) и референсы подаются в узел «Изображение».</p>
-        </div>
-        <div className="wf-console-title">Создать узел</div>
-        {KINDS.map(k => (
-          <button
-            key={k.kind}
-            className="wf-add"
-            disabled={!k.enabled}
-            title={k.hint}
-            style={{'--kc': k.color} as CSSProperties}
-            onClick={() => add(k.kind, k.label)}
-          >
-            <i className="wf-dot" />
-            <span>
-              <b>{k.label}</b>
-              <small>{k.enabled ? k.hint : 'скоро'}</small>
-            </span>
-            <em>＋</em>
-          </button>
-        ))}
-        <div className="wf-console-title">Как это работает</div>
-        <ol className="wf-help">
-          <li>Добавь «Текст», при желании «LLM» (ИИ улучшит текст) и «Референс».</li>
-          <li>Добавь «Изображение» и выбери модель.</li>
-          <li>Протяни связь от кружка справа к кружку слева.</li>
-          <li>«Запустить» — сначала оценка цены и подтверждение.</li>
-        </ol>
-        <div className="wf-stat">
-          узлов: <b>{nodes.length}</b> · связей: <b>{edges.length}</b>
-        </div>
-      </aside>
-      <div className="wf-stage">
-        <div className="wf-bar">
-          <div className="wf-legend">
-            {KINDS.filter(k => k.enabled).map(k => (
-              <span key={k.kind} style={{'--kc': k.color} as CSSProperties}>
+    <WfCtx.Provider value={ctxValue}>
+      <section className="wf">
+        <aside className="wf-console">
+          <div className="wf-console-head">
+            <h2>Воркфлоу</h2>
+            <p>Собери цепочку: текст, LLM и референсы подаются в узлы «Image» и «Видео».</p>
+          </div>
+          <input
+            className="wf-search"
+            type="search"
+            placeholder="Поиск узла…"
+            aria-label="Поиск узла"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+          />
+          <div className="wf-console-title">＋ Создать узел</div>
+          {MENU_KINDS.map(kind => KINDS.find(k => k.kind === kind)!)
+            .filter(
+              k =>
+                !search.trim() || (k.label + ' ' + k.hint).toLowerCase().includes(search.trim().toLowerCase())
+            )
+            .map(k => (
+              <button
+                key={k.kind}
+                className="wf-add"
+                title={k.hint}
+                style={{'--kc': k.color} as CSSProperties}
+                onClick={() => add(k.kind, k.label)}
+              >
                 <i className="wf-dot" />
-                {k.label}
-              </span>
+                <span>
+                  <b>{k.label}</b>
+                  <small>{k.hint}</small>
+                </span>
+                <em>＋</em>
+              </button>
             ))}
+          <div className="wf-console-title">Референсы</div>
+          {KINDS.filter(k => k.kind === 'reference' || k.kind === 'file')
+            .filter(
+              k =>
+                !search.trim() || (k.label + ' ' + k.hint).toLowerCase().includes(search.trim().toLowerCase())
+            )
+            .map(k => (
+              <button
+                key={k.kind}
+                className="wf-add"
+                title={k.hint}
+                style={{'--kc': k.color} as CSSProperties}
+                onClick={() => add(k.kind, k.label)}
+              >
+                <i className="wf-dot" />
+                <span>
+                  <b>{k.label}</b>
+                  <small>{k.hint}</small>
+                </span>
+                <em>＋</em>
+              </button>
+            ))}
+          <div className="wf-console-title">Как это работает</div>
+          <ol className="wf-help">
+            <li>Добавь «Текст» (при желании «LLM») и референсы.</li>
+            <li>Добавь «Image» или «Видео», выбери модель.</li>
+            <li>Протяни связь от кружка справа к кружку слева.</li>
+            <li>«Запустить» — сначала оценка цены и подтверждение.</li>
+            <li>Кнопка «＋» сверху справа загружает картинки, аудио и файлы сразу узлами.</li>
+          </ol>
+          <div className="wf-stat">
+            узлов: <b>{nodes.length}</b> · связей: <b>{edges.length}</b>
           </div>
-          <button className="primary" disabled={running || !projectId} onClick={() => void prepare()}>
-            {running ? 'Выполняется…' : '▶ Запустить всё'}
-          </button>
-        </div>
-        {(notice || error) && (
-          <div className="wf-banners">
-            {notice && (
-              <div className="notice" role="status">
-                {notice}
-                <button onClick={() => setNotice('')}>✕</button>
-              </div>
-            )}
-            {error && (
-              <div className="alert" role="alert">
-                {error}
-                <button onClick={() => setError('')}>✕</button>
-              </div>
-            )}
-          </div>
-        )}
-        <div className="wf-canvas">
-          <ReactFlow
-            nodes={nodes}
-            edges={shownEdges}
-            colorMode="dark"
-            onNodesChange={changes => onChange(g => ({...g, nodes: applyNodeChanges(changes, g.nodes)}))}
-            onEdgesChange={changes => onChange(g => ({...g, edges: applyEdgeChanges(changes, g.edges)}))}
-            isValidConnection={c =>
-              canConnect(
-                nodes.find(n => n.id === c.source),
-                nodes.find(n => n.id === c.target)
-              )
-            }
-            onConnect={c => onChange(g => ({...g, edges: addEdge({...c, animated: true}, g.edges)}))}
-            nodeTypes={types}
-            fitView
-            proOptions={{hideAttribution: true}}
-          >
-            <Background gap={22} size={1.2} color="#23262e" />
-            <Controls showInteractive={false} />
-            <MiniMap
-              pannable
-              zoomable
-              maskColor="#0e0f12cc"
-              nodeColor={n => KIND_COLOR[String(n.data?.kind)] || '#8b8f99'}
+        </aside>
+        <div className="wf-stage">
+          <div className="wf-bar">
+            <div className="wf-legend">
+              {KINDS.filter(k => MENU_KINDS.includes(k.kind)).map(k => (
+                <span key={k.kind} style={{'--kc': k.color} as CSSProperties}>
+                  <i className="wf-dot" />
+                  {k.label}
+                </span>
+              ))}
+            </div>
+            <div className="wf-plus-wrap">
+              <button
+                className="wf-plus"
+                aria-haspopup="menu"
+                aria-expanded={plusOpen}
+                title="Загрузить референс: картинка, аудио, файл"
+                disabled={!projectId}
+                onClick={() => setPlusOpen(v => !v)}
+              >
+                ＋
+              </button>
+              {plusOpen && (
+                <div className="wf-plus-menu" role="menu">
+                  <button role="menuitem" onClick={() => pickMany(ACCEPT.image)}>
+                    Картинки-референсы
+                  </button>
+                  <button role="menuitem" onClick={() => pickMany(ACCEPT.audio)}>
+                    Аудио-референсы
+                  </button>
+                  <button role="menuitem" onClick={() => pickMany(ACCEPT.file)}>
+                    Файлы-референсы
+                  </button>
+                  <button
+                    role="menuitem"
+                    onClick={() => pickMany([ACCEPT.image, ACCEPT.audio, ACCEPT.file].join(','))}
+                  >
+                    Всё сразу…
+                  </button>
+                  <small>Каждый файл появится узлом в схеме.</small>
+                </div>
+              )}
+            </div>
+            <input
+              ref={fileInput}
+              type="file"
+              hidden
+              onChange={e => {
+                const list = Array.from(e.target.files || []);
+                e.target.value = '';
+                if (list.length) void onFiles(list);
+              }}
             />
-          </ReactFlow>
-          {!nodes.length && (
-            <div className="wf-hint">
-              <b>Схема пуста</b>
-              <span>Добавь первый узел слева — например «Текст» с промптом.</span>
+            <button className="primary" disabled={running || !projectId} onClick={() => void prepare()}>
+              {running ? 'Выполняется…' : '▶ Запустить всё'}
+            </button>
+          </div>
+          {(notice || error) && (
+            <div className="wf-banners">
+              {notice && (
+                <div className="notice" role="status">
+                  {notice}
+                  <button onClick={() => setNotice('')}>✕</button>
+                </div>
+              )}
+              {error && (
+                <div className="alert" role="alert">
+                  {error}
+                  <button onClick={() => setError('')}>✕</button>
+                </div>
+              )}
             </div>
           )}
+          <div className="wf-canvas">
+            <ReactFlow
+              nodes={nodes}
+              edges={shownEdges}
+              colorMode="dark"
+              onNodesChange={changes => onChange(g => ({...g, nodes: applyNodeChanges(changes, g.nodes)}))}
+              onEdgesChange={changes => onChange(g => ({...g, edges: applyEdgeChanges(changes, g.edges)}))}
+              isValidConnection={c =>
+                canConnect(
+                  nodes.find(n => n.id === c.source),
+                  nodes.find(n => n.id === c.target)
+                )
+              }
+              onConnect={c => onChange(g => ({...g, edges: addEdge({...c, animated: true}, g.edges)}))}
+              nodeTypes={types}
+              fitView
+              proOptions={{hideAttribution: true}}
+            >
+              <Background gap={22} size={1.2} color="#23262e" />
+              <Controls showInteractive={false} />
+              <MiniMap
+                pannable
+                zoomable
+                maskColor="#0e0f12cc"
+                nodeColor={n => KIND_COLOR[String(n.data?.kind)] || '#8b8f99'}
+              />
+            </ReactFlow>
+            {!nodes.length && (
+              <div className="wf-hint">
+                <b>Схема пуста</b>
+                <span>
+                  Добавь первый узел слева — например «Текст» с промптом — или нажми «＋» сверху справа и
+                  загрузи референсы.
+                </span>
+              </div>
+            )}
+          </div>
         </div>
-      </div>
-      {review && (
-        <div className="modal-backdrop">
-          <section className="panel generation-review" role="dialog" aria-modal="true">
-            <h2>Запустить всё: подтверждение</h2>
-            <ol>
-              {review.llmSteps.map(s => (
-                <li key={s.nodeId}>
-                  LLM {LLM_MODELS[s.model]?.label || s.model} · текст · до $
-                  {review.estimates[s.nodeId].toFixed(4)}
-                </li>
-              ))}
-              {review.steps.map(s => (
-                <li key={s.nodeId}>
-                  {IMAGE_MODELS[s.model] || s.model} · референсов: {s.refAssetIds.length + s.waitFor.length}
-                  {s.waitFor.length ? ' (после предыдущего шага)' : ''} · $
-                  {review.estimates[s.nodeId].toFixed(3)}
-                </li>
-              ))}
-            </ol>
-            <p>
-              Итого по оценке: <b>${review.total.toFixed(3)}</b>
-            </p>
-            <LimitPicker
-              total={review.total}
-              limit={limit}
-              onLimit={setLimit}
-              highConfirmed={highOk}
-              onHighConfirmed={setHighOk}
-            />
-            <label className="inline-checkbox">
-              <input type="checkbox" checked={approved} onChange={e => setApproved(e.target.checked)} />{' '}
-              Подтверждаю платный запуск в пределах лимита
-            </label>
-            <div className="chips">
-              <button
-                className="primary"
-                disabled={!approved || !limitAllowed(review.total, limit, highOk)}
-                onClick={() => void execute()}
-              >
-                Подтвердить и запустить
-              </button>
-              <button onClick={() => setReview(null)}>Отмена</button>
-            </div>
-          </section>
-        </div>
-      )}
-    </section>
+        {review && (
+          <div className="modal-backdrop">
+            <section className="panel generation-review" role="dialog" aria-modal="true">
+              <h2>Запустить всё: подтверждение</h2>
+              <ol>
+                {review.llmSteps.map(s => (
+                  <li key={s.nodeId}>
+                    LLM {LLM_MODELS[s.model]?.label || s.model} · текст · до $
+                    {review.estimates[s.nodeId].toFixed(4)}
+                  </li>
+                ))}
+                {review.steps.map(s => (
+                  <li key={s.nodeId}>
+                    {IMAGE_MODELS[s.model] || VIDEO_MODELS[s.model]?.label || s.model} · референсов:{' '}
+                    {s.refAssetIds.length + s.waitFor.length}
+                    {s.waitFor.length ? ' (после предыдущего шага)' : ''} · $
+                    {review.estimates[s.nodeId].toFixed(3)}
+                  </li>
+                ))}
+              </ol>
+              <p>
+                Итого по оценке: <b>${review.total.toFixed(3)}</b>
+              </p>
+              <LimitPicker
+                total={review.total}
+                limit={limit}
+                onLimit={setLimit}
+                highConfirmed={highOk}
+                onHighConfirmed={setHighOk}
+              />
+              <label className="inline-checkbox">
+                <input type="checkbox" checked={approved} onChange={e => setApproved(e.target.checked)} />{' '}
+                Подтверждаю платный запуск в пределах лимита
+              </label>
+              <div className="chips">
+                <button
+                  className="primary"
+                  disabled={!approved || !limitAllowed(review.total, limit, highOk)}
+                  onClick={() => void execute()}
+                >
+                  Подтвердить и запустить
+                </button>
+                <button onClick={() => setReview(null)}>Отмена</button>
+              </div>
+            </section>
+          </div>
+        )}
+      </section>
+    </WfCtx.Provider>
   );
 }
