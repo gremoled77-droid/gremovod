@@ -709,3 +709,17 @@ section.panel {
     gap: 12px;
   }
 }
+
+/* Телефон: двухколонные блоки не шире экрана («Допилить») */
+@media (max-width: 700px) {
+  .twocol {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .twocol > *,
+  .upload-area {
+    min-width: 0;
+  }
+  .upload-area input {
+    max-width: 100%;
+  }
+}
