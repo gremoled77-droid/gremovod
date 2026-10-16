@@ -6,6 +6,7 @@ import {type ActivityItem} from './useActivity';
 import {useSharedActivity} from './ActivityContext';
 import Lightbox, {type LightboxItem} from './Lightbox';
 import {DEFAULT_CHAT_URL, copyTextFor, getChatUrl} from './chatLink';
+import {appendBlock} from './visualPlan';
 
 type OptionSpec = {
   values?: (string | number)[];
@@ -70,6 +71,15 @@ function CreateScreenBody({projectId, heroes}: {projectId: string; heroes: Hero[
       setPrompt(current =>
         current.includes('VISUAL RULES') ? current : current.trimEnd() + '\n\n' + data.prompt
       );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  }
+  async function addComposition() {
+    setError('');
+    try {
+      const data = await json(await apiFetch(`/api/projects/${projectId}/composition-brief`));
+      setPrompt(current => appendBlock(current, data.prompt, 'VISUAL COMPOSITION BRIEF'));
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
@@ -814,6 +824,13 @@ function CreateScreenBody({projectId, heroes}: {projectId: string; heroes: Hero[
               onClick={() => void addVisualRules()}
             >
               ＋ Визуальные правила
+            </button>
+            <button
+              disabled={!projectId}
+              title="Добавить в промпт блок композиции: доминанта, баланс или напряжение, противовес из плана кадра"
+              onClick={() => void addComposition()}
+            >
+              ＋ Композиция
             </button>
             <button disabled={!projectId} onClick={() => void external()}>
               Скопировать для ChatGPT

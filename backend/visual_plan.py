@@ -18,6 +18,8 @@ class VisualPlan(BaseModel):
     line: Literal['', 'horizontal', 'vertical', 'diagonal', 'mixed'] = ''
     shape: Literal['', 'circle', 'square', 'triangle'] = ''
     tone: Literal['', 'reveal', 'conceal'] = ''
+    balance: Literal['', 'stable', 'tense'] = ''
+    counterweight: str = Field(default='', max_length=300)
     beat: int | None = Field(default=None, ge=1, le=99)
     sector_start: int | None = Field(default=None, ge=1, le=9)
     sector_end: int | None = Field(default=None, ge=1, le=9)
@@ -49,7 +51,11 @@ PHRASES = {
     'shape': {'circle': 'soft rounded shapes and silhouettes', 'square': 'stable squared shapes and silhouettes',
               'triangle': 'sharp triangular shapes and silhouettes'},
     'tone': {'reveal': 'lighting clearly reveals the subject', 'conceal': 'shadow partly conceals the subject'},
+    'balance': {'stable': 'stable balanced composition: symmetric, level horizon, calm',
+                'tense': 'tense unbalanced composition: diagonal lines, off-center subject, tilted or unexpected element'},
 }
+ROWS = ('upper', 'middle', 'lower')
+COLUMNS = ('left', 'center', 'right')
 SCOPES = {'series': 'Series', 'episode': 'Scene', 'location': 'Location', 'character': 'Character', 'frame': 'Shot'}
 
 
@@ -129,12 +135,47 @@ def rules_text(db, pid, nid):
         plan = stored(db, 'visual_plans', ident)
         if plan:
             plan = clean(plan)
-            clauses = [PHRASES[k][plan[k]] for k in ('space', 'line', 'shape', 'tone') if plan.get(k) in PHRASES[k]]
+            clauses = [PHRASES[k][plan[k]] for k in ('space', 'line', 'shape', 'tone', 'balance') if plan.get(k) in PHRASES[k]]
+            if plan.get('counterweight', '').strip():
+                clauses.append('counterweight: ' + plan['counterweight'].strip())
             if plan.get('note', '').strip():
                 clauses.append(plan['note'].strip())
             if clauses:
                 lines.append(f'{SCOPES[kind]} plan: ' + '; '.join(clauses))
     return ('VISUAL RULES (keep consistent, never render as text):\n' + '\n'.join(lines)) if lines else ''
+
+
+def sector_place(sector):
+    if not isinstance(sector, int) or not 1 <= sector <= 9:
+        return ''
+    row, col = ROWS[(sector - 1) // 3], COLUMNS[(sector - 1) % 3]
+    return 'center' if (row, col) == ('middle', 'center') else f'{row} {col}'
+
+
+def composition_brief(db, pid, nid):
+    """VISUAL COMPOSITION BRIEF (Dondis): focal point, balance/tension, counterweight from the shot plan plus fixed reading rules."""
+    node = db.execute('SELECT * FROM production_nodes WHERE id=? AND production_id=?', (nid, pid)).fetchone()
+    plan = clean(stored(db, 'visual_plans', nid) if node else None)
+    if node and node['kind'] == 'frame':
+        scene = stored(db, 'visual_plans', node['parent_id'])
+        scene = clean(scene) if scene else {}
+        for key in ('balance', 'counterweight'):
+            plan[key] = plan[key] or scene.get(key, '')
+    place = sector_place(plan['sector_end'] or plan['sector_start'])
+    focal = f'one dominant subject, {place}' if place else 'one dominant subject, placed exactly at the center or clearly to one side, never almost-center'
+    balance = PHRASES['balance'].get(plan['balance'], 'balance chosen on purpose: either calm symmetry or deliberate tension, never accidental')
+    lines = ['VISUAL COMPOSITION BRIEF (follow silently, never render as text):',
+             f'Focal point: {focal}. Only one dominant element, no competing focal points.',
+             f'Balance: {balance}.']
+    if plan['counterweight'].strip():
+        lines.append(f'Visual weight: heavy element balanced by counterweight: {plan["counterweight"].strip()}.')
+    else:
+        lines.append('Visual weight: large, dark or high-right elements are heavy; balance them with a small distant counterweight on the opposite side.')
+    lines += ['Figure/ground: subject clearly separated from background by tone contrast, readable in black and white.',
+              'Grouping: related objects close and similar in shape and color; unrelated objects different.',
+              'Lines & direction: leading lines point toward the subject; movement follows left to right unless tension is intended.',
+              'Avoid: ambiguous near-center placement, tilted horizon unless tension is intended.']
+    return '\n'.join(lines)
 
 
 def register(app, studio):

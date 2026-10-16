@@ -4,6 +4,8 @@ export type VisualPlan = {
   line: '' | 'horizontal' | 'vertical' | 'diagonal' | 'mixed';
   shape: '' | 'circle' | 'square' | 'triangle';
   tone: '' | 'reveal' | 'conceal';
+  balance: '' | 'stable' | 'tense';
+  counterweight: string;
   beat: number | null;
   sector_start: number | null;
   sector_end: number | null;
@@ -17,6 +19,8 @@ export const emptyPlan = (): VisualPlan => ({
   line: '',
   shape: '',
   tone: '',
+  balance: '',
+  counterweight: '',
   beat: null,
   sector_start: null,
   sector_end: null,
@@ -50,6 +54,14 @@ export const TONE_LABELS: Record<string, string> = {
   reveal: 'свет показывает',
   conceal: 'тень скрывает',
 };
+export const BALANCE_LABELS: Record<string, string> = {
+  '': 'не задано',
+  stable: 'баланс (покой, симметрия)',
+  tense: 'напряжение (диагональ, смещение)',
+};
+/** Добавляет блок в конец промпта один раз: если маркер уже есть, промпт не меняется. */
+export const appendBlock = (prompt: string, block: string, marker: string) =>
+  !block || prompt.includes(marker) ? prompt : prompt.trimEnd() + '\n\n' + block;
 export type ShotPoint = {
   id: string;
   label: string;
