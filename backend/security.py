@@ -98,8 +98,12 @@ def register(app, studio):
     @app.get('/api/budgets/{project_id}')
     def budgets(project_id: str):
         studio.project(project_id)
+        from backend import llm_guard
         with studio.connect() as db:
-            return budget_state(db, project_id)
+            llm_project = llm_guard.summary(db, {project_id})
+            llm_all = llm_guard.summary(db)
+            return {**budget_state(db, project_id), 'llm_project_usd': llm_project['usd'], 'llm_daily_usd': llm_all['today_usd'],
+                    'llm_calls_project': llm_project['calls']}
 
     @app.put('/api/budgets/limits')
     def limits(body: BudgetLimits):

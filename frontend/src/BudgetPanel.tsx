@@ -1,12 +1,16 @@
 import {useEffect, useState} from 'react';
 import {apiFetch} from './api';
 import {responseJson} from './ChatGPTPanel';
+import {smallUsd} from './usdFormat';
 type Budget = {
   project_limit_usd: number;
   daily_limit_usd: number;
   project_reserved_usd: number;
   daily_reserved_usd: number;
   day_moscow: string;
+  llm_project_usd?: number;
+  llm_daily_usd?: number;
+  llm_calls_project?: number;
 };
 export default function BudgetPanel({projectId}: {projectId: string}) {
   const [data, setData] = useState<Budget | null>(null),
@@ -64,6 +68,11 @@ export default function BudgetPanel({projectId}: {projectId: string}) {
           <p>
             Зарезервировано: ${data.project_reserved_usd.toFixed(3)} в проекте; $
             {data.daily_reserved_usd.toFixed(3)} за {data.day_moscow} (МСК).
+          </p>
+          <p>
+            LLM-запросы (в лимитах учтены дополнительно к генерациям): {smallUsd(data.llm_project_usd ?? 0)} в
+            проекте ({data.llm_calls_project ?? 0} вызовов); {smallUsd(data.llm_daily_usd ?? 0)} за сутки по
+            всей студии.
           </p>
           <div className="param-grid">
             <label>

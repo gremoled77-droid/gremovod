@@ -17,6 +17,8 @@ def check_budget(db,project_id,cost):
     if not limit or limit['limit_usd'] is None:return
     owned=projects(db,parent['parent_id'])
     reserved=sum(r['estimated_usd'] for r in db.execute('SELECT a.estimated_usd,j.project_id FROM generation_approvals a JOIN jobs j ON j.id=a.job_id') if r['project_id'] in owned)
+    from backend import llm_guard
+    reserved+=llm_guard.summary(db,owned)['usd']
     if reserved+cost>limit['limit_usd']+1e-9:raise HTTPException(400,'Превышен общий бюджет серии. Измени лимит на доске раскадровки.')
 
 
@@ -49,6 +51,8 @@ def register(app,studio):
             recipients={r['id']:json.loads(r['request']).get('context',{}).get('entity',{}).get('node_id') for r in db.execute('SELECT id,request FROM native_chat_jobs')}
             limit=db.execute('SELECT limit_usd FROM production_series_limits WHERE series_id=?',(sid,)).fetchone()
             reserved=sum(r['estimated_usd'] for r in db.execute('SELECT a.estimated_usd,j.project_id FROM generation_approvals a JOIN jobs j ON j.id=a.job_id') if r['project_id'] in owned)
+            from backend import llm_guard
+            llm=llm_guard.summary(db,owned)
         jobs={}
         for project_id in owned|{common}:
             data=studio.report_economics(project_id)
@@ -64,4 +68,4 @@ def register(app,studio):
                 'unknown_cost_count':unknown,'costs_complete':unknown==0,'attempts':len(finished),'used_generations':used,
                 'success_percent':round(100*used/len(finished),1) if finished else None,
                 'chat_api_equivalent_usd':round(sum(j['api_equivalent']['usd'] for j in items if j['api_equivalent']),6),
-                'limit_usd':limit['limit_usd'] if limit else None,'jobs':sorted(items,key=lambda j:j['created_at'],reverse=True)}
+                'llm':llm,'limit_usd':limit['limit_usd'] if limit else None,'jobs':sorted(items,key=lambda j:j['created_at'],reverse=True)}
