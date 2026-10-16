@@ -798,6 +798,8 @@ from backend import character_voice
 character_voice.register(app,sys.modules[__name__])
 camera_movements.register(app)
 frame_composition.register(app)
+from backend import reel_recipes
+reel_recipes.register(app,sys.modules[__name__])
 from backend.temp_cleanup import register as register_temp_cleanup
 register_temp_cleanup(app,sys.modules[__name__])
 from backend import remote_access

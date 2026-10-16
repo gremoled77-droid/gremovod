@@ -1,0 +1,333 @@
+/* Рилсы: меню рецептов сценариев. */
+.app main.reels-main {
+  display: block;
+  padding: 0;
+  min-width: 0;
+}
+.reels-main > .sidebar,
+.reels-main .workspace-trail {
+  display: none;
+}
+.reels {
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 32px 28px 64px;
+}
+.reels-hero {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 24px 26px;
+  border: 1px solid var(--border-strong);
+  border-radius: 20px;
+  background:
+    radial-gradient(520px 200px at 10% 0%, rgba(242, 177, 52, 0.16), transparent 70%),
+    linear-gradient(160deg, #1b1e25, #121419);
+}
+.reels-hero small,
+.reels-detail-head small {
+  color: var(--accent);
+  letter-spacing: 0.12em;
+  font-size: 11px;
+}
+.reels-hero h1 {
+  margin: 4px 0 8px;
+  font-size: 28px;
+}
+.reels-hero p {
+  margin: 0;
+  max-width: 640px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+.reels-filters {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  margin: 20px 0;
+}
+.reels-chips {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.reels-chips button {
+  border-radius: 999px;
+  padding: 7px 14px;
+}
+.reels-chips button.on {
+  background: #3a2f12;
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.reels-filters input[type='search'] {
+  min-width: 260px;
+}
+.reels-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 14px;
+}
+.reels-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  text-align: left;
+  padding: 16px;
+  border-radius: 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+.reels-card:hover {
+  border-color: var(--accent);
+  transform: translateY(-1px);
+}
+.reels-card b {
+  font-size: 16px;
+}
+.reels-card-top {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+}
+.reels-emoji {
+  font-size: 26px;
+}
+.reels-family {
+  font-size: 11px;
+  color: var(--accent);
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  padding: 2px 9px;
+}
+.reels-hook {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.reels-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: auto;
+}
+.reels-meta i {
+  font-style: normal;
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 8px;
+  background: var(--surface-2);
+  color: var(--text);
+}
+.reels-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  justify-content: flex-end;
+  background: rgba(5, 6, 8, 0.66);
+}
+.reels-detail {
+  width: min(760px, 100%);
+  height: 100%;
+  overflow-y: auto;
+  background: var(--bg);
+  border-left: 1px solid var(--border-strong);
+}
+.reels-detail-head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px 24px 14px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+}
+.reels-detail-head h2 {
+  margin: 4px 0 6px;
+  font-size: 22px;
+}
+.reels-detail-head p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.reels-detail-body {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  padding: 20px 24px 40px;
+}
+.reels-detail-body h3 {
+  margin: 0 0 8px;
+  font-size: 14px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+.reels-detail-body ul,
+.reels-detail-body ol {
+  margin: 0;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  line-height: 1.5;
+}
+.reels-prices {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.reels-prices span {
+  padding: 6px 12px;
+  border-radius: 10px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+.reels-prices span.on {
+  border-color: var(--accent);
+}
+.reels-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+.reels-detail label {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.reels-detail label.reels-check {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+.reels-slots li small {
+  display: block;
+  color: var(--muted);
+}
+.reels-slots li em {
+  color: var(--muted);
+  font-style: normal;
+}
+.reels-beats {
+  list-style: none;
+  padding: 0 !important;
+}
+.reels-beats li {
+  display: grid;
+  grid-template-columns: 96px 1fr;
+  gap: 12px;
+  padding: 8px 12px;
+  border-left: 3px solid var(--accent);
+  background: var(--surface);
+  border-radius: 0 10px 10px 0;
+}
+.reels-beats b {
+  color: var(--accent);
+}
+.reels-step {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.reels-step-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.reels-step-head small {
+  color: var(--muted);
+}
+.reels-step textarea {
+  font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.reels-step-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.reels-detail-foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+.reels-detail-foot span {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.reels .link {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: var(--info);
+  text-decoration: underline;
+}
+.reels-error {
+  color: var(--bad);
+  margin: 0;
+}
+@media (max-width: 700px) {
+  .reels {
+    padding: 14px 12px 90px;
+  }
+  .reels-hero {
+    flex-direction: column;
+    padding: 18px;
+  }
+  .reels-hero h1 {
+    font-size: 22px;
+  }
+  .reels-filters input[type='search'] {
+    min-width: 0;
+    width: 100%;
+  }
+  .reels-filters,
+  .reels-filters > * {
+    min-width: 0;
+    max-width: 100%;
+  }
+  .reels-chips {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    width: 100%;
+    scrollbar-width: none;
+  }
+  .reels-chips button {
+    flex: none;
+  }
+  .reels-detail-head,
+  .reels-detail-body {
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+  .reels-beats li {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+}
