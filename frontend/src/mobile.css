@@ -62,6 +62,7 @@
   .generation-review {
     width: calc(100vw - 24px);
     max-height: 90vh;
+    max-height: calc(100dvh - 40px);
     overflow-y: auto;
   }
 }
@@ -129,9 +130,10 @@
   }
 }
 
-/* Телефон: компактная верхняя панель в одну строку */
+/* Телефон: компактная верхняя панель в одну строку; не липнет к верху, чтобы не закрывать меню и контент при прокрутке */
 @media (max-width: 700px) {
   .topbar {
+    position: static;
     display: flex;
     align-items: center;
     gap: 8px;
@@ -178,5 +180,20 @@
   }
   .topbar .project-global-actions > button {
     display: inline-flex;
+  }
+}
+
+/* Телефон: нижняя навигация прячется при прокрутке вниз */
+@media (max-width: 900px) {
+  .shell > .stage-nav {
+    transition: transform 0.22s ease;
+  }
+  .shell > .stage-nav.nav-hidden {
+    transform: translateY(110%);
+  }
+}
+@media (max-width: 900px) and (prefers-reduced-motion: reduce) {
+  .shell > .stage-nav {
+    transition: none;
   }
 }

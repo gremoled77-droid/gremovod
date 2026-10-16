@@ -54,9 +54,6 @@ button:disabled {
   min-height: 100vh;
 }
 header {
-  position: sticky;
-  top: 0;
-  z-index: 6;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -468,7 +465,7 @@ footer {
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 20;
+  z-index: 60; /* выше нижней навигации телефона (30) и пузырьков (50) */
   background: #000b;
   display: flex;
   align-items: center;
@@ -478,6 +475,7 @@ footer {
 .generation-review {
   width: min(700px, 100%);
   max-height: 90vh;
+  max-height: 90dvh;
   overflow: auto;
   margin: 0;
 }

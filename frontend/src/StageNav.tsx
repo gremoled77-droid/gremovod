@@ -1,4 +1,4 @@
-import type {ReactNode} from 'react';
+import {useEffect, useState, type ReactNode} from 'react';
 
 export type Mode =
   | 'studio'
@@ -46,6 +46,21 @@ export default function StageNav({
   onMode: (m: Mode) => void;
   onDemo: () => void;
 }) {
+  const [hidden, setHidden] = useState(false);
+  // На телефоне нижняя панель уезжает вниз при прокрутке вниз и возвращается при прокрутке вверх.
+  useEffect(() => {
+    let last = window.scrollY;
+    const onScroll = () => {
+      const y = window.scrollY,
+        delta = y - last;
+      if (Math.abs(delta) < 8) return;
+      last = y;
+      const bottom = window.innerHeight + y >= document.documentElement.scrollHeight - 4;
+      setHidden(delta > 0 && y > 80 && !bottom);
+    };
+    window.addEventListener('scroll', onScroll, {passive: true});
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
   const activeStage = STAGES.find(s => s.mode === mode)?.key;
   const render = (item: Item, active: boolean) => (
     <button
@@ -64,7 +79,11 @@ export default function StageNav({
     </button>
   );
   return (
-    <nav className="stage-nav" aria-label="Этапы ролика">
+    <nav
+      className={'stage-nav' + (hidden ? ' nav-hidden' : '')}
+      aria-label="Этапы ролика"
+      onFocus={() => setHidden(false)}
+    >
       <div className="nav-brand">
         <span className="nav-logo">◆</span>
         <div>
