@@ -1,4 +1,4 @@
-import {useMemo, useRef, useState} from 'react';
+import {useMemo, useRef, useState, type CSSProperties} from 'react';
 import {
   ReactFlow,
   Background,
@@ -19,13 +19,22 @@ import {buildSteps, canConnect, type NodeKind, type Step} from './workflowPlan';
 type Graph = {nodes: Node[]; edges: Edge[]};
 type Lib = {id: string; url: string; thumbnail_url: string | null; provider_reference_url?: string | null};
 
-const KINDS: {kind: NodeKind; label: string; enabled: boolean; hint: string}[] = [
-  {kind: 'text', label: 'Текст', enabled: true, hint: 'Промпт'},
-  {kind: 'reference', label: 'Референс', enabled: true, hint: 'Картинка из библиотеки'},
-  {kind: 'image', label: 'Изображение', enabled: true, hint: 'Генерация моделью'},
-  {kind: 'video', label: 'Видео', enabled: false, hint: 'Появится на этапе видео'},
-  {kind: 'audio', label: 'Аудио', enabled: false, hint: 'Появится на этапе видео'},
+const KINDS: {kind: NodeKind; label: string; enabled: boolean; hint: string; color: string}[] = [
+  {kind: 'text', label: 'Текст', enabled: true, hint: 'Промпт для узла «Изображение»', color: '#5ec4b6'},
+  {kind: 'reference', label: 'Референс', enabled: true, hint: 'Картинка из библиотеки', color: '#6ea8fe'},
+  {kind: 'image', label: 'Изображение', enabled: true, hint: 'Генерация моделью', color: '#6ea8fe'},
+  {kind: 'video', label: 'Видео', enabled: false, hint: 'Появится на этапе видео', color: '#b18cff'},
+  {kind: 'audio', label: 'Аудио', enabled: false, hint: 'Появится на этапе видео', color: '#f2b134'},
 ];
+const KIND_COLOR = Object.fromEntries(KINDS.map(k => [k.kind, k.color])) as Record<string, string>;
+const STATUS_LABEL: Record<string, string> = {
+  done: 'готово',
+  running: 'генерируется',
+  queued: 'в очереди',
+  pending: 'в очереди',
+  failed: 'ошибка',
+  error: 'ошибка',
+};
 const IMAGE_MODELS: Record<string, string> = {
   'seedream-5-lite': 'Seedream 5 Fast',
   'seedream-5-pro': 'Seedream 5 Pro',
@@ -35,6 +44,13 @@ const IMAGE_MODELS: Record<string, string> = {
   'qwen-image-2.1': 'Qwen Image 2.1',
 };
 
+/** Колонка по типу (вход слева, результат справа); новые узлы встают под уже стоящими в колонке. */
+const COLUMN_X: Record<NodeKind, number> = {text: 40, reference: 40, image: 380, video: 720, audio: 380};
+function slot(kind: NodeKind, nodes: Node[]) {
+  const x = COLUMN_X[kind];
+  const below = nodes.filter(n => Math.abs(n.position.x - x) < 160).map(n => n.position.y);
+  return {x, y: below.length ? Math.max(...below) + 300 : 40};
+}
 async function json(r: Response) {
   const d = await r.json().catch(() => ({}));
   if (!r.ok) throw Error(typeof d.detail === 'string' ? d.detail : 'Запрос не выполнен');
@@ -43,6 +59,7 @@ async function json(r: Response) {
 
 type Ctx = {
   patch: (id: string, p: Record<string, unknown>) => void;
+  remove: (id: string) => void;
   results: Record<string, string>;
   status: Record<string, string>;
   library: Lib[];
@@ -50,65 +67,97 @@ type Ctx = {
 };
 let ctxRef: Ctx | null = null;
 
-function Block({id, data}: {id: string; data: Record<string, any>}) {
+function Block({id, data, selected}: {id: string; data: Record<string, any>; selected?: boolean}) {
   const ctx = ctxRef!;
+  const kind = String(data.kind) as NodeKind;
+  const color = KIND_COLOR[kind] || '#8b8f99';
   const lib = ctx.library.find(a => a.id === data.asset_id);
   const out = ctx.results[id] ? ctx.library.find(a => a.id === ctx.results[id]) : undefined;
+  const state = ctx.status[id] || (out ? 'done' : '');
+  const accepts = kind === 'image' || kind === 'video';
+  const emits = kind === 'text' || kind === 'reference' || kind === 'image';
   return (
-    <div className={'flow-node flow-' + data.kind}>
-      {data.kind !== 'text' && data.kind !== 'reference' && <Handle type="target" position={Position.Left} />}
-      <b>{data.title}</b>
-      {data.kind === 'text' && (
-        <textarea
-          className="nodrag"
-          rows={3}
-          value={data.text || ''}
-          onChange={e => ctx.patch(id, {text: e.target.value})}
-        />
-      )}
-      {data.kind === 'reference' && (
-        <>
-          <select
-            className="nodrag"
-            value={data.asset_id || ''}
-            onChange={e => ctx.patch(id, {asset_id: e.target.value})}
-          >
-            <option value="">Выбери картинку</option>
-            {ctx.library.map(a => (
-              <option key={a.id} value={a.id}>
-                {a.id.slice(0, 8)}
-              </option>
-            ))}
-          </select>
-          {lib && <img src={lib.thumbnail_url || lib.url} alt="" width={96} />}
-        </>
-      )}
-      {data.kind === 'image' && (
-        <>
-          <select
-            className="nodrag"
-            value={data.model || ''}
-            onChange={e => ctx.patch(id, {model: e.target.value})}
-          >
-            <option value="">Модель…</option>
-            {Object.entries(IMAGE_MODELS).map(([k, v]) => (
-              <option key={k} value={k}>
-                {v}
-              </option>
-            ))}
-          </select>
-          {out && <img src={out.thumbnail_url || out.url} alt="" width={140} />}
-          <small>{ctx.status[id] || (out ? 'готово' : 'не запускался')}</small>
-          <button className="nodrag" onClick={() => ctx.run([id])}>
-            {out ? '↻ Перегенерировать' : '▶ Запустить'}
+    <div
+      className={'wf-node wf-' + kind + (selected ? ' sel' : '') + (state ? ' st-' + state : '')}
+      style={{'--kc': color} as CSSProperties}
+    >
+      {accepts && <Handle type="target" position={Position.Left} className="wf-handle" />}
+      <header className="wf-node-head">
+        <i className="wf-dot" />
+        <b>{data.title}</b>
+        {kind === 'image' && data.model && <span className="wf-model">{IMAGE_MODELS[data.model]}</span>}
+        <button className="wf-node-x nodrag" title="Убрать узел из схемы" onClick={() => ctx.remove(id)}>
+          ×
+        </button>
+      </header>
+      <div className="wf-node-body">
+        {kind === 'text' && (
+          <>
+            <textarea
+              className="nodrag"
+              rows={4}
+              placeholder="Опиши кадр: кто, где, что делает, свет, камера…"
+              value={data.text || ''}
+              onChange={e => ctx.patch(id, {text: e.target.value})}
+            />
+            <small>{(data.text || '').length} симв.</small>
+          </>
+        )}
+        {kind === 'reference' && (
+          <>
+            <select
+              className="nodrag"
+              value={data.asset_id || ''}
+              onChange={e => ctx.patch(id, {asset_id: e.target.value})}
+            >
+              <option value="">Выбери картинку</option>
+              {ctx.library.map(a => (
+                <option key={a.id} value={a.id}>
+                  {a.id.slice(0, 8)}
+                </option>
+              ))}
+            </select>
+            {lib ? (
+              <img className="wf-thumb" src={lib.thumbnail_url || lib.url} alt="" />
+            ) : (
+              <div className="wf-empty">нет картинки</div>
+            )}
+          </>
+        )}
+        {kind === 'image' && (
+          <>
+            <select
+              className="nodrag"
+              value={data.model || ''}
+              onChange={e => ctx.patch(id, {model: e.target.value})}
+            >
+              <option value="">Модель…</option>
+              {Object.entries(IMAGE_MODELS).map(([k, v]) => (
+                <option key={k} value={k}>
+                  {v}
+                </option>
+              ))}
+            </select>
+            {out ? (
+              <img className="wf-thumb" src={out.thumbnail_url || out.url} alt="" />
+            ) : (
+              <div className="wf-empty">результат появится здесь</div>
+            )}
+          </>
+        )}
+        {(kind === 'video' || kind === 'audio') && <small>Будет добавлено на этапе видео</small>}
+      </div>
+      {kind === 'image' && (
+        <footer className="wf-node-foot">
+          <span className={'wf-chip ' + (state ? 'st-' + state : '')}>
+            {STATUS_LABEL[state] || state || 'не запускался'}
+          </span>
+          <button className="nodrag wf-run" onClick={() => ctx.run([id])}>
+            {out ? '↻ Ещё раз' : '▶ Запустить'}
           </button>
-        </>
+        </footer>
       )}
-      {(data.kind === 'video' || data.kind === 'audio') && <small>Будет добавлено на этапе видео</small>}
-      {data.kind !== 'reference' && data.kind !== 'text' ? null : null}
-      {(data.kind === 'text' || data.kind === 'reference' || data.kind === 'image') && (
-        <Handle type="source" position={Position.Right} />
-      )}
+      {emits && <Handle type="source" position={Position.Right} className="wf-handle" />}
     </div>
   );
 }
@@ -292,7 +341,24 @@ export default function WorkflowPanel({
     }
   };
 
-  ctxRef = {patch, results, status, library, run: ids => void prepare(ids)};
+  const remove = (id: string) =>
+    onChange(g => ({
+      ...g,
+      nodes: g.nodes.filter(n => n.id !== id),
+      edges: g.edges.filter(e => e.source !== id && e.target !== id),
+    }));
+
+  ctxRef = {patch, remove, results, status, library, run: ids => void prepare(ids)};
+
+  // Цвет связи — по типу узла-источника (только для показа, в схему не пишется)
+  const shownEdges = useMemo(
+    () =>
+      edges.map(e => {
+        const kind = String(nodes.find(n => n.id === e.source)?.data?.kind || '');
+        return {...e, style: {...e.style, stroke: KIND_COLOR[kind] || '#8b8f99', strokeWidth: 2}};
+      }),
+    [nodes, edges]
+  );
 
   const add = (kind: NodeKind, label: string) =>
     onChange(g => ({
@@ -302,48 +368,83 @@ export default function WorkflowPanel({
         {
           id: crypto.randomUUID(),
           type: 'studio',
-          position: {x: 80 + g.nodes.length * 40, y: 80 + (g.nodes.length % 5) * 120},
+          position: slot(kind, g.nodes),
           data: {kind, title: label},
         },
       ],
     }));
 
   return (
-    <section className="panel graph-panel">
-      <div className="panel-title">
-        <div>
+    <section className="wf">
+      <aside className="wf-console">
+        <div className="wf-console-head">
           <h2>Воркфлоу</h2>
-          <p className="muted">
-            Собери цепочку: текст и референсы подключаются к узлу «Изображение». Каждый запуск идёт только
-            после оценки и подтверждения.
-          </p>
+          <p>Собери цепочку: текст и референсы подаются в узел «Изображение».</p>
         </div>
-        <button className="primary" disabled={running || !projectId} onClick={() => void prepare()}>
-          {running ? 'Выполняется…' : '▶ Запустить всё'}
-        </button>
-      </div>
-      {notice && (
-        <div className="notice" role="status">
-          {notice}
+        <div className="wf-console-title">Создать узел</div>
+        {KINDS.map(k => (
+          <button
+            key={k.kind}
+            className="wf-add"
+            disabled={!k.enabled}
+            title={k.hint}
+            style={{'--kc': k.color} as CSSProperties}
+            onClick={() => add(k.kind, k.label)}
+          >
+            <i className="wf-dot" />
+            <span>
+              <b>{k.label}</b>
+              <small>{k.enabled ? k.hint : 'скоро'}</small>
+            </span>
+            <em>＋</em>
+          </button>
+        ))}
+        <div className="wf-console-title">Как это работает</div>
+        <ol className="wf-help">
+          <li>Добавь «Текст» и, если нужно, «Референс».</li>
+          <li>Добавь «Изображение» и выбери модель.</li>
+          <li>Протяни связь от кружка справа к кружку слева.</li>
+          <li>«Запустить» — сначала оценка цены и подтверждение.</li>
+        </ol>
+        <div className="wf-stat">
+          узлов: <b>{nodes.length}</b> · связей: <b>{edges.length}</b>
         </div>
-      )}
-      {error && (
-        <div className="alert" role="alert">
-          {error}
+      </aside>
+      <div className="wf-stage">
+        <div className="wf-bar">
+          <div className="wf-legend">
+            {KINDS.filter(k => k.enabled).map(k => (
+              <span key={k.kind} style={{'--kc': k.color} as CSSProperties}>
+                <i className="wf-dot" />
+                {k.label}
+              </span>
+            ))}
+          </div>
+          <button className="primary" disabled={running || !projectId} onClick={() => void prepare()}>
+            {running ? 'Выполняется…' : '▶ Запустить всё'}
+          </button>
         </div>
-      )}
-      <div className="flow-layout" style={{display: 'flex', gap: 12}}>
-        <aside className="flow-console" style={{minWidth: 150}}>
-          {KINDS.map(k => (
-            <button key={k.kind} disabled={!k.enabled} title={k.hint} onClick={() => add(k.kind, k.label)}>
-              ＋ {k.label}
-            </button>
-          ))}
-        </aside>
-        <div className="flow-wrap" style={{flexGrow: 1}}>
+        {(notice || error) && (
+          <div className="wf-banners">
+            {notice && (
+              <div className="notice" role="status">
+                {notice}
+                <button onClick={() => setNotice('')}>✕</button>
+              </div>
+            )}
+            {error && (
+              <div className="alert" role="alert">
+                {error}
+                <button onClick={() => setError('')}>✕</button>
+              </div>
+            )}
+          </div>
+        )}
+        <div className="wf-canvas">
           <ReactFlow
             nodes={nodes}
-            edges={edges}
+            edges={shownEdges}
+            colorMode="dark"
             onNodesChange={changes => onChange(g => ({...g, nodes: applyNodeChanges(changes, g.nodes)}))}
             onEdgesChange={changes => onChange(g => ({...g, edges: applyEdgeChanges(changes, g.edges)}))}
             isValidConnection={c =>
@@ -355,11 +456,23 @@ export default function WorkflowPanel({
             onConnect={c => onChange(g => ({...g, edges: addEdge({...c, animated: true}, g.edges)}))}
             nodeTypes={types}
             fitView
+            proOptions={{hideAttribution: true}}
           >
-            <Background />
-            <Controls />
-            <MiniMap />
+            <Background gap={22} size={1.2} color="#23262e" />
+            <Controls showInteractive={false} />
+            <MiniMap
+              pannable
+              zoomable
+              maskColor="#0e0f12cc"
+              nodeColor={n => KIND_COLOR[String(n.data?.kind)] || '#8b8f99'}
+            />
           </ReactFlow>
+          {!nodes.length && (
+            <div className="wf-hint">
+              <b>Схема пуста</b>
+              <span>Добавь первый узел слева — например «Текст» с промптом.</span>
+            </div>
+          )}
         </div>
       </div>
       {review && (
