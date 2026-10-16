@@ -5,6 +5,7 @@ import GenerationReview, {type GenerationRequest} from './GenerationReview';
 import {type ActivityItem} from './useActivity';
 import {useSharedActivity} from './ActivityContext';
 import Lightbox, {type LightboxItem} from './Lightbox';
+import CinemaInfo from './CinemaInfo';
 import {DEFAULT_CHAT_URL, copyTextFor, getChatUrl} from './chatLink';
 import {appendBlock} from './visualPlan';
 
@@ -832,6 +833,8 @@ function CreateScreenBody({projectId, heroes}: {projectId: string; heroes: Hero[
             >
               ＋ Композиция
             </button>
+            <CinemaInfo topic="composition" />
+            <CinemaInfo topic="lens" />
             <button disabled={!projectId} onClick={() => void external()}>
               Скопировать для ChatGPT
             </button>
