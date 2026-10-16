@@ -53,7 +53,6 @@ export default function AgentPanel({projectId, brief, character, style, onApply}
   };
   return (
     <section className="panel">
-      <h2>☁ AI Director — команда агентов</h2>
       <p className="notice">
         Платные API-агенты временно отключены до настройки оценки стоимости. Основной чат Codex доступен в
         студии.

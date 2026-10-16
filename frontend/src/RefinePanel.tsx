@@ -172,7 +172,6 @@ export default function RefinePanel({
   return (
     <section className="panel refine-panel">
       <div className="panel-title">
-        <h2>Допилить</h2>
         {status && (
           <a className="button" href={status.chat_url}>
             Открыть чат ↗

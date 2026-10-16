@@ -55,7 +55,6 @@ export default function ConnectionsPanel() {
   return (
     <section className="panel">
       <div className="panel-title">
-        <h2>Подключения</h2>
         <button onClick={load} disabled={!!busy}>
           Обновить
         </button>

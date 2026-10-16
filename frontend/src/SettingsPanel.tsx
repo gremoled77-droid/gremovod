@@ -1,5 +1,4 @@
 import type {ReactNode} from 'react';
-import {Settings} from 'lucide-react';
 import {PAID_LLM_ENABLED} from './api';
 import ArchivedProjects from './ArchivedProjects';
 import ChatLinkSetting from './ChatLinkSetting';
@@ -33,11 +32,6 @@ export default function SettingsPanel({
 }: Props) {
   return (
     <section className="panel settings-panel">
-      <div className="panel-title">
-        <h2>
-          <Settings size={21} /> Настройки
-        </h2>
-      </div>
       {projectHeader && (
         <>
           <h3>Проект</h3>

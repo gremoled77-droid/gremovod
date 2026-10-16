@@ -65,6 +65,18 @@ export default function WorkspaceTrail({
     settings: 'Настройки',
     archive: 'Архив',
   };
+  const lede: Partial<Record<Mode, string>> = {
+    studio: 'Задание ролика и стартовая постановка кадра.',
+    styles: 'Стиль мира и герои: общие для всех кадров серии.',
+    files: 'Папки проекта и подготовка материалов к монтажу.',
+    economics: 'Бюджет, лимиты и расходы на генерации.',
+    scene: 'Собери кадр из героя, локации и предметов.',
+    refine: 'Точечная правка готового кадра через ChatGPT.',
+    agents: 'Команда ИИ-агентов: план, проверка и промпты.',
+    connections: 'Ключи и доступ к сервисам: PiAPI, OpenAI, голос.',
+    settings: 'Проект, модель для промптов и ссылка на чат.',
+    archive: 'Все картинки и видео проекта.',
+  };
   return (
     <div className="workspace-trail">
       <div>
@@ -81,6 +93,7 @@ export default function WorkspaceTrail({
             : 'Рабочее пространство проекта'}
         </small>
         <h1>{title[mode]}</h1>
+        {lede[mode] && <p className="trail-lede">{lede[mode]}</p>}
         {error && <small role="alert">Не удалось загрузить связь с доской. {error}</small>}
       </div>
       {location && location.source_project_id !== projectId && (

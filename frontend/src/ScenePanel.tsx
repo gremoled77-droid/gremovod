@@ -86,7 +86,6 @@ export default function ScenePanel({
   return (
     <section className="panel scene-panel">
       <div className="panel-title">
-        <h2>Сцена</h2>
         <CinemaInfo topic="mise" />
       </div>
       <p className="muted">

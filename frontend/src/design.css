@@ -723,3 +723,13 @@ section.panel {
     max-width: 100%;
   }
 }
+
+/* Подпись под заголовком экрана; пустая строка заголовка панели не занимает место */
+.trail-lede {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+.panel-title:empty {
+  display: none;
+}
