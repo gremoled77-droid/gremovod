@@ -16,13 +16,24 @@ import {apiFetch} from './api';
 import LimitPicker from './LimitPicker';
 import {initialLimit, limitAllowed} from './spendLimit';
 import {useSharedActivity} from './ActivityContext';
-import {buildSteps, canConnect, type NodeKind, type Step} from './workflowPlan';
+import {
+  DEFAULT_LLM_SYSTEM,
+  buildLlmSteps,
+  buildSteps,
+  canConnect,
+  llmInput,
+  type LlmStep,
+  type NodeKind,
+  type Step,
+} from './workflowPlan';
+import {LLM_MAX_TOKENS, LLM_MODELS, llmEstimate} from './llmPricing';
 
 type Graph = {nodes: Node[]; edges: Edge[]};
 type Lib = {id: string; url: string; thumbnail_url: string | null; provider_reference_url?: string | null};
 
 const KINDS: {kind: NodeKind; label: string; enabled: boolean; hint: string; color: string}[] = [
   {kind: 'text', label: 'Текст', enabled: true, hint: 'Промпт для узла «Изображение»', color: '#5ec4b6'},
+  {kind: 'llm', label: 'LLM', enabled: true, hint: 'ИИ пишет или улучшает текст', color: '#5ec4b6'},
   {kind: 'reference', label: 'Референс', enabled: true, hint: 'Картинка из библиотеки', color: '#6ea8fe'},
   {kind: 'image', label: 'Изображение', enabled: true, hint: 'Генерация моделью', color: '#6ea8fe'},
   {kind: 'video', label: 'Видео', enabled: false, hint: 'Появится на этапе видео', color: '#b18cff'},
@@ -47,7 +58,14 @@ const IMAGE_MODELS: Record<string, string> = {
 };
 
 /** Колонка по типу (вход слева, результат справа); новые узлы встают под уже стоящими в колонке. */
-const COLUMN_X: Record<NodeKind, number> = {text: 40, reference: 40, image: 380, video: 720, audio: 380};
+const COLUMN_X: Record<NodeKind, number> = {
+  text: 40,
+  reference: 40,
+  llm: 330,
+  image: 620,
+  video: 900,
+  audio: 620,
+};
 function slot(kind: NodeKind, nodes: Node[]) {
   const x = COLUMN_X[kind];
   const below = nodes.filter(n => Math.abs(n.position.x - x) < 160).map(n => n.position.y);
@@ -75,9 +93,9 @@ function Block({id, data, selected}: {id: string; data: Record<string, any>; sel
   const color = KIND_COLOR[kind] || '#8b8f99';
   const lib = ctx.library.find(a => a.id === data.asset_id);
   const out = ctx.results[id] ? ctx.library.find(a => a.id === ctx.results[id]) : undefined;
-  const state = ctx.status[id] || (out ? 'done' : '');
-  const accepts = kind === 'image' || kind === 'video';
-  const emits = kind === 'text' || kind === 'reference' || kind === 'image';
+  const state = ctx.status[id] || (out || (kind === 'llm' && data.output) ? 'done' : '');
+  const accepts = kind === 'image' || kind === 'video' || kind === 'llm';
+  const emits = kind === 'text' || kind === 'reference' || kind === 'image' || kind === 'llm';
   return (
     <div
       className={'wf-node wf-' + kind + (selected ? ' sel' : '') + (state ? ' st-' + state : '')}
@@ -88,6 +106,9 @@ function Block({id, data, selected}: {id: string; data: Record<string, any>; sel
         <i className="wf-dot" />
         <b>{data.title}</b>
         {kind === 'image' && data.model && <span className="wf-model">{IMAGE_MODELS[data.model]}</span>}
+        {kind === 'llm' && data.model && (
+          <span className="wf-model">{LLM_MODELS[data.model]?.label || data.model}</span>
+        )}
         <button className="wf-node-x nodrag" title="Убрать узел из схемы" onClick={() => ctx.remove(id)}>
           ×
         </button>
@@ -103,6 +124,37 @@ function Block({id, data, selected}: {id: string; data: Record<string, any>; sel
               onChange={e => ctx.patch(id, {text: e.target.value})}
             />
             <small>{(data.text || '').length} симв.</small>
+          </>
+        )}
+        {kind === 'llm' && (
+          <>
+            <select
+              className="nodrag"
+              value={data.model || ''}
+              onChange={e => ctx.patch(id, {model: e.target.value})}
+            >
+              <option value="">Модель…</option>
+              {Object.entries(LLM_MODELS).map(([k, v]) => (
+                <option key={k} value={k}>
+                  {v.label}
+                </option>
+              ))}
+            </select>
+            <textarea
+              className="nodrag"
+              rows={3}
+              placeholder={DEFAULT_LLM_SYSTEM}
+              title="Инструкция модели"
+              value={data.system || ''}
+              onChange={e => ctx.patch(id, {system: e.target.value})}
+            />
+            <textarea
+              className="nodrag"
+              rows={4}
+              placeholder="Ответ появится здесь; его можно поправить руками"
+              value={data.output || ''}
+              onChange={e => ctx.patch(id, {output: e.target.value})}
+            />
           </>
         )}
         {kind === 'reference' && (
@@ -149,13 +201,19 @@ function Block({id, data, selected}: {id: string; data: Record<string, any>; sel
         )}
         {(kind === 'video' || kind === 'audio') && <small>Будет добавлено на этапе видео</small>}
       </div>
-      {kind === 'image' && (
+      {(kind === 'image' || kind === 'llm') && (
         <footer className="wf-node-foot">
           <span className={'wf-chip ' + (state ? 'st-' + state : '')}>
             {STATUS_LABEL[state] || state || 'не запускался'}
           </span>
           <button className="nodrag wf-run" onClick={() => ctx.run([id])}>
-            {out ? '↻ Ещё раз' : '▶ Запустить'}
+            {kind === 'llm'
+              ? data.output
+                ? '↻ Ещё раз'
+                : '▶ Сгенерировать'
+              : out
+                ? '↻ Ещё раз'
+                : '▶ Запустить'}
           </button>
         </footer>
       )}
@@ -182,12 +240,16 @@ export default function WorkflowPanel({
   const [error, setError] = useState('');
   const [review, setReview] = useState<{
     steps: Step[];
+    llmSteps: LlmStep[];
     estimates: Record<string, number>;
     total: number;
   } | null>(null);
   const [limit, setLimit] = useState('');
   const [approved, setApproved] = useState(false);
   const [highOk, setHighOk] = useState(false);
+  const [llmState, setLlmState] = useState<Record<string, string>>({});
+  const graph = useRef({nodes, edges});
+  graph.current = {nodes, edges};
   const [running, setRunning] = useState(false);
   const loaded = useRef('');
 
@@ -252,22 +314,31 @@ export default function WorkflowPanel({
   /** Подготовка запуска: оценка по каждому шагу, показ итога и подтверждение. */
   const prepare = async (onlyIds?: string[]) => {
     setError('');
-    const plan = buildSteps(nodes, edges, results);
+    const outputs: Record<string, string> = {};
+    for (const n of nodes) if (n.data.kind === 'llm' && n.data.output) outputs[n.id] = String(n.data.output);
+    const llmPlan = buildLlmSteps(nodes, edges);
+    const llmSteps = llmPlan.steps.filter(s => !onlyIds || onlyIds.includes(s.nodeId));
+    const plan = buildSteps(nodes, edges, results, {llm: outputs, pendingLlm: llmSteps.map(s => s.nodeId)});
     const steps = plan.steps.filter(s => !onlyIds || onlyIds.includes(s.nodeId));
-    const problems = plan.problems.filter(
-      p => !onlyIds || steps.some(s => p.includes(String(nodes.find(n => n.id === s.nodeId)?.data.title)))
+    const titleOf = (id: string) => String(nodes.find(n => n.id === id)?.data.title);
+    const selected = [...steps.map(s => s.nodeId), ...llmSteps.map(s => s.nodeId)];
+    const problems = [...plan.problems, ...llmPlan.problems].filter(
+      p => !onlyIds || selected.some(id => p.includes(titleOf(id)))
     );
     if (problems.length) return setError(problems.join(' · '));
-    if (!steps.length) return setError('Нет узлов «Изображение» для запуска');
+    if (!steps.length && !llmSteps.length) return setError('Нет узлов «Изображение» или «LLM» для запуска');
     try {
       const estimates: Record<string, number> = {};
+      for (const s of llmSteps) {
+        estimates[s.nodeId] = llmEstimate(s.model, llmInput(s, nodes, outputs).length + 600);
+      }
       for (const s of steps) {
         const urls = s.waitFor.length ? [] : await Promise.all(s.refAssetIds.map(cloudUrl));
         const placeholders = s.waitFor.map((_, i) => `https://example.invalid/pending-${i}.png`);
         estimates[s.nodeId] = (await estimate(s, [...urls, ...placeholders])).estimated_usd;
       }
-      setReview({steps, estimates, total: Object.values(estimates).reduce((a, b) => a + b, 0)});
       const total = Object.values(estimates).reduce((a, b) => a + b, 0);
+      setReview({steps, llmSteps, estimates, total});
       setLimit(initialLimit(total));
       setHighOk(false);
       setApproved(false);
@@ -296,7 +367,45 @@ export default function WorkflowPanel({
     setRunning(true);
     setReview(null);
     try {
-      const pending = [...review.steps];
+      const outs: Record<string, string> = {};
+      for (const n of graph.current.nodes)
+        if (n.data.kind === 'llm' && n.data.output) outs[n.id] = String(n.data.output);
+      for (const step of review.llmSteps) {
+        const estimated = review.estimates[step.nodeId] || 0;
+        if (spent + estimated > budget) throw Error('Лимит запуска исчерпан, остальные шаги не отправлены');
+        const input = llmInput(step, graph.current.nodes, outs);
+        if (!input) throw Error('У LLM-узла нет входного текста');
+        setLlmState(v => ({...v, [step.nodeId]: 'running'}));
+        try {
+          const answer = await json(
+            await apiFetch('/api/llm/chat', {
+              method: 'POST',
+              headers: {'Content-Type': 'application/json'},
+              body: JSON.stringify({
+                provider: 'piapi',
+                model: step.model,
+                max_tokens: LLM_MAX_TOKENS,
+                messages: [
+                  {role: 'system', content: step.system},
+                  {role: 'user', content: input},
+                ],
+              }),
+            })
+          );
+          const text = String(answer.choices?.[0]?.message?.content || '').trim();
+          if (!text) throw Error('LLM вернул пустой ответ');
+          outs[step.nodeId] = text;
+          patch(step.nodeId, {output: text});
+          setLlmState(v => ({...v, [step.nodeId]: 'done'}));
+        } catch (e) {
+          setLlmState(v => ({...v, [step.nodeId]: 'failed'}));
+          throw e;
+        }
+        spent += estimated;
+      }
+      const fresh = buildSteps(graph.current.nodes, graph.current.edges, live.current.results, {llm: outs});
+      const pending = review.steps.map(s => fresh.steps.find(f => f.nodeId === s.nodeId) ?? s);
+      if (pending.some(s => !s.prompt)) throw Error('У узла «Изображение» пустой промпт после LLM');
       const finished = new Set<string>();
       let guard = 0;
       while (pending.length && guard++ < 50) {
@@ -337,7 +446,9 @@ export default function WorkflowPanel({
         reset();
         if (pending.some(s => s.waitFor.includes(step.nodeId))) await wait([step.nodeId]);
       }
-      setNotice(`Запущено шагов: ${review.steps.length}. Потрачено по оценке: $${spent.toFixed(3)}`);
+      setNotice(
+        `Запущено шагов: ${review.steps.length + review.llmSteps.length}. Потрачено по оценке: $${spent.toFixed(3)}`
+      );
       await refreshLibrary();
     } catch (e) {
       setError((e instanceof Error ? e.message : String(e)) + ' Проверь очередь перед повторным запуском.');
@@ -353,7 +464,7 @@ export default function WorkflowPanel({
       edges: g.edges.filter(e => e.source !== id && e.target !== id),
     }));
 
-  ctxRef = {patch, remove, results, status, library, run: ids => void prepare(ids)};
+  ctxRef = {patch, remove, results, status: {...status, ...llmState}, library, run: ids => void prepare(ids)};
 
   // Цвет связи — по типу узла-источника (только для показа, в схему не пишется)
   const shownEdges = useMemo(
@@ -384,7 +495,7 @@ export default function WorkflowPanel({
       <aside className="wf-console">
         <div className="wf-console-head">
           <h2>Воркфлоу</h2>
-          <p>Собери цепочку: текст и референсы подаются в узел «Изображение».</p>
+          <p>Собери цепочку: текст (или ответ LLM) и референсы подаются в узел «Изображение».</p>
         </div>
         <div className="wf-console-title">Создать узел</div>
         {KINDS.map(k => (
@@ -406,7 +517,7 @@ export default function WorkflowPanel({
         ))}
         <div className="wf-console-title">Как это работает</div>
         <ol className="wf-help">
-          <li>Добавь «Текст» и, если нужно, «Референс».</li>
+          <li>Добавь «Текст», при желании «LLM» (ИИ улучшит текст) и «Референс».</li>
           <li>Добавь «Изображение» и выбери модель.</li>
           <li>Протяни связь от кружка справа к кружку слева.</li>
           <li>«Запустить» — сначала оценка цены и подтверждение.</li>
@@ -485,6 +596,12 @@ export default function WorkflowPanel({
           <section className="panel generation-review" role="dialog" aria-modal="true">
             <h2>Запустить всё: подтверждение</h2>
             <ol>
+              {review.llmSteps.map(s => (
+                <li key={s.nodeId}>
+                  LLM {LLM_MODELS[s.model]?.label || s.model} · текст · до $
+                  {review.estimates[s.nodeId].toFixed(4)}
+                </li>
+              ))}
               {review.steps.map(s => (
                 <li key={s.nodeId}>
                   {IMAGE_MODELS[s.model] || s.model} · референсов: {s.refAssetIds.length + s.waitFor.length}

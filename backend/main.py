@@ -140,6 +140,7 @@ class UnifiedChatRequest(BaseModel):
     provider:str='openai'
     model:str='gpt-4.1-mini'
     messages:list[dict[str,Any]]=Field(min_length=1,max_length=50)
+    max_tokens:int|None=Field(default=None,ge=16,le=8000)
 
 @app.post('/api/llm/chat')
 async def unified_chat(body:UnifiedChatRequest, x_api_key:str|None=Header(default=None)):
@@ -155,7 +156,9 @@ async def unified_chat(body:UnifiedChatRequest, x_api_key:str|None=Header(defaul
         content,usage=await agent_completion('openai',body.model,key,system,json.dumps(history,ensure_ascii=False))
         return {'choices':[{'message':{'role':'assistant','content':content}}],'usage':usage,'provider':'openai'}
     if body.model not in ALLOWED_CHAT: raise HTTPException(400,'Модель PiAPI отсутствует в списке')
-    value=await request_piapi('POST','/v1/chat/completions',key,{'model':body.model,'messages':messages})
+    payload={'model':body.model,'messages':messages}
+    if body.max_tokens: payload['max_tokens']=body.max_tokens
+    value=await request_piapi('POST','/v1/chat/completions',key,payload)
     return {'choices':[{'message':{'role':'assistant','content':chat_text(value)}}],'usage':value.get('usage',{}),'provider':'piapi','model':body.model}
 
 class DiagnosticInfo(BaseModel):

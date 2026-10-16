@@ -36,3 +36,33 @@ test('без текста и модели — понятные проблемы'
   const {problems} = buildSteps([n('i', 0, {kind: 'image', title: 'Кадр'})], [], {});
   assert.equal(problems.length, 2);
 });
+
+test('LLM-узел: порядок, вход и промпт изображения из ответа LLM', async () => {
+  const {buildLlmSteps, llmInput, PENDING_LLM_TEXT} = await import('./src/workflowPlan.ts');
+  const nodes = [
+    n('t', 0, {kind: 'text', text: 'Грэм у такси'}),
+    n('l1', 100, {kind: 'llm', model: 'gpt-5.6-luna', title: 'LLM'}),
+    n('l2', 200, {kind: 'llm', model: 'gpt-6-astra', title: 'LLM 2'}),
+    n('i', 300, {kind: 'image', model: 'seedream-5-lite', title: 'Кадр'}),
+  ];
+  const edges = [e('t', 'l1'), e('l1', 'l2'), e('l2', 'i')];
+  const plan = buildLlmSteps(nodes, edges);
+  assert.deepEqual(plan.problems, []);
+  assert.deepEqual(
+    plan.steps.map(s => s.nodeId),
+    ['l1', 'l2']
+  );
+  assert.equal(llmInput(plan.steps[0], nodes, {}), 'Грэм у такси');
+  assert.equal(llmInput(plan.steps[1], nodes, {l1: 'Подробный промпт'}), 'Подробный промпт');
+  // без ответа и без запуска в этом прогоне — понятная проблема; с запуском — заглушка
+  assert.equal(buildSteps(nodes, edges, {}).problems.length, 1);
+  assert.equal(buildSteps(nodes, edges, {}, {pendingLlm: ['l2']}).steps[0].prompt, PENDING_LLM_TEXT);
+  assert.equal(buildSteps(nodes, edges, {}, {llm: {l2: 'Готово'}}).steps[0].prompt, 'Готово');
+});
+
+test('LLM принимает только текст и другие LLM', async () => {
+  const llm = n('l', 0, {kind: 'llm', model: 'x'});
+  assert.equal(canConnect(n('t', 0, {kind: 'text'}), llm), true);
+  assert.equal(canConnect(n('r', 0, {kind: 'reference'}), llm), false);
+  assert.equal(canConnect(llm, n('i', 1, {kind: 'image'})), true);
+});
