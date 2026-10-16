@@ -9,6 +9,10 @@ export default defineConfig({
   server: {
     port: 5173,
     allowedHosts: remoteHosts,
-    proxy: {'/api': 'http://127.0.0.1:8000', '/login': 'http://127.0.0.1:8000'},
+    // changeOrigin: false — бэкенду нужен настоящий Host запроса: по нему он отличает телефон от локального браузера.
+    proxy: {
+      '/api': {target: 'http://127.0.0.1:8000', changeOrigin: false},
+      '/login': {target: 'http://127.0.0.1:8000', changeOrigin: false},
+    },
   },
 });
