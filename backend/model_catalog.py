@@ -69,6 +69,10 @@ MODEL_SPECS['minimax-h3']={
                'aspect_ratio':{'values':['16:9','9:16','1:1'],'default':'16:9'}}}
 
 
+# Seedance 2.5: адаптер сам валидирует картинки, видео, аудио, edit/extend и draft (backend/adapters.py).
+MODEL_SPECS['seedance-2.5']['adapter']='seedance_25'
+
+
 # --- Живая проверка 16.10.2026 (scripts/live_piapi_test.py): отправка, статус, результат и списание совпали с оценкой.
 # gpt-image-2.5-sunburst (правки) и референсы GPT Image не проверялись и остаются выключенными.
 for _id in ('seedream-5-pro','nano-banana-2.1','qwen-image-2.1','gpt-image-2','gpt-image-2.5','minimax-h3'):
@@ -91,7 +95,7 @@ _REF_PROFILES = {
     'seedance-2.5': {
         'ref_limits': {'image':30,'video':10,'audio':10,'total':50,'video_total_s':30,'audio_total_s':30,
                        'duration_min_s':4,'duration_max_s':30,
-                       'note':'по документации PiAPI; адаптер студии пока отправляет только картинки'},
+                       'note':'по документации PiAPI; адаптер студии отправляет картинки, видео, аудио, edit/extend и draft (не проверено вживую)'},
         'ref_syntax': {'style':'at_numbered','image':'@image{n}','video':'@video{n}','audio':'@audio{n}',
                        'rule':'строчные теги по порядку массивов; ссылка на отсутствующий файл даёт 400',
                        'tasks':['auto','reference','edit','extend'],'draft_mode':True}},

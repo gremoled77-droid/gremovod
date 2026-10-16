@@ -31,7 +31,7 @@ def register(app, studio):
         data=result.get('data') or {}
         expected=json.loads(job['request'])['payload']
         actual_input=data.get('input') or {}
-        if data.get('task_id')!=body.task_id or any(data.get(k)!=expected.get(k) for k in ('model','task_type')) or actual_input.get('prompt')!=expected['input']['prompt']:
+        if data.get('task_id')!=body.task_id or any(data.get(k)!=expected.get(k) for k in ('model','task_type')) or actual_input.get('prompt')!=expected['input'].get('prompt'):
             raise HTTPException(409,'Task ID не совпадает с моделью, типом или промптом исходной отправки')
         differences=[k for k,v in expected['input'].items() if actual_input.get(k)!=v]
         if not body.approved:

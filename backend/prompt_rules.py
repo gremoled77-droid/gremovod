@@ -8,7 +8,7 @@ import re
 from pathlib import Path
 from fastapi import HTTPException
 
-RULES_VERSION='2026-10-16.1'
+RULES_VERSION='2026-10-17.1'
 PROFILES=json.loads((Path(__file__).parent/'prompt_profiles.json').read_text(encoding='utf-8'))
 
 def reference_label(target, index):
@@ -60,8 +60,11 @@ SEEDANCE_RULES='''Target: Seedance 2.5 through PiAPI.
 When images are supplied, reference them as @image1, @image2, etc., exactly in array order.
 These are actual reference images, not Kling Elements, and not a guaranteed exact first frame.
 Use image references to preserve the scene while describing desired motion.
-This adapter supports ordinary generation with image references, not editing or extending
-an input video. Never ask to extend a video or use @videoN/@audioN without supplied inputs.
+Reference videos and audio are @video1.. and @audio1.. by position, and only when the user
+supplied them; never use @videoN/@audioN or ask to extend or edit a video without a supplied
+source clip. When the brief asks to extend a clip, begin with "Extend @video1 forward:"; when it
+asks to change something in a clip, begin with "In @video1, change". Keep the wording consistent
+with the declared task (reference, edit or extend) because the provider re-checks it.
 Do not include generate_audio, negative_prompt, enhancement, draft or API flags in the prompt.'''
 
 def system_rules(spec):

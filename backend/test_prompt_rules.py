@@ -6,7 +6,7 @@ from backend.model_catalog import MODEL_SPECS
 
 class PillarsRulesTest(unittest.TestCase):
     def test_version_bumped(self):
-        self.assertEqual(prompt_rules.RULES_VERSION, '2026-10-16.1')
+        self.assertEqual(prompt_rules.RULES_VERSION, '2026-10-17.1')
 
     def test_pillars_in_image_and_video_rules(self):
         for model in ('seedream-5-lite', 'gpt-image-2', 'seedance-2.5', 'minimax-h3'):

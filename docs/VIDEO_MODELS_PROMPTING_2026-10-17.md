@@ -51,7 +51,7 @@
 
 ## Очередь проверок и задач
 
-1. Адаптер Seedance 2.5: отправлять `video_urls`, `audio_urls`, `omni_reference_task_type`, `draft`; живой тест `edit`/`extend` с малой суммой (по разрешению владельца).
+1. Адаптер Seedance 2.5 написан (`video_urls`, `audio_urls`, `edit`/`extend`, `draft`, цена с входным видео, раскладка в `GenerationReview`), тесты офлайн. Осталось: форма в «Видео» для выбора видео/аудио референсов, `task` и черновика; живой тест `edit`/`extend`/`draft` на 480p с малой суммой только по разрешению владельца.
 2. Kling Elements: сохранить страницу PiAPI «Kling Elements Video Generation API» (элементы и голос в схеме Omni отсутствуют) и сверить с `video-kling-3-omni`. Сделано: страницы Kling 3.0 и Kling 3.0 omni (17.10).
 3. FLUX 3: выяснить, есть ли он у PiAPI; пока навык описывает модель по инструкции владельца.
 4. Seedance 2: решение владельца про `-less-restriction` ради Private Asset Library; живой тест загрузки и ссылки `asset://` на 480p, 4 с с малой суммой. Сделано: страницы Seedance 2 и Private Asset Library сохранены (17.10).
