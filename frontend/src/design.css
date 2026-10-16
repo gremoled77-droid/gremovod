@@ -448,3 +448,49 @@ section.panel {
   margin: 0;
   box-sizing: border-box;
 }
+
+/* Выбор лимита перед платным запуском */
+.limit-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 12px 0;
+}
+.limit-title {
+  color: var(--muted);
+  font-size: 13px;
+}
+.limit-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.limit-presets button {
+  padding: 5px 14px;
+  border-radius: 99px;
+}
+.limit-presets button:disabled {
+  opacity: 0.4;
+}
+.limit-slider {
+  width: 100%;
+  accent-color: var(--accent);
+}
+.limit-exact {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 13px;
+}
+.limit-exact input {
+  width: 120px;
+  padding: 6px 9px;
+}
+.limit-high {
+  padding: 8px 10px;
+  border: 1px solid #6a5420;
+  border-radius: 10px;
+  background: #2a2111;
+  color: var(--accent);
+}

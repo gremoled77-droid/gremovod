@@ -13,6 +13,8 @@ import {
   type Edge,
 } from '@xyflow/react';
 import {apiFetch} from './api';
+import LimitPicker from './LimitPicker';
+import {initialLimit, limitAllowed} from './spendLimit';
 import {useSharedActivity} from './ActivityContext';
 import {buildSteps, canConnect, type NodeKind, type Step} from './workflowPlan';
 
@@ -185,6 +187,7 @@ export default function WorkflowPanel({
   } | null>(null);
   const [limit, setLimit] = useState('');
   const [approved, setApproved] = useState(false);
+  const [highOk, setHighOk] = useState(false);
   const [running, setRunning] = useState(false);
   const loaded = useRef('');
 
@@ -264,7 +267,9 @@ export default function WorkflowPanel({
         estimates[s.nodeId] = (await estimate(s, [...urls, ...placeholders])).estimated_usd;
       }
       setReview({steps, estimates, total: Object.values(estimates).reduce((a, b) => a + b, 0)});
-      setLimit('');
+      const total = Object.values(estimates).reduce((a, b) => a + b, 0);
+      setLimit(initialLimit(total));
+      setHighOk(false);
       setApproved(false);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -491,16 +496,13 @@ export default function WorkflowPanel({
             <p>
               Итого по оценке: <b>${review.total.toFixed(3)}</b>
             </p>
-            <label>
-              Мой лимит на весь запуск, USD
-              <input
-                type="number"
-                min={review.total}
-                step="0.001"
-                value={limit}
-                onChange={e => setLimit(e.target.value)}
-              />
-            </label>
+            <LimitPicker
+              total={review.total}
+              limit={limit}
+              onLimit={setLimit}
+              highConfirmed={highOk}
+              onHighConfirmed={setHighOk}
+            />
             <label className="inline-checkbox">
               <input type="checkbox" checked={approved} onChange={e => setApproved(e.target.checked)} />{' '}
               Подтверждаю платный запуск в пределах лимита
@@ -508,7 +510,7 @@ export default function WorkflowPanel({
             <div className="chips">
               <button
                 className="primary"
-                disabled={!approved || !(Number(limit) >= review.total)}
+                disabled={!approved || !limitAllowed(review.total, limit, highOk)}
                 onClick={() => void execute()}
               >
                 Подтвердить и запустить

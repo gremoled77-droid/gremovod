@@ -1,5 +1,7 @@
 import {useEffect, useRef, useState} from 'react';
 import {apiFetch} from './api';
+import LimitPicker from './LimitPicker';
+import {initialLimit, limitAllowed} from './spendLimit';
 
 export type GenerationRequest = {
   project_id: string;
@@ -31,6 +33,7 @@ export default function GenerationReview({
   const [busy, setBusy] = useState(false);
   const [approved, setApproved] = useState(false);
   const [limit, setLimit] = useState('');
+  const [highOk, setHighOk] = useState(false);
   const [attempted, setAttempted] = useState(false);
   const requestId = useRef(crypto.randomUUID());
   useEffect(() => {
@@ -44,7 +47,10 @@ export default function GenerationReview({
         });
         const d = await r.json();
         if (!r.ok) throw Error(typeof d.detail === 'string' ? d.detail : 'Не удалось оценить запуск');
-        if (active) setEstimate(d);
+        if (active) {
+          setEstimate(d);
+          setLimit(current => current || initialLimit(d.estimated_usd));
+        }
       } catch (e) {
         if (active) setError(e instanceof Error ? e.message : String(e));
       }
@@ -54,7 +60,7 @@ export default function GenerationReview({
     };
   }, [request]);
   const submit = async () => {
-    if (!estimate || !approved || Number(limit) < estimate.estimated_usd || attempted) return;
+    if (!estimate || !approved || !limitAllowed(estimate.estimated_usd, limit, highOk) || attempted) return;
     setBusy(true);
     setAttempted(true);
     setError('');
@@ -123,19 +129,14 @@ export default function GenerationReview({
               </a>{' '}
               · проверено {estimate.verified_at}
             </p>
-            <label>
-              Мой лимит на этот запуск, USD
-              <input
-                type="number"
-                min={estimate.estimated_usd}
-                max="100"
-                step="0.001"
-                value={limit}
-                onChange={e => setLimit(e.target.value)}
-                placeholder="Укажи сумму"
-                disabled={attempted}
-              />
-            </label>
+            <LimitPicker
+              total={estimate.estimated_usd}
+              limit={limit}
+              onLimit={setLimit}
+              highConfirmed={highOk}
+              onHighConfirmed={setHighOk}
+              disabled={attempted}
+            />
             <label className="inline-checkbox">
               <input
                 type="checkbox"
@@ -158,8 +159,7 @@ export default function GenerationReview({
             disabled={
               !estimate ||
               !approved ||
-              !Number.isFinite(Number(limit)) ||
-              Number(limit) < (estimate?.estimated_usd || 0) ||
+              !limitAllowed(estimate?.estimated_usd || 0, limit, highOk) ||
               busy ||
               attempted
             }
