@@ -244,7 +244,7 @@ class StudioSmokeTests(unittest.TestCase):
             self.assertEqual(stranger.get('/api/projects').status_code,200)
 
     def test_paid_llm_routes_fail_closed_without_verified_prices(self):
-        for endpoint in ('/api/chat','/api/llm/chat','/api/compose','/api/agents/run'):
+        for endpoint in ('/api/chat','/api/compose','/api/agents/run'):
             self.assertEqual(self.client.post(endpoint,json={'approved':True}).status_code,503)
         main.request_piapi.assert_not_awaited()
         main.agent_completion.assert_not_awaited()

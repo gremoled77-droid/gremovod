@@ -78,7 +78,7 @@ def register(app, studio):
         supplied = request.headers.get('x-studio-session') or request.cookies.get('studio_session', '')
         if not public and not worker and not secrets.compare_digest(supplied.encode(), LAUNCH_TOKEN.encode()):
             return JSONResponse({'detail':'Локальная сессия отсутствует. Обнови страницу студии.'}, status_code=401)
-        if request.method == 'POST' and request.url.path in {'/api/llm/chat','/api/chat','/api/compose','/api/agents/run'}:
+        if request.method == 'POST' and request.url.path in {'/api/chat','/api/compose','/api/agents/run'}:
             return JSONResponse({'detail':'Платный LLM-резерв временно отключён: для него ещё нет проверенной серверной оценки и лимита стоимости. Используй основной чат Codex.'}, status_code=503)
         return await call_next(request)
 

@@ -142,25 +142,20 @@ class UnifiedChatRequest(BaseModel):
     model:str='gpt-4.1-mini'
     messages:list[dict[str,Any]]=Field(min_length=1,max_length=50)
     max_tokens:int|None=Field(default=None,ge=16,le=8000)
+    project_id:str|None=None
+    approved:bool=False
+    quote_token:str|None=None
+    max_cost_usd:float|None=Field(default=None,ge=0,le=100,allow_inf_nan=False)
+    request_id:str|None=Field(default=None,min_length=8,max_length=100,pattern=r'^[a-zA-Z0-9_-]+$')
 
 @app.post('/api/llm/chat')
 async def unified_chat(body:UnifiedChatRequest, x_api_key:str|None=Header(default=None)):
-    key=get_key(x_api_key) if body.provider=='piapi' else provider_key(body.provider,x_api_key)
+    if body.provider!='piapi': raise HTTPException(400,'Платный LLM доступен только через PiAPI')
+    key=get_key(x_api_key)
     if not key or not key.isascii() or any(c.isspace() for c in key):
-        raise HTTPException(400,'Введи корректный API-ключ выбранного провайдера')
-    if body.provider not in {'openai','piapi'}: raise HTTPException(400,'Недопустимый провайдер')
-    messages=[{'role':m.get('role'),'content':str(m.get('content',''))[:20000]} for m in body.messages if m.get('role') in {'user','system','assistant'}]
-    if not messages: raise HTTPException(400,'Нет сообщений')
-    system='\n'.join(m['content'] for m in messages if m['role']=='system') or 'You are an AI production assistant.'
-    history=[m for m in messages if m['role']!='system']
-    if body.provider=='openai':
-        content,usage=await agent_completion('openai',body.model,key,system,json.dumps(history,ensure_ascii=False))
-        return {'choices':[{'message':{'role':'assistant','content':content}}],'usage':usage,'provider':'openai'}
-    if body.model not in ALLOWED_CHAT: raise HTTPException(400,'Модель PiAPI отсутствует в списке')
-    payload={'model':body.model,'messages':messages}
-    if body.max_tokens: payload['max_tokens']=body.max_tokens
-    value=await request_piapi('POST','/v1/chat/completions',key,payload)
-    return {'choices':[{'message':{'role':'assistant','content':chat_text(value)}}],'usage':value.get('usage',{}),'provider':'piapi','model':body.model}
+        raise HTTPException(400,'Введи корректный API-ключ PiAPI')
+    from backend import llm_guard
+    return await llm_guard.guarded_chat(sys.modules[__name__],body,key)
 
 class DiagnosticInfo(BaseModel):
     check_remote:bool=False
@@ -792,6 +787,8 @@ from backend import edit_list
 edit_list.register(app,sys.modules[__name__])
 from backend import clip_chain
 clip_chain.register(app,sys.modules[__name__])
+from backend import llm_guard
+llm_guard.register(app,sys.modules[__name__])
 from backend import workflow_import
 workflow_import.register(app,sys.modules[__name__])
 from backend import series_economics

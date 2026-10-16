@@ -528,24 +528,47 @@ export default function WorkflowPanel({
         const input = llmInput(step, graph.current.nodes, outs);
         if (!input) throw Error('У LLM-узла нет входного текста');
         setLlmState(v => ({...v, [step.nodeId]: 'running'}));
+        let lastCost: number | undefined;
         try {
+          const messages = [
+            {role: 'system', content: step.system},
+            {role: 'user', content: input},
+          ];
+          // Сервер даёт подписанную верхнюю оценку; без неё платный LLM-вызов не выполняется.
+          const quote = await json(
+            await apiFetch('/api/llm/estimate', {
+              method: 'POST',
+              headers: {'Content-Type': 'application/json'},
+              body: JSON.stringify({
+                project_id: projectId,
+                model: step.model,
+                messages,
+                max_tokens: LLM_MAX_TOKENS,
+              }),
+            })
+          );
+          if (spent + quote.estimated_usd > budget)
+            throw Error('Лимит запуска исчерпан, остальные шаги не отправлены');
           const answer = await json(
             await apiFetch('/api/llm/chat', {
               method: 'POST',
               headers: {'Content-Type': 'application/json'},
               body: JSON.stringify({
                 provider: 'piapi',
+                project_id: projectId,
                 model: step.model,
                 max_tokens: LLM_MAX_TOKENS,
-                messages: [
-                  {role: 'system', content: step.system},
-                  {role: 'user', content: input},
-                ],
+                messages,
+                approved: true,
+                quote_token: quote.quote_token,
+                max_cost_usd: quote.estimated_usd,
+                request_id: crypto.randomUUID(),
               }),
             })
           );
           const text = String(answer.choices?.[0]?.message?.content || '').trim();
           if (!text) throw Error('LLM вернул пустой ответ');
+          lastCost = Number(answer.cost_usd);
           outs[step.nodeId] = text;
           patch(step.nodeId, {output: text});
           setLlmState(v => ({...v, [step.nodeId]: 'done'}));
@@ -553,7 +576,7 @@ export default function WorkflowPanel({
           setLlmState(v => ({...v, [step.nodeId]: 'failed'}));
           throw e;
         }
-        spent += estimated;
+        spent += lastCost !== undefined && Number.isFinite(lastCost) ? lastCost : estimated;
       }
       const fresh = buildSteps(graph.current.nodes, graph.current.edges, live.current.results, {llm: outs});
       const pending = review.steps.map(s => fresh.steps.find(f => f.nodeId === s.nodeId) ?? s);
