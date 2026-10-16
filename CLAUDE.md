@@ -58,6 +58,8 @@
 
 ## Где что лежит
 
+- [docs/STAGE_SKILLS_2026-10-16.md](docs/STAGE_SKILLS_2026-10-16.md) — карта восьми страниц и их навыков `skills/gremovod-stage-*/`. Для творческого задания начинать с нужной страницы, затем читать связанные тематические навыки. Первый этап Макки: `gremovod-world-design`, `gremovod-character-dramaturgy` и дополнения нарратива/сценария; границы изучения в `docs/MCKEE_STORY_FOUNDATION_2026-10-16.md`. Код автоматического подключения к страницам этим пакетом не меняется.
+
 - `TODO.md` — список пожеланий и задач (актуальный). `CHANGES.md` — история версий (сейчас 0.3.0).
 - `docs/` — решения и проверки: `PIAPI_MODELS_2026-10-16.md` (каталог и живые тесты), `CLOUD_DEPLOY.md` (Docker/Caddy, не проверялся на сервере), `TECHNICAL_SPEC.md`, `ARCHITECTURE_PLAN_2026-10-16.md`.
 - `skills/gremovod-screenplay/` — формат сценария для ChatGPT.
