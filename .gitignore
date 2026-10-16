@@ -42,3 +42,15 @@ docs/*.png
 docs/*.jpg
 .env.cloud
 .env.lan
+
+# Local worktrees and production data stay on this computer.
+/.worktrees/
+/projects/
+/.claude/
+/Claude outputs/
+/guitar-workshop/
+/index.html
+/docs/screenshots/
+*.sqlite3-wal
+*.sqlite3-shm
+*.sqlite3-journal

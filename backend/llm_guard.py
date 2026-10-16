@@ -65,6 +65,33 @@ def spent(db, project_id):
     return total, daily
 
 
+def summary(db, projects=None):
+    """Расход на LLM по таблице llm_calls: вызовов, USD, по моделям, за сегодня (МСК). projects=None — вся студия."""
+    from backend.security import MOSCOW
+    today = datetime.now(MOSCOW).date().isoformat()
+    out = {'calls': 0, 'usd': 0.0, 'estimated_usd': 0.0, 'today_usd': 0.0, 'by_model': {}}
+    try:
+        rows = db.execute("SELECT project_id,model,status,usd,estimated_usd,created_at FROM llm_calls WHERE status IN ('reserved','done')").fetchall()
+    except Exception:  # таблица появляется при запуске сервера
+        return out
+    for r in rows:
+        if projects is not None and r['project_id'] not in projects:
+            continue
+        out['calls'] += 1
+        out['usd'] += r['usd']
+        out['estimated_usd'] += r['estimated_usd']
+        if datetime.fromisoformat(r['created_at']).astimezone(MOSCOW).date().isoformat() == today:
+            out['today_usd'] += r['usd']
+        item = out['by_model'].setdefault(r['model'], {'calls': 0, 'usd': 0.0})
+        item['calls'] += 1
+        item['usd'] += r['usd']
+    for key in ('usd', 'estimated_usd', 'today_usd'):
+        out[key] = round(out[key], 6)
+    for item in out['by_model'].values():
+        item['usd'] = round(item['usd'], 6)
+    return out
+
+
 def check_budget(db, project_id, cost):
     from backend import security, series_economics
     series_economics.check_budget(db, project_id, cost)

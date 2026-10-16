@@ -1,0 +1,179 @@
+/* Экран «Сцена»: четыре шага карточками */
+.sc {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.sc-bar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.sc-bar p {
+  margin: 0;
+  max-width: 70ch;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.sc-step {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface);
+}
+.sc-step h3 {
+  margin: 0;
+  font-size: 16px;
+}
+.sc-step small {
+  color: var(--muted);
+}
+.sc-step textarea,
+.sc-step select {
+  width: 100%;
+  box-sizing: border-box;
+}
+.sc-count {
+  margin-left: auto;
+  padding: 3px 10px;
+  border-radius: 99px;
+  border: 1px solid var(--border-strong);
+  color: var(--accent);
+  font-size: 12px;
+  white-space: nowrap;
+}
+.sc-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+}
+.sc-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface-2);
+}
+.sc-card input {
+  width: 100%;
+  box-sizing: border-box;
+}
+.sc-thumb {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--bg);
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  font-size: 12px;
+}
+.sc-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.sc-x {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: #0e0f12dd;
+  color: var(--text);
+  font-size: 16px;
+  line-height: 1;
+}
+.sc-x:hover {
+  background: var(--bad);
+  color: #fff;
+}
+.sc-num {
+  position: absolute;
+  left: 6px;
+  bottom: 6px;
+  min-width: 22px;
+  padding: 2px 7px;
+  border-radius: 99px;
+  background: #0e0f12dd;
+  color: var(--text);
+  font-size: 12px;
+  text-align: center;
+}
+.sc-roles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.sc-roles button {
+  padding: 4px 10px;
+  border-radius: 99px;
+  font-size: 12px;
+}
+.sc-roles button.on {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface-2));
+}
+.sc-pick {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.sc-strip {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+.sc-add {
+  position: relative;
+  flex: none;
+  width: 84px;
+  height: 84px;
+  padding: 0;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--border-strong);
+  background: var(--bg);
+}
+.sc-add img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.sc-add span {
+  position: absolute;
+  inset: auto 4px 4px auto;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: 14px;
+  font-weight: 700;
+}
+@media (max-width: 700px) {
+  .sc-bar {
+    flex-direction: column;
+  }
+  .sc-cards {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

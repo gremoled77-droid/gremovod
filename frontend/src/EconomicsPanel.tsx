@@ -2,6 +2,7 @@ import BudgetPanel from './BudgetPanel';
 import {useEffect, useState} from 'react';
 import {apiFetch} from './api';
 import {responseJson} from './ChatGPTPanel';
+import {smallUsd} from './usdFormat';
 type Entry = {
   id: string;
   target: string;
@@ -20,7 +21,15 @@ type Entry = {
     assumed_size: boolean;
   } | null;
 };
+type LlmUsage = {
+  calls: number;
+  usd: number;
+  estimated_usd: number;
+  today_usd: number;
+  by_model: Record<string, {calls: number; usd: number}>;
+};
 type Report = {
+  llm?: LlmUsage;
   llm_calls_unpriced: number;
   media_costs_complete: boolean;
   unknown_generation_cost_count: number;
@@ -189,6 +198,16 @@ export default function EconomicsPanel({projectId, revision}: {projectId: string
               </small>
             </article>
           </div>
+          {data.llm && data.llm.calls > 0 && (
+            <p className="muted">
+              LLM-запросы из воркфлоу: {data.llm.calls} · {smallUsd(data.llm.usd)} по токенам (оценка{' '}
+              {smallUsd(data.llm.estimated_usd)}), сегодня {smallUsd(data.llm.today_usd)}.{' '}
+              {Object.entries(data.llm.by_model)
+                .map(([model, v]) => `${model}: ${v.calls} · ${smallUsd(v.usd)}`)
+                .join('; ')}
+              . В «Расходы ролика» не входят: у них отдельный журнал.
+            </p>
+          )}
           {data.llm_calls_unpriced > 0 && (
             <p className="notice">
               Без цены: генерации — {data.unknown_generation_cost_count}, API-промпты —{' '}

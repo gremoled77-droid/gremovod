@@ -502,3 +502,29 @@
     min-height: 70vh;
   }
 }
+
+/* Цены узлов и общая сумма графа */
+.wf-price {
+  margin-left: auto;
+  margin-right: 8px;
+  padding: 2px 9px;
+  border-radius: 99px;
+  background: var(--surface-2);
+  color: var(--accent);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.wf-total {
+  padding: 6px 12px;
+  border-radius: 99px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+.wf-total b {
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}

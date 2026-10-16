@@ -1,6 +1,7 @@
 import {useEffect, useState} from 'react';
 import {apiFetch} from './api';
 import {responseJson} from './ChatGPTPanel';
+import {smallUsd} from './usdFormat';
 type Summary = {
   actual_usd_known: number;
   reserved_usd: number;
@@ -10,6 +11,7 @@ type Summary = {
   success_percent: number | null;
   limit_usd: number | null;
   chat_api_equivalent_usd: number;
+  llm?: {calls: number; usd: number; estimated_usd: number};
 };
 export default function SeriesEconomics({pid, sid}: {pid: string; sid: string}) {
   const [data, setData] = useState<Summary | null>(null),
@@ -44,6 +46,10 @@ export default function SeriesEconomics({pid, sid}: {pid: string; sid: string}) 
           <p>
             Подтверждено: <b>${data.actual_usd_known.toFixed(3)}</b> · неизвестных сумм:{' '}
             {data.unknown_cost_count}. Резерв по оценкам: ${data.reserved_usd.toFixed(3)}.
+          </p>
+          <p>
+            LLM-запросы кадров серии: <b>{smallUsd(data.llm?.usd ?? 0)}</b> ({data.llm?.calls ?? 0} вызовов).
+            Входят в проверку лимита серии. Запросы из общего проекта сюда не попадают.
           </p>
           <p>
             Завершённых попыток: {data.attempts} · использовано: {data.used_generations} · выход годных:{' '}
