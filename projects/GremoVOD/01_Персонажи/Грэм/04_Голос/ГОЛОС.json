@@ -1,9 +1,0 @@
-{
-  "provider": "elevenlabs",
-  "name": "",
-  "voice_id": "",
-  "url": "",
-  "model": "eleven_multilingual_v2",
-  "cost_multiplier": 1,
-  "audio_files": []
-}
