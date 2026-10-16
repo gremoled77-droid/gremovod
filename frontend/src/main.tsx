@@ -7,6 +7,7 @@ import './design.css';
 import './mobile.css';
 import './create.css';
 import './home.css';
+import './lightbox.css';
 import '@xyflow/react/dist/style.css';
 createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

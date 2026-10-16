@@ -2,6 +2,7 @@ import {useEffect, useState} from 'react';
 import {apiFetch} from './api';
 import {useSharedActivity} from './ActivityContext';
 import type {Mode} from './StageNav';
+import Lightbox from './Lightbox';
 
 type Budget = {
   project_limit_usd: number;
@@ -48,6 +49,7 @@ export default function HomeScreen({
 }) {
   const {items} = useSharedActivity();
   const [budget, setBudget] = useState<Budget | null>(null);
+  const [view, setView] = useState(-1);
   const [images, setImages] = useState<{id: string; url: string; thumbnail_url: string | null}[]>([]);
 
   useEffect(() => {
@@ -162,7 +164,7 @@ export default function HomeScreen({
         <div className="home-perf" aria-hidden="true" />
         <div className="home-frames">
           {images.slice(0, 6).map((a, i) => (
-            <button key={a.id} onClick={() => onMode('create')} aria-label={'Кадр ' + (i + 1)}>
+            <button key={a.id} onClick={() => setView(i)} aria-label={'Открыть кадр ' + (i + 1)}>
               <img src={a.thumbnail_url || a.url} alt="" />
               <span>{String(i + 1).padStart(2, '0')}</span>
             </button>
@@ -234,6 +236,14 @@ export default function HomeScreen({
           </div>
         </aside>
       </div>
+      {view >= 0 && (
+        <Lightbox
+          items={images.slice(0, 6).map((a, i) => ({url: a.url, title: 'Кадр ' + (i + 1)}))}
+          index={view}
+          onIndex={setView}
+          onClose={() => setView(-1)}
+        />
+      )}
     </section>
   );
 }

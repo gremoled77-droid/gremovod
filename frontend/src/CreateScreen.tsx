@@ -3,6 +3,7 @@ import {apiFetch} from './api';
 import GenerationReview, {type GenerationRequest} from './GenerationReview';
 import {type ActivityItem} from './useActivity';
 import {useSharedActivity} from './ActivityContext';
+import Lightbox, {type LightboxItem} from './Lightbox';
 
 type OptionSpec = {
   values?: (string | number)[];
@@ -60,6 +61,7 @@ export default function CreateScreen({projectId, heroes}: {projectId: string; he
   const fileInput = useRef<HTMLInputElement>(null);
   const [pasteFor, setPasteFor] = useState('');
   const [animate, setAnimate] = useState('');
+  const [view, setView] = useState<{items: LightboxItem[]; index: number} | null>(null);
   const [videoModel, setVideoModel] = useState('seedance-2.5');
   const [motion, setMotion] = useState('');
   const [videoOptions, setVideoOptions] = useState<Record<string, string | number>>({});
@@ -314,6 +316,26 @@ export default function CreateScreen({projectId, heroes}: {projectId: string; he
   const shownImages = tab === 'favorites' ? images.filter(a => a.metadata.favorite) : images;
   const total = selected.length;
 
+  const openResult = (aid: string) => {
+    const list = results.flatMap(it =>
+      it.asset_ids
+        .filter(x => byId[x])
+        .map(x => ({
+          id: x,
+          url: byId[x].url,
+          kind: it.kind,
+          title: LABELS[it.model] || it.model,
+        }))
+    );
+    setView({
+      items: list,
+      index: Math.max(
+        0,
+        list.findIndex(x => x.id === aid)
+      ),
+    });
+  };
+
   const modelCard = (id: string) => {
     const on = selected.includes(id);
     const o = specs[id]?.options;
@@ -408,6 +430,21 @@ export default function CreateScreen({projectId, heroes}: {projectId: string; he
                 title="Добавить/убрать референс"
               >
                 <img src={a.thumbnail_url || a.url} alt="" />
+              </button>
+              <button
+                type="button"
+                className="cs-x cs-zoom"
+                aria-label="Открыть крупно"
+                title="Открыть крупно"
+                onClick={() => {
+                  const list = shownImages.slice(0, 60);
+                  setView({
+                    items: list.map(x => ({url: x.url, title: x.id})),
+                    index: list.findIndex(x => x.id === a.id),
+                  });
+                }}
+              >
+                ⤢
               </button>
               <button
                 type="button"
@@ -521,7 +558,13 @@ export default function CreateScreen({projectId, heroes}: {projectId: string; he
                   {item.kind === 'video' ? (
                     <video src={a.url} controls />
                   ) : (
-                    <img src={a.thumbnail_url || a.url} alt="" />
+                    <img
+                      src={a.thumbnail_url || a.url}
+                      alt=""
+                      className="cs-zoomable"
+                      title="Открыть крупно"
+                      onClick={() => openResult(aid)}
+                    />
                   )}
                   <button
                     type="button"
@@ -602,6 +645,14 @@ export default function CreateScreen({projectId, heroes}: {projectId: string; he
         </div>
       </aside>
 
+      {view && (
+        <Lightbox
+          items={view.items}
+          index={view.index}
+          onIndex={i => setView(v => (v ? {...v, index: i} : v))}
+          onClose={() => setView(null)}
+        />
+      )}
       {animate && (
         <div className="modal-backdrop">
           <section className="panel generation-review" role="dialog" aria-modal="true">

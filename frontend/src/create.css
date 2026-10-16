@@ -371,3 +371,23 @@
   height: 34px;
   font-size: 19px;
 }
+
+.cs-zoomable {
+  cursor: zoom-in;
+}
+.cs-zoom {
+  top: auto;
+  bottom: 4px;
+  right: 4px;
+  font-size: 13px;
+  opacity: 0;
+}
+.cs-tile:hover .cs-zoom,
+.cs-zoom:focus-visible {
+  opacity: 1;
+}
+@media (hover: none) {
+  .cs-zoom {
+    opacity: 1;
+  }
+}
