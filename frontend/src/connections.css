@@ -1,0 +1,149 @@
+/* Экран «Подключения»: карточки сервисов со статусом */
+.cx {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.cx-bar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+.cx-bar p {
+  margin: 0;
+  max-width: 70ch;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.cx-bar button {
+  flex: none;
+}
+.cx-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 14px;
+}
+.cx-card {
+  --tone: var(--muted);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface);
+  min-width: 0;
+}
+.cx-card.ok {
+  --tone: var(--ok);
+}
+.cx-card.warn {
+  --tone: var(--accent);
+}
+.cx-card.bad {
+  --tone: var(--bad);
+}
+.cx-card.ok,
+.cx-card.bad {
+  border-color: color-mix(in srgb, var(--tone) 45%, var(--border));
+}
+.cx-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.cx-head > div {
+  flex: 1;
+  min-width: 0;
+}
+.cx-head h3 {
+  margin: 0;
+  font-size: 17px;
+}
+.cx-head small {
+  color: var(--muted);
+}
+.cx-logo {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--accent) 16%, var(--surface-2));
+  color: var(--accent);
+  font-weight: 700;
+  font-size: 18px;
+}
+.cx-status {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 11px;
+  border-radius: 99px;
+  border: 1px solid color-mix(in srgb, var(--tone) 40%, var(--border));
+  color: var(--tone);
+  font-size: 12px;
+  white-space: nowrap;
+}
+.cx-status i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--tone);
+}
+.cx-message {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+.cx-meta {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 12px 0 0;
+  border-top: 1px solid var(--border);
+  font-size: 12px;
+}
+.cx-meta div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+.cx-meta dt {
+  color: var(--muted);
+}
+.cx-meta dd {
+  margin: 0;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+.cx-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-top: auto;
+}
+.cx-actions a {
+  color: var(--accent);
+  font-size: 13px;
+}
+@media (max-width: 700px) {
+  .cx-bar {
+    flex-direction: column;
+  }
+  .cx-head {
+    display: grid;
+    grid-template-columns: 40px minmax(0, 1fr);
+    align-items: center;
+    gap: 6px 12px;
+  }
+  .cx-status {
+    grid-column: 2;
+    justify-self: start;
+  }
+}

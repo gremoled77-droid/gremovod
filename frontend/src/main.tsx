@@ -9,6 +9,7 @@ import './create.css';
 import './home.css';
 import './lightbox.css';
 import './workflow.css';
+import './connections.css';
 import '@xyflow/react/dist/style.css';
 createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

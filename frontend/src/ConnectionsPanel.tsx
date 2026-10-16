@@ -22,6 +22,23 @@ const statuses: Record<string, string> = {
   unreachable: 'Нет соединения',
   error: 'Ошибка',
 };
+/** Для чего студия использует сервис. */
+const ROLES: Record<string, string> = {
+  piapi: 'Картинки и видео, LLM для промптов',
+  openai: 'Резервный API для текстов',
+  elevenlabs: 'Голос персонажей',
+  fish: 'Голос персонажей, второй движок',
+};
+/** Цвет статуса: зелёный, янтарный, серый или красный. */
+const tone = (status: string) =>
+  status === 'connected'
+    ? 'ok'
+    : status === 'unverified'
+      ? 'warn'
+      : status === 'not_configured'
+        ? 'off'
+        : 'bad';
+
 export default function ConnectionsPanel() {
   const [items, setItems] = useState<Connection[]>([]);
   const [busy, setBusy] = useState('');
@@ -52,51 +69,74 @@ export default function ConnectionsPanel() {
       setBusy('');
     }
   };
+  const checkedAt = (value: string) =>
+    new Date(value).toLocaleString('ru-RU', {timeZone: 'Europe/Moscow'}) + ' МСК';
   return (
-    <section className="panel">
-      <div className="panel-title">
+    <section className="cx">
+      <div className="cx-bar">
+        <p className="muted">
+          Ключи читает сервер из файлов в папке студии или переменных окружения: одна строка, без пробелов.
+          Перезапуск не нужен. Проверка читает сведения аккаунта и ничего не запускает и не тратит.
+        </p>
         <button onClick={load} disabled={!!busy}>
           Обновить
         </button>
       </div>
-      <p className="muted">
-        Ключи читает сервер из файлов в папке студии или переменных окружения. Вставь только ключ одной
-        строкой и сохрани файл. Перезапуск не требуется. Проверка читает сведения аккаунта и не запускает
-        генерации.
-      </p>
       {error && (
         <div className="alert" role="alert">
           {error}
         </div>
       )}
-      <div className="connections-grid">
-        {items.map(p => (
-          <article className="connection-card" key={p.id}>
-            <div className="panel-title">
-              <h3>{p.name}</h3>
-              <span className={'connection-status ' + p.status}>{statuses[p.status] || p.status}</span>
-            </div>
-            <p>{p.message}</p>
-            <small>
-              Файл: {p.filename}
-              {p.source && ` · Источник: ${p.source}`}
-            </small>
-            {p.checked_at && (
-              <small>
-                Последняя проверка:{' '}
-                {new Date(p.checked_at).toLocaleString('ru-RU', {timeZone: 'Europe/Moscow'}) + ' МСК'}
-              </small>
-            )}
-            <div className="chips">
-              <button disabled={!!busy || !p.configured} onClick={() => check(p.id)}>
-                {busy === p.id ? 'Проверяется…' : 'Проверить доступ'}
-              </button>
-              <a href={p.docs} target="_blank" rel="noreferrer">
-                Документация ↗
-              </a>
-            </div>
-          </article>
-        ))}
+      <div className="cx-grid">
+        {items.map(p => {
+          const role = ROLES[p.id];
+          return (
+            <article className={'cx-card ' + tone(p.status)} key={p.id}>
+              <header className="cx-head">
+                <span className="cx-logo" aria-hidden="true">
+                  {p.name.slice(0, 1)}
+                </span>
+                <div>
+                  <h3>{p.name}</h3>
+                  {role && <small>{role}</small>}
+                </div>
+                <span className="cx-status">
+                  <i aria-hidden="true" />
+                  {statuses[p.status] || p.status}
+                </span>
+              </header>
+              <p className="cx-message">{p.message}</p>
+              <dl className="cx-meta">
+                <div>
+                  <dt>Файл ключа</dt>
+                  <dd>{p.filename}</dd>
+                </div>
+                {p.source && (
+                  <div>
+                    <dt>Источник</dt>
+                    <dd>{p.source}</dd>
+                  </div>
+                )}
+                <div>
+                  <dt>Проверка</dt>
+                  <dd>{p.checked_at ? checkedAt(p.checked_at) : 'ещё не было'}</dd>
+                </div>
+              </dl>
+              <div className="cx-actions">
+                <button
+                  className={p.configured && p.status !== 'connected' ? 'primary' : ''}
+                  disabled={!!busy || !p.configured}
+                  onClick={() => check(p.id)}
+                >
+                  {busy === p.id ? 'Проверяется…' : 'Проверить доступ'}
+                </button>
+                <a href={p.docs} target="_blank" rel="noreferrer">
+                  Документация ↗
+                </a>
+              </div>
+            </article>
+          );
+        })}
       </div>
       <p className="muted">
         Для ElevenLabs также учитывается найденный файл ключа проекта «Гремовод». Доступ к аккаунту и
