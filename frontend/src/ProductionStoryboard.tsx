@@ -13,6 +13,7 @@ import EditListPanel from './EditListPanel';
 import FrameTakes from './FrameTakes';
 import SceneCast from './SceneCast';
 import FrameCast from './FrameCast';
+import UpscaleButton from './UpscaleButton';
 import {moveItem} from './boardOrder';
 import {patchEntity, putOrder, type EntityPatch} from './boardApi';
 import OutlineDialog, {type OutlineContext} from './OutlineDialog';
@@ -711,6 +712,9 @@ export default function ProductionStoryboard({
                         busy={busy}
                         onChange={(patch, message) => savePatch(frame.id, patch, message)}
                       />
+                      {frame.selection.selected_image_file_id && (
+                        <UpscaleButton fileId={frame.selection.selected_image_file_id} />
+                      )}
                       <FrameTakes
                         files={frame.files}
                         imageId={frame.selection.selected_image_file_id}

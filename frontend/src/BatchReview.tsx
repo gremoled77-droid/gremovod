@@ -95,15 +95,15 @@ export default function BatchReview({
       >
         <h2>Пакетный запуск · {items.length} картинок</h2>
         <p className="muted">
-          PiAPI · {items[0]?.request.model_id}. Референсов в каждом запросе:{' '}
-          {items[0]?.request.reference_urls.length}. Задание и ссылки будут переданы PiAPI.
+          PiAPI · {[...new Set(items.map(i => i.request.model_id))].join(', ')}. Задание и ссылки будут
+          переданы PiAPI.
         </p>
         <ul className="batch-list">
           {items.map((item, i) => (
             <li key={i}>
               <span>
                 {states[i] === 'sent' ? '✓ ' : states[i] === 'failed' ? '✗ ' : ''}
-                {item.label}
+                {item.label} · реф: {item.request.reference_urls.length}
               </span>
               <b>{quotes ? `$${quotes[i].estimated_usd.toFixed(3)}` : '…'}</b>
             </li>

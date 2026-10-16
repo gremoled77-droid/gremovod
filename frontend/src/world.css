@@ -263,3 +263,34 @@
   display: flex;
   justify-content: space-between;
 }
+
+.op {
+  display: grid;
+  gap: 8px;
+}
+.op fieldset {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+}
+.ol-chips,
+.fb-models {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.ol-chips small,
+.fb-models small {
+  min-width: 90px;
+  opacity: 0.75;
+}
+.ol-chips button {
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 12px;
+}
+.ol-chips button.on {
+  background: var(--accent, #f2b134);
+  color: #1a1306;
+}

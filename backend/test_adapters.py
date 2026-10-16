@@ -117,6 +117,49 @@ class AdapterTests(unittest.TestCase):
         self.assertEqual(output_urls(minimax, 'video'), ['https://example.test/v.mp4'])
 
 
+class UpscaleAdapterTests(unittest.TestCase):
+    """Апскейл: параметры и цена по документации PiAPI, запуск выключен до живой проверки."""
+
+    def test_upscale_is_preview_only_and_priced_per_megapixel(self):
+        spec = main.MODEL_SPECS['image-upscale']
+        self.assertFalse(spec['launch_enabled'])
+        self.assertIsNone(spec.get('verified_at'))
+        with self.assertRaises(HTTPException):
+            main.image_payload(job('image-upscale', prompt='Upscale', reference_urls=[REF]))  # запуск заблокирован
+        payload, cost = preview('image-upscale', prompt='Upscale', reference_urls=[REF],
+                                options={'scale': 2, 'in_width': 1024, 'in_height': 1024})
+        self.assertEqual(cost, 0.004)  # 1024² ×2 = 4 Мп (пример из документации)
+        self.assertEqual((payload['model'], payload['task_type']), ('Qubico/image-toolkit', 'upscale'))
+        _, big = preview('image-upscale', prompt='Upscale', reference_urls=[REF], options={'scale': 4})
+        self.assertEqual(big, 0.064)  # потолок: 2048² ×4 = 64 Мп (пример из документации)
+        _, tiny = preview('image-upscale', prompt='Upscale', reference_urls=[REF],
+                          options={'scale': 2, 'in_width': 480, 'in_height': 480})
+        self.assertEqual(tiny, 0.001)  # меньше 1 Мп, минимум $0.001
+        _, unknown = preview('image-upscale', prompt='Upscale', reference_urls=[REF])
+        self.assertEqual(unknown, 0.016)  # без размеров входа: максимум 2048² ×2
+
+    def test_upscale_wire_body_has_no_internal_fields_and_inputs_are_checked(self):
+        body = job('image-upscale', prompt='Upscale', reference_urls=[REF], options={'scale': 4, 'in_width': 800, 'in_height': 600})
+        payload = main.image_payload(body, enforce_launch=False)
+        spec = main.MODEL_SPECS['image-upscale']
+        self.assertEqual(adapters.wire_body(spec, payload), {'model': 'Qubico/image-toolkit', 'task_type': 'upscale',
+                                                           'input': {'image': REF, 'scale': 4}})
+        self.assertEqual(adapters.submit_path(spec), '/api/v1/task')
+        for bad in (dict(reference_urls=[]), dict(reference_urls=[REF, REF + '?2']),
+                    dict(reference_urls=['http://example.test/a.png']), dict(reference_urls=['https://localhost/a.png']),
+                    dict(reference_urls=[REF], options={'scale': 8}), dict(reference_urls=[REF], options={'scale': 3}),
+                    dict(reference_urls=[REF], options={'in_width': 4096}), dict(reference_urls=[REF], options={'face_enhance': True})):
+            with self.assertRaises(HTTPException, msg=str(bad)):
+                preview('image-upscale', prompt='Upscale', **bad)
+
+    def test_upscale_result_is_read_from_documented_or_example_shape(self):
+        schema = {'data': {'task_result': {'task_output': {'image_url': 'https://example.test/u.png'}}}}
+        example = {'data': {'output': {'image_url': 'https://example.test/e.png'}}}
+        self.assertEqual(output_urls(schema), ['https://example.test/u.png'])
+        self.assertEqual(output_urls(example), ['https://example.test/e.png'])
+        self.assertEqual(output_urls({'data': {'output': None, 'task_result': None}}), [])
+
+
 if __name__ == '__main__':
     unittest.main()
 

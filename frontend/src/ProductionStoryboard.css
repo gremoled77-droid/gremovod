@@ -461,3 +461,10 @@ main.storyboard-main {
 .ps-angle.on {
   outline: 2px solid var(--accent, #f2b134);
 }
+
+.ps-upscale {
+  margin: 4px 0;
+  font-size: 12px;
+  display: grid;
+  gap: 4px;
+}

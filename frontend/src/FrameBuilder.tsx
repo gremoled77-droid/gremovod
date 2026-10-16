@@ -2,8 +2,10 @@ import {useEffect, useMemo, useRef, useState} from 'react';
 import {apiFetch} from './api';
 import {responseJson} from './ChatGPTPanel';
 import type {Identity, WorldFields} from './characterPrompt';
-import GenerationReview, {type GenerationRequest} from './GenerationReview';
-import {buildFramePrompt, defaultFrameTitles} from './framePrompt';
+import BatchReview, {type BatchItem} from './BatchReview';
+import {defaultFrameTitles} from './framePrompt';
+import OperatorLayers from './OperatorLayers';
+import {buildOperatorPrompt, EMPTY_LAYERS, type Layers} from './operatorPrompt';
 import {loadTarget, sendFrames, type BoardTarget} from './sendToBoard';
 
 type Hero = {id: string; name: string; identity: Identity; working_asset_id?: string};
@@ -35,14 +37,14 @@ export default function FrameBuilder({
 }) {
   const [specs, setSpecs] = useState<Record<string, Spec>>({}),
     [library, setLibrary] = useState<Asset[]>([]),
-    [model, setModel] = useState(DEFAULT_MODEL),
+    [pickedModels, setPickedModels] = useState<string[]>([DEFAULT_MODEL]),
     [locationId, setLocationId] = useState(''),
     [heroIds, setHeroIds] = useState<string[]>([]),
-    [action, setAction] = useState(''),
+    [layers, setLayers] = useState<Layers>(EMPTY_LAYERS),
     [prompt, setPrompt] = useState(''),
     [edited, setEdited] = useState(false),
     [count, setCount] = useState(2),
-    [queue, setQueue] = useState<GenerationRequest[]>([]),
+    [batch, setBatch] = useState<BatchItem[] | null>(null),
     [picked, setPicked] = useState<string[]>([]),
     [error, setError] = useState(''),
     [note, setNote] = useState(''),
@@ -82,18 +84,24 @@ export default function FrameBuilder({
     [specs]
   );
   useEffect(() => {
-    if (models.length && !models.some(([id]) => id === model)) setModel(models[0][0]);
-  }, [models, model]);
+    if (!models.length) return;
+    setPickedModels(m => {
+      const ok = m.filter(id => models.some(([x]) => x === id));
+      return ok.length ? ok : [models[0][0]];
+    });
+  }, [models]);
   const chosen = heroes.filter(h => heroIds.includes(h.id));
   const auto = useMemo(
     () =>
-      buildFramePrompt({
-        brief: action || brief,
-        heroes: chosen.map(h => ({name: h.name, identity: h.identity})),
-        location: locationId ? 'как на референсе локации' : '',
-        world,
-      }),
-    [action, brief, heroIds, locationId, world, heroes] // eslint-disable-line react-hooks/exhaustive-deps
+      buildOperatorPrompt(
+        {
+          ...layers,
+          subject: layers.subject || brief,
+          environment: layers.environment || (locationId ? 'location exactly as in the reference' : ''),
+        },
+        {heroes: chosen.map(h => ({name: h.name, identity: h.identity})), world}
+      ),
+    [layers, brief, heroIds, locationId, world, heroes] // eslint-disable-line react-hooks/exhaustive-deps
   );
   useEffect(() => {
     if (!edited) setPrompt(auto);
@@ -126,26 +134,28 @@ export default function FrameBuilder({
     setBusy(true);
     try {
       const pid = projectId || (await ensureProject());
-      const spec = specs[model],
-        limit = spec?.api_refs ?? 0;
-      const urls = await Promise.all(refAssets.slice(0, limit).map(cloudUrl));
-      const options = Object.fromEntries(
-        Object.entries(spec?.options || {})
-          .filter(([, s]) => s.default !== undefined)
-          .map(([k, s]) => [
-            k,
-            k === 'aspect_ratio' && s.values?.includes('16:9') ? '16:9' : (s.default as string | number),
-          ])
-      );
-      setQueue(
-        Array.from({length: count}, () => ({
-          project_id: pid,
-          model_id: model,
-          prompt,
-          options,
-          reference_urls: urls,
-        }))
-      );
+      const urlCache: Record<string, string> = {};
+      const items: BatchItem[] = [];
+      for (const model of pickedModels) {
+        const spec = specs[model],
+          limit = spec?.api_refs ?? 0;
+        const urls: string[] = [];
+        for (const id of refAssets.slice(0, limit)) urls.push((urlCache[id] ||= await cloudUrl(id)));
+        const options = Object.fromEntries(
+          Object.entries(spec?.options || {})
+            .filter(([, s]) => s.default !== undefined)
+            .map(([k, s]) => [
+              k,
+              k === 'aspect_ratio' && s.values?.includes('16:9') ? '16:9' : (s.default as string | number),
+            ])
+        );
+        for (let i = 1; i <= count; i++)
+          items.push({
+            label: `${model} · вариант ${i}`,
+            request: {project_id: pid, model_id: model, prompt, options, reference_urls: urls},
+          });
+      }
+      setBatch(items);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -198,19 +208,12 @@ export default function FrameBuilder({
           </p>
         )}
       </div>
-      <h4>3. Что в кадре</h4>
+      <h4>3. Операторский промпт · 5 слоёв</h4>
+      <OperatorLayers layers={layers} onChange={setLayers} />
       <label>
-        Что происходит
-        <input
-          value={action}
-          placeholder="Например: Грэм смотрит в окно такси, ночь, дождь"
-          onChange={e => setAction(e.target.value)}
-        />
-      </label>
-      <label>
-        Промпт кадра
+        Итоговый промпт
         <textarea
-          rows={6}
+          rows={8}
           value={prompt}
           onChange={e => {
             setPrompt(e.target.value);
@@ -218,28 +221,31 @@ export default function FrameBuilder({
           }}
         />
       </label>
+      <div className="fb-models" role="group" aria-label="Модели">
+        <small>Модели (можно несколько)</small>
+        {(models.length ? models.map(([id]) => id) : [DEFAULT_MODEL]).map(id => (
+          <label key={id}>
+            <input
+              type="checkbox"
+              checked={pickedModels.includes(id)}
+              onChange={e => setPickedModels(m => (e.target.checked ? [...m, id] : m.filter(x => x !== id)))}
+            />
+            {id}
+            {id === DEFAULT_MODEL ? ' (по умолчанию)' : ''}
+          </label>
+        ))}
+      </div>
       <div className="fb-row">
         <label>
-          Модель
-          <select value={model} onChange={e => setModel(e.target.value)}>
-            {(models.length ? models.map(([id]) => id) : [DEFAULT_MODEL]).map(id => (
-              <option key={id} value={id}>
-                {id}
-                {id === DEFAULT_MODEL ? ' (по умолчанию)' : ''}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Вариантов
+          Вариантов на модель
           <select value={count} onChange={e => setCount(Number(e.target.value))}>
             {[1, 2, 3, 4].map(n => (
               <option key={n}>{n}</option>
             ))}
           </select>
         </label>
-        <button className="primary" disabled={busy} onClick={() => void start()}>
-          {busy ? 'Готовлю…' : 'Сгенерировать: оценка и подтверждение'}
+        <button className="primary" disabled={busy || !pickedModels.length} onClick={() => void start()}>
+          {busy ? 'Готовлю…' : `Сгенерировать (${pickedModels.length * count}): оценка и подтверждение`}
         </button>
         <button
           disabled={!edited}
@@ -255,7 +261,7 @@ export default function FrameBuilder({
       {note && <p className="muted">{note}</p>}
       <p className="muted">
         Образы героев и локация уйдут моделью как референсы: перед запуском их копии загружаются во временное
-        хранилище по ссылке. Каждый вариант подтверждается отдельно, после оценки цены.
+        хранилище по ссылке. Весь пакет считается и подтверждается один раз, после оценки цены.
       </p>
       <h4>4. Варианты · последние картинки библиотеки</h4>
       <div className="fb-strip" aria-label="Варианты кадров">
@@ -271,12 +277,12 @@ export default function FrameBuilder({
           Отправить в раскадровку{picked.length ? ` (${picked.length})` : ''}
         </button>
       </div>
-      {queue[0] && (
-        <GenerationReview
-          request={queue[0]}
-          onClose={() => setQueue([])}
+      {batch && (
+        <BatchReview
+          items={batch}
+          onClose={() => setBatch(null)}
           onSubmitted={() => {
-            setQueue(q => q.slice(1));
+            setBatch(null);
             setNote('Задание запущено. Готовые картинки появятся в «Вариантах» (обновляются сами).');
           }}
         />
