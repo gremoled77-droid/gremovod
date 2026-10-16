@@ -1,4 +1,4 @@
-import {createContext, useContext, useMemo, useRef, useState, type CSSProperties} from 'react';
+import {createContext, useContext, useEffect, useMemo, useRef, useState, type CSSProperties} from 'react';
 import {
   ReactFlow,
   Background,
@@ -29,6 +29,7 @@ import {
 } from './workflowPlan';
 import {useNodePrices} from './workflowPrices';
 import {LLM_MAX_TOKENS, LLM_MODELS, llmEstimate} from './llmPricing';
+import {missingAssetIds} from './workflowLibrary';
 
 type Graph = {nodes: Node[]; edges: Edge[]};
 type Lib = {
@@ -437,6 +438,22 @@ export default function WorkflowPanel({
     }
     return {results, status};
   }, [items]);
+
+  // Сервер сам сохраняет готовый результат в библиотеку (монитор раз в 30 с), но загруженный список библиотеки
+  // устаревает: пока вкладка открыта, подтягиваем новые ассеты, чтобы клип появился в узле без перезагрузки.
+  const missing = missingAssetIds(results, library).join(',');
+  useEffect(() => {
+    if (!missing || !projectId) return;
+    let tries = 0;
+    const tick = () => {
+      tries++;
+      void refreshLibrary().catch(() => undefined);
+    };
+    tick();
+    const timer = window.setInterval(() => (tries >= 6 ? window.clearInterval(timer) : tick()), 4000);
+    return () => window.clearInterval(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [missing, projectId]);
 
   const live = useRef({results, status});
   live.current = {results, status};
