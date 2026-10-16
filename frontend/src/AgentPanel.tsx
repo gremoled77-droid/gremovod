@@ -51,93 +51,112 @@ export default function AgentPanel({projectId, brief, character, style, onApply}
       setBusy(false);
     }
   };
-  return (
-    <section className="panel">
-      <p className="notice">
-        Платные API-агенты временно отключены до настройки оценки стоимости. Основной чат Codex доступен в
-        студии.
-      </p>
-      <p className="muted">
-        Три специалиста последовательно подготовят план, проверят консистентность и составят модельные
-        промпты. Генерация изображений и видео автоматически не запускается. Ключ берётся из серверных
-        подключений.
-      </p>
-      <div className="param-grid">
-        <label>
-          Провайдер
-          <select
-            value={provider}
-            onChange={e => {
-              const p = e.target.value;
-              setProvider(p);
-              setModel(p === 'openai' ? 'gpt-4.1-mini' : 'gpt-5.6-luna');
-            }}
-          >
-            <option value="openai">OpenAI напрямую</option>
-            <option value="piapi">PiAPI</option>
-          </select>
-        </label>
-        <label>
-          Модель
-          <input value={model} onChange={e => setModel(e.target.value)} />
-        </label>
+  const roleTitle: Record<string, string> = {
+    director: '🎬 Режиссёр',
+    continuity: '🛡 Консистентность',
+    prompt: '✦ Промпты',
+  };
+  const stepHead = (n: number, title: string, hint: string) => (
+    <div className="rf-head">
+      <span className="rf-step">{n}</span>
+      <div>
+        <h3>{title}</h3>
+        <small>{hint}</small>
       </div>
-      <label>
-        Дополнение к библии мира (канон берётся из проекта)
+    </div>
+  );
+  return (
+    <section className="sc">
+      <div className="ag-state" role="status">
+        <b>Платные API-агенты выключены</b>
+        <span>
+          Пока для них нет оценки стоимости и лимита. Основной чат Codex доступен в студии, а форма ниже
+          показывает, как будет работать команда.
+        </span>
+      </div>
+      <p className="muted sc-lede">
+        Три специалиста последовательно подготовят план, проверят консистентность и составят промпты под
+        выбранные модели. Генерация картинок и видео автоматически не запускается.
+      </p>
+      <article className="sc-step">
+        {stepHead(1, 'Провайдер и модель', 'Ключ берётся из серверных подключений')}
+        <div className="param-grid">
+          <label>
+            Провайдер
+            <select
+              value={provider}
+              onChange={e => {
+                const p = e.target.value;
+                setProvider(p);
+                setModel(p === 'openai' ? 'gpt-4.1-mini' : 'gpt-5.6-luna');
+              }}
+            >
+              <option value="openai">OpenAI напрямую</option>
+              <option value="piapi">PiAPI</option>
+            </select>
+          </label>
+          <label>
+            Модель
+            <input value={model} onChange={e => setModel(e.target.value)} />
+          </label>
+        </div>
+      </article>
+      <article className="sc-step">
+        {stepHead(2, 'Мир проекта', 'Канон берётся из проекта; здесь можно добавить замечания')}
         <textarea
           rows={3}
           value={styleNotes}
           onChange={e => setStyleNotes(e.target.value)}
           placeholder="Дополнительные замечания к стилю проекта"
         />
-      </label>
-      <h3>Модели, для которых нужны промпты</h3>
-      <div className="chips">
-        {options.map(m => (
-          <label key={m} className="inline-checkbox">
-            <input
-              type="checkbox"
-              checked={targets.includes(m)}
-              onChange={e => setTargets(t => (e.target.checked ? [...t, m] : t.filter(x => x !== m)))}
-            />
-            {m}
-          </label>
-        ))}
-      </div>
-      <p className="muted">
-        Задание берётся из верхнего поля «Режиссёрское задание». Каждый запуск делает 3 платных LLM-вызова. В
-        облаке потребуется отдельное развёртывание.
-      </p>
-      <button
-        className="primary"
-        disabled={!PAID_LLM_ENABLED || busy || !brief.trim() || targets.length === 0}
-        onClick={run}
-      >
-        {busy ? 'Агенты работают…' : '▶ Создать план и промпты'}
-      </button>
-      {error && (
-        <div className="alert">
-          {error.includes('1010')
-            ? 'PiAPI заблокировал клиент (Cloudflare 1010). Можно выбрать OpenAI напрямую. '
-            : ''}
-          {error}
+      </article>
+      <article className="sc-step">
+        {stepHead(3, 'Для каких моделей нужны промпты', 'Отметь одну или несколько')}
+        <div className="ag-targets">
+          {options.map(m => (
+            <label key={m} className={'ag-target' + (targets.includes(m) ? ' on' : '')}>
+              <input
+                type="checkbox"
+                checked={targets.includes(m)}
+                onChange={e => setTargets(t => (e.target.checked ? [...t, m] : t.filter(x => x !== m)))}
+              />
+              {m}
+            </label>
+          ))}
         </div>
-      )}
+      </article>
+      <article className="sc-step">
+        {stepHead(4, 'Запуск', 'Задание берётся из «Идеи». Один запуск — 3 вызова LLM')}
+        <div className="rf-actions">
+          <button
+            className="primary"
+            disabled={!PAID_LLM_ENABLED || busy || !brief.trim() || targets.length === 0}
+            onClick={run}
+          >
+            {busy ? 'Агенты работают…' : '▶ Создать план и промпты'}
+          </button>
+        </div>
+        {!brief.trim() && <small className="muted">Сначала напиши задание ролика на экране «Идея».</small>}
+        {error && (
+          <div className="alert">
+            {error.includes('1010')
+              ? 'PiAPI заблокировал клиент (Cloudflare 1010). Можно выбрать OpenAI напрямую. '
+              : ''}
+            {error}
+          </div>
+        )}
+      </article>
       {result && (
-        <div>
-          <p className="muted">
-            Run ID: {result.id} · {result.status} · оплачиваемые генерации не запускались
-          </p>
+        <article className="sc-step">
+          <small className="muted">
+            Запуск {result.id.slice(0, 8)} · {result.status} · платные генерации не запускались
+          </small>
           {Object.entries(result.output).map(([role, r]) => (
-            <details key={role} open>
+            <details key={role} className="ag-result" open>
               <summary>
-                <b>
-                  {({director: '🎬 Режиссёр', continuity: '🛡 Консистентность', prompt: '✦ Промпты'} as any)[
-                    role
-                  ] || role}
-                </b>
+                <b>{roleTitle[role] || role}</b>
               </summary>
-              <pre style={{whiteSpace: 'pre-wrap', fontFamily: 'inherit', lineHeight: 1.6}}>{r.content}</pre>
+              <pre>{r.content}</pre>
               {role === 'prompt' && (
                 <button className="secondary" onClick={() => onApply(r.content)}>
                   Перенести в режиссёрское задание
@@ -145,7 +164,7 @@ export default function AgentPanel({projectId, brief, character, style, onApply}
               )}
             </details>
           ))}
-        </div>
+        </article>
       )}
     </section>
   );

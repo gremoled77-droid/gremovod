@@ -1,0 +1,88 @@
+/* «Агенты» и «Настройки»: карточки-шаги, общий вид с экранами Сцена и Допилить */
+.sc-lede {
+  margin: 0;
+  max-width: 70ch;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.ag-state {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 16px;
+  border: 1px solid #6a5420;
+  border-radius: 14px;
+  background: #2a2111;
+  color: var(--accent);
+  font-size: 13px;
+  line-height: 1.45;
+}
+.ag-state span {
+  color: var(--muted);
+}
+.ag-targets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.ag-target {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 14px;
+  border: 1px solid var(--border-strong);
+  border-radius: 99px;
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 13px;
+  cursor: pointer;
+}
+.ag-target.on {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface-2));
+}
+.ag-result {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px 14px;
+  background: var(--surface-2);
+}
+.ag-result pre {
+  margin: 10px 0;
+  white-space: pre-wrap;
+  font-family: inherit;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.stg-ico {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--accent) 16%, var(--surface-2));
+  color: var(--accent);
+  font-size: 16px;
+}
+.stg .project-header {
+  margin: 0;
+}
+.stg .chat-link-setting > h3,
+.stg .sc-step > .panel > h3:first-child {
+  display: none;
+}
+.stg .sc-step > .panel {
+  border: 0;
+  background: none;
+  padding: 0;
+  box-shadow: none;
+}
+.stg .reserve-tools {
+  padding: 14px 16px;
+}
+.stg .reserve-tools summary {
+  cursor: pointer;
+  font-weight: 600;
+}

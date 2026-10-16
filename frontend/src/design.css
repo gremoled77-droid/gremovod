@@ -561,17 +561,6 @@ section.panel {
   }
 }
 
-/* Телефон, «Мир»: содержимое выше колонки персонажей */
-@media (max-width: 700px) {
-  .app main.styles-main {
-    display: flex;
-    flex-direction: column;
-  }
-  .styles-main > .sidebar {
-    order: 2;
-  }
-}
-
 /* Сворачиваемые разделы */
 .collapsible {
   padding: 0;
