@@ -116,6 +116,20 @@ export default function CreateScreen({projectId, heroes}: {projectId: string; he
   const byId = useMemo(() => Object.fromEntries(library.map(a => [a.id, a])), [library]);
   const images = library.filter(a => (a.metadata.kind || 'image') === 'image');
 
+  const trashAsset = async (id: string) => {
+    if (!window.confirm('Убрать файл из библиотеки? Он хранится в корзине 30 дней и восстанавливается.'))
+      return;
+    try {
+      await json(await apiFetch(`/api/library/${id}/trash`, {method: 'POST'}));
+      setRefs(r => r.filter(x => x !== id));
+      setNotice('Файл убран в корзину на 30 дней.');
+      await loadLibrary();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  };
+  const toggleRef = (id: string) => setRefs(r => (r.includes(id) ? r.filter(x => x !== id) : [...r, id]));
+
   const toggle = (id: string) => setSelected(s => (s.includes(id) ? s.filter(x => x !== id) : [...s, id]));
 
   const ensureCloudUrl = async (assetId: string) => {
@@ -288,124 +302,197 @@ export default function CreateScreen({projectId, heroes}: {projectId: string; he
   const results = items.filter(
     i => (i.kind === 'image' || i.kind === 'video') && i.status !== 'waiting_external'
   );
+  const pending = items.filter(
+    i =>
+      i.status !== 'waiting_external' &&
+      i.status !== 'completed' &&
+      i.status !== 'succeeded' &&
+      i.status !== 'failed' &&
+      (i.kind === 'image' || i.kind === 'video') &&
+      !i.asset_ids.length
+  );
+  const shownImages = tab === 'favorites' ? images.filter(a => a.metadata.favorite) : images;
+  const total = selected.length;
 
-  return (
-    <section className="panel create-screen">
-      <h2>Создать</h2>
-      {notice && (
-        <div className="notice" role="status">
-          {notice}
-        </div>
-      )}
-      {(error || feedError) && (
-        <div className="alert" role="alert">
-          {error || feedError}
-        </div>
-      )}
-
-      <label>
-        Промпт
-        <textarea rows={4} value={prompt} onChange={e => setPrompt(e.target.value)} />
-      </label>
-
-      <h3>Референсы из библиотеки</h3>
-      <div className="chips">
-        {images.slice(0, 40).map(a => (
-          <button
-            key={a.id}
-            className={refs.includes(a.id) ? 'active' : ''}
-            onClick={() => setRefs(r => (r.includes(a.id) ? r.filter(x => x !== a.id) : [...r, a.id]))}
-            title={a.id}
-          >
-            <img src={a.thumbnail_url || a.url} alt="" width={56} height={56} />
-          </button>
-        ))}
-        {!images.length && <span className="muted">В библиотеке пока нет изображений</span>}
-      </div>
-
-      <h3>Модели</h3>
-      <div className="chips">
-        {models.map(id => (
-          <label key={id} className="inline-checkbox">
-            <input type="checkbox" checked={selected.includes(id)} onChange={() => toggle(id)} /> {LABELS[id]}
-            {specs[id].launch_enabled === false && <span className="muted"> · проверяется</span>}
-          </label>
-        ))}
-      </div>
-      {selected.map(id => {
-        const o = specs[id]?.options;
-        if (!o) return null;
-        return (
-          <fieldset key={id}>
-            <legend>{LABELS[id]}</legend>
-            {Object.entries(o).map(([key, s]) =>
-              s.values ? (
-                <label key={key}>
-                  {key}
+  const modelCard = (id: string) => {
+    const on = selected.includes(id);
+    const o = specs[id]?.options;
+    return (
+      <div key={id} className={'cs-model' + (on ? ' on' : '')}>
+        <button type="button" className="cs-model-head" onClick={() => toggle(id)} aria-pressed={on}>
+          <span>
+            <b>{LABELS[id]}</b>
+            <small>PiAPI{specs[id].launch_enabled === false ? ' · проверяется' : ''}</small>
+          </span>
+          <em>{on ? 'вкл' : 'выкл'}</em>
+        </button>
+        {on && o && (
+          <div className="cs-model-opts">
+            {Object.entries(o).map(([key, sp]) => (
+              <label key={key}>
+                <span>{key}</span>
+                {sp.values ? (
                   <select
-                    value={String(optionValue(id, key, s))}
-                    onChange={e =>
-                      setOptions(p => ({
-                        ...p,
-                        [id]: {...p[id], [key]: e.target.value},
-                      }))
-                    }
+                    value={String(optionValue(id, key, sp))}
+                    onChange={e => setOptions(p => ({...p, [id]: {...p[id], [key]: e.target.value}}))}
                   >
-                    {s.values.map(v => (
+                    {sp.values.map(v => (
                       <option key={String(v)} value={String(v)}>
                         {String(v)}
                       </option>
                     ))}
                   </select>
-                </label>
-              ) : (
-                <label key={key}>
-                  {key}
+                ) : (
                   <input
                     type="number"
-                    min={s.min}
-                    max={s.max}
-                    value={Number(optionValue(id, key, s))}
-                    onChange={e =>
-                      setOptions(p => ({
-                        ...p,
-                        [id]: {...p[id], [key]: Number(e.target.value)},
-                      }))
-                    }
+                    min={sp.min}
+                    max={sp.max}
+                    value={Number(optionValue(id, key, sp))}
+                    onChange={e => setOptions(p => ({...p, [id]: {...p[id], [key]: Number(e.target.value)}}))}
                   />
-                </label>
-              )
-            )}
-          </fieldset>
-        );
-      })}
-
-      <div className="chips">
-        <button className="primary" disabled={busy || !projectId} onClick={start}>
-          {busy ? 'Готовлю…' : 'Создать'}
-        </button>
-        <button disabled={!projectId} onClick={external}>
-          Скопировать для ChatGPT
-        </button>
+                )}
+              </label>
+            ))}
+          </div>
+        )}
       </div>
+    );
+  };
 
-      {waiting.length > 0 && (
-        <>
-          <h3>Ждут картинку из ChatGPT</h3>
-          {waiting.map(j => (
-            <div key={j.id} className="chips">
-              <span>{j.prompt.slice(0, 60)}…</span>
+  return (
+    <section className="create-screen cs">
+      <aside className="cs-refs">
+        <div className="cs-head">
+          <b>Референсы</b>
+          <span className="muted">{refs.length} выбрано</span>
+        </div>
+        {refs.length > 0 && (
+          <div className="cs-grid2">
+            {refs.map(id => {
+              const a = byId[id];
+              return (
+                <div key={id} className="cs-tile on">
+                  {a && <img src={a.thumbnail_url || a.url} alt="" />}
+                  <button
+                    type="button"
+                    className="cs-x"
+                    aria-label="Убрать из запроса"
+                    title="Убрать из запроса (файл остаётся в библиотеке)"
+                    onClick={() => toggleRef(id)}
+                  >
+                    ×
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+        <div className="cs-head">
+          <b className="muted">Библиотека</b>
+          <span className="cs-tabs">
+            <button className={tab !== 'favorites' ? 'active' : ''} onClick={() => setTab('results')}>
+              все
+            </button>
+            <button className={tab === 'favorites' ? 'active' : ''} onClick={() => setTab('favorites')}>
+              ♥
+            </button>
+          </span>
+        </div>
+        <div className="cs-grid2 cs-scroll">
+          {shownImages.slice(0, 60).map(a => (
+            <div key={a.id} className={'cs-tile' + (refs.includes(a.id) ? ' on' : '')}>
               <button
-                onClick={() => {
-                  setPasteFor(j.id);
-                  fileInput.current?.click();
-                }}
+                type="button"
+                className="cs-pick"
+                onClick={() => toggleRef(a.id)}
+                title="Добавить/убрать референс"
               >
-                Выбрать файл
+                <img src={a.thumbnail_url || a.url} alt="" />
               </button>
-              <button className={pasteFor === j.id ? 'active' : ''} onClick={() => setPasteFor(j.id)}>
-                {pasteFor === j.id ? 'Ctrl+V — вставь картинку' : 'Вставить результат'}
+              <button
+                type="button"
+                className={'cs-heart' + (a.metadata.favorite ? ' on' : '')}
+                aria-label="Избранное"
+                title="Избранное"
+                onClick={() => void favorite(a.id, !a.metadata.favorite)}
+              >
+                {a.metadata.favorite ? '♥' : '♡'}
               </button>
+              <button
+                type="button"
+                className="cs-x cs-trash"
+                aria-label="Убрать в корзину"
+                title="Убрать из библиотеки (в корзину на 30 дней)"
+                onClick={() => void trashAsset(a.id)}
+              >
+                🗑
+              </button>
+            </div>
+          ))}
+          {!shownImages.length && <span className="muted">Пока нет изображений</span>}
+        </div>
+        <div className="cs-temp">
+          <button onClick={() => setTab('temp')} className={tab === 'temp' ? 'active' : ''}>
+            Временные (7 дней)
+          </button>
+        </div>
+        {tab === 'temp' && (
+          <div className="cs-tempbox">
+            <p className="muted">
+              Без сердечка и без использования уходят через 7 дней в корзину (ещё 30 дней хранятся).
+            </p>
+            <div className="cs-temp-list">
+              {temp.map(t => (
+                <span key={t.asset_id} title={t.protected || ''}>
+                  {byId[t.asset_id] && (
+                    <img src={byId[t.asset_id].thumbnail_url || byId[t.asset_id].url} alt="" />
+                  )}
+                  <small>
+                    {t.protected ? 'используется' : t.expired ? 'просрочен' : `${t.days_left} дн.`}
+                  </small>
+                </span>
+              ))}
+            </div>
+            <button onClick={() => cleanup(false)}>Показать, что будет убрано</button>
+            {wouldRemove && (
+              <button className="primary" disabled={!wouldRemove.length} onClick={() => cleanup(true)}>
+                Убрать в корзину: {wouldRemove.length}
+              </button>
+            )}
+          </div>
+        )}
+      </aside>
+
+      <div className="cs-main">
+        {notice && (
+          <div className="notice" role="status">
+            {notice}
+          </div>
+        )}
+        {(error || feedError) && (
+          <div className="alert" role="alert">
+            {error || feedError}
+          </div>
+        )}
+        <div className="cs-results">
+          {waiting.map(j => (
+            <div key={j.id} className="cs-card cs-wait">
+              <b>Ждём результат из ChatGPT</b>
+              <small>{j.prompt.slice(0, 80)}…</small>
+              <small>Ctrl+V, перетащи файл или выбери</small>
+              <div className="cs-row">
+                <button className={pasteFor === j.id ? 'primary' : ''} onClick={() => setPasteFor(j.id)}>
+                  {pasteFor === j.id ? 'Жду Ctrl+V…' : 'Вставить результат'}
+                </button>
+                <button
+                  onClick={() => {
+                    setPasteFor(j.id);
+                    fileInput.current?.click();
+                  }}
+                >
+                  Файл…
+                </button>
+              </div>
             </div>
           ))}
           <input
@@ -419,87 +506,50 @@ export default function CreateScreen({projectId, heroes}: {projectId: string; he
               e.target.value = '';
             }}
           />
-        </>
-      )}
-
-      <div className="chips">
-        <button className={tab === 'results' ? 'active' : ''} onClick={() => setTab('results')}>
-          Результаты
-        </button>
-        <button className={tab === 'favorites' ? 'active' : ''} onClick={() => setTab('favorites')}>
-          ♥ Избранное
-        </button>
-        <button className={tab === 'temp' ? 'active' : ''} onClick={() => setTab('temp')}>
-          Временные (7 дней)
-        </button>
-      </div>
-      {tab === 'favorites' && (
-        <div className="chips">
-          {images
-            .filter(a => a.metadata.favorite)
-            .map(a => (
-              <button key={a.id} onClick={() => favorite(a.id, false)} title="Убрать из избранного">
-                <img src={a.thumbnail_url || a.url} alt="" width={96} height={96} />
-              </button>
-            ))}
-          {!images.some(a => a.metadata.favorite) && <span className="muted">Нажми ♡ под результатом</span>}
-        </div>
-      )}
-      {tab === 'temp' && (
-        <div>
-          <p className="muted">
-            Результаты без сердечка и без использования удаляются через 7 дней в корзину и хранятся там ещё 30
-            дней.
-          </p>
-          <div className="chips">
-            {temp.map(t => (
-              <span key={t.asset_id} title={t.protected || ''}>
-                {byId[t.asset_id] && (
-                  <img
-                    src={byId[t.asset_id].thumbnail_url || byId[t.asset_id].url}
-                    alt=""
-                    width={64}
-                    height={64}
-                  />
-                )}
-                <br />
-                {t.protected ? 'используется' : t.expired ? 'просрочен' : `${t.days_left} дн.`}
-              </span>
-            ))}
-          </div>
-          <div className="chips">
-            <button onClick={() => cleanup(false)}>Показать, что будет убрано</button>
-            {wouldRemove && (
-              <button className="primary" disabled={!wouldRemove.length} onClick={() => cleanup(true)}>
-                Убрать в корзину: {wouldRemove.length}
-              </button>
-            )}
-          </div>
-        </div>
-      )}
-      <h3>Результаты</h3>
-      <div className="create-grid" hidden={tab !== 'results'}>
-        {results.map(item => (
-          <article key={item.id} className="panel">
-            <b>{LABELS[item.model] || item.model}</b> <span className="muted">{item.status}</span>
-            <div>
-              {item.asset_ids.map(aid => {
-                const a = byId[aid];
-                return a ? (
-                  <div key={aid}>
-                    {item.kind === 'video' ? (
-                      <video src={a.url} controls style={{maxWidth: '100%'}} />
-                    ) : (
-                      <img src={a.thumbnail_url || a.url} alt="" style={{maxWidth: '100%'}} />
-                    )}
-                    <div className="chips">
-                      {item.kind === 'image' && <button onClick={() => setAnimate(aid)}>🎬 Оживить</button>}
-                      <button onClick={() => regenerate(item)}>↻ Перегенерировать</button>
-                      <button onClick={() => favorite(aid, !a.metadata.favorite)}>
+          {pending.map(i => (
+            <div key={i.id} className="cs-card cs-spin">
+              <div className="cs-spinner" />
+              <small>{LABELS[i.model] || i.model} · в работе…</small>
+            </div>
+          ))}
+          {results.flatMap(item =>
+            item.asset_ids.map(aid => {
+              const a = byId[aid];
+              if (!a) return null;
+              return (
+                <div key={item.id + aid} className="cs-card cs-result">
+                  {item.kind === 'video' ? (
+                    <video src={a.url} controls />
+                  ) : (
+                    <img src={a.thumbnail_url || a.url} alt="" />
+                  )}
+                  <button
+                    type="button"
+                    className={'cs-heart cs-heart-big' + (a.metadata.favorite ? ' on' : '')}
+                    aria-label="Избранное"
+                    title="Избранное"
+                    onClick={() => void favorite(aid, !a.metadata.favorite)}
+                  >
+                    {a.metadata.favorite ? '♥' : '♡'}
+                  </button>
+                  <div className="cs-cap">
+                    <div>
+                      <b>{LABELS[item.model] || item.model}</b>
+                      <small>{item.status}</small>
+                    </div>
+                    <div className="cs-row">
+                      {item.kind === 'image' && <button onClick={() => setAnimate(aid)}>Оживить</button>}
+                      <button onClick={() => regenerate(item)} title="Подставить промпт и модель">
+                        ↻
+                      </button>
+                      <button onClick={() => favorite(aid, !a.metadata.favorite)} title="Избранное">
                         {a.metadata.favorite ? '♥' : '♡'}
                       </button>
+                      <button onClick={() => toggleRef(aid)} title="Использовать как референс">
+                        {refs.includes(aid) ? '✓ реф.' : '+ реф.'}
+                      </button>
                       <select value="" onChange={e => e.target.value && toHero(aid, e.target.value)}>
-                        <option value="">В референсы ▾</option>
+                        <option value="">В героя ▾</option>
                         {heroes.map(h => (
                           <option key={h.id} value={h.id}>
                             {h.name}
@@ -508,13 +558,49 @@ export default function CreateScreen({projectId, heroes}: {projectId: string; he
                       </select>
                     </div>
                   </div>
-                ) : null;
-              })}
+                </div>
+              );
+            })
+          )}
+          {!results.length && !waiting.length && !pending.length && (
+            <div className="cs-empty muted">
+              Здесь появятся результаты. Напиши промпт ниже и выбери модели справа.
             </div>
-          </article>
-        ))}
-        {!results.length && <span className="muted">Здесь появятся результаты</span>}
+          )}
+        </div>
+
+        <div className="cs-prompt">
+          <textarea
+            rows={3}
+            value={prompt}
+            placeholder="Опиши кадр: кто, где, свет, ракурс…"
+            onChange={e => setPrompt(e.target.value)}
+          />
+          <div className="cs-row">
+            <span className="muted">
+              {refs.length} реф. · {total} {total === 1 ? 'модель' : 'моделей'}
+            </span>
+            <span className="cs-spacer" />
+            <button disabled={!projectId} onClick={external}>
+              Скопировать для ChatGPT
+            </button>
+            <button className="primary" disabled={busy || !projectId} onClick={start}>
+              {busy ? 'Готовлю…' : 'Сгенерировать'}
+            </button>
+          </div>
+        </div>
       </div>
+
+      <aside className="cs-models">
+        <div className="cs-head">
+          <b>Модели</b>
+        </div>
+        {models.map(modelCard)}
+        <div className="cs-note">
+          Перед отправкой покажу точную цену и попрошу подтверждение. Ручная попытка в ChatGPT стоит $0 по
+          API.
+        </div>
+      </aside>
 
       {animate && (
         <div className="modal-backdrop">

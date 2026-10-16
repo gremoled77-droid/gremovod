@@ -1150,7 +1150,7 @@ function App() {
             )}
           </section>
         ) : (
-          <main className={mode === 'storyboard' ? 'storyboard-main' : ''}>
+          <main className={mode === 'storyboard' ? 'storyboard-main' : mode === 'create' ? 'create-main' : ''}>
             <aside className="sidebar">
               <ProjectHeader
                 id={projectId}

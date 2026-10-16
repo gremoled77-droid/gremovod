@@ -136,6 +136,34 @@ def register(app, studio):
             db.execute('UPDATE library_assets SET metadata=? WHERE id=?', (json.dumps(meta, ensure_ascii=False), asset_id))
         return {'asset_id': asset_id, 'favorite': body.favorite}
 
+    @app.post('/api/library/{asset_id}/trash')
+    def trash_one(asset_id: str):
+        """Ручное «удалить»: мягко, в корзину на 30 дней; используемые ассеты не трогаем."""
+        with studio.connect() as db:
+            row = db.execute('SELECT * FROM library_assets WHERE id=?', (asset_id,)).fetchone()
+            if not row:
+                raise HTTPException(404, 'Ассет не найден')
+            state_texts = [r['state'] for r in db.execute('SELECT state FROM projects')]
+            reason = used_reason(db, row, state_texts)
+        if reason:
+            raise HTTPException(409, 'Нельзя убрать: ' + str(reason))
+        now = datetime.now(timezone.utc)
+        trash = studio.LIBRARY_ROOT / '.trash'
+        with studio.connect() as db:
+            db.execute('CREATE TABLE IF NOT EXISTS cleanup_journal(id INTEGER PRIMARY KEY AUTOINCREMENT,asset_id TEXT,project_id TEXT,'
+                       'trash_name TEXT,row_json TEXT,trashed_at TEXT,restored_at TEXT)')
+            source = (studio.LIBRARY_ROOT / row['filename']).resolve()
+            if not source.is_relative_to(studio.LIBRARY_ROOT.resolve()):
+                raise HTTPException(400, 'Недопустимый путь')
+            trash.mkdir(exist_ok=True)
+            name = f"{row['id']}_{Path(row['filename']).name}"
+            if source.is_file():
+                shutil.move(str(source), str(trash / name))
+            db.execute('INSERT INTO cleanup_journal(asset_id,project_id,trash_name,row_json,trashed_at) VALUES(?,?,?,?,?)',
+                       (row['id'], row['project_id'], name, json.dumps(dict(row), ensure_ascii=False), now.isoformat()))
+            db.execute('DELETE FROM library_assets WHERE id=?', (row['id'],))
+        return {'asset_id': asset_id, 'trashed': True, 'restore_days': 30}
+
     @app.get('/api/library/temp')
     def temp_list(project_id: str):
         studio.project(project_id)
