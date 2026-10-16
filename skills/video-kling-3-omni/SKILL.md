@@ -98,3 +98,8 @@ Consistent element identity, clothing and voice across all shots. No morphing, n
 ## Технический хвост
 
 `Consistent element identity, clothing and voice across all shots. No morphing, no deformation, no flickering, no ghosting. Stable facial features during camera movement and occlusions. Realistic physics and lighting. Product shape, color and typography accurate throughout.`
+
+## Связанные материалы
+
+- Сводка по всем видеомоделям, источники и расхождения: [docs/VIDEO_MODELS_PROMPTING_2026-10-17.md](../../docs/VIDEO_MODELS_PROMPTING_2026-10-17.md).
+- Что и зачем ставить в кадре и клипе: [gremovod-stage-video](../gremovod-stage-video/SKILL.md) (страница «Видео»), [gremovod-stage-frames](../gremovod-stage-frames/SKILL.md) (страница «Кадры»), [cinema-five-pillars](../cinema-five-pillars/SKILL.md) (формула кадра и чек-лист).

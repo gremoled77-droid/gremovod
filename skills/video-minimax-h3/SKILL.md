@@ -5,7 +5,16 @@ description: "Use when writing a prompt for MiniMax H3 (Hailuo 3.0) video: Omni 
 
 # MiniMax H3 (Hailuo 3.0) — промпты для видео
 
-Статус: модель уже в каталоге (`minimax-h3`, проверена вживую с одним референсом-картинкой). **Omni Reference (много референсов) через студию не проверен**: адаптер сейчас отдаёт 1 картинку. Правила ниже из инструкции владельца.
+Статус: модель уже в каталоге (`minimax-h3`) и проверена вживую (16.10.2026, Codex): `txt2video` и `img2video`. Правила Omni Reference ниже из инструкции владельца относятся к приложению Hailuo и платформам-обёрткам; **через PiAPI и студию Omni Reference недоступен**.
+
+## Через студию и PiAPI (`Qubico/minimax-h3`)
+
+- Режимы: `txt2video` и `img2video` (картинка становится первым кадром). Последнего кадра и референса субъекта нет; также есть `Qubico/minimax-h3-nsfw` (мягче фильтр, модерация остаётся).
+- Поля: `prompt` до 2000 символов, `image` (публичный JPG/PNG, только для `img2video`), `resolution` **только строчными** (`480p`, `768p`, `1080p`; `480P` даёт `Invalid input`), `duration` целое 5–15 с, `aspect_ratio` 16:9, 9:16 или 1:1, `seed`.
+- Цена за секунду: 480p $0.03, 768p $0.05, 1080p $0.07 (480p, 5 с = $0.15). Стерео-звук идёт в MP4 и уже входит в цену, отдельного параметра звука нет.
+- `img2video` проверен дважды: первый кадр результата совпал с загруженной картинкой; так же проверено продолжение из последнего кадра предыдущего клипа.
+- Поэтому в студии строить промпт по схеме «первый кадр + действие»: не переописывать картинку, описывать только движение, камеру и звук; идентичность держит сам кадр. Тег `Image 1` и роли Omni в API не отправляются.
+- Обзор по всем моделям и источникам: `docs/VIDEO_MODELS_PROMPTING_2026-10-17.md`.
 
 ## Режимы (взаимоисключающие)
 
@@ -60,3 +69,8 @@ Preserve identity and wardrobe throughout. No morphing. No deformation. No flick
 ## Технический хвост
 
 `Preserve identity and wardrobe throughout. No morphing. No deformation. No flickering. Stable face and product geometry across the clip. Realistic physics. 2K cinematic, native audio.`
+
+## Связанные материалы
+
+- Сводка по всем видеомоделям, источники и расхождения: [docs/VIDEO_MODELS_PROMPTING_2026-10-17.md](../../docs/VIDEO_MODELS_PROMPTING_2026-10-17.md).
+- Что и зачем ставить в кадре и клипе: [gremovod-stage-video](../gremovod-stage-video/SKILL.md) (страница «Видео»), [gremovod-stage-frames](../gremovod-stage-frames/SKILL.md) (страница «Кадры»), [cinema-five-pillars](../cinema-five-pillars/SKILL.md) (формула кадра и чек-лист).

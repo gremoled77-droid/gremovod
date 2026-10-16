@@ -7,6 +7,8 @@ description: "Use when writing a prompt for Seedance 2.0 video (up to 15 s, @Ima
 
 Статус: правила из инструкции владельца (ТВ-реклама) и практикума GORA ACADEMY (экшн и мультфильм), **вживую через студию не проверены**. Модель 2.0 не включена в запуск (`launch_enabled` в `backend/model_catalog.py`). Лимиты у провайдера (PiAPI) уточнять перед запуском.
 
+PiAPI (по разбору Codex, `docs/PIAPI_MODELS_2026-10-16.md`): у Seedance 2 отдельная страница API (`POST Seedance 2`), цена от $0.042 до $0.08 за секунду и **Private Asset Library**: сохранённые лица и персонажи по asset ID, что подходит для постоянства Грэма в видео. Параметры Seedance 2 и формат ID ассетов в локальной документации не сохранены: перед подключением сверять страницы PiAPI. Теги референсов писать строчными: `@image1`, `@video1`, `@audio1`. Отличия от 2.5 и сводка по моделям: `docs/VIDEO_MODELS_PROMPTING_2026-10-17.md`.
+
 ## Когда выбирать
 
 - Ролик до 15 секунд одним проходом. Для 30 с: две генерации и склейка, либо Seedance 2.5.
@@ -15,9 +17,9 @@ description: "Use when writing a prompt for Seedance 2.0 video (up to 15 s, @Ima
 
 ## Референсы
 
-- Теги `@Image1`, `@Image2`, `@Video1`, `@Audio1` (нумерация по типу, с `@`).
+- Теги `@image1`, `@image2`, `@video1`, `@audio1` (нумерация по типу, с `@`).
 - Лимит: до 9 изображений + 3 видео + 3 аудио.
-- Каждому тегу сразу назначать роль одной фразой: `@Image1 — лист персонажа Грэма, сохранить лицо и одежду`, `@Image2 — ВАЗ-2106, точная форма и цвет`, `@Audio1 — озвучка, лип-синк точно по ней`.
+- Каждому тегу сразу назначать роль одной фразой: `@image1 — лист персонажа Грэма, сохранить лицо и одежду`, `@image2 — ВАЗ-2106, точная форма и цвет`, `@audio1 — озвучка, лип-синк точно по ней`.
 - Минимум: один референс на героя, один на машину/локацию, один на стиль или композицию.
 - Один ракурс героя даёт «дрейф» лица. Надёжнее коллаж из нескольких ракурсов или лист персонажа (см. `references/character-sheet-and-storyboard.md`).
 
@@ -35,7 +37,7 @@ description: "Use when writing a prompt for Seedance 2.0 video (up to 15 s, @Ima
 ## Шаблон под мультсериал
 
 ```
-@Image1 — Грэм, lock face, outfit and proportions. @Image2 — ВАЗ-2106, preserve exact shape, color and plates.
+@image1 — Грэм, lock face, outfit and proportions. @image2 — ВАЗ-2106, preserve exact shape, color and plates.
 Format 9:16. Style: stylized 3D cartoon, warm dusk palette of amber, teal and asphalt grey.
 
 [0-3s] Low-angle tracking shot, Грэм parks the car at a wet Minsk curb, headlights flare
@@ -46,13 +48,13 @@ Format 9:16. Style: stylized 3D cartoon, warm dusk palette of amber, teal and as
 Stable face and car geometry throughout. No morphing. No deformation. No flickering. No ghosting. Realistic physics.
 ```
 
-Для звука: `music and cuts synced to @Audio1's beat`, `lip sync reference @Audio1 exactly`, `impact sound cue at 8s`.
+Для звука: `music and cuts synced to @audio1's beat`, `lip sync reference @audio1 exactly`, `impact sound cue at 8s`.
 
 ## Продление сцены
 
-Готовое видео подключается как `@Video1`; в Seedance грузить **концовку исходника около 5 секунд**, чтобы модель поняла, что продолжает. Промпт продолжения:
+Готовое видео подключается как `@video1`; в Seedance грузить **концовку исходника около 5 секунд**, чтобы модель поняла, что продолжает. Промпт продолжения:
 
-1. Открыть строкой: `@Video1 — direct visual continuation reference. Replicate camera style, color palette, motion blur, atmosphere and all character appearances from @Video1 exactly. Scene continues from the final frame of @Video1.`
+1. Открыть строкой: `@video1 — direct visual continuation reference. Replicate camera style, color palette, motion blur, atmosphere and all character appearances from @video1 exactly. Scene continues from the final frame of @video1.`
 2. Формат и стиль те же, что в исходнике (для сериала: стилизованный 3D-мульт, не «hyper-realistic live-action»).
 3. 3–4 отрезка `[0s–Xs]`, не больше 15 с суммарно, в каждом приём камеры.
 4. Технический хвост.
@@ -84,3 +86,8 @@ Seedance может останавливать генерацию с реаль�
 ## Технический хвост (всегда в конце)
 
 `Stable face/product throughout. No morphing. No deformation. No flickering. No ghosting. Realistic physics. 4K cinematic.`
+
+## Связанные материалы
+
+- Сводка по всем видеомоделям, источники и расхождения: [docs/VIDEO_MODELS_PROMPTING_2026-10-17.md](../../docs/VIDEO_MODELS_PROMPTING_2026-10-17.md).
+- Что и зачем ставить в кадре и клипе: [gremovod-stage-video](../gremovod-stage-video/SKILL.md) (страница «Видео»), [gremovod-stage-frames](../gremovod-stage-frames/SKILL.md) (страница «Кадры»), [cinema-five-pillars](../cinema-five-pillars/SKILL.md) (формула кадра и чек-лист).

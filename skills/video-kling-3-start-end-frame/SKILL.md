@@ -68,3 +68,8 @@ Master Prompt + `Shot 1: … Shot 2: …`, до 6 планов по 1–12 с, �
 ## Технический хвост
 
 `Smooth continuous motion, no cuts, no camera shake. Stable facial identity and clothing throughout. No morphing, no deformation, no flickering. Realistic physics and weight. Motion resolves exactly into the final frame composition.`
+
+## Связанные материалы
+
+- Сводка по всем видеомоделям, источники и расхождения: [docs/VIDEO_MODELS_PROMPTING_2026-10-17.md](../../docs/VIDEO_MODELS_PROMPTING_2026-10-17.md).
+- Что и зачем ставить в кадре и клипе: [gremovod-stage-video](../gremovod-stage-video/SKILL.md) (страница «Видео»), [gremovod-stage-frames](../gremovod-stage-frames/SKILL.md) (страница «Кадры»), [cinema-five-pillars](../cinema-five-pillars/SKILL.md) (формула кадра и чек-лист).

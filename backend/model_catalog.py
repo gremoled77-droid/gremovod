@@ -81,12 +81,15 @@ for _id in ('seedream-5-pro','nano-banana-2.1','qwen-image-2.1','gpt-image-2','g
 _REF_PROFILES = {
     'seedance-2.0': {
         'ref_limits': {'image':9,'video':3,'audio':3,'total':None,'duration_max_s':15},
-        'ref_syntax': {'style':'at_numbered','image':'@Image{n}','video':'@Video{n}','audio':'@Audio{n}',
-                       'rule':'каждому тегу одна роль в первой строке промпта'}},
+        'ref_syntax': {'style':'at_numbered','image':'@image{n}','video':'@video{n}','audio':'@audio{n}',
+                       'rule':'каждому тегу одна роль в первой строке промпта; параметры Seedance 2 в PiAPI не проверены'}},
     'seedance-2.5': {
-        'ref_limits': {'image':30,'video':10,'audio':10,'total':50,'duration_max_s':30},
-        'ref_syntax': {'style':'at_numbered','image':'@Image{n}','video':'@Video{n}','audio':'@Audio{n}',
-                       'rule':'каждому тегу одна роль; продление и локальная правка через @Video1'}},
+        'ref_limits': {'image':30,'video':10,'audio':10,'total':50,'video_total_s':30,'audio_total_s':30,
+                       'duration_min_s':4,'duration_max_s':30,
+                       'note':'по документации PiAPI; адаптер студии пока отправляет только картинки'},
+        'ref_syntax': {'style':'at_numbered','image':'@image{n}','video':'@video{n}','audio':'@audio{n}',
+                       'rule':'строчные теги по порядку массивов; ссылка на отсутствующий файл даёт 400',
+                       'tasks':['auto','reference','edit','extend'],'draft_mode':True}},
     'flux-3': {
         'ref_limits': {'image':None,'video':1,'audio':0,'total':None,
                        'note':'мультиреференса нет (Omni Reference: Soon); картинки только как старт-кадр или Keyframes по порядку'},
@@ -95,9 +98,10 @@ _REF_PROFILES = {
     'minimax-h3': {
         'ref_limits': {'image':9,'video':3,'audio':3,'total':12,'video_total_s':15,'audio_total_s':15,
                        'duration_min_s':4,'duration_max_s':15,
-                       'note':'Omni Reference взаимоисключающ с First/Last Frame; адаптер студии пока отдаёт 1 картинку (max_refs)'},
+                       'note':'Omni Reference из инструкции владельца (приложение Hailuo); через PiAPI только txt2video и img2video с одним первым кадром (max_refs)'},
         'ref_syntax': {'style':'words_numbered','image':'Image {n}','video':'Video {n}','audio':'Audio {n}',
-                       'rule':'назначать роль, не описывать содержимое; после имени обращаться по имени'}},
+                       'piapi':{'modes':['txt2video','img2video'],'first_frame_only':True,'resolution_case':'lower'},
+                       'rule':'назначать роль, не описывать содержимое; после имени обращаться по имени; в API теги не отправляются'}},
     'kling-3.0-omni': {
         'ref_limits': {'image':7,'image_with_video':4,'video':1,'audio':0,'elements':3,'images_per_element':4,
                        'video_max_s':10,'element_video_s':[3,8],'voice_s':[3,30],
