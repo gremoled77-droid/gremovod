@@ -1310,8 +1310,9 @@ function App() {
                 </option>
               ))}
             </select>
-            <span className={'status ' + apiHealth} role="status">
-              ● {apiStatus}
+            <span className={'status topbar-status ' + apiHealth} role="status" title={apiStatus}>
+              <i aria-hidden="true" />
+              {apiStatus}
             </span>
           </div>
           <div className="top-actions">
@@ -1330,6 +1331,7 @@ function App() {
               Очередь{activeCount ? ` · ${activeCount}` : ''}
             </button>
             <button
+              className="topbar-ghost"
               onClick={() => {
                 void checkHealth();
                 void refresh();
@@ -1339,6 +1341,7 @@ function App() {
             </button>
             <div className="project-global-actions">
               <button
+                className="topbar-new"
                 disabled={startup !== 'ready' || !!busy}
                 onClick={() => void requestProjectChange({type: 'new'})}
               >
