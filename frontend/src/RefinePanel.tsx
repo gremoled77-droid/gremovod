@@ -169,147 +169,160 @@ export default function RefinePanel({
     reference = assets.find(a => a.id === draft.reference_asset_id);
   const name = (a: Asset) =>
     `${a.metadata.original_name || a.id.slice(0, 8)} · ${a.metadata.width}×${a.metadata.height}${a.metadata.character_status === 'approved' ? ' · рабочий образ' : ''}`;
+  const slot = (
+    n: number,
+    title: string,
+    hint: string,
+    value: string,
+    role: 'source_asset_id' | 'reference_asset_id',
+    picked: Asset | undefined,
+    options: Asset[],
+    emptyLabel: string
+  ) => (
+    <article className={'rf-slot' + (picked ? ' filled' : '')}>
+      <div className="rf-head">
+        <span className="rf-step">{n}</span>
+        <div>
+          <h3>{title}</h3>
+          <small>{hint}</small>
+        </div>
+      </div>
+      <div className="rf-frame">
+        {picked ? (
+          <img src={picked.url} alt={title} />
+        ) : (
+          <div className="rf-empty">
+            <b>{emptyLabel}</b>
+            <span>Выбери из библиотеки или загрузи файл</span>
+          </div>
+        )}
+      </div>
+      <select value={value} onChange={e => onChange({...draft, [role]: e.target.value})}>
+        <option value="">
+          {role === 'source_asset_id' ? 'Выбери изображение…' : 'Без дополнительного референса'}
+        </option>
+        {options.map(a => (
+          <option key={a.id} value={a.id}>
+            {name(a)}
+          </option>
+        ))}
+      </select>
+      <div className="rf-slot-actions">
+        <label className={'button rf-upload' + (busy || active ? ' disabled' : '')}>
+          Загрузить файл
+          <input
+            type="file"
+            accept="image/png,image/jpeg,image/webp"
+            disabled={!!busy || active}
+            onChange={e => {
+              const f = e.target.files?.[0];
+              if (f) void upload(f, role);
+              e.target.value = '';
+            }}
+          />
+        </label>
+        {picked && role === 'reference_asset_id' && (
+          <button onClick={() => onChange({...draft, reference_asset_id: ''})}>Убрать</button>
+        )}
+      </div>
+    </article>
+  );
+  const online = !!status?.worker_online;
   return (
-    <section className="panel refine-panel">
-      <div className="panel-title">
+    <section className="rf">
+      <div className="rf-bar">
+        <p className={'worker-status ' + (online ? 'online' : 'offline')} role="status">
+          {online
+            ? status?.worker_busy
+              ? '● Чат выполняет задание'
+              : '● Обработчик чата подключён'
+            : '○ Обработчик чата неактивен'}
+        </p>
         {status && (
           <a className="button" href={status.chat_url}>
             Открыть чат ↗
           </a>
         )}
       </div>
-      <p className="muted">
-        Точечные правки через ChatGPT / imagegen. Оригинал задаёт внешность и визуал, дополнительный референс
-        — только нужную деталь.
-      </p>
-      <div className="twocol">
-        <div>
-          <h3>1. Оригинал для правки</h3>
-          <label>
-            Из библиотеки
-            <select
-              value={draft.source_asset_id}
-              onChange={e => onChange({...draft, source_asset_id: e.target.value})}
-            >
-              <option value="">Выбери изображение…</option>
-              {assets.map(a => (
-                <option key={a.id} value={a.id}>
-                  {name(a)}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="upload-area">
-            Прикрепить оригинал
-            <input
-              type="file"
-              accept="image/png,image/jpeg,image/webp"
-              disabled={!!busy || active}
-              onChange={e => {
-                const f = e.target.files?.[0];
-                if (f) void upload(f, 'source_asset_id');
-                e.target.value = '';
-              }}
-            />
-          </label>
-          {source && <img className="refine-preview" src={source.url} alt="Оригинал для правки" />}
-        </div>
-        <div>
-          <h3>2. Референс детали · необязательно</h3>
-          <label>
-            Из библиотеки
-            <select
-              value={draft.reference_asset_id}
-              onChange={e => onChange({...draft, reference_asset_id: e.target.value})}
-            >
-              <option value="">Без дополнительного референса</option>
-              {assets
-                .filter(a => a.id !== draft.source_asset_id)
-                .map(a => (
-                  <option key={a.id} value={a.id}>
-                    {name(a)}
-                  </option>
-                ))}
-            </select>
-          </label>
-          <label className="upload-area">
-            Прикрепить референс
-            <input
-              type="file"
-              accept="image/png,image/jpeg,image/webp"
-              disabled={!!busy || active}
-              onChange={e => {
-                const f = e.target.files?.[0];
-                if (f) void upload(f, 'reference_asset_id');
-                e.target.value = '';
-              }}
-            />
-          </label>
-          {reference && (
-            <>
-              <img className="refine-preview" src={reference.url} alt="Дополнительный референс детали" />
-              <button onClick={() => onChange({...draft, reference_asset_id: ''})}>Убрать референс</button>
-            </>
-          )}
-        </div>
+      {!online && <p className="muted rf-note">{status?.note || 'Проверка связи…'}</p>}
+      <div className="rf-slots">
+        {slot(
+          1,
+          'Оригинал для правки',
+          'Задаёт внешность и весь визуал',
+          draft.source_asset_id,
+          'source_asset_id',
+          source,
+          assets,
+          'Нет оригинала'
+        )}
+        {slot(
+          2,
+          'Референс детали',
+          'Необязательно: берём только нужную деталь',
+          draft.reference_asset_id,
+          'reference_asset_id',
+          reference,
+          assets.filter(a => a.id !== draft.source_asset_id),
+          'Референса нет'
+        )}
       </div>
-      <label>
-        3. Что изменить
+      <article className="rf-instruction">
+        <div className="rf-head">
+          <span className="rf-step">3</span>
+          <div>
+            <h3>Что изменить</h3>
+            <small>Одна понятная правка: что поменять и что сохранить</small>
+          </div>
+        </div>
         <textarea
-          rows={5}
+          rows={4}
           maxLength={4000}
           value={draft.instruction}
           onChange={e => onChange({...draft, instruction: e.target.value})}
           placeholder="Например: заменить только обувь на ботинки с референса. Лицо, кепку, фигуру, одежду, позу, фон и свет сохранить."
         />
-      </label>
-      <details>
-        <summary>Что будет добавлено в промпт</summary>
-        <p className="muted">
-          Редактировать исходное изображение. Менять только указанную деталь; сохранять лица, идентичность
-          персонажей, остальные предметы, композицию, стиль, свет и цвета. Из дополнительного референса брать
-          только то, что указано в правке. Не пересоздавать картинку по старому промпту.
-        </p>
-      </details>
-      <p className="muted">
-        Сохранение визуала — инструкция модели; абсолютная неизменность остальных пикселей не гарантируется.
-        Встроенный инструмент не раскрывает точный выбор модели и качества. API автоматически не используется.
-      </p>
-      <p className={'worker-status ' + (status?.worker_online ? 'online' : 'offline')} role="status">
-        {status?.worker_online
-          ? status.worker_busy
-            ? '● Чат выполняет задание'
-            : '● Обработчик чата подключён'
-          : '○ Обработчик чата неактивен'}
-      </p>
-      {!status?.worker_online && <p className="muted">{status?.note || 'Проверка связи…'}</p>}
-      <div className="chips">
-        <button
-          className="primary"
-          disabled={
-            !!busy ||
-            active ||
-            !source ||
-            !draft.instruction.trim() ||
-            draft.source_asset_id === draft.reference_asset_id
-          }
-          onClick={() => void submit()}
-        >
-          Улучшить промпт и перегенерировать
-        </button>
-        <button
-          disabled={!!busy}
-          onClick={() => {
-            setBusy('save');
-            void ensureProject()
-              .then(() => setNotice('Черновик правки сохранён.'))
-              .catch(e => setError(String(e)))
-              .finally(() => setBusy(''));
-          }}
-        >
-          Сохранить черновик
-        </button>
-      </div>
+        <details>
+          <summary>Что будет добавлено в промпт</summary>
+          <p className="muted">
+            Редактировать исходное изображение. Менять только указанную деталь; сохранять лица, идентичность
+            персонажей, остальные предметы, композицию, стиль, свет и цвета. Из дополнительного референса
+            брать только то, что указано в правке. Не пересоздавать картинку по старому промпту.
+          </p>
+        </details>
+        <div className="rf-actions">
+          <button
+            className="primary"
+            disabled={
+              !!busy ||
+              active ||
+              !source ||
+              !draft.instruction.trim() ||
+              draft.source_asset_id === draft.reference_asset_id
+            }
+            onClick={() => void submit()}
+          >
+            Улучшить промпт и перегенерировать
+          </button>
+          <button
+            disabled={!!busy}
+            onClick={() => {
+              setBusy('save');
+              void ensureProject()
+                .then(() => setNotice('Черновик правки сохранён.'))
+                .catch(e => setError(String(e)))
+                .finally(() => setBusy(''));
+            }}
+          >
+            Сохранить черновик
+          </button>
+        </div>
+        <small className="muted">
+          Сохранение визуала — инструкция модели; абсолютная неизменность остальных пикселей не гарантируется.
+          Точный выбор модели и качества встроенный инструмент не раскрывает. API автоматически не
+          используется.
+        </small>
+      </article>
       {error && (
         <div className="alert" role="alert">
           {error}
@@ -320,7 +333,7 @@ export default function RefinePanel({
           {notice}
         </div>
       )}
-      <h3>Версии правок</h3>
+      <h3 className="rf-versions">Версии правок</h3>
       <div className="native-results">
         {jobs
           .filter(j => j.operation === 'edit')
@@ -353,7 +366,7 @@ export default function RefinePanel({
               )}
               {j.image_url && (
                 <>
-                  <div className="twocol">
+                  <div className="rf-compare">
                     <div>
                       <small>Исходник</small>
                       <img src={`/api/library/${j.source_asset_id}/file`} alt="Исходник версии" />
