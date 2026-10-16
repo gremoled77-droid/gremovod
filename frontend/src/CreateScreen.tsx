@@ -218,6 +218,21 @@ function CreateScreenBody({projectId, heroes}: {projectId: string; heroes: Hero[
     }
   };
 
+  /** На телефоне уходим в приложение ChatGPT; на компьютере чат открывается во вкладке рядом. */
+  const openChatApp = () => {
+    const url = getChatUrl() || DEFAULT_CHAT_URL;
+    if (window.matchMedia('(max-width: 700px)').matches) window.location.href = url;
+    else window.open(url, '_blank', 'noopener');
+  };
+
+  const copyPrompt = async (text: string) => {
+    const ok = await navigator.clipboard?.writeText(text).then(
+      () => true,
+      () => false
+    );
+    setNotice(ok ? 'Промпт скопирован.' : 'Не удалось скопировать — выдели и скопируй промпт вручную.');
+  };
+
   /** Копирует промпт и создаёт ожидающее внешнее задание; с openChat ещё открывает чат ChatGPT. */
   const external = async (openChat = false) => {
     setError('');
@@ -260,12 +275,7 @@ function CreateScreenBody({projectId, heroes}: {projectId: string; heroes: Hero[
           ? `Промпт скопирован. ${where} Потом верни картинку кнопкой «Вставить результат» или «Файл…».`
           : `Не удалось скопировать в буфер — скопируй промпт вручную из поля ниже. ${where}`
       );
-      if (openChat) {
-        const url = chat || DEFAULT_CHAT_URL;
-        // На телефоне уходим в приложение ChatGPT; на компьютере чат открывается во вкладке рядом.
-        if (window.matchMedia('(max-width: 700px)').matches) window.location.href = url;
-        else window.open(url, '_blank', 'noopener');
-      }
+      if (openChat) openChatApp();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
@@ -555,22 +565,35 @@ function CreateScreenBody({projectId, heroes}: {projectId: string; heroes: Hero[
         <div className="cs-results">
           {waiting.map(j => (
             <div key={j.id} className="cs-card cs-wait">
-              <b>Ждём результат из ChatGPT</b>
+              <b>Ждём картинку из ChatGPT</b>
               <small>{j.prompt.slice(0, 80)}…</small>
-              <small>Ctrl+V, перетащи файл или выбери</small>
-              <div className="cs-row">
-                <button className={pasteFor === j.id ? 'primary' : ''} onClick={() => setPasteFor(j.id)}>
-                  {pasteFor === j.id ? 'Жду Ctrl+V…' : 'Вставить результат'}
-                </button>
-                <button
-                  onClick={() => {
-                    setPasteFor(j.id);
-                    fileInput.current?.click();
-                  }}
-                >
-                  Файл…
-                </button>
-              </div>
+              <ol className="cs-steps">
+                <li>
+                  <span>Скопировать промпт</span>
+                  <button onClick={() => void copyPrompt(j.prompt)}>Промпт</button>
+                </li>
+                <li>
+                  <span>Открыть ChatGPT и сгенерировать</span>
+                  <button onClick={openChatApp}>Открыть чат</button>
+                </li>
+                <li>
+                  <span>Вернуть готовую картинку (Ctrl+V, файл или галерея)</span>
+                  <div className="cs-row">
+                    <button className={pasteFor === j.id ? 'primary' : ''} onClick={() => setPasteFor(j.id)}>
+                      {pasteFor === j.id ? 'Жду Ctrl+V…' : 'Вставить'}
+                    </button>
+                    <button
+                      className="primary"
+                      onClick={() => {
+                        setPasteFor(j.id);
+                        fileInput.current?.click();
+                      }}
+                    >
+                      Выбрать из галереи
+                    </button>
+                  </div>
+                </li>
+              </ol>
             </div>
           ))}
           <input

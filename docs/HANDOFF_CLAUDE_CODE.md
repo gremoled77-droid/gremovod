@@ -108,3 +108,11 @@
 - Старые документы проекта в облачном Project «AI_Workflow_Studio» (`claude/software_status.md`, `claude/status.md`, `jokes_archive.json`, `prompt_templates.json`, `cinema_info_integration.md`) — справочные, не код.
 - Ключи лежат файлами `*_API_KEY.txt` в корне (в `.gitignore`). Никогда не печатать и не отправлять их содержимое.
 - В корне есть `.claude/settings.local.json` и папка `Claude outputs/` (не отслеживаются git) — это артефакты Cowork, можно не трогать.
+
+## 9. Сессия Claude Code 16.10.2026 (после передачи)
+
+- «Воркфлоу» перерисован (`WorkflowPanel.tsx`, `workflow.css`, макет `docs/design/Workflow.dc.html`). Цены на узлах и «Весь граф: $…» из макета не сделаны.
+- Окно подтверждения платного запуска (`GenerationReview`, `WorkflowPanel`) использует `LimitPicker.tsx` / `spendLimit.ts`: лимит по умолчанию $2, быстрые суммы 10¢…$50, ползунок, выше $2 нужна галочка «Подтверждаю генерацию».
+- Кнопка «Отправить в ChatGPT» на «Кадрах» (`chatLink.ts`, `ChatLinkSetting.tsx`): копирует промпт, создаёт внешнее задание, открывает чат по ссылке из Настроек (хранится в localStorage браузера). Карточка ожидания — три шага. **Не проверено на реальном телефоне**; вопрос «куда именно слать» (очередь Codex-чата `native_chat.py` против чата ChatGPT) владелец решил обсудить позже.
+- Тесты на `/trash` уже есть (Codex). Бэкенд: `python -m unittest discover -s backend -p "test_*.py"` (pytest в .venv не установлен).
+- Не сделано: остальная телефонная версия (нижняя навигация есть, экран «Сцены/Герои/Архив/Бюджет» нет), вертикальная версия 9:16, экспорт для CapCut.
