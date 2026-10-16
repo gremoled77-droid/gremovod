@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {mergeWorld, parseWorld} from './src/worldBible.ts';
+import {mergeWorld, parseWorld, passportText, WORLD_FIELDS} from './src/worldBible.ts';
 
 test('JSON достаётся из обёртки markdown и текста вокруг', () => {
   const w = parseWorld('Вот мир:\n```json\n{"look":" тёплый 2D ","palette":"охра","x":"лишнее"}\n```');
@@ -25,4 +25,13 @@ test('слияние: пустые заполняются, занятые отл
   );
   assert.deepEqual(fill, {palette: 'охра', avoid: 'логотипы'});
   assert.deepEqual(conflicts, {look: 'новый'});
+});
+
+test('паспорт мира: 11 полей, в текст попадают только заполненные', () => {
+  assert.equal(WORLD_FIELDS.length, 11);
+  assert.equal(
+    passportText({look: ' тёплая 2D ', time: 'ночь, осень', mood: '', tech: undefined}),
+    'Визуальный стиль: тёплая 2D\nВремя суток и сезон: ночь, осень'
+  );
+  assert.equal(passportText(undefined), '');
 });

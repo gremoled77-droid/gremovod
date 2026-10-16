@@ -127,6 +127,37 @@ def send_check(db,pid,sid,body):
             raise HTTPException(400,'Персонаж или локация не принадлежит этому общему проекту')
 
 
+class OutlineFrame(BaseModel):
+    title:str=Field(min_length=1,max_length=75)
+    notes:str=Field(default='',max_length=5000)
+
+
+class OutlineScene(BaseModel):
+    title:str=Field(min_length=1,max_length=75)
+    notes:str=Field(default='',max_length=30000)
+    frames:list[OutlineFrame]=Field(min_length=1,max_length=20)
+
+
+class Outline(BaseModel):
+    base_revision:str=Field(min_length=64,max_length=64)
+    request_id:str=Field(min_length=8,max_length=100,pattern=r'^[a-zA-Z0-9_-]+$')
+    scenes:list[OutlineScene]=Field(min_length=1,max_length=20)
+
+
+def outline_check(db,pid,sid,body):
+    """Проверки до создания папок: ревизия, названия сцен и кадров, допустимость для имён папок."""
+    _,nodes,_,revision=snapshot(db,pid,sid)
+    if body.base_revision!=revision:raise HTTPException(409,'Доска изменилась. Обнови её и повтори добавление.')
+    taken={n['title'].casefold() for n in nodes if n['kind']=='episode' and n['parent_id']==sid}
+    names=[s.title.strip().casefold() for s in body.scenes]
+    if len(set(names))!=len(names) or taken&set(names):raise HTTPException(409,'Названия сцен должны различаться и не совпадать с уже существующими')
+    for scene in body.scenes:
+        folders.safe_name(scene.title)
+        titles=[f.title.strip().casefold() for f in scene.frames]
+        if len(set(titles))!=len(titles):raise HTTPException(409,f'В сцене «{scene.title}» названия кадров должны различаться')
+        for f in scene.frames:folders.safe_name(f.title)
+
+
 def register(app,studio):
     @app.on_event('startup')
     def setup():
@@ -190,6 +221,31 @@ def register(app,studio):
             db.execute('INSERT INTO production_entity_state(node_id,data,updated_at) VALUES(?,?,?) ON CONFLICT(node_id) DO UPDATE SET data=excluded.data,updated_at=excluded.updated_at',
                        (scene_id,json.dumps(cast),studio.now()))
             result={'scene_id':scene_id,'frame_ids':frame_ids}
+            db.execute('INSERT INTO storyboard_sends(request_id,series_id,payload_hash,result,created_at) VALUES(?,?,?,?,?)',
+                       (body.request_id,sid,digest,json.dumps(result),studio.now()))
+            revision=snapshot(db,pid,sid)[3]
+        return {**result,'revision':revision,'replayed':False}
+
+    @app.post('/api/productions/{pid}/series/{sid}/storyboard/outline')
+    def add_outline(pid:str,sid:str,body:Outline):
+        """Сцены и пустые кадры по плану (например, от GPT): без картинок, текст кадра в заметке. Повтор с тем же request_id ничего не дублирует."""
+        digest=hashlib.sha256(body.model_dump_json(exclude={'base_revision'}).encode()).hexdigest()
+        with studio.connect() as db:
+            previous=db.execute('SELECT * FROM storyboard_sends WHERE request_id=?',(body.request_id,)).fetchone()
+            if previous:
+                if previous['series_id']!=sid or previous['payload_hash']!=digest:raise HTTPException(409,'Этот идентификатор уже использован для другого плана')
+                return {**json.loads(previous['result']),'replayed':True}
+            series(db,pid,sid)
+            outline_check(db,pid,sid,body)
+        scene_ids=[];frame_ids=[]
+        for scene in body.scenes:
+            node=folders.create_node(studio,pid,folders.NewNode(kind='episode',parent_id=sid,title=scene.title.strip(),notes=scene.notes))
+            scene_ids.append(node['id'])
+            for frame in scene.frames:
+                frame_ids.append(folders.create_node(studio,pid,folders.NewNode(kind='frame',parent_id=node['id'],title=frame.title.strip(),notes=frame.notes))['id'])
+        with studio.connect() as db:
+            db.execute('BEGIN IMMEDIATE')
+            result={'scene_ids':scene_ids,'frame_ids':frame_ids}
             db.execute('INSERT INTO storyboard_sends(request_id,series_id,payload_hash,result,created_at) VALUES(?,?,?,?,?)',
                        (body.request_id,sid,digest,json.dumps(result),studio.now()))
             revision=snapshot(db,pid,sid)[3]

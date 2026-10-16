@@ -390,3 +390,41 @@ main.storyboard-main {
     flex-wrap: wrap;
   }
 }
+
+.ps-change {
+  margin: 2px 0;
+  font-size: 12px;
+  line-height: 1.35;
+  opacity: 0.9;
+}
+.ol {
+  display: grid;
+  gap: 10px;
+  max-width: 720px;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+.ol-row {
+  display: flex;
+  gap: 12px;
+}
+.ol-plan {
+  display: grid;
+  gap: 10px;
+}
+.ol-plan fieldset {
+  display: grid;
+  gap: 6px;
+}
+.ol-shot {
+  display: grid;
+  grid-template-columns: 24px 1fr auto auto auto;
+  align-items: start;
+  gap: 6px;
+}
+.ol-shot input {
+  width: 100%;
+}
+.ol-close {
+  justify-self: start;
+}

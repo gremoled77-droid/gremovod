@@ -14,6 +14,8 @@ import FrameTakes from './FrameTakes';
 import SceneCast from './SceneCast';
 import {moveItem} from './boardOrder';
 import {patchEntity, putOrder, type EntityPatch} from './boardApi';
+import OutlineDialog, {type OutlineContext} from './OutlineDialog';
+import {changeOf} from './outlinePlan';
 import './ProductionStoryboard.css';
 
 type Node = {
@@ -65,8 +67,10 @@ export default function ProductionStoryboard({
   onInspect,
   onOpenProject,
   location,
+  outlineContext,
 }: {
   location?: WorkspaceLocation | null;
+  outlineContext?: OutlineContext;
   onInspect: (productionId: string, nodeId: string) => void;
   onOpenProject: (id: string) => void;
 }) {
@@ -103,6 +107,7 @@ export default function ProductionStoryboard({
     [error, setError] = useState(''),
     [notice, setNotice] = useState(''),
     [showScript, setShowScript] = useState(false),
+    [showOutline, setShowOutline] = useState(false),
     [importMode, setImportMode] = useState<'append' | 'update'>('append');
   const visual = useVisualPlans(pid, sid);
   const [estimating, setEstimating] = useState(false);
@@ -426,9 +431,26 @@ export default function ProductionStoryboard({
           <SeriesEconomics key={pid + sid} pid={pid} sid={sid} />
           <div className="chips">
             <button onClick={() => setShowScript(s => !s)}>Вставить сценарий</button>
+            {outlineContext && (
+              <button onClick={() => setShowOutline(true)}>Разбить на сцены и кадры (GPT)</button>
+            )}
             <button onClick={() => inspect(sid)}>Файлы и описание серии ↗</button>
           </div>
           <VisualRulesForm key={sid} pid={pid} nid={sid} />
+          {showOutline && outlineContext && board && (
+            <OutlineDialog
+              pid={pid}
+              sid={sid}
+              revision={board.revision}
+              context={outlineContext}
+              onClose={() => setShowOutline(false)}
+              onDone={() => {
+                setShowOutline(false);
+                setTick(t => t + 1);
+                setNotice('Сцены и кадры добавлены в раскадровку');
+              }}
+            />
+          )}
           {showScript && (
             <section className="ps-script">
               <label>
@@ -668,6 +690,7 @@ export default function ProductionStoryboard({
                         )}
                       </div>
                       <b>{frame.title}</b>
+                      {changeOf(frame.notes) && <p className="ps-change">{changeOf(frame.notes)}</p>}
                       <small>
                         {image
                           ? frame.selection.selected_image_file_id

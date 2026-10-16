@@ -30,6 +30,7 @@ import {type CharacterVersion} from './ReplaceCharacterButton';
 import RefinePanel, {EMPTY_REFINE, type RefineDraft} from './RefinePanel';
 import ChatGPTPanel from './ChatGPTPanel';
 import WorldFromBrief from './WorldFromBrief';
+import {passportText} from './worldBible';
 import AttachmentMenu, {AttachmentStrip} from './AttachmentMenu';
 import CharactersScreen from './CharactersScreen';
 import FrameBuilder from './FrameBuilder';
@@ -106,6 +107,10 @@ type StyleBible = {
   lighting: string;
   camera: string;
   environment: string;
+  time: string;
+  tech: string;
+  textures: string;
+  mood: string;
   rules: string;
   avoid: string;
 };
@@ -137,6 +142,10 @@ const INITIAL: Studio = {
     lighting: 'Ночной Минск; теплые фонари, прохладный ambient',
     camera: 'Согласованные пропорции и ракурсы',
     environment: 'Минск, дворики, панельки, гаражи, улицы',
+    time: '',
+    tech: '',
+    textures: '',
+    mood: '',
     rules: 'Грэм и автомобиль соответствуют утвержденным референсам',
     avoid: 'Случайные изменения внешности, формы машины, цвета и стилистики',
   },
@@ -1752,6 +1761,12 @@ function App() {
                     setMode('files');
                   }}
                   location={workspaceLocation}
+                  outlineContext={{
+                    projectId,
+                    brief: state.brief,
+                    passport: passportText(state.style),
+                    heroes: state.characters.map(c => c.name),
+                  }}
                   onOpenProject={id => {
                     void load(id, 'create');
                   }}
@@ -1832,11 +1847,15 @@ function App() {
                   <div className="world-fields">
                     {(
                       [
-                        ['look', 'Визуальный стиль', 'Техника, жанр, общее настроение'],
+                        ['look', 'Визуальный стиль', 'Техника, жанр, общий образ'],
+                        ['environment', 'Архитектура и среда', 'Где происходит действие, какие здания'],
+                        ['time', 'Время суток и сезон', 'Когда: ночь, рассвет, зима, дождь'],
+                        ['tech', 'Уровень технологий', 'Эпоха, транспорт, устройства'],
+                        ['textures', 'Фактуры и материалы', 'Металл, стекло, ткань, поверхности'],
                         ['palette', 'Палитра', 'Главные цвета и оттенки'],
-                        ['lighting', 'Освещение', 'Свет, время суток, источники'],
+                        ['lighting', 'Освещение', 'Направление, температура, источники света'],
                         ['camera', 'Камера и оптика', 'Ракурсы, объективы, движение'],
-                        ['environment', 'Среда и локации', 'Где происходит действие'],
+                        ['mood', 'Настроение', 'Эмоция и атмосфера ролика'],
                         ['rules', 'Неизменные правила', 'Что одинаково в каждом кадре'],
                         ['avoid', 'Что запрещено', 'Чего не должно быть в кадре'],
                       ] as [keyof StyleBible, string, string][]
@@ -1859,6 +1878,15 @@ function App() {
                   <div className="world-actions">
                     <button className="primary" disabled={!!busy} onClick={save}>
                       Сохранить стиль проекта
+                    </button>
+                    <button
+                      onClick={() =>
+                        void navigator.clipboard
+                          ?.writeText(passportText(state.style))
+                          .then(() => setNotice('Паспорт мира скопирован'))
+                      }
+                    >
+                      Копировать паспорт
                     </button>
                     <button onClick={() => setMode('characters')}>Дальше: персонажи →</button>
                   </div>

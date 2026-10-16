@@ -194,3 +194,39 @@ class StoryboardTests(unittest.TestCase):
         self.assertEqual(self.send(fresh,scene_title='Двор',frames=frame)[1].status_code,409)
         scene=fresh['scenes'][0];self.assertEqual(self.send(fresh,scene_id=scene['id'],frames=frame)[1].status_code,409)
         self.assertEqual(self.client.post(self.path.replace(self.pid,'wrong-project')+'/frames',json={'base_revision':fresh['revision'],'request_id':uuid.uuid4().hex,'scene_title':'Z','frames':frame}).status_code,404)
+
+    def outline(self,board,scenes,**extra):
+        body={'base_revision':board['revision'],'request_id':uuid.uuid4().hex,'scenes':scenes,**extra}
+        return body,self.client.post(self.path+'/outline',json=body)
+
+    def test_outline_creates_scenes_and_empty_frames_with_notes_idempotently(self):
+        board=self.prepare()
+        scenes=[{'title':'Двор','notes':'Ночь.','frames':[{'title':'Кадр 1','notes':'Изменение: Грэм видит пассажира'},{'title':'Кадр 2','notes':'Изменение: пассажир садится'}]},
+                {'title':'Поездка','frames':[{'title':'Кадр 1'}]}]
+        body,done=self.outline(board,scenes)
+        self.assertEqual(done.status_code,200,done.text);result=done.json();self.assertFalse(result['replayed'])
+        saved=self.client.get(self.path).json()
+        self.assertEqual([s['title'] for s in saved['scenes']],['Двор','Поездка']);self.assertEqual([s['number'] for s in saved['scenes']],[1,2])
+        first=saved['scenes'][0];self.assertEqual(first['notes'],'Ночь.')
+        self.assertEqual([f['title'] for f in first['frames']],['Кадр 1','Кадр 2']);self.assertEqual([f['number'] for f in first['frames']],[1,2])
+        self.assertEqual(first['frames'][0]['notes'],'Изменение: Грэм видит пассажира');self.assertEqual(first['frames'][0]['files'],[])
+        self.assertEqual(len(result['scene_ids']),2);self.assertEqual(len(result['frame_ids']),3);self.assertEqual(result['revision'],saved['revision'])
+        self.assertTrue((main.PRODUCTIONS_ROOT/first['frames'][0]['relative_dir']).is_dir())
+        again=self.client.post(self.path+'/outline',json=body);self.assertEqual(again.status_code,200,again.text);self.assertTrue(again.json()['replayed'])
+        self.assertEqual(len(self.client.get(self.path).json()['scenes']),2)
+        altered={**body,'scenes':scenes[:1]};self.assertEqual(self.client.post(self.path+'/outline',json=altered).status_code,409)
+
+    def test_outline_rejects_bad_plans_without_creating_anything(self):
+        board=self.prepare();frame=[{'title':'Кадр 1'}]
+        cases=[([{'title':'А','frames':frame},{'title':'а','frames':frame}],409),
+               ([{'title':'А','frames':[{'title':'Кадр 1'},{'title':'кадр 1'}]}],409),
+               ([{'title':'А','frames':[]}],422),([],422),([{'title':'','frames':frame}],422),([{'title':'CON','frames':frame}],400),([{'title':'А','frames':[{'title':'  '}]}],400)]
+        for scenes,status in cases:
+            self.assertEqual(self.outline(board,scenes)[1].status_code,status,scenes)
+        self.assertFalse(self.client.get(self.path).json()['scenes'])
+        _,ok=self.outline(board,[{'title':'Двор','frames':frame}]);self.assertEqual(ok.status_code,200,ok.text)
+        self.assertEqual(self.outline(board,[{'title':'Другая','frames':frame}])[1].status_code,409)
+        fresh=self.client.get(self.path).json()
+        self.assertEqual(self.outline(fresh,[{'title':'двор','frames':frame}])[1].status_code,409)
+        wrong=self.path.replace(self.pid,'wrong-project')+'/outline'
+        self.assertEqual(self.client.post(wrong,json={'base_revision':fresh['revision'],'request_id':uuid.uuid4().hex,'scenes':[{'title':'Z','frames':frame}]}).status_code,404)

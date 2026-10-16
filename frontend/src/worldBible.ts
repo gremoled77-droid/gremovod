@@ -1,17 +1,21 @@
 /** «Мир» из задания ролика: системный промпт для LLM, разбор JSON-ответа и слияние с уже заполненными полями. */
 export const WORLD_FIELDS = [
   ['look', 'Визуальный стиль'],
+  ['environment', 'Архитектура и среда'],
+  ['time', 'Время суток и сезон'],
+  ['tech', 'Уровень технологий'],
+  ['textures', 'Фактуры и материалы'],
   ['palette', 'Палитра'],
   ['lighting', 'Освещение'],
   ['camera', 'Камера и оптика'],
-  ['environment', 'Среда и локации'],
+  ['mood', 'Настроение'],
   ['rules', 'Неизменные правила'],
   ['avoid', 'Что запрещено'],
 ] as const;
 export type WorldKey = (typeof WORLD_FIELDS)[number][0];
 export type World = Record<WorldKey, string>;
 
-export const WORLD_SYSTEM = `Ты арт-директор мультсериала. По заданию ролика составь «Библию мира»: короткие конкретные описания для промптов генерации картинок и видео.
+export const WORLD_SYSTEM = `Ты арт-директор мультсериала. По заданию ролика составь «Паспорт мира» (10–15 строк, якорь единого стиля для всех сцен): короткие конкретные описания для промптов генерации картинок и видео.
 Верни ТОЛЬКО JSON без пояснений и без markdown, ровно с такими ключами (значения — строки на русском, 1–3 предложения, без воды):
 ${WORLD_FIELDS.map(([k, label]) => `"${k}": ${label}`).join('\n')}
 Правила: не придумывай новых героев, если их нет в задании; не пиши названия моделей и технические параметры API; в "avoid" перечисли, чего не должно быть в кадре.`;
@@ -48,4 +52,12 @@ export function mergeWorld(current: Partial<World> | undefined, next: Partial<Wo
     else if (old !== v) conflicts[k] = v;
   }
   return {fill, conflicts};
+}
+
+/** Паспорт мира одним куском: по строке на заполненное поле. Вставляется в другие инструменты как якорь стиля. */
+export function passportText(world: Partial<World> | undefined): string {
+  return WORLD_FIELDS.map(([k, label]) => ({label, value: (world?.[k] || '').trim().replace(/\s+/g, ' ')}))
+    .filter(f => f.value)
+    .map(f => `${f.label}: ${f.value}`)
+    .join('\n');
 }
