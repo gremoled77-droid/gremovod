@@ -1,0 +1,4 @@
+interface:
+  display_name: "GremoVOD — сценарий и сцены"
+  short_description: "Сценарии со сценами, кадрами и связями с библиотекой"
+  default_prompt: "Используй $gremovod-screenplay, чтобы оформить сценарий серии по сценам и подготовить данные для доски раскадровки."

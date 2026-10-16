@@ -1,0 +1,39 @@
+{
+  "source_commit": "008fde3ce3bfd295ea2e2c7d8bcf0561f0fa8b68",
+  "exported_at": "2026-10-16T15:16:37.526112+00:00",
+  "branch": "codex/skills",
+  "skills": [
+    "gremovod-screenplay",
+    "cinema-narrative-genre",
+    "cinema-mise-en-scene",
+    "cinema-camera-work",
+    "cinema-editing",
+    "cinema-sound-design",
+    "cinema-visual-structure"
+  ],
+  "checks": [
+    "frontmatter-required-fields",
+    "relative-markdown-links",
+    "json-parse"
+  ],
+  "not_checked": [
+    "end-to-end Codex invocation",
+    "application integration"
+  ],
+  "files": {
+    "skills/gremovod-screenplay/SKILL.md": "7bbc0813145d9c9d78c4f0a134be077e78d0f372d3bb578600715f14f6b107f0",
+    "skills/gremovod-screenplay/agents/openai.yaml": "233634023c986340205f1e1586c049fd019854a8bb2b271b30b02e1bb77f5397",
+    "skills/gremovod-screenplay/references/example.json": "3aed9a62c2ff6ce95bd4faf4a1a2705adb8800ea631450abe2ab6bd0a272f8c4",
+    "skills/gremovod-screenplay/references/format.md": "c6771d1e22f9224a42b6dd30dffa1ec7091b9b9849c74b4f82034b9e86c50238",
+    "skills/cinema-narrative-genre/SKILL.md": "0b675a268cd04544ee1962da03de9e06ea62620882c9ac0600df560972974531",
+    "skills/cinema-mise-en-scene/SKILL.md": "4dd4c62799a51402ef792819a807e14209626fa37cfd3f83d2a6320a3906183c",
+    "skills/cinema-camera-work/SKILL.md": "b7822fe48c9fde553e17a7f3d53071ecb158c29feeb06db140d18ea326932132",
+    "skills/cinema-editing/SKILL.md": "b7c7c158719d57823bce31f33869e159d24330f2936a418218cf08a08c3baa7c",
+    "skills/cinema-sound-design/SKILL.md": "91962839d2949cfc3a115869ad9526970d027cb6bb40bf80a67ff33c387237a8",
+    "skills/cinema-visual-structure/SKILL.md": "21b453ced4dc4e56fe41f375a7ec060e80c8300d29c5d4427206409b330dded4",
+    "docs/WILLIAMS_CHARACTER_ACTING_2026-10-16.md": "03bc864bb65ab04b3c295b2fa87d37c76762fc9244b10a378a95a9f7bce53a73",
+    "docs/BLOCK_VISUAL_STORY_2026-10-16.md": "901749056122d696b5ce0aa55d33263fa0538ba6ff79f534b235912940a2d880",
+    "docs/SKILLS_PRODUCTION_REFERENCE.md": "c4dc07fbeb501cfb5e037c33cfbd2605d365c9581285411859b789bdffe6bd50",
+    "README.md": "a59b0b8a36428c2bb57e3cb343b0ba0039bdf266234b410dc4ccf46fa786e675"
+  }
+}
