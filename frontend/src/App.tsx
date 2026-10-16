@@ -1,6 +1,4 @@
 import ProductionStoryboard from './ProductionStoryboard';
-const StoryboardDemo = lazy(() => import('./StoryboardDemo'));
-const GraphPanel = lazy(() => import('./WorkflowPanel'));
 import CharacterReferences from './CharacterReferences';
 import SettingsPanel from './SettingsPanel';
 import CinemaInfo from './CinemaInfo';
@@ -50,6 +48,9 @@ import {
   Palette,
   Settings,
 } from 'lucide-react';
+
+const StoryboardDemo = lazy(() => import('./StoryboardDemo'));
+const GraphPanel = lazy(() => import('./WorkflowPanel'));
 
 type ModelSpec = {
   kind: string;
