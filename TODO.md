@@ -1,5 +1,18 @@
 # Пожелания и задачи AI Workflow Studio
 
+## Видеомодели: навыки и адаптер Seedance 2.5 — 17.10.2026
+
+Сводка: docs/VIDEO_MODELS_PROMPTING_2026-10-17.md, правила моделей: skills/video-*, пять столпов: skills/cinema-five-pillars.
+
+- [x] Навыки по Seedance 2.0/2.5, FLUX 3, MiniMax H3, Kling 3.0 Omni и Start+Last Frame; лимиты референсов и теги в `model_catalog.py` (`ref_limits`, `ref_syntax`), без изменения `launch_enabled`.
+- [x] Адаптер Seedance 2.5: `video_urls`, `audio_urls`, `task` (reference/edit/extend), черновой режим и финал по `draft_task_id`, цена с входным видео и раскладка в `GenerationReview`. Тесты офлайн.
+- [x] Форма в «Кадры → Оживить кадр» (блок «Видео, аудио, правка и черновик»): ссылки на видео и аудио, длина референсов, тип задачи, черновик, финал по черновику.
+- [ ] Живой тест `edit`, `extend` и черновик → финал на 480p, 4 с; только по разрешению владельца и с лимитом (до $1 за вызов).
+- [ ] Выбор видео и аудио из библиотеки вместо вставки ссылок; ID черновика подставлять из очереди.
+- [ ] Живая проверка русской речи: Seedance 2.5 с аудиореференсом на коротком отрезке.
+- [ ] Seedance 2 + Private Asset Library: нужно решение владельца по `-less-restriction`; страницы PiAPI сохранены в docs/official-prompts/.
+- [ ] Адаптеры Kling 3.0 / Omni / Start+Last Frame (после сохранения страницы Kling Elements) и проверка FLUX 3 у PiAPI.
+
 ## Рилсы: меню рецептов сценариев — 16.10.2026
 
 Разбор паков промптов BALTÈON (сентябрь, №2, №3): docs/PROMPT_PACK_ANALYSIS_2026-10-16.md. Меню рецептов: backend/reel_recipes.py, backend/reel_recipes_data.py, frontend/src/ReelsScreen.tsx.
