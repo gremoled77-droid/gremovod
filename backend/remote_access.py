@@ -46,11 +46,15 @@ def allowed_host(hostname):
     return (hostname or '').lower() in config()[0]
 
 
+TAILSCALE_NET = ipaddress.ip_network('100.64.0.0/10')  # адреса Tailscale (частная сеть между своими устройствами)
+
+
 def private_ip(host):
     try:
-        return ipaddress.ip_address(host).is_private
+        address = ipaddress.ip_address(host)
     except ValueError:
         return False
+    return address.is_private or address in TAILSCALE_NET
 
 
 def allowed_origin(origin):

@@ -70,6 +70,12 @@ class HomeNetworkTests(unittest.TestCase):
         Req.client = type('C', (), {'host': '127.0.0.1'})()
         self.assertTrue(remote_access.is_loopback(Req()))
 
+    def test_tailscale_addresses_count_as_private(self):
+        self.assertTrue(remote_access.private_ip('100.101.102.103'))
+        self.assertFalse(remote_access.private_ip('8.8.8.8'))
+        with mock.patch.dict(os.environ, {"STUDIO_REMOTE_HOSTS": "100.101.102.103", 'STUDIO_ACCESS_PASSWORD': 'correct-horse-battery'}):
+            self.assertTrue(remote_access.allowed_origin('http://100.101.102.103:5173'))
+
     def test_http_origin_only_for_listed_private_ip_and_known_ports(self):
         with mock.patch.dict(os.environ, self.LAN):
             self.assertTrue(remote_access.allowed_origin('http://192.168.8.253:8000'))

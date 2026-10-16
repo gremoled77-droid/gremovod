@@ -54,7 +54,7 @@ def start():
     launch_env=os.environ.copy();launch_env['PATH']=str(ROOT/'tools/ffmpeg/bin')+os.pathsep+launch_env.get('PATH','')
     for port in [8000,5173]:
         if probe(port):print(f'Service {port}: already running');continue
-        command=[sys.executable,'-m','uvicorn','backend.main:app','--host','127.0.0.1','--port','8000','--no-access-log'] if port==8000 else [shutil.which('node') or 'node',str(ROOT/'frontend/node_modules/vite/bin/vite.js'),'--host','127.0.0.1','--port','5173','--strictPort']
+        command=[sys.executable,'-m','uvicorn','backend.main:app','--host','127.0.0.1','--port','8000','--no-access-log'] if port==8000 else [shutil.which('node') or 'node',str(ROOT/'frontend/node_modules/vite/bin/vite.js'),'--host','0.0.0.0' if os.environ.get('STUDIO_REMOTE_HOSTS') else '127.0.0.1','--port','5173','--strictPort']
         cwd=ROOT if port==8000 else ROOT/'frontend'
         with (runtime/f'{port}.log').open('a',encoding='utf-8') as log:
             process=subprocess.Popen(command,cwd=cwd,env=launch_env,stdin=subprocess.DEVNULL,stdout=log,stderr=subprocess.STDOUT,creationflags=flags)
