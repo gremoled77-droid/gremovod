@@ -79,6 +79,7 @@ function CreateScreenBody({projectId, heroes}: {projectId: string; heroes: Hero[
   const [refs, setRefs] = useState<string[]>(restored.refs);
   const [queue, setQueue] = useState<GenerationRequest[]>([]);
   const [notice, setNotice] = useState('');
+  const [codexJob, setCodexJob] = useState<{id: string; status: string; message: string} | null>(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
@@ -263,6 +264,57 @@ function CreateScreenBody({projectId, heroes}: {projectId: string; heroes: Hero[
   };
 
   /** Копирует промпт и создаёт ожидающее внешнее задание; с openChat ещё открывает чат ChatGPT. */
+  /** Ставит промпт и референсы в очередь ветки Codex на компьютере: она сама сгенерирует картинку. */
+  const toCodex = async () => {
+    setError('');
+    if (!prompt.trim()) return setError('Напиши промпт');
+    try {
+      const target = selected.find(id => id.startsWith('gpt-image-')) || 'gpt-image-2.5';
+      const job = await json(
+        await apiFetch('/api/chatgpt/jobs', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({
+            project_id: projectId,
+            target,
+            operation: 'generate',
+            request_id: crypto.randomUUID().replace(/-/g, ''),
+            brief: prompt,
+            reference_asset_ids: refs,
+          }),
+        })
+      );
+      setCodexJob({id: job.id, status: job.status, message: job.message});
+      const chat = await json(await apiFetch('/api/chatgpt/status')).catch(() => null);
+      setNotice(
+        chat?.worker_online
+          ? 'Отправлено в Codex. Картинка появится в библиотеке, когда ветка её сгенерирует.'
+          : 'Поставлено в очередь, но ветка Codex сейчас не слушает очередь. Открой её на компьютере и напиши «Продолжай очередь студии».'
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  };
+
+  useEffect(() => {
+    if (!codexJob || ['completed', 'failed', 'cancelled'].includes(codexJob.status)) return;
+    const timer = window.setInterval(() => {
+      void apiFetch('/api/chatgpt/jobs?project_id=' + encodeURIComponent(projectId))
+        .then(r => (r.ok ? r.json() : []))
+        .then((list: {id: string; status: string; message: string}[]) => {
+          const current = list.find(j => j.id === codexJob.id);
+          if (!current) return;
+          setCodexJob({id: current.id, status: current.status, message: current.message});
+          if (current.status === 'completed') {
+            void loadLibrary();
+            setNotice('Codex прислал картинку: она в библиотеке.');
+          }
+        })
+        .catch(() => undefined);
+    }, 6000);
+    return () => window.clearInterval(timer);
+  }, [codexJob, projectId]);
+
   const external = async (openChat = false) => {
     setError('');
     if (!prompt.trim()) return setError('Напиши промпт');
@@ -714,6 +766,36 @@ function CreateScreenBody({projectId, heroes}: {projectId: string; heroes: Hero[
           )}
         </div>
 
+        {codexJob && (
+          <div className={'cs-codex-status st-' + codexJob.status} role="status">
+            <b>Codex:</b>{' '}
+            {(
+              {
+                queued: 'в очереди',
+                preparing: 'готовит промпт',
+                generating: 'генерирует',
+                completed: 'готово',
+                failed: 'ошибка',
+                cancelled: 'отменено',
+              } as Record<string, string>
+            )[codexJob.status] || codexJob.status}
+            {codexJob.message ? ` · ${codexJob.message}` : ''}
+            {codexJob.status === 'queued' && (
+              <button
+                onClick={() => {
+                  void apiFetch(`/api/chatgpt/jobs/${codexJob.id}/cancel`, {method: 'POST'})
+                    .then(() => setCodexJob(null))
+                    .catch(e => setError(String(e)));
+                }}
+              >
+                Отменить
+              </button>
+            )}
+            {['completed', 'failed', 'cancelled'].includes(codexJob.status) && (
+              <button onClick={() => setCodexJob(null)}>Скрыть</button>
+            )}
+          </div>
+        )}
         <div className="cs-prompt">
           <textarea
             rows={3}
@@ -735,6 +817,9 @@ function CreateScreenBody({projectId, heroes}: {projectId: string; heroes: Hero[
             </button>
             <button disabled={!projectId} onClick={() => void external()}>
               Скопировать для ChatGPT
+            </button>
+            <button className="cs-send-codex" disabled={!projectId} onClick={() => void toCodex()}>
+              Отправить в Codex
             </button>
             <button className="cs-send-chat" disabled={!projectId} onClick={() => void external(true)}>
               Отправить в ChatGPT

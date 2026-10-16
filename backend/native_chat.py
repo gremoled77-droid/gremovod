@@ -25,6 +25,8 @@ class NativeRequest(BaseModel):
     operation: str = 'generate'
     request_id: str = Field(min_length=16, max_length=100,pattern=r'^[A-Za-z0-9_-]+$')
     use_scene: bool = False
+    brief: str = Field(default='', max_length=4000)  # готовый промпт из «Кадров» (только generate)
+    reference_asset_ids: list[str] = Field(default_factory=list, max_length=8)
     character_id: str | None = None
     production_id: str | None = None
     production_node_id: str | None = None
@@ -120,7 +122,13 @@ def register(app, studio):
         else:
             if body.source_asset_id or body.reference_asset_id or body.edit_instruction:
                 raise HTTPException(400,'Исходники правки разрешены только для операции edit')
-            context = studio.compose_context(studio.ComposeRequest(project_id=body.project_id, target=body.target,use_scene=body.use_scene,provider='codex_chat'))
+            if body.brief.strip():
+                if body.operation not in {'generate','prompt'} or body.use_scene:
+                    raise HTTPException(400,'Готовый промпт принимают только generate и prompt без сцены')
+                override={'brief':body.brief.strip(),'assets':[{'asset_id':a,'role':'reference','note':''} for a in dict.fromkeys(body.reference_asset_ids)]}
+                context = studio.compose_context(studio.ComposeRequest(project_id=body.project_id, target=body.target,use_scene=True,scene_override=override,provider='codex_chat'))
+            else:
+                context = studio.compose_context(studio.ComposeRequest(project_id=body.project_id, target=body.target,use_scene=body.use_scene,provider='codex_chat'))
         if body.target not in studio.MODEL_SPECS:raise HTTPException(400,'Неизвестная целевая модель')
         request = json.dumps({'body': body.model_dump(), 'context': context,
                               'rules': character_description.RULES if body.operation=='describe_character' else studio.system_rules(studio.MODEL_SPECS[body.target]),
