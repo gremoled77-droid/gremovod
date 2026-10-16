@@ -9,11 +9,13 @@
 """
 import hashlib
 import hmac
+import ipaddress
 import os
 import secrets
 import time
 from collections import defaultdict, deque
 from pathlib import Path
+from urllib.parse import urlparse
 
 from fastapi import Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
@@ -44,8 +46,20 @@ def allowed_host(hostname):
     return (hostname or '').lower() in config()[0]
 
 
+def private_ip(host):
+    try:
+        return ipaddress.ip_address(host).is_private
+    except ValueError:
+        return False
+
+
 def allowed_origin(origin):
-    return any(origin == f'https://{h}' for h in config()[0])
+    hosts = config()[0]
+    if any(origin == f'https://{h}' for h in hosts):
+        return True
+    # Домашняя сеть по HTTP: только частные IP-адреса из списка, например http://192.168.8.253:8000
+    parsed = urlparse(origin)
+    return parsed.scheme == 'http' and (parsed.hostname or '').lower() in hosts and private_ip(parsed.hostname)         and parsed.port in (None, 8000, 5173)
 
 
 def _key(password):
@@ -74,8 +88,11 @@ def client_ip(request: Request):
 
 
 def is_loopback(request: Request):
+    """Заголовок Host подделывается любым устройством сети, поэтому локальным запрос считается,
+    только если и Host, и адрес клиента loopback ('testclient' бывает лишь в тестах)."""
     host = request.headers.get('host', '').rsplit(':', 1)[0].strip('[]').lower()
-    return host in LOOPBACK
+    client = request.client.host if request.client else ''
+    return host in LOOPBACK and client in LOOPBACK | {'testclient'}
 
 
 LOGIN_PAGE = '''<!doctype html><html lang="ru"><head><meta charset="utf-8">

@@ -57,6 +57,28 @@ class RemoteAccessTests(unittest.TestCase):
             with self.assertRaises(RuntimeError):
                 remote_access.config()
 
+class HomeNetworkTests(unittest.TestCase):
+    setUp = test_smoke.StudioSmokeTests.setUp
+    tearDown = test_smoke.StudioSmokeTests.tearDown
+    LAN = {'STUDIO_REMOTE_HOSTS': '192.168.8.253', 'STUDIO_ACCESS_PASSWORD': 'correct-horse-battery'}
+
+    def test_spoofed_loopback_host_from_another_device_still_needs_login(self):
+        class Req:
+            headers = {'host': '127.0.0.1:8000'}
+            client = type('C', (), {'host': '192.168.8.50'})()
+        self.assertFalse(remote_access.is_loopback(Req()))
+        Req.client = type('C', (), {'host': '127.0.0.1'})()
+        self.assertTrue(remote_access.is_loopback(Req()))
+
+    def test_http_origin_only_for_listed_private_ip_and_known_ports(self):
+        with mock.patch.dict(os.environ, self.LAN):
+            self.assertTrue(remote_access.allowed_origin('http://192.168.8.253:8000'))
+            self.assertTrue(remote_access.allowed_origin('http://192.168.8.253'))
+            self.assertFalse(remote_access.allowed_origin('http://192.168.8.253:9999'))
+            self.assertFalse(remote_access.allowed_origin('http://192.168.8.77:8000'))
+        with mock.patch.dict(os.environ, {'STUDIO_REMOTE_HOSTS': '8.8.8.8', 'STUDIO_ACCESS_PASSWORD': 'correct-horse-battery'}):
+            self.assertFalse(remote_access.allowed_origin('http://8.8.8.8:8000'))
+
 
 if __name__ == '__main__':
     unittest.main()
