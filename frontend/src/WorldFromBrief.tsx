@@ -2,7 +2,7 @@ import {useState} from 'react';
 import {apiFetch} from './api';
 import {responseJson} from './ChatGPTPanel';
 import {LLM_MAX_TOKENS, LLM_MODELS} from './llmPricing';
-import {mergeWorld, parseWorld, WORLD_FIELDS, WORLD_SYSTEM, type World} from './worldFromBrief';
+import {mergeWorld, parseWorld, WORLD_FIELDS, WORLD_SYSTEM, type World} from './worldBible';
 
 const MODEL = 'gpt-5.6-sol';
 const post = (body: unknown) => ({

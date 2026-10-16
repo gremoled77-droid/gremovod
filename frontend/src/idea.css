@@ -128,3 +128,24 @@
     padding: 0 12px;
   }
 }
+.world-llm {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line, rgba(255, 255, 255, 0.08));
+  display: grid;
+  gap: 8px;
+}
+.world-llm-quote {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.world-llm-conflicts {
+  display: grid;
+  gap: 8px;
+}
+.world-llm-conflicts p {
+  margin: 2px 0 6px;
+  white-space: pre-wrap;
+}

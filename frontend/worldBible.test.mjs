@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {mergeWorld, parseWorld} from './src/worldFromBrief.ts';
+import {mergeWorld, parseWorld} from './src/worldBible.ts';
 
 test('JSON достаётся из обёртки markdown и текста вокруг', () => {
   const w = parseWorld('Вот мир:\n```json\n{"look":" тёплый 2D ","palette":"охра","x":"лишнее"}\n```');

@@ -29,6 +29,7 @@ import NativeGallery from './NativeGallery';
 import {type CharacterVersion} from './ReplaceCharacterButton';
 import RefinePanel, {EMPTY_REFINE, type RefineDraft} from './RefinePanel';
 import ChatGPTPanel from './ChatGPTPanel';
+import WorldFromBrief from './WorldFromBrief';
 import ScenePanel, {EMPTY_SCENE, type Scene} from './ScenePanel';
 import EconomicsPanel from './EconomicsPanel';
 import PromptComposer, {type PromptRequest} from './PromptComposer';
@@ -1931,6 +1932,14 @@ function App() {
                           </button>
                           <button onClick={() => setMode('scene')}>Собрать сцену из исходников</button>
                         </div>
+                        <WorldFromBrief
+                          projectId={projectId}
+                          brief={state.brief}
+                          style={state.style}
+                          ensureProject={ensureProject}
+                          onApply={fields => setState(s => ({...s, style: {...s.style, ...fields}}))}
+                          onDone={() => setMode('styles')}
+                        />
                       </section>
                       <section className="panel photo-setup" aria-label="Фото">
                         <h2>Фото · постановка и промпт</h2>
