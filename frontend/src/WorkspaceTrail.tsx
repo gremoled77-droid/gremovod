@@ -63,6 +63,7 @@ export default function WorkspaceTrail({
     agents: 'Агенты',
     connections: 'Подключения',
     settings: 'Настройки',
+    archive: 'Архив',
   };
   return (
     <div className="workspace-trail">

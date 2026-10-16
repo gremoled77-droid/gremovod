@@ -1857,6 +1857,18 @@ function App() {
                 </>
               ) : mode === 'audio' ? (
                 <>{audioPanel()}</>
+              ) : mode === 'archive' ? (
+                <AssetLibrary
+                  {...replacementControls}
+                  onRefine={refineAsset}
+                  onScene={addToScene}
+                  projectId={projectId}
+                  revision={libraryRevision}
+                  onUse={(link, id) => {
+                    change({videoReference: link, videoAssetId: id});
+                    setNotice('Изображение из библиотеки выбрано для Video Lab');
+                  }}
+                />
               ) : mode === 'studio' ? (
                 <>
                   <section className="panel">

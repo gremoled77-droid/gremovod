@@ -15,6 +15,7 @@ export const MODES: Mode[] = [
   'agents',
   'connections',
   'settings',
+  'archive',
 ];
 export function readWorkspaceRoute(hash: string): {projectId: string; mode: Mode} | null {
   const match = hash.match(/^#\/project\/([a-zA-Z0-9_-]{1,100})\/([a-z]+)$/);

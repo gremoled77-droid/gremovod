@@ -92,7 +92,7 @@ export default function AssetLibrary({
   }, [projectId, revision]);
   return (
     <section className="panel">
-      <h2>⑥ Библиотека проекта</h2>
+      <h2>Библиотека проекта</h2>
       {!projectId && <p className="muted">Сохрани проект, чтобы хранить результаты в его библиотеке.</p>}
       {projectId && !items.length && !error && (
         <p className="muted">
