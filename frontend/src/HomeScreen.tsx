@@ -75,107 +75,162 @@ export default function HomeScreen({
       : images.length
         ? {mode: 'create' as Mode, text: 'Продолжить: выбрать главный дубль и оживить кадр'}
         : {mode: 'studio' as Mode, text: 'Начать с идеи ролика'};
-  const pct = (a: number | undefined, b: number | undefined) =>
-    b ? Math.min(100, Math.round(((a ?? 0) / b) * 100)) : 0;
+
+  const videos = items.filter(i => i.kind === 'video' && i.asset_ids.length).length;
+  const stageMeta: Record<string, string> = {
+    '4': images.length ? `${images.length}+ картинок` : '',
+    '5': videos ? `${videos} клипов` : '',
+  };
+  const nextN = next.mode === 'create' ? '4' : '1';
+  const Gauge = ({label, used, limit}: {label: string; used?: number; limit?: number}) => {
+    const p = limit ? Math.min(1, (used ?? 0) / limit) : 0;
+    const R = 34;
+    const C = 2 * Math.PI * R;
+    return (
+      <div className="hg">
+        <svg viewBox="0 0 84 84" aria-hidden="true">
+          <circle cx="42" cy="42" r={R} className="hg-bg" />
+          <circle
+            cx="42"
+            cy="42"
+            r={R}
+            className="hg-fg"
+            strokeDasharray={`${C * p} ${C}`}
+            transform="rotate(-90 42 42)"
+          />
+        </svg>
+        <div className="hg-t">
+          <b>{money(used)}</b>
+          <small>из {money(limit)}</small>
+        </div>
+        <span>{label}</span>
+      </div>
+    );
+  };
 
   return (
     <section className="home">
-      <div className="home-hero">
-        <div>
-          <div className="muted">GremoVOD Studio</div>
-          <h1>{projectName || 'Новый проект'}</h1>
-          {projects.length > 1 && (
-            <select value={projectId} onChange={e => onOpenProject(e.target.value)} aria-label="Проект">
-              {projects.map(p => (
-                <option key={p.id} value={p.id}>
-                  {p.title}
-                </option>
-              ))}
-            </select>
+      <div className="home-glow" aria-hidden="true" />
+      <header className="home-hero">
+        <div className="home-slate">
+          <div className="home-slate-bar" aria-hidden="true">
+            {Array.from({length: 8}).map((_, i) => (
+              <i key={i} />
+            ))}
+          </div>
+          <div className="home-slate-body">
+            <span className="home-eyebrow">GREMOVOD STUDIO · AI ANIMATION PIPELINE</span>
+            <h1>{projectName || 'Новый проект'}</h1>
+            <div className="home-meta">
+              <span>
+                <small>ЭТАПОВ</small>8
+              </span>
+              <span>
+                <small>КАДРОВ</small>
+                {images.length}+
+              </span>
+              <span>
+                <small>В РАБОТЕ</small>
+                {active.length + waiting.length}
+              </span>
+              <span>
+                <small>СЕГОДНЯ</small>
+                {money(budget?.daily_reserved_usd)}
+              </span>
+            </div>
+            {projects.length > 1 && (
+              <select value={projectId} onChange={e => onOpenProject(e.target.value)} aria-label="Проект">
+                {projects.map(p => (
+                  <option key={p.id} value={p.id}>
+                    {p.title}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+        </div>
+        <button className="home-cta" onClick={() => onMode(next.mode)}>
+          <span className="home-cta-k">NEXT TAKE</span>
+          <span className="home-cta-t">{next.text}</span>
+          <span className="home-cta-a" aria-hidden="true">
+            →
+          </span>
+        </button>
+      </header>
+
+      <div className="home-film" aria-label="Последние кадры">
+        <div className="home-perf" aria-hidden="true" />
+        <div className="home-frames">
+          {images.slice(0, 6).map((a, i) => (
+            <button key={a.id} onClick={() => onMode('create')} aria-label={'Кадр ' + (i + 1)}>
+              <img src={a.thumbnail_url || a.url} alt="" />
+              <span>{String(i + 1).padStart(2, '0')}</span>
+            </button>
+          ))}
+          {!images.length && (
+            <div className="home-frames-empty">Плёнка пуста. Первый кадр рождается на экране «Кадры».</div>
           )}
         </div>
-        <button className="primary home-next" onClick={() => onMode(next.mode)}>
-          <small>Дальше</small>
-          {next.text} →
-        </button>
+        <div className="home-perf" aria-hidden="true" />
       </div>
 
       <div className="home-grid">
         <div className="home-col">
-          <h2>Путь ролика</h2>
-          <div className="home-steps">
+          <h2>
+            <i /> Конвейер ролика
+          </h2>
+          <ol className="home-track">
             {STEPS.map(s => (
-              <button key={s.n + s.title} className="home-step" onClick={() => onMode(s.mode)}>
-                <span className="home-n">{s.n}</span>
-                <span>
-                  <b>{s.title}</b>
-                  <small>{s.text}</small>
-                </span>
-              </button>
+              <li key={s.n + s.title} className={s.n === nextN ? 'now' : ''}>
+                <button onClick={() => onMode(s.mode)}>
+                  <span className="home-n">{s.n}</span>
+                  <span className="home-st">
+                    <b>{s.title}</b>
+                    <small>{s.text}</small>
+                    {stageMeta[s.n] && <em>{stageMeta[s.n]}</em>}
+                  </span>
+                </button>
+              </li>
             ))}
-          </div>
-
-          <h2>Последние картинки</h2>
-          <div className="home-thumbs">
-            {images.map(a => (
-              <button key={a.id} onClick={() => onMode('create')} aria-label="Открыть «Кадры»">
-                <img src={a.thumbnail_url || a.url} alt="" />
-              </button>
-            ))}
-            {!images.length && <span className="muted">Пока нет. Начни на экране «Кадры».</span>}
-          </div>
+          </ol>
         </div>
 
         <aside className="home-col">
-          <h2>Сейчас</h2>
+          <h2>
+            <i /> Очередь рендера
+          </h2>
           <div className="home-card">
-            {latest.map(i => (
-              <div key={i.id} className="home-job">
-                <span
-                  className={'dot ' + (i.status === 'failed' ? 'bad' : waiting.includes(i) ? 'warn' : '')}
-                />
-                <span className="home-job-text">
-                  <b>{i.model || i.provider}</b>
-                  <small>{i.prompt.slice(0, 48)}</small>
-                </span>
-                <em>{STATUS[i.status] || i.status}</em>
-              </div>
-            ))}
+            {latest.map(i => {
+              const live = ['queued', 'running', 'processing'].includes(i.status);
+              return (
+                <div key={i.id} className={'home-job' + (live ? ' live' : '')}>
+                  <span
+                    className={'dot ' + (i.status === 'failed' ? 'bad' : waiting.includes(i) ? 'warn' : '')}
+                  />
+                  <span className="home-job-text">
+                    <b>{i.model || i.provider}</b>
+                    <small>{i.prompt.slice(0, 48)}</small>
+                  </span>
+                  <em>{STATUS[i.status] || i.status}</em>
+                </div>
+              );
+            })}
             {!latest.length && <span className="muted">Заданий пока нет</span>}
           </div>
 
-          <h2>Расход</h2>
-          <div className="home-card">
-            <div className="home-meter">
-              <div>
-                <span>Сегодня</span>
-                <b>
-                  {money(budget?.daily_reserved_usd)} / {money(budget?.daily_limit_usd)}
-                </b>
-              </div>
-              <i>
-                <u style={{width: pct(budget?.daily_reserved_usd, budget?.daily_limit_usd) + '%'}} />
-              </i>
-            </div>
-            <div className="home-meter">
-              <div>
-                <span>Проект</span>
-                <b>
-                  {money(budget?.project_reserved_usd)} / {money(budget?.project_limit_usd)}
-                </b>
-              </div>
-              <i>
-                <u style={{width: pct(budget?.project_reserved_usd, budget?.project_limit_usd) + '%'}} />
-              </i>
-            </div>
-            <button onClick={() => onMode('economics')}>Бюджет и лимиты</button>
+          <h2>
+            <i /> Бюджет
+          </h2>
+          <div className="home-card home-gauges">
+            <Gauge label="Сегодня" used={budget?.daily_reserved_usd} limit={budget?.daily_limit_usd} />
+            <Gauge label="Проект" used={budget?.project_reserved_usd} limit={budget?.project_limit_usd} />
+            <button onClick={() => onMode('economics')}>Лимиты</button>
           </div>
 
-          <h2>Быстро</h2>
           <div className="home-quick">
             <button onClick={() => onMode('create')}>Сгенерировать кадр</button>
-            <button onClick={() => onMode('graph')}>Открыть узлы</button>
-            <button onClick={() => onMode('connections')}>Подключения API</button>
+            <button onClick={() => onMode('graph')}>Узлы</button>
+            <button onClick={() => onMode('connections')}>API</button>
           </div>
         </aside>
       </div>
