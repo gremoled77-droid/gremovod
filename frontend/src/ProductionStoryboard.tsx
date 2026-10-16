@@ -6,6 +6,10 @@ import {useEffect, useRef, useState} from 'react';
 import {apiFetch} from './api';
 import {responseJson} from './ChatGPTPanel';
 import Lightbox, {type LightboxItem} from './Lightbox';
+import {analyzeAsset, shotPoints, TensionGraph, useVisualPlans, VisualPlanForm} from './VisualPlanPanel';
+import {emptyPlan, planFromAnalysis} from './visualPlan';
+import VisualRulesForm from './VisualRulesForm';
+import EditListPanel from './EditListPanel';
 import './ProductionStoryboard.css';
 
 type Node = {
@@ -96,6 +100,29 @@ export default function ProductionStoryboard({
     [notice, setNotice] = useState(''),
     [showScript, setShowScript] = useState(false),
     [importMode, setImportMode] = useState<'append' | 'update'>('append');
+  const visual = useVisualPlans(pid, sid);
+  const [estimating, setEstimating] = useState(false);
+  const estimateEmpty = async () => {
+    if (!board) return;
+    setEstimating(true);
+    setError('');
+    try {
+      for (const scene of board.scenes)
+        for (const frame of scene.frames) {
+          const current = visual.plans[frame.id] || emptyPlan();
+          if (current.visual !== null) continue;
+          const image =
+            frame.files.find(f => f.id === frame.selection.selected_image_file_id) ||
+            frame.files.find(f => f.kind === 'image');
+          if (!image?.asset_id) continue;
+          await visual.save(frame.id, planFromAnalysis(current, await analyzeAsset(image.asset_id)));
+        }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setEstimating(false);
+    }
+  };
   const key = pid + '/' + sid,
     path = `/api/productions/${pid}/series/${sid}/storyboard`;
   const script = drafts[key] ?? board?.script ?? '';
@@ -380,6 +407,7 @@ export default function ProductionStoryboard({
             <button onClick={() => setShowScript(s => !s)}>Вставить сценарий</button>
             <button onClick={() => inspect(sid)}>Файлы и описание серии ↗</button>
           </div>
+          <VisualRulesForm key={sid} pid={pid} nid={sid} />
           {showScript && (
             <section className="ps-script">
               <label>
@@ -487,6 +515,14 @@ export default function ProductionStoryboard({
           {!board.scenes.length && (
             <p>Сцен ещё нет. Вставь сценарий и проверь разбиение перед сохранением.</p>
           )}
+          {board.scenes.some(s => s.frames.length) && <EditListPanel key={sid} pid={pid} sid={sid} />}
+          {board.scenes.some(s => s.frames.length) && (
+            <TensionGraph
+              points={shotPoints(board.scenes, visual.plans)}
+              onEstimate={() => void estimateEmpty()}
+              estimating={estimating}
+            />
+          )}
           {board.scenes.map(scene => (
             <article key={scene.id} className="ps-scene">
               <div className="ps-scene-head">
@@ -518,6 +554,11 @@ export default function ProductionStoryboard({
                 )}
                 <button onClick={() => inspect(scene.id)}>Состав сцены и бэкграунд</button>
               </div>
+              <VisualPlanForm
+                kind="scene"
+                plan={visual.plans[scene.id]}
+                onSave={plan => visual.save(scene.id, plan)}
+              />
               <div className="ps-frames">
                 {scene.frames.map(frame => {
                   const image =
@@ -592,6 +633,13 @@ export default function ProductionStoryboard({
                         </button>
                         <button onClick={() => inspect(frame.id)}>Файлы ↗</button>
                       </div>
+                      <VisualPlanForm
+                        kind="frame"
+                        assetId={image?.asset_id}
+                        verticalUrl={`/api/productions/${pid}/nodes/${frame.id}/vertical-prompt`}
+                        plan={visual.plans[frame.id]}
+                        onSave={plan => visual.save(frame.id, plan)}
+                      />
                     </article>
                   );
                 })}

@@ -80,11 +80,13 @@ def context(studio,body):
                 seen.add(str(path));refs.append({'label':studio.reference_label(body.target,len(refs)+1),'local_path':str(path),'role':item['kind'],'note':item['title'],'asset_id':f['asset_id']})
         limit=studio.MODEL_SPECS[body.target]['max_refs']
         if len(refs)>limit:raise HTTPException(400,'Слишком много референсов. Выбери основные изображения в карточках')
+        from backend import visual_plan
+        style=visual_plan.rules_text(db,body.production_id,node['id'])
         character=None
         if node['kind']=='character':
             project=db.execute('SELECT state FROM projects WHERE id=?',(common['source_project_id'],)).fetchone()
             character=next((c for c in json.loads(project['state']).get('characters',[]) if c['id']==node['character_id']),None)
-    return {'brief':node['notes']+'\n\nЗАДАНИЕ: '+body.entity_instruction,'references':refs,'character':character,
+    return {'brief':node['notes']+('\n\n'+style if style else '')+'\n\nЗАДАНИЕ: '+body.entity_instruction,'references':refs,'character':character,
             'scene':{'participants':[{'id':n['id'],'kind':n['kind'],'name':n['title'],'description':n['notes']} for n in related]},
             'entity':{'production_id':body.production_id,'node_id':node['id'],'kind':node['kind'],'title':node['title'],'character_id':node.get('character_id'),'revision':revision},
             'capabilities':studio.MODEL_SPECS[body.target],'rules_version':studio.RULES_VERSION,

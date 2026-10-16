@@ -3,6 +3,7 @@ import {apiFetch} from './api';
 import {responseJson} from './ChatGPTPanel';
 import ReplaceCharacterButton, {type CharacterVersion} from './ReplaceCharacterButton';
 import CharacterVoicePanel from './CharacterVoicePanel';
+import VisualRulesForm from './VisualRulesForm';
 import {readLocal, writeLocal, clearLocal} from './localDrafts';
 
 type Selection = {
@@ -280,6 +281,7 @@ export default function ProductionEntityEditor({
                 onChange={e => update({notes: e.target.value})}
               />
             </label>
+            <VisualRulesForm pid={pid} nid={nid} />
             {editor.node.kind === 'episode' && (
               <>
                 <fieldset>

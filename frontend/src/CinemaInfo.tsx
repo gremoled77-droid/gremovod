@@ -1,7 +1,7 @@
 import {useState} from 'react';
 import {Info} from 'lucide-react';
 
-export type CinemaTopic = 'narrative' | 'mise' | 'camera' | 'editing' | 'sound';
+export type CinemaTopic = 'narrative' | 'mise' | 'camera' | 'editing' | 'sound' | 'visual';
 
 const TOPICS: Record<CinemaTopic, {title: string; points: string[]}> = {
   narrative: {
@@ -34,6 +34,14 @@ const TOPICS: Record<CinemaTopic, {title: string; points: string[]}> = {
       'Ритм задают длительность шота и чередование движения с покоем.',
       'Стык двух шотов должен читаться: совпадение движения или взгляда, перемена плана.',
       'Для видео держи шоты короткими и с одним действием, чтобы склейка работала.',
+    ],
+  },
+  visual: {
+    title: 'Визуальная структура',
+    points: [
+      'Семь компонентов кадра: пространство, линия, форма, тон, цвет, движение, ритм. Контраст повышает напряжение, однородность снижает.',
+      'Веди визуальное напряжение вместе с сюжетом: спокойно в начале, пик в кульминации, спад в развязке.',
+      'Если внимание кончается и начинается в одном секторе сетки 3×3, склейка гладкая.',
     ],
   },
   sound: {

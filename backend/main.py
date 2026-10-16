@@ -786,6 +786,12 @@ from backend import production_entities
 production_entities.register(app,sys.modules[__name__])
 from backend import visual_plan
 visual_plan.register(app,sys.modules[__name__])
+from backend import frame_analysis
+frame_analysis.register(app,sys.modules[__name__])
+from backend import edit_list
+edit_list.register(app,sys.modules[__name__])
+from backend import clip_chain
+clip_chain.register(app,sys.modules[__name__])
 from backend import series_economics
 series_economics.register(app,sys.modules[__name__])
 from backend import character_voice

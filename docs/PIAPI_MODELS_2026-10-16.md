@@ -97,4 +97,5 @@ LLM: единый OpenAI-совместимый эндпоинт (`/docs/llm-api
 - **Seedream 5 Pro (1K)** $0.068: `output.image_urls`.
 - **MiniMax H3 txt2video 480p / 5 с** $0.15: `resolution` принимается **только в нижнем регистре** (`480p`, `768p`, `1080p`); `480P` даёт `Invalid input`. Результат — `output.video_url`.
 - Картинки лежат на `img.theapi.app` (путь `/temp` или `/ephemeral`), домен должен быть доступен для скачивания.
-- Не проверялись: референсы и правки GPT Image (sunburst), референсы Seedream/Nano, img2video MiniMax.
+- **MiniMax H3 img2video 480p / 5 с** $0.15 (проверено 2026-10-16, дважды: клип из загруженной картинки и продолжение из последнего кадра предыдущего клипа): параметры `image`, `prompt`, `resolution`, `duration`, `aspect_ratio` принимаются; первый кадр результата совпадает с входной картинкой.
+- Не проверялись: референсы и правки GPT Image (sunburst), референсы Seedream/Nano.

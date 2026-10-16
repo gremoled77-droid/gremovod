@@ -1,0 +1,126 @@
+.vp-graph {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: 14px;
+  padding: 14px 16px;
+  margin: 0 0 18px;
+}
+.vp-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.vp-head h3 {
+  margin: 0;
+  font-size: 15px;
+}
+.vp-graph svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+.vp-graph text {
+  fill: var(--muted);
+  font-size: 10px;
+}
+.vp-axis {
+  stroke: var(--border);
+  stroke-width: 1;
+}
+.vp-story,
+.vp-visual {
+  fill: none;
+  stroke-width: 2.4;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.vp-story {
+  stroke: var(--accent);
+}
+.vp-visual {
+  stroke: #6ab7ff;
+}
+.vp-legend {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+.vp-legend i {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin: 0 4px 0 10px;
+}
+.vp-story-dot {
+  background: var(--accent);
+}
+.vp-visual-dot {
+  background: #6ab7ff;
+}
+.vp-warn {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: var(--accent);
+}
+.vp-jumps {
+  font-size: 12px;
+  color: var(--muted);
+  padding-left: 18px;
+}
+.vp-form {
+  margin: 8px 0 0;
+  font-size: 13px;
+}
+.vp-form summary {
+  cursor: pointer;
+}
+.vp-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 8px 12px;
+  margin: 8px 0;
+}
+.vp-fields label,
+.vp-wide {
+  display: grid;
+  gap: 3px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.vp-wide {
+  margin: 6px 0;
+}
+.vp-ok {
+  color: #7ad39a;
+  font-size: 12px;
+}
+.vp-err {
+  color: #ff8a8a;
+  font-size: 12px;
+}
+.vp-analysis {
+  margin: 8px 0;
+  font-size: 12px;
+}
+.vp-analysis ul {
+  margin: 6px 0;
+  padding-left: 18px;
+  color: var(--muted);
+}
+.vp-squint {
+  display: block;
+  max-width: 320px;
+  width: 100%;
+  margin-top: 6px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+.vp-prompt {
+  white-space: pre-wrap;
+  font-size: 11px;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 8px;
+  padding: 8px;
+}

@@ -59,6 +59,21 @@ function CreateScreenBody({projectId, heroes}: {projectId: string; heroes: Hero[
   const [specs, setSpecs] = useState<Record<string, Spec>>({});
   const [library, setLibrary] = useState<LibAsset[]>([]);
   const [prompt, setPrompt] = useState(restored.prompt);
+  async function addVisualRules() {
+    setError('');
+    try {
+      const data = await json(await apiFetch(`/api/projects/${projectId}/visual-rules-prompt`));
+      if (!data.prompt)
+        return setError(
+          'Для этого проекта визуальные правила не заданы: открой серию или сцену в раскадровке.'
+        );
+      setPrompt(current =>
+        current.includes('VISUAL RULES') ? current : current.trimEnd() + '\n\n' + data.prompt
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  }
   const [selected, setSelected] = useState<string[]>(restored.selected);
   const [options, setOptions] = useState<Record<string, Record<string, string | number>>>(restored.options);
   const [refs, setRefs] = useState<string[]>(restored.refs);
@@ -171,6 +186,20 @@ function CreateScreenBody({projectId, heroes}: {projectId: string; heroes: Hero[
       duration: {min: spec.duration_min, max: spec.duration_max, default: spec.duration_min},
       aspect_ratio: {values: spec.aspect_ratio, default: spec.aspect_ratio?.[0]},
     };
+  };
+  /** Цепочка клипов: последний кадр видео становится первым кадром следующего. */
+  const continueFrom = async (videoAssetId: string) => {
+    setError('');
+    setBusy(true);
+    try {
+      const frame = await json(await apiFetch(`/api/library/${videoAssetId}/last-frame`, {method: 'POST'}));
+      await loadLibrary();
+      setAnimate(frame.id);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
   };
   const startAnimate = async () => {
     setError('');
@@ -646,6 +675,15 @@ function CreateScreenBody({projectId, heroes}: {projectId: string; heroes: Hero[
                     </div>
                     <div className="cs-row">
                       {item.kind === 'image' && <button onClick={() => setAnimate(aid)}>Оживить</button>}
+                      {item.kind === 'video' && (
+                        <button
+                          disabled={busy}
+                          title="Сохранить последний кадр клипа и начать с него следующий клип"
+                          onClick={() => void continueFrom(aid)}
+                        >
+                          Продолжить →
+                        </button>
+                      )}
                       <button onClick={() => regenerate(item)} title="Подставить промпт и модель">
                         ↻
                       </button>
@@ -688,6 +726,13 @@ function CreateScreenBody({projectId, heroes}: {projectId: string; heroes: Hero[
               {refs.length} реф. · {total} {total === 1 ? 'модель' : 'моделей'}
             </span>
             <span className="cs-spacer" />
+            <button
+              disabled={!projectId}
+              title="Добавить в промпт визуальные правила серии, локации и героев этого кадра"
+              onClick={() => void addVisualRules()}
+            >
+              ＋ Визуальные правила
+            </button>
             <button disabled={!projectId} onClick={() => void external()}>
               Скопировать для ChatGPT
             </button>
