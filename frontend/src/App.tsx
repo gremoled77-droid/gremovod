@@ -1,6 +1,7 @@
 import ProductionStoryboard from './ProductionStoryboard';
 import CharacterReferences from './CharacterReferences';
 import SettingsPanel from './SettingsPanel';
+import StageFooter from './StageFooter';
 import CinemaInfo from './CinemaInfo';
 import ProjectHeader from './ProjectHeader';
 import FramePanel, {
@@ -1357,7 +1358,9 @@ function App() {
                       ? 'home-main'
                       : mode === 'graph'
                         ? 'workflow-main'
-                        : ''
+                        : mode === 'styles'
+                          ? 'styles-main'
+                          : 'solo-main'
             }
           >
             <aside className="sidebar">
@@ -2000,6 +2003,7 @@ function App() {
                   />
                 </Suspense>
               )}
+              <StageFooter mode={mode} onMode={setMode} />
               <footer>Workflow Studio · ChatGPT · сцены · экономика ролика</footer>
             </div>
           </main>

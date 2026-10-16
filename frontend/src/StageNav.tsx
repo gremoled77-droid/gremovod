@@ -19,7 +19,7 @@ export type Mode =
 
 type Item = {key: string; mode: Mode; label: string; hint?: string; icon: ReactNode};
 
-const STAGES: Item[] = [
+export const STAGES: Item[] = [
   {key: 'idea', mode: 'studio', label: 'Идея', hint: 'задание ролика', icon: '1'},
   {key: 'world', mode: 'styles', label: 'Мир', hint: 'стиль и герои', icon: '2'},
   {key: 'board', mode: 'storyboard', label: 'Раскадровка', hint: 'кадры эпизода', icon: '3'},

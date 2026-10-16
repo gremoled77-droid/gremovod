@@ -494,3 +494,80 @@ section.panel {
   background: #2a2111;
   color: var(--accent);
 }
+
+/* Экраны без левой колонки проекта: одна колонка по центру */
+.app main.solo-main {
+  display: block;
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 0 22px;
+  box-sizing: border-box;
+}
+.solo-main > .sidebar {
+  display: none;
+}
+.solo-main > .content {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding-left: 0;
+  padding-right: 0;
+}
+
+/* Нижняя полоса этапа */
+.stage-footer {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 12px;
+  margin: 28px 0 8px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+.stage-footer button {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-align: left;
+  padding: 10px 16px;
+  border-radius: 12px;
+}
+.stage-footer button small {
+  font-size: 11px;
+  opacity: 0.75;
+}
+.stage-footer-prev {
+  justify-self: start;
+}
+.stage-footer-next {
+  justify-self: end;
+  text-align: right !important;
+}
+.stage-footer-step {
+  color: var(--muted);
+  font-size: 12px;
+  text-align: center;
+}
+@media (max-width: 700px) {
+  .app main.solo-main {
+    padding: 0 12px;
+  }
+  .stage-footer {
+    grid-template-columns: 1fr 1fr;
+    margin-bottom: 76px;
+  }
+  .stage-footer-step {
+    display: none;
+  }
+}
+
+/* Телефон, «Мир»: содержимое выше колонки персонажей */
+@media (max-width: 700px) {
+  .app main.styles-main {
+    display: flex;
+    flex-direction: column;
+  }
+  .styles-main > .sidebar {
+    order: 2;
+  }
+}
