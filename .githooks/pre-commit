@@ -2,7 +2,7 @@
 set -eu
 repo=$(git rev-parse --show-toplevel)
 common=$(git rev-parse --path-format=absolute --git-common-dir)
-shared=$(dirname "$common")
+shared=${common%/*}
 if [ -x "$repo/.venv/Scripts/python.exe" ]; then
   exec "$repo/.venv/Scripts/python.exe" -X utf8 "$repo/scripts/check_git_files.py" --staged
 elif [ -x "$shared/.venv/Scripts/python.exe" ]; then
