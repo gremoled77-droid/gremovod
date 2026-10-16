@@ -22,6 +22,14 @@
   header .top-actions > * {
     flex: none;
   }
+  .topbar .top-actions {
+    width: 100%;
+    flex-wrap: wrap;
+    overflow: visible;
+  }
+  .topbar .project-global-actions {
+    margin-left: 0;
+  }
   main {
     padding: 10px 12px;
   }

@@ -17,8 +17,8 @@ const STEPS: {mode: Mode; n: string; title: string; text: string}[] = [
   {mode: 'styles', n: '2', title: 'Мир', text: 'Стиль, герои, локации'},
   {mode: 'storyboard', n: '3', title: 'Раскадровка', text: 'Сцены и кадры эпизода'},
   {mode: 'create', n: '4', title: 'Кадры', text: 'Картинки от нескольких моделей'},
-  {mode: 'studio', n: '5', title: 'Видео', text: 'Оживить кадры'},
-  {mode: 'studio', n: '6', title: 'Звук', text: 'Голос и музыка'},
+  {mode: 'video', n: '5', title: 'Видео', text: 'Оживить кадры'},
+  {mode: 'audio', n: '6', title: 'Звук', text: 'Голос и музыка'},
   {mode: 'files', n: '7', title: 'Монтаж', text: 'Выгрузка в CapCut по порядку кадров'},
   {mode: 'economics', n: '8', title: 'Выпуск', text: 'Бюджет серии и итоги'},
 ];
@@ -58,14 +58,14 @@ export default function HomeScreen({
       .then(r => (r.ok ? r.json() : null))
       .then(setBudget)
       .catch(() => undefined);
-  }, [projectId, items.length]);
+  }, [projectId, items]);
   useEffect(() => {
     if (!projectId) return;
     void apiFetch('/api/library?project_id=' + encodeURIComponent(projectId))
       .then(r => (r.ok ? r.json() : []))
       .then(list => setImages(list.filter((a: any) => (a.metadata?.kind || 'image') === 'image').slice(0, 8)))
       .catch(() => undefined);
-  }, [projectId, items.length]);
+  }, [projectId, items]);
 
   const waiting = items.filter(i => i.status === 'waiting_external');
   const active = items.filter(i => ['queued', 'running', 'processing'].includes(i.status));

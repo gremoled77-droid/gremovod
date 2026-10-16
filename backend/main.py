@@ -48,6 +48,7 @@ def connect():
 def init():
     with connect() as db:
         db.execute('CREATE TABLE IF NOT EXISTS projects (id TEXT PRIMARY KEY, title TEXT NOT NULL, state TEXT NOT NULL, updated_at TEXT NOT NULL)')
+        db.execute('CREATE TABLE IF NOT EXISTS project_archives(project_id TEXT PRIMARY KEY,reason TEXT NOT NULL,archived_at TEXT NOT NULL)')
         if 'revision' not in {r['name'] for r in db.execute('PRAGMA table_info(projects)')}:
             db.execute('ALTER TABLE projects ADD COLUMN revision INTEGER NOT NULL DEFAULT 0')
         db.execute('''CREATE TRIGGER IF NOT EXISTS project_revision AFTER UPDATE OF state,title ON projects
@@ -71,7 +72,19 @@ def health(): return {'ok':True,'version':'0.3.0','mode':'local'}
 
 @app.get('/api/projects')
 def projects():
-    with connect() as db: return [dict(x) for x in db.execute('SELECT id,title,updated_at FROM projects ORDER BY updated_at DESC')]
+    with connect() as db: return [dict(x) for x in db.execute('SELECT id,title,updated_at FROM projects WHERE id NOT IN (SELECT project_id FROM project_archives) ORDER BY updated_at DESC')]
+
+@app.get('/api/archived-projects')
+def archived_projects():
+    with connect() as db:
+        return [dict(r) for r in db.execute('SELECT p.id,p.title,a.reason,a.archived_at FROM project_archives a JOIN projects p ON p.id=a.project_id ORDER BY a.archived_at DESC')]
+
+@app.post('/api/projects/{pid}/restore')
+def restore_project(pid:str):
+    with connect() as db:
+        if not db.execute('SELECT 1 FROM projects WHERE id=?',(pid,)).fetchone():raise HTTPException(404,'Проект не найден')
+        db.execute('DELETE FROM project_archives WHERE project_id=?',(pid,))
+    return {'restored':True}
 
 @app.get('/api/projects/{pid}')
 def project(pid:str):

@@ -1,6 +1,7 @@
 import type {ReactNode} from 'react';
 import {Settings} from 'lucide-react';
 import {PAID_LLM_ENABLED} from './api';
+import ArchivedProjects from './ArchivedProjects';
 
 type Props = {
   children?: ReactNode;
@@ -12,6 +13,7 @@ type Props = {
   onModel: (model: string) => void;
   onConnections: () => void;
   onDiagnose: () => void;
+  onProjectsChanged: () => void;
 };
 
 export default function SettingsPanel({
@@ -23,6 +25,7 @@ export default function SettingsPanel({
   onModel,
   onConnections,
   onDiagnose,
+  onProjectsChanged,
   children,
 }: Props) {
   return (
@@ -72,6 +75,7 @@ export default function SettingsPanel({
         </details>
       )}
       <hr />
+      <ArchivedProjects onRestored={onProjectsChanged} />
       <h3>Окружение студии</h3>
       <button className="secondary" disabled={busy} onClick={onDiagnose}>
         Проверить окружение

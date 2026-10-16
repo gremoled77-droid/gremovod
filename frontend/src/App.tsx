@@ -36,7 +36,10 @@ import CreateScreen from './CreateScreen';
 import HomeScreen from './HomeScreen';
 import GenerationWatcher from './GenerationWatcher';
 import {ActivityProvider} from './ActivityContext';
-import StageNav from './StageNav';
+import StageNav, {type Mode} from './StageNav';
+import WorkspaceTrail, {type WorkspaceLocation} from './WorkspaceTrail';
+import {readWorkspaceRoute, workspaceHash} from './workspaceRoute';
+import {readLocal, writeLocal, clearLocal} from './localDrafts';
 import Dock, {countActive} from './Dock';
 import useActivity from './useActivity';
 import AgentPanel from './AgentPanel';
@@ -178,21 +181,21 @@ function App() {
   const [storyboardDemoOpen, setStoryboardDemoOpen] = useState(false);
   const [dockOpen, setDockOpen] = useState(false);
   const [demoVisited, setDemoVisited] = useState(false);
-  const [mode, setMode] = useState<
-    | 'studio'
-    | 'graph'
-    | 'agents'
-    | 'styles'
-    | 'connections'
-    | 'scene'
-    | 'economics'
-    | 'refine'
-    | 'files'
-    | 'settings'
-    | 'storyboard'
-    | 'create'
-    | 'home'
-  >('home');
+  const [mode, setMode] = useState<Mode>(() => readWorkspaceRoute(window.location.hash)?.mode || 'home');
+  const [workspaceLocation, setWorkspaceLocation] = useState<WorkspaceLocation | null>(null);
+  useEffect(() => {
+    const header = document.querySelector<HTMLElement>('header.topbar');
+    if (!header) return;
+    const resize = () =>
+      document.documentElement.style.setProperty(
+        '--topbar-height',
+        header.getBoundingClientRect().height + 'px'
+      );
+    resize();
+    const observer = new ResizeObserver(resize);
+    observer.observe(header);
+    return () => observer.disconnect();
+  }, []);
   const [audioFile, setAudioFile] = useState('');
   const [audioDuration, setAudioDuration] = useState(0);
   const [audioSegments, setAudioSegments] = useState<{start: number; end: number; duration: number}[]>([]);
@@ -207,6 +210,8 @@ function App() {
   const [assetCategory, setAssetCategory] = useState('real_references');
   const [assetNote, setAssetNote] = useState('');
   const [projectId, setProjectId] = useState('');
+  const currentProjectId = useRef(projectId);
+  currentProjectId.current = projectId;
   const activity = useActivity(projectId);
   const activeCount = countActive(activity.items);
   const [projectName, setProjectName] = useState('Новый клип');
@@ -214,7 +219,7 @@ function App() {
   const [titleEditing, setTitleEditing] = useState(true);
   const [startup, setStartup] = useState<'loading' | 'ready' | 'error'>('loading');
   const [startupAttempt, setStartupAttempt] = useState(0);
-  type ProjectChange = {type: 'new'} | {type: 'load'; id: string};
+  type ProjectChange = {type: 'new'} | {type: 'load'; id: string; mode?: Mode; characterId?: string};
   const [pendingProjectChange, setPendingProjectChange] = useState<ProjectChange | null>(null);
   const [catalogue, setCatalogue] = useState<'frame' | 'camera' | null>(null);
   const [frameCatalogue, setFrameCatalogue] = useState<FrameCatalogue>({
@@ -271,6 +276,10 @@ function App() {
   const change = (patch: Partial<Studio>) => setState(s => ({...s, ...patch}));
   const character = state.characters.find(c => c.id === state.selectedCharacter);
   const [apiHealth, setApiHealth] = useState<'checking' | 'online' | 'offline'>('checking');
+  useEffect(() => {
+    if (activity.error) setApiHealth('offline');
+    else if (activity.connected) setApiHealth('online');
+  }, [activity.error, activity.connected]);
   const checkHealth = useCallback(async () => {
     setApiHealth('checking');
     try {
@@ -288,11 +297,13 @@ function App() {
   const refresh = useCallback(async () => {
     try {
       setProjects(await json(await apiFetch(url + '/projects')));
-      setJobs(
-        projectId ? await json(await apiFetch(url + '/jobs?project_id=' + encodeURIComponent(projectId))) : []
-      );
+      const refreshedJobs = projectId
+        ? await json(await apiFetch(url + '/jobs?project_id=' + encodeURIComponent(projectId)))
+        : [];
+      if (currentProjectId.current === projectId) setJobs(refreshedJobs);
     } catch (e) {
-      setError('Не удалось обновить проекты и очередь: ' + (e instanceof Error ? e.message : String(e)));
+      if (currentProjectId.current === projectId)
+        setError('Не удалось обновить проекты и очередь: ' + (e instanceof Error ? e.message : String(e)));
     }
   }, [projectId]);
   useEffect(() => {
@@ -312,6 +323,13 @@ function App() {
   const loadingEpoch = useRef(0),
     saving = useRef(false);
   const [conflict, setConflict] = useState('');
+  const [recovery, setRecovery] = useState<{
+    projectId: string;
+    title: string;
+    state: Studio;
+    conflicts: string[];
+  } | null>(null);
+  const [projectDraftSaved, setProjectDraftSaved] = useState(true);
   const persistProject = async () => {
     if (saving.current) throw Error('Сохранение уже выполняется. Дождись завершения.');
     const epoch = loadingEpoch.current,
@@ -362,6 +380,7 @@ function App() {
         setProjectName(current => (current.trim() === initial.title ? local.title : current));
         setTitleEditing(false);
         setConflict('');
+        clearLocal('studio:project-draft:' + result.id);
         return result.id as string;
       }
       throw Error('Проект продолжает изменяться. Правки сохранены в форме; повтори сохранение позже.');
@@ -374,6 +393,22 @@ function App() {
     !baseProject.current ||
     projectName !== baseProject.current.title ||
     JSON.stringify(state) !== JSON.stringify(baseProject.current.state);
+  useEffect(() => {
+    if (!projectId || startup !== 'ready' || baseProject.current?.id !== projectId || recovery) return;
+    const key = 'studio:project-draft:' + projectId;
+    if (projectDirty)
+      setProjectDraftSaved(
+        writeLocal(key, {
+          version: 1,
+          base: {title: baseProject.current.title, state: baseProject.current.state},
+          local: {title: projectName, state},
+        })
+      );
+    else {
+      clearLocal(key);
+      setProjectDraftSaved(true);
+    }
+  }, [projectId, projectName, state, projectDirty, startup, recovery]);
   const downloadDraft = () => {
     const blob = new Blob([JSON.stringify({id: projectId, title: projectName, state}, null, 2)], {
       type: 'application/json',
@@ -410,12 +445,10 @@ function App() {
       }
     };
     void update();
-    const timer = window.setInterval(() => void update(), 10000);
     return () => {
       active = false;
-      window.clearInterval(timer);
     };
-  }, [projectId]);
+  }, [projectId, activity.items]);
 
   const replacementControls = {
     character,
@@ -528,6 +561,7 @@ function App() {
     const epoch = ++loadingEpoch.current;
     const p = await json(await apiFetch(url + '/projects/' + encodeURIComponent(id)));
     if (!isActive() || epoch !== loadingEpoch.current) return;
+    setApiHealth('online');
     const loaded = {...INITIAL, ...p.state};
     baseProject.current = {
       id: p.id,
@@ -536,13 +570,34 @@ function App() {
       state: loaded,
     };
     setProjectId(p.id);
-    setProjectName(p.title);
+    const draft = readLocal<{
+      version: number;
+      base: {title: string; state: Studio};
+      local: {title: string; state: Studio};
+    } | null>('studio:project-draft:' + p.id, null);
+    let restored = {title: p.title as string, state: loaded as Studio};
+    setRecovery(null);
+    if (
+      draft?.version === 1 &&
+      draft.base?.state &&
+      draft.local?.state &&
+      Array.isArray(draft.local.state.characters) &&
+      typeof draft.local.title === 'string'
+    ) {
+      const merge = mergeProject(draft.base, draft.local, restored);
+      if (merge.conflicts.length) setRecovery({projectId: p.id, ...merge.value, conflicts: merge.conflicts});
+      else restored = merge.value;
+    }
+    setProjectName(restored.title);
     setTitleEditing(false);
-    setState(loaded);
+    setState(restored.state);
     setMessages([]);
     setChatText('');
     setJobs([]);
     setSelectedJob('');
+    setAudioFile('');
+    setAudioResult('');
+    setAudioSegments([]);
     setConflict('');
   }, []);
   useEffect(() => {
@@ -554,7 +609,14 @@ function App() {
         if (!active) return;
         setProjects(saved);
         // The API orders projects by their last saved time, newest first.
-        if (saved.length) await openProject(saved[0].id, () => active);
+        if (saved.length) {
+          const route = readWorkspaceRoute(window.location.hash);
+          const id =
+            route && saved.some((p: {id: string}) => p.id === route.projectId)
+              ? route.projectId
+              : saved[0].id;
+          await openProject(id, () => active);
+        }
         if (active) {
           setStartup('ready');
           setError('');
@@ -585,15 +647,22 @@ function App() {
       setSelectedJob('');
       setConflict('');
     }
+    if (target.type === 'new') setRecovery(null);
     setCatalogue(null);
     setPromptRequest(null);
     setGenerationRequest(null);
-    setMode('studio');
+    if (target.type === 'load' && target.characterId)
+      setState(s => ({...s, selectedCharacter: target.characterId!}));
+    setMode(target.type === 'load' ? target.mode || 'studio' : 'studio');
     setNotice('');
   };
   const requestProjectChange = async (target: ProjectChange) => {
-    if (busy || saving.current || startup !== 'ready' || (target.type === 'load' && target.id === projectId))
+    if (busy || saving.current || startup !== 'ready') return;
+    if (target.type === 'load' && target.id === projectId) {
+      if (target.characterId) setState(s => ({...s, selectedCharacter: target.characterId!}));
+      setMode(target.mode || 'studio');
       return;
+    }
     const hasChanges = projectId
       ? projectDirty
       : projectName !== 'Новый клип' || JSON.stringify(state) !== JSON.stringify(INITIAL);
@@ -603,7 +672,14 @@ function App() {
     }
     await work('load', () => applyProjectChange(target));
   };
-  const load = (id: string) => requestProjectChange({type: 'load', id});
+  const load = (id: string, destination?: Mode, characterId?: string) =>
+    requestProjectChange({type: 'load', id, mode: destination, characterId});
+  useEffect(() => {
+    if (startup === 'ready' && projectId) {
+      const hash = workspaceHash(projectId, mode);
+      if (hash && window.location.hash !== hash) window.history.replaceState(null, '', hash);
+    }
+  }, [projectId, mode, startup]);
   const finishProjectChange = (saveFirst: boolean) =>
     work('switch-project', async () => {
       if (!pendingProjectChange) return;
@@ -611,6 +687,7 @@ function App() {
         await persistProject();
         void refresh();
       }
+      if (!saveFirst && projectId) clearLocal('studio:project-draft:' + projectId);
       await applyProjectChange(pendingProjectChange);
       setPendingProjectChange(null);
     });
@@ -1076,6 +1153,99 @@ function App() {
       setAudioResult(result.url);
       setNotice('Фрагмент подготовлен: WAV 44.1 kHz, mono, loudnorm');
     });
+  const audioPanel = () => (
+    <section className="panel">
+      <div className="panel-title">
+        <h2>④ Audio Lab — референсы голоса</h2>
+        <CinemaInfo topic="sound" />
+        <Music size={19} />
+      </div>
+      <p className="muted">
+        Загрузи собственный или разрешённый медиафайл. Сервис предлагает фрагменты по паузам, затем ты вручную
+        выбираешь лучший дубль. Экспорт WAV подходит для дальнейшей загрузки в разрешённый сервис озвучки.
+      </p>
+      <label className="upload-area">
+        <Upload size={18} /> Импорт MP3 / WAV / MP4 / MOV / WEBM (до 100 МБ)
+        <input
+          type="file"
+          accept="audio/*,video/mp4,video/quicktime,video/webm,.mkv"
+          onChange={e => e.target.files?.[0] && uploadAudio(e.target.files[0])}
+        />
+      </label>
+      {audioFile && (
+        <>
+          <audio src={audioFile} controls />
+          <div className="audio-actions">
+            <button className="secondary" disabled={!!busy} onClick={analyzeAudio}>
+              Найти интервалы по паузам
+            </button>
+            <span className="muted">Длительность: {audioDuration.toFixed(1)} сек.</span>
+          </div>
+          {audioSegments.length > 0 && (
+            <div className="chips">
+              {audioSegments.map((s, i) => (
+                <button
+                  key={i}
+                  className="secondary"
+                  onClick={() => {
+                    setAudioStart(s.start);
+                    setAudioEnd(s.end);
+                  }}
+                >
+                  {s.start}–{s.end} c
+                </button>
+              ))}
+            </div>
+          )}
+          <div className="param-grid">
+            <label>
+              От (сек)
+              <input
+                type="number"
+                min="0"
+                step="0.1"
+                value={audioStart}
+                onChange={e => setAudioStart(Number(e.target.value))}
+              />
+            </label>
+            <label>
+              До (сек)
+              <input
+                type="number"
+                min="0"
+                step="0.1"
+                value={audioEnd}
+                onChange={e => setAudioEnd(Number(e.target.value))}
+              />
+            </label>
+            <label className="inline-checkbox">
+              <input type="checkbox" checked={denoise} onChange={e => setDenoise(e.target.checked)} /> Лёгкая
+              очистка
+            </label>
+          </div>
+          <label className="inline-checkbox">
+            <input type="checkbox" checked={audioConsent} onChange={e => setAudioConsent(e.target.checked)} />{' '}
+            Подтверждаю права на использование голоса и разрешение на создание голосового референса
+          </label>
+          <button className="primary" disabled={!!busy || !audioConsent} onClick={cutAudio}>
+            ✂ Вырезать и подготовить WAV
+          </button>
+          {audioResult && (
+            <div className="audio-result">
+              <audio controls src={audioResult} />
+              <a href={audioResult} download>
+                Скачать подготовленный WAV ↓
+              </a>
+              <p className="muted">
+                Передавать в ElevenLabs/Fish Audio следует только при соблюдении их правил и разрешений.
+                Прямая отправка API ещё не подключена.
+              </p>
+            </div>
+          )}
+        </>
+      )}
+    </section>
+  );
   const apiStatus =
     apiHealth === 'online'
       ? 'Backend подключён'
@@ -1100,12 +1270,35 @@ function App() {
         </Suspense>
         <header className="topbar">
           <div className="topbar-project">
-            <span className="topbar-title">{projectName || 'Проект'}</span>
+            <select
+              className="topbar-project-picker"
+              aria-label="Текущий рабочий проект"
+              value={projectId}
+              disabled={startup !== 'ready' || !!busy}
+              onChange={e => void load(e.target.value, mode)}
+            >
+              {!projectId && <option value="">Новый проект</option>}
+              {projectId && !projects.some(p => p.id === projectId) && (
+                <option value={projectId}>{projectName}</option>
+              )}
+              {projects.map(p => (
+                <option key={p.id} value={p.id}>
+                  {p.title}
+                </option>
+              ))}
+            </select>
             <span className={'status ' + apiHealth} role="status">
               ● {apiStatus}
             </span>
           </div>
           <div className="top-actions">
+            {projectId &&
+              projectDirty &&
+              ['home', 'create', 'video', 'audio', 'storyboard', 'graph'].includes(mode) && (
+                <button disabled={!!busy} onClick={() => void save()}>
+                  Сохранить проект
+                </button>
+              )}
             <button
               className={'dock-toggle' + (dockOpen ? ' active' : '')}
               onClick={() => setDockOpen(v => !v)}
@@ -1152,7 +1345,21 @@ function App() {
             )}
           </section>
         ) : (
-          <main className={mode === 'storyboard' ? 'storyboard-main' : mode === 'create' ? 'create-main' : mode === 'home' ? 'home-main' : ''}>
+          <main
+            className={
+              mode === 'video' || mode === 'audio'
+                ? 'media-main'
+                : mode === 'storyboard'
+                  ? 'storyboard-main'
+                  : mode === 'create'
+                    ? 'create-main'
+                    : mode === 'home'
+                      ? 'home-main'
+                      : mode === 'graph'
+                        ? 'workflow-main'
+                        : ''
+            }
+          >
             <aside className="sidebar">
               <ProjectHeader
                 id={projectId}
@@ -1371,6 +1578,44 @@ function App() {
               )}
             </aside>
             <div className="content">
+              <WorkspaceTrail
+                projectId={projectId}
+                mode={mode}
+                onMode={setMode}
+                onLocation={setWorkspaceLocation}
+                onOpenProject={id => void load(id, 'home')}
+              />
+              {!projectDraftSaved && (
+                <p className="alert" role="alert">
+                  Черновик проекта не сохранён браузером. Сохрани проект перед перезагрузкой.
+                </p>
+              )}
+              {recovery && (
+                <section className="alert" role="alert">
+                  <p>
+                    Сохранённый черновик конфликтует с серверными правками: {recovery.conflicts.join(', ')}.
+                    Серверные данные автоматически не заменены.
+                  </p>
+                  <button
+                    onClick={() => {
+                      setState(recovery.state);
+                      setProjectName(recovery.title);
+                      setRecovery(null);
+                      setConflict('Восстановлен черновик. Проверь конфликтующие поля перед сохранением.');
+                    }}
+                  >
+                    Восстановить для проверки
+                  </button>
+                  <button
+                    onClick={() => {
+                      clearLocal('studio:project-draft:' + projectId);
+                      setRecovery(null);
+                    }}
+                  >
+                    Оставить серверную версию
+                  </button>
+                </section>
+              )}
               {conflict && (
                 <div className="alert" role="alert">
                   {conflict}
@@ -1389,6 +1634,7 @@ function App() {
               {notice && <div className="notice">{notice}</div>}
               {mode === 'settings' ? (
                 <SettingsPanel
+                  onProjectsChanged={() => void refresh()}
                   provider={provider}
                   model={llm}
                   busy={!!busy}
@@ -1455,9 +1701,9 @@ function App() {
                     setProductionTarget({productionId, nodeId});
                     setMode('files');
                   }}
+                  location={workspaceLocation}
                   onOpenProject={id => {
-                    void load(id);
-                    setMode('studio');
+                    void load(id, 'create');
                   }}
                 />
               ) : mode === 'files' ? (
@@ -1465,14 +1711,7 @@ function App() {
                   initialLocation={productionTarget}
                   projectId={projectId}
                   onOpenProject={(id, characterId) => {
-                    void load(id).then(() => {
-                      if (characterId)
-                        setState(s => ({
-                          ...s,
-                          selectedCharacter: characterId,
-                        }));
-                      setMode('studio');
-                    });
+                    void load(id, 'studio', characterId);
                   }}
                 />
               ) : mode === 'connections' ? (
@@ -1571,7 +1810,7 @@ function App() {
                   projectName={projectName}
                   projects={projects}
                   onMode={setMode}
-                  onOpenProject={id => void load(id)}
+                  onOpenProject={id => void load(id, 'home')}
                 />
               ) : mode === 'create' ? (
                 <CreateScreen
@@ -1581,6 +1820,23 @@ function App() {
                     name: c.name,
                   }))}
                 />
+              ) : mode === 'video' ? (
+                <>
+                  {modelPanel('video')}
+                  <AssetLibrary
+                    {...replacementControls}
+                    onRefine={refineAsset}
+                    onScene={addToScene}
+                    projectId={projectId}
+                    revision={libraryRevision}
+                    onUse={(link, id) => {
+                      change({videoReference: link, videoAssetId: id});
+                      setNotice('Фото выбрано для видео. Опиши движение и проверь стоимость перед запуском.');
+                    }}
+                  />
+                </>
+              ) : mode === 'audio' ? (
+                <>{audioPanel()}</>
               ) : mode === 'studio' ? (
                 <>
                   <section className="panel">
@@ -1621,108 +1877,7 @@ function App() {
                       onAsset={() => setLibraryRevision(x => x + 1)}
                     />
                   </section>
-                  {modelPanel('video')}
-                  <section className="panel">
-                    <div className="panel-title">
-                      <h2>④ Audio Lab — референсы голоса</h2>
-                      <CinemaInfo topic="sound" />
-                      <Music size={19} />
-                    </div>
-                    <p className="muted">
-                      Загрузи собственный или разрешённый медиафайл. Сервис предлагает фрагменты по паузам,
-                      затем ты вручную выбираешь лучший дубль. Экспорт WAV подходит для дальнейшей загрузки в
-                      разрешённый сервис озвучки.
-                    </p>
-                    <label className="upload-area">
-                      <Upload size={18} /> Импорт MP3 / WAV / MP4 / MOV / WEBM (до 100 МБ)
-                      <input
-                        type="file"
-                        accept="audio/*,video/mp4,video/quicktime,video/webm,.mkv"
-                        onChange={e => e.target.files?.[0] && uploadAudio(e.target.files[0])}
-                      />
-                    </label>
-                    {audioFile && (
-                      <>
-                        <audio src={audioFile} controls />
-                        <div className="audio-actions">
-                          <button className="secondary" disabled={!!busy} onClick={analyzeAudio}>
-                            Найти интервалы по паузам
-                          </button>
-                          <span className="muted">Длительность: {audioDuration.toFixed(1)} сек.</span>
-                        </div>
-                        {audioSegments.length > 0 && (
-                          <div className="chips">
-                            {audioSegments.map((s, i) => (
-                              <button
-                                key={i}
-                                className="secondary"
-                                onClick={() => {
-                                  setAudioStart(s.start);
-                                  setAudioEnd(s.end);
-                                }}
-                              >
-                                {s.start}–{s.end} c
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                        <div className="param-grid">
-                          <label>
-                            От (сек)
-                            <input
-                              type="number"
-                              min="0"
-                              step="0.1"
-                              value={audioStart}
-                              onChange={e => setAudioStart(Number(e.target.value))}
-                            />
-                          </label>
-                          <label>
-                            До (сек)
-                            <input
-                              type="number"
-                              min="0"
-                              step="0.1"
-                              value={audioEnd}
-                              onChange={e => setAudioEnd(Number(e.target.value))}
-                            />
-                          </label>
-                          <label className="inline-checkbox">
-                            <input
-                              type="checkbox"
-                              checked={denoise}
-                              onChange={e => setDenoise(e.target.checked)}
-                            />{' '}
-                            Лёгкая очистка
-                          </label>
-                        </div>
-                        <label className="inline-checkbox">
-                          <input
-                            type="checkbox"
-                            checked={audioConsent}
-                            onChange={e => setAudioConsent(e.target.checked)}
-                          />{' '}
-                          Подтверждаю права на использование голоса и разрешение на создание голосового
-                          референса
-                        </label>
-                        <button className="primary" disabled={!!busy || !audioConsent} onClick={cutAudio}>
-                          ✂ Вырезать и подготовить WAV
-                        </button>
-                        {audioResult && (
-                          <div className="audio-result">
-                            <audio controls src={audioResult} />
-                            <a href={audioResult} download>
-                              Скачать подготовленный WAV ↓
-                            </a>
-                            <p className="muted">
-                              Передавать в ElevenLabs/Fish Audio следует только при соблюдении их правил и
-                              разрешений. Прямая отправка API ещё не подключена.
-                            </p>
-                          </div>
-                        )}
-                      </>
-                    )}
-                  </section>
+
                   <section className="panel">
                     <h2>⑤ Очередь и галерея</h2>
                     <NativeGallery {...replacementControls} projectId={projectId} onRefine={refineAsset} />
@@ -1933,7 +2088,9 @@ function App() {
             }}
           />
         )}
-        {projectId && <GenerationWatcher projectId={projectId} onOpen={() => setMode('create')} />}
+        {projectId && (
+          <GenerationWatcher key={projectId} projectId={projectId} onOpen={() => setMode('create')} />
+        )}
         {generationRequest && (
           <GenerationReview
             request={generationRequest}

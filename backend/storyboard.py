@@ -79,6 +79,7 @@ def register(app,studio):
                     if frame['kind']!='frame' or frame['parent_id']!=item['id']:continue
                     files=[{**dict(r),'url':'/api/production-files/'+r['id']} for r in db.execute("SELECT * FROM production_files WHERE node_id=? AND kind IN ('image','video') ORDER BY created_at DESC,id DESC",(frame['id'],))]
                     bound=db.execute('SELECT project_id FROM production_links WHERE production_id=? AND node_id=?',(pid,frame['id'])).fetchone()
+                    if bound and db.execute('SELECT 1 FROM project_archives WHERE project_id=?',(bound['project_id'],)).fetchone():continue
                     from backend.production_entities import state
                     _,selection,_=state(db,pid,frame['id'])
                     frames.append({**frame,'files':files,'selection':selection,'project_id':bound['project_id'] if bound else None})

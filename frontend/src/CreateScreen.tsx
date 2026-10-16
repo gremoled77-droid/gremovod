@@ -1,5 +1,6 @@
 import {useEffect, useMemo, useRef, useState} from 'react';
 import {apiFetch} from './api';
+import {loadCreateDraft, saveCreateDraft} from './createDraft';
 import GenerationReview, {type GenerationRequest} from './GenerationReview';
 import {type ActivityItem} from './useActivity';
 import {useSharedActivity} from './ActivityContext';
@@ -46,14 +47,20 @@ async function json(r: Response) {
 
 type TempItem = {asset_id: string; days_left: number; expired: boolean; protected: string};
 
-export default function CreateScreen({projectId, heroes}: {projectId: string; heroes: Hero[]}) {
+export default function CreateScreen(props: {projectId: string; heroes: Hero[]}) {
+  return <CreateScreenBody key={props.projectId} {...props} />;
+}
+
+function CreateScreenBody({projectId, heroes}: {projectId: string; heroes: Hero[]}) {
+  const [restored] = useState(() => loadCreateDraft(projectId));
+  const [draftSaved, setDraftSaved] = useState(true);
   const {items, error: feedError, reset} = useSharedActivity();
   const [specs, setSpecs] = useState<Record<string, Spec>>({});
   const [library, setLibrary] = useState<LibAsset[]>([]);
-  const [prompt, setPrompt] = useState('');
-  const [selected, setSelected] = useState<string[]>(['seedream-5-lite']);
-  const [options, setOptions] = useState<Record<string, Record<string, string | number>>>({});
-  const [refs, setRefs] = useState<string[]>([]);
+  const [prompt, setPrompt] = useState(restored.prompt);
+  const [selected, setSelected] = useState<string[]>(restored.selected);
+  const [options, setOptions] = useState<Record<string, Record<string, string | number>>>(restored.options);
+  const [refs, setRefs] = useState<string[]>(restored.refs);
   const [queue, setQueue] = useState<GenerationRequest[]>([]);
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
@@ -62,12 +69,18 @@ export default function CreateScreen({projectId, heroes}: {projectId: string; he
   const [pasteFor, setPasteFor] = useState('');
   const [animate, setAnimate] = useState('');
   const [view, setView] = useState<{items: LightboxItem[]; index: number} | null>(null);
-  const [videoModel, setVideoModel] = useState('seedance-2.5');
-  const [motion, setMotion] = useState('');
-  const [videoOptions, setVideoOptions] = useState<Record<string, string | number>>({});
+  const [videoModel, setVideoModel] = useState(restored.videoModel);
+  const [motion, setMotion] = useState(restored.motion);
+  const [videoOptions, setVideoOptions] = useState<Record<string, string | number>>(restored.videoOptions);
   const [tab, setTab] = useState<'results' | 'favorites' | 'temp'>('results');
   const [temp, setTemp] = useState<TempItem[]>([]);
   const [wouldRemove, setWouldRemove] = useState<string[] | null>(null);
+
+  useEffect(() => {
+    setDraftSaved(
+      saveCreateDraft(projectId, {prompt, selected, options, refs, videoModel, motion, videoOptions})
+    );
+  }, [projectId, prompt, selected, options, refs, videoModel, motion, videoOptions]);
 
   const loadLibrary = async () => {
     if (projectId)
@@ -84,7 +97,7 @@ export default function CreateScreen({projectId, heroes}: {projectId: string; he
   }, []);
   useEffect(() => {
     void loadLibrary().catch(e => setError(String(e)));
-  }, [projectId, items.length]);
+  }, [projectId, items]);
 
   useEffect(() => {
     if (tab !== 'temp' || !projectId) return;
@@ -501,6 +514,11 @@ export default function CreateScreen({projectId, heroes}: {projectId: string; he
       </aside>
 
       <div className="cs-main">
+        {!draftSaved && (
+          <div className="alert" role="alert">
+            Браузер не сохранил черновик. Скопируй промпт перед уходом со страницы.
+          </div>
+        )}
         {notice && (
           <div className="notice" role="status">
             {notice}

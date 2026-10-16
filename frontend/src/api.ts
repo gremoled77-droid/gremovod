@@ -17,6 +17,9 @@ function sessionToken() {
 }
 export async function apiFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
   const controller = new AbortController();
+  const parentAbort = () => controller.abort();
+  if (init?.signal?.aborted) controller.abort();
+  init?.signal?.addEventListener('abort', parentAbort, {once: true});
   const timer = window.setTimeout(
     () => controller.abort(),
     String(input).endsWith('/health') ? 10000 : 180000
@@ -28,7 +31,7 @@ export async function apiFetch(input: RequestInfo | URL, init?: RequestInit): Pr
       ...init,
       headers,
       credentials: 'same-origin',
-      signal: init?.signal ?? controller.signal,
+      signal: controller.signal,
     });
     if (response.status === 401) session = null;
     return response;
@@ -41,5 +44,6 @@ export async function apiFetch(input: RequestInfo | URL, init?: RequestInit): Pr
     throw new Error('Не удалось подключиться к API. Проверь запуск backend на 127.0.0.1:8000.');
   } finally {
     window.clearTimeout(timer);
+    init?.signal?.removeEventListener('abort', parentAbort);
   }
 }

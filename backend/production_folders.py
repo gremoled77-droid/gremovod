@@ -239,6 +239,22 @@ class Notes(BaseModel):
 
 
 def register(app,studio):
+    @app.get('/api/projects/{project_id}/workspace-location')
+    def workspace_location(project_id:str):
+        studio.project(project_id)
+        membership=link(studio,project_id)
+        if not membership:return None
+        info={'production_id':membership['production_id'],'production_title':membership['title'],'source_project_id':membership['source_project_id'],'series':None,'scene':None,'frame':None}
+        current=membership['node_id']
+        seen=set()
+        while current and current not in seen:
+            seen.add(current)
+            item=node(studio,membership['production_id'],current)
+            field={'series':'series','episode':'scene','frame':'frame'}.get(item['kind'])
+            if field:info[field]={'id':item['id'],'title':item['title']}
+            current=item['parent_id']
+        return info
+
     @app.on_event('startup')
     def setup():
         with studio.connect() as db:
@@ -334,7 +350,10 @@ def register(app,studio):
         target=node(studio,pid,nid)
         if target['kind']!='frame':raise HTTPException(400,'Открыть в студии можно папку кадра')
         with studio.connect() as db:existing=db.execute('SELECT project_id FROM production_links WHERE node_id=?',(nid,)).fetchone()
-        if existing:return {'project_id':existing['project_id']}
+        if existing:
+            with studio.connect() as db:
+                if db.execute('SELECT 1 FROM project_archives WHERE project_id=?',(existing['project_id'],)).fetchone():raise HTTPException(409,'Тестовый проект в архиве. Восстановление доступно в настройках.')
+            return {'project_id':existing['project_id']}
         common=production(studio,pid);source=studio.project(common['source_project_id'])['state']
         state={'brief':target['notes'],'prompts':{},'parameters':{},'characters':source.get('characters',[]),'selectedCharacter':source.get('selectedCharacter',''),'style':source.get('style',{})}
         project_id=studio.save_project(studio.Project(title=common['title']+' / '+target['title'],state=state))['id']

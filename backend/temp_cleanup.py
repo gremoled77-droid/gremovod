@@ -8,6 +8,7 @@
 import asyncio
 import json
 import shutil
+import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -78,31 +79,66 @@ def candidates(studio, project_id=None, now=None):
     return items
 
 
-def run_cleanup(studio, project_id=None, now=None):
-    now = now or datetime.now(timezone.utc)
-    trash = studio.LIBRARY_ROOT / '.trash'
-    removed = []
-    with studio.connect() as db:
-        db.execute('CREATE TABLE IF NOT EXISTS cleanup_journal(id INTEGER PRIMARY KEY AUTOINCREMENT,asset_id TEXT,project_id TEXT,'
-                   'trash_name TEXT,row_json TEXT,trashed_at TEXT,restored_at TEXT)')
-    for item in candidates(studio, project_id, now):
-        if not item['expired'] or item['protected']:
-            continue
+def move_to_trash(studio, asset_id, now, automatic=False):
+    """Recheck protection under the SQLite writer lock; compensate filesystem on rollback."""
+    moved = False
+    source = target = None
+    try:
         with studio.connect() as db:
-            row = db.execute('SELECT * FROM library_assets WHERE id=?', (item['asset_id'],)).fetchone()
+            db.execute('BEGIN IMMEDIATE')
+            row = db.execute('SELECT * FROM library_assets WHERE id=?', (asset_id,)).fetchone()
             if not row:
-                continue
-            source = (studio.LIBRARY_ROOT / row['filename']).resolve()
-            if not source.is_relative_to(studio.LIBRARY_ROOT.resolve()):
-                continue
+                if automatic:
+                    return False
+                raise HTTPException(404, 'Ассет не найден')
+            if automatic:
+                meta = json.loads(row['metadata'])
+                created = _parse(row['created_at'])
+                if (meta.get('favorite') or meta.get('keep')
+                        or meta.get('provider') in GENERATED_PROVIDERS_EXCLUDED
+                        or meta.get('kind', 'image') not in {'image', 'video'}
+                        or not created or created + timedelta(days=TTL_DAYS) > now):
+                    return False
+            state_texts = [r['state'] for r in db.execute('SELECT state FROM projects')]
+            reason = used_reason(db, row, state_texts)
+            if reason:
+                if automatic:
+                    return False
+                raise HTTPException(409, 'Нельзя убрать: ' + str(reason))
+            root = studio.LIBRARY_ROOT.resolve()
+            source = (root / row['filename']).resolve()
+            trash = (root / '.trash').resolve()
+            if not source.is_relative_to(root) or not trash.is_relative_to(root):
+                raise HTTPException(400, 'Недопустимый путь')
             trash.mkdir(exist_ok=True)
-            name = f"{row['id']}_{Path(row['filename']).name}"
+            name = f"{uuid.uuid4().hex}_{Path(row['filename']).name}"
+            target = (trash / name).resolve()
+            if not target.is_relative_to(trash):
+                raise HTTPException(400, 'Недопустимый путь корзины')
+            db.execute('CREATE TABLE IF NOT EXISTS cleanup_journal(id INTEGER PRIMARY KEY AUTOINCREMENT,asset_id TEXT,project_id TEXT,'
+                       'trash_name TEXT,row_json TEXT,trashed_at TEXT,restored_at TEXT)')
             if source.is_file():
-                shutil.move(str(source), str(trash / name))
+                source.rename(target)
+                moved = True
             db.execute('INSERT INTO cleanup_journal(asset_id,project_id,trash_name,row_json,trashed_at) VALUES(?,?,?,?,?)',
                        (row['id'], row['project_id'], name, json.dumps(dict(row), ensure_ascii=False), now.isoformat()))
-            db.execute('DELETE FROM library_assets WHERE id=?', (row['id'],))
-        removed.append(item['asset_id'])
+            db.execute('DELETE FROM library_assets WHERE id=?', (asset_id,))
+        return True
+    except Exception:
+        if moved and target is not None and source is not None:
+            # Never overwrite an independently recreated original.
+            if target.is_file() and not source.exists():
+                target.rename(source)
+        raise
+
+
+def run_cleanup(studio, project_id=None, now=None):
+    now = now or datetime.now(timezone.utc)
+    removed = []
+    # The scan is advisory only; every candidate is reread and checked while holding the writer lock.
+    for item in candidates(studio, project_id, now):
+        if item['expired'] and not item['protected'] and move_to_trash(studio, item['asset_id'], now, automatic=True):
+            removed.append(item['asset_id'])
     purge_trash(studio, now)
     return removed
 
@@ -113,6 +149,8 @@ def purge_trash(studio, now):
         return
     limit = now - timedelta(days=TRASH_DAYS)
     with studio.connect() as db:
+        if not _has(db, 'cleanup_journal'):
+            return
         for entry in db.execute('SELECT * FROM cleanup_journal WHERE restored_at IS NULL').fetchall():
             when = _parse(entry['trashed_at'])
             if when and when < limit:
@@ -124,6 +162,7 @@ def register(app, studio):
     @app.post('/api/library/{asset_id}/favorite')
     def favorite(asset_id: str, body: Favorite):
         with studio.connect() as db:
+            db.execute('BEGIN IMMEDIATE')
             row = db.execute('SELECT * FROM library_assets WHERE id=?', (asset_id,)).fetchone()
             if not row:
                 raise HTTPException(404, 'Ассет не найден')
@@ -139,29 +178,7 @@ def register(app, studio):
     @app.post('/api/library/{asset_id}/trash')
     def trash_one(asset_id: str):
         """Ручное «удалить»: мягко, в корзину на 30 дней; используемые ассеты не трогаем."""
-        with studio.connect() as db:
-            row = db.execute('SELECT * FROM library_assets WHERE id=?', (asset_id,)).fetchone()
-            if not row:
-                raise HTTPException(404, 'Ассет не найден')
-            state_texts = [r['state'] for r in db.execute('SELECT state FROM projects')]
-            reason = used_reason(db, row, state_texts)
-        if reason:
-            raise HTTPException(409, 'Нельзя убрать: ' + str(reason))
-        now = datetime.now(timezone.utc)
-        trash = studio.LIBRARY_ROOT / '.trash'
-        with studio.connect() as db:
-            db.execute('CREATE TABLE IF NOT EXISTS cleanup_journal(id INTEGER PRIMARY KEY AUTOINCREMENT,asset_id TEXT,project_id TEXT,'
-                       'trash_name TEXT,row_json TEXT,trashed_at TEXT,restored_at TEXT)')
-            source = (studio.LIBRARY_ROOT / row['filename']).resolve()
-            if not source.is_relative_to(studio.LIBRARY_ROOT.resolve()):
-                raise HTTPException(400, 'Недопустимый путь')
-            trash.mkdir(exist_ok=True)
-            name = f"{row['id']}_{Path(row['filename']).name}"
-            if source.is_file():
-                shutil.move(str(source), str(trash / name))
-            db.execute('INSERT INTO cleanup_journal(asset_id,project_id,trash_name,row_json,trashed_at) VALUES(?,?,?,?,?)',
-                       (row['id'], row['project_id'], name, json.dumps(dict(row), ensure_ascii=False), now.isoformat()))
-            db.execute('DELETE FROM library_assets WHERE id=?', (row['id'],))
+        move_to_trash(studio, asset_id, datetime.now(timezone.utc))
         return {'asset_id': asset_id, 'trashed': True, 'restore_days': 30}
 
     @app.get('/api/library/temp')

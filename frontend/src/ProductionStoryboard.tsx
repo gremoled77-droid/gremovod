@@ -1,7 +1,8 @@
+import type {WorkspaceLocation} from './WorkspaceTrail';
 import SeriesEconomics from './SeriesEconomics';
 import ProductionEntityEditor from './ProductionEntityEditor';
 import {readLocal, writeLocal} from './localDrafts';
-import {useEffect, useState} from 'react';
+import {useEffect, useRef, useState} from 'react';
 import {apiFetch} from './api';
 import {responseJson} from './ChatGPTPanel';
 import Lightbox, {type LightboxItem} from './Lightbox';
@@ -55,17 +56,30 @@ const request = async (path: string, body?: unknown) =>
 export default function ProductionStoryboard({
   onInspect,
   onOpenProject,
+  location,
 }: {
+  location?: WorkspaceLocation | null;
   onInspect: (productionId: string, nodeId: string) => void;
   onOpenProject: (id: string) => void;
 }) {
   const [productions, setProductions] = useState<Production[]>([]),
     [pid, setPid] = useState(
-      () => readLocal<{pid: string; sid: string}>('studio:board-location', {pid: '', sid: ''}).pid
+      () =>
+        location?.production_id ||
+        readLocal<{pid: string; sid: string}>('studio:board-location', {pid: '', sid: ''}).pid
     ),
     [sid, setSid] = useState(
-      () => readLocal<{pid: string; sid: string}>('studio:board-location', {pid: '', sid: ''}).sid
+      () =>
+        location?.series?.id ||
+        readLocal<{pid: string; sid: string}>('studio:board-location', {pid: '', sid: ''}).sid
     );
+  const restoredScroll = useRef('');
+  useEffect(() => {
+    if (location?.production_id && location.series?.id) {
+      setPid(location.production_id);
+      setSid(location.series.id);
+    }
+  }, [location?.production_id, location?.series?.id]);
   const [nodes, setNodes] = useState<Node[]>([]),
     [board, setBoard] = useState<Board | null>(null),
     [tick, setTick] = useState(0);
@@ -158,6 +172,32 @@ export default function ProductionStoryboard({
   useEffect(() => {
     if (pid && sid && nodes.some(n => n.id === sid)) writeLocal('studio:board-location', {pid, sid});
   }, [pid, sid, nodes]);
+  useEffect(() => {
+    if (!board) return;
+    const scrollKey = 'studio:board-scroll:' + key;
+    if (restoredScroll.current !== key) {
+      restoredScroll.current = key;
+      try {
+        const stored = sessionStorage.getItem(scrollKey);
+        if (stored !== null) requestAnimationFrame(() => window.scrollTo(0, Number(stored) || 0));
+        else if (location?.frame)
+          requestAnimationFrame(() =>
+            document.getElementById('board-frame-' + location.frame!.id)?.scrollIntoView({block: 'center'})
+          );
+      } catch {
+        /* Storage may be disabled. */
+      }
+    }
+    const remember = () => {
+      try {
+        sessionStorage.setItem(scrollKey, String(window.scrollY));
+      } catch {
+        /* Keep the board usable. */
+      }
+    };
+    window.addEventListener('scroll', remember, {passive: true});
+    return () => window.removeEventListener('scroll', remember);
+  }, [board, key, location?.frame]);
   const inspect = (id: string) => {
     if (nodes.find(n => n.id === id)?.kind === 'series') {
       onInspect(pid, id);

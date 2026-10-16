@@ -29,6 +29,7 @@ export default function GenerationWatcher({projectId, onOpen}: {projectId: strin
   const [toasts, setToasts] = useState<Toast[]>([]);
   const previous = useRef<Record<string, string> | null>(null);
   const lastPoll = useRef<Record<string, number>>({});
+  const inFlight = useRef(new Set<string>());
   const itemsRef = useRef<ActivityItem[]>([]);
   itemsRef.current = items;
 
@@ -38,12 +39,14 @@ export default function GenerationWatcher({projectId, onOpen}: {projectId: strin
     const timer = window.setInterval(() => {
       const now = Date.now();
       for (const item of itemsRef.current) {
-        if (item.source !== 'api' || !ACTIVE.has(item.status)) continue;
+        if (item.source !== 'api' || !ACTIVE.has(item.status) || inFlight.current.has(item.id)) continue;
         if (now - (lastPoll.current[item.id] || 0) < pollEvery(item)) continue;
         lastPoll.current[item.id] = now;
+        inFlight.current.add(item.id);
         void apiFetch('/api/activity/refresh/' + encodeURIComponent(item.id), {method: 'POST'})
           .then(r => (r.ok ? reset() : undefined))
-          .catch(() => undefined);
+          .catch(() => undefined)
+          .finally(() => inFlight.current.delete(item.id));
       }
     }, 1000);
     return () => window.clearInterval(timer);

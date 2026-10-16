@@ -2,6 +2,7 @@
 .app main.create-main {
   display: block;
   padding: 0;
+  min-height: 0;
 }
 .create-main > .sidebar {
   display: none;
@@ -385,6 +386,108 @@
 .cs-tile:hover .cs-zoom,
 .cs-zoom:focus-visible {
   opacity: 1;
+}
+
+/* Fit the work area below the app header and shared page trail, without a second viewport height. */
+.app main.create-main > .content {
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  height: calc(100dvh - var(--topbar-height, 64px));
+  min-height: 0;
+  padding: 16px 20px;
+  gap: 12px;
+  overflow: hidden;
+}
+.create-main .workspace-trail,
+.create-main .content > .alert,
+.create-main .content > .notice {
+  flex: none;
+}
+.create-main .content > footer {
+  display: none;
+}
+.create-main .cs {
+  flex: 1;
+  width: 100%;
+  height: auto;
+  min-height: 0;
+  grid-template-columns: 200px minmax(0, 1fr) 250px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  overflow: hidden;
+}
+.create-main .cs-main {
+  padding: 16px;
+}
+.create-main .cs-prompt {
+  flex: none;
+}
+.create-main .cs-results {
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 210px), 1fr));
+}
+.create-main .cs-result img,
+.create-main .cs-result video {
+  object-fit: contain;
+  background: var(--bg);
+}
+@media (max-width: 1250px) and (min-width: 761px) {
+  .create-main .cs {
+    grid-template-columns: 170px minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) auto;
+  }
+  .create-main .cs-models {
+    grid-column: 1 / -1;
+    border-left: 0;
+    border-top: 1px solid var(--border);
+    flex-direction: row;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    max-height: 170px;
+  }
+  .create-main .cs-model {
+    flex: 0 0 190px;
+  }
+  .create-main .cs-note {
+    flex: 0 0 200px;
+  }
+}
+@media (max-width: 760px) {
+  .app main.create-main > .content {
+    height: auto;
+    min-height: calc(100dvh - var(--topbar-height, 64px));
+    overflow: visible;
+    padding: 12px;
+  }
+  .create-main .cs {
+    display: flex;
+    flex-direction: column;
+    overflow: visible;
+  }
+  .create-main .cs-refs {
+    max-height: 230px;
+    overflow-y: auto;
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .create-main .cs-main {
+    min-height: 380px;
+  }
+  .create-main .cs-results {
+    overflow: visible;
+  }
+  .create-main .cs-models {
+    flex-direction: row;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    max-height: 230px;
+  }
+  .create-main .cs-model {
+    flex: 0 0 190px;
+  }
+  .create-main .cs-note {
+    flex: 0 0 190px;
+  }
 }
 @media (hover: none) {
   .cs-zoom {

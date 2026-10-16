@@ -13,7 +13,9 @@ export type Mode =
   | 'settings'
   | 'storyboard'
   | 'create'
-  | 'home';
+  | 'home'
+  | 'video'
+  | 'audio';
 
 type Item = {key: string; mode: Mode; label: string; hint?: string; icon: ReactNode};
 
@@ -22,8 +24,8 @@ const STAGES: Item[] = [
   {key: 'world', mode: 'styles', label: 'Мир', hint: 'стиль и герои', icon: '2'},
   {key: 'board', mode: 'storyboard', label: 'Раскадровка', hint: 'кадры эпизода', icon: '3'},
   {key: 'frames', mode: 'create', label: 'Кадры', hint: 'картинки', icon: '4'},
-  {key: 'video', mode: 'studio', label: 'Видео', hint: 'пока в «Идея»', icon: '5'},
-  {key: 'sound', mode: 'studio', label: 'Звук', hint: 'пока в «Идея»', icon: '6'},
+  {key: 'video', mode: 'video', label: 'Видео', hint: 'оживление кадров', icon: '5'},
+  {key: 'sound', mode: 'audio', label: 'Звук', hint: 'голос и обработка', icon: '6'},
   {key: 'edit', mode: 'files', label: 'Монтаж', hint: 'выгрузка в CapCut', icon: '7'},
   {key: 'release', mode: 'economics', label: 'Выпуск', hint: 'бюджет серии', icon: '8'},
 ];
@@ -44,7 +46,6 @@ export default function StageNav({
   onMode: (m: Mode) => void;
   onDemo: () => void;
 }) {
-  // «Видео» и «Звук» открывают тот же экран, что «Идея»: активным подсвечиваем первый подходящий пункт.
   const activeStage = STAGES.find(s => s.mode === mode)?.key;
   const render = (item: Item, active: boolean) => (
     <button

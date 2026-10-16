@@ -1,5 +1,6 @@
 import {useEffect, useRef, useState} from 'react';
 import {apiFetch} from './api';
+import {startActivityFeed} from './activityFeed';
 
 export type ActivityItem = {
   id: string;
@@ -16,47 +17,37 @@ export type ActivityItem = {
   delivery?: {state: string} | null;
 };
 
-/** Один долгий запрос вместо набора таймеров: сервер отвечает при изменении или через ~25 с. */
+const EMPTY: ActivityItem[] = [];
+/** One feed scoped to the active project; stale responses never cross project boundaries. */
 export default function useActivity(projectId: string) {
-  const [items, setItems] = useState<ActivityItem[]>([]);
-  const [error, setError] = useState('');
-  const kick = useRef<() => void>(() => undefined);
+  const [snapshot, setSnapshot] = useState<{
+    project: string;
+    items: ActivityItem[];
+    error: string;
+    ready: boolean;
+  }>({ready: false, project: '', items: EMPTY, error: ''});
+  const kick = useRef<{project: string; refresh: () => void} | null>(null);
   useEffect(() => {
-    if (!projectId) {
-      setItems([]);
-      return;
-    }
-    let alive = true;
-    let version = '';
-    const controller = new AbortController();
-    const loop = async () => {
-      while (alive) {
-        try {
-          const r = await apiFetch(
-            `/api/activity?project_id=${encodeURIComponent(projectId)}&since=${version}&wait=20`,
-            {signal: controller.signal}
-          );
-          if (!r.ok) throw Error('Лента заданий недоступна');
-          const d = await r.json();
-          if (!alive) return;
-          version = d.version;
-          if (d.changed) setItems(d.items);
-          setError('');
-        } catch (e) {
-          if (!alive) return;
-          setError(e instanceof Error ? e.message : String(e));
-          await new Promise(res => window.setTimeout(res, 4000));
-        }
-      }
-    };
-    kick.current = () => {
-      version = '';
-    };
-    void loop();
+    setSnapshot({project: projectId, items: EMPTY, error: '', ready: false});
+    if (!projectId) return;
+    const feed = startActivityFeed<ActivityItem>(
+      projectId,
+      apiFetch,
+      items => setSnapshot({project: projectId, items, error: '', ready: true}),
+      error => setSnapshot(current => (current.project === projectId ? {...current, error} : current))
+    );
+    kick.current = {project: projectId, refresh: feed.refresh};
     return () => {
-      alive = false;
-      controller.abort();
+      feed.stop();
+      if (kick.current?.project === projectId) kick.current = null;
     };
   }, [projectId]);
-  return {items, error, reset: () => kick.current()};
+  return {
+    connected: snapshot.project === projectId && snapshot.ready && !snapshot.error,
+    items: snapshot.project === projectId ? snapshot.items : EMPTY,
+    error: snapshot.project === projectId ? snapshot.error : '',
+    reset: () => {
+      if (kick.current?.project === projectId) kick.current.refresh();
+    },
+  };
 }

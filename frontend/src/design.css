@@ -97,11 +97,12 @@ section.panel {
 .shell {
   display: grid;
   grid-template-columns: var(--nav-w) minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
   min-height: 100vh;
 }
 .shell > .stage-nav {
   grid-column: 1;
-  grid-row: 1 / span 40;
+  grid-row: 1 / span 2;
 }
 .shell > header,
 .shell > main,
@@ -384,8 +385,63 @@ section.panel {
 }
 
 /* Экраны нового дизайна занимают всю ширину рабочей области */
+.workspace-trail {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 16px;
+  min-width: 0;
+}
+.workspace-trail h1 {
+  font-size: 24px;
+  line-height: 1.2;
+  margin: 4px 0 0;
+}
+.workspace-trail small {
+  display: block;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.home-main .workspace-trail {
+  display: none;
+}
+.app main.media-main {
+  display: block;
+  width: 100%;
+  margin: 0;
+  max-width: none;
+}
+.media-main > .sidebar {
+  display: none;
+}
+.ps-frame-current {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+.create-main .workspace-trail {
+  margin-bottom: 0;
+}
+.topbar-project-picker {
+  max-width: min(360px, 40vw);
+  min-width: 130px;
+  font-weight: 600;
+}
+@media (max-width: 700px) {
+  .topbar-project {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .topbar-project-picker {
+    max-width: 52vw;
+  }
+  .workspace-trail h1 {
+    font-size: 21px;
+  }
+}
 .app main.storyboard-main,
 .app main.create-main,
+.app main.workflow-main,
 .app main.home-main {
   width: 100%;
   max-width: none;
