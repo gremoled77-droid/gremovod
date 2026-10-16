@@ -4,6 +4,7 @@ import {readLocal, writeLocal} from './localDrafts';
 import {useEffect, useState} from 'react';
 import {apiFetch} from './api';
 import {responseJson} from './ChatGPTPanel';
+import Lightbox, {type LightboxItem} from './Lightbox';
 import './ProductionStoryboard.css';
 
 type Node = {
@@ -75,6 +76,7 @@ export default function ProductionStoryboard({
     [name, setName] = useState('');
   const [editorStack, setEditorStack] = useState<string[]>([]),
     [storageOK, setStorageOK] = useState(true);
+  const [view, setView] = useState<{items: LightboxItem[]; index: number} | null>(null);
   const [busy, setBusy] = useState(false),
     [error, setError] = useState(''),
     [notice, setNotice] = useState(''),
@@ -220,26 +222,35 @@ export default function ProductionStoryboard({
     });
   }
   return (
-    <section className="panel ps-board">
-      <div className="panel-title">
+    <section className="ps-board">
+      <header className="ps-top">
         <div>
-          <small>GremoVOD · рабочие данные</small>
-          <h2>Сценарий и раскадровка</h2>
+          <span className="ps-eyebrow">РАСКАДРОВКА · РАБОЧАЯ ДОСКА</span>
+          <h2>{nodes.find(n => n.id === sid)?.title || 'Сценарий и раскадровка'}</h2>
         </div>
-        <button
-          disabled={busy}
-          onClick={() => {
-            setPlan(null);
-            setTick(t => t + 1);
-          }}
-        >
-          Обновить доску
-        </button>
-      </div>
-      <p className="muted">
-        Сцены и кадры связаны с папками проекта. Это сохраняемая доска; демонстрация остаётся под кнопкой
-        «Раскадровка · демо».
-      </p>
+        <div className="ps-top-actions">
+          {board && (
+            <span className="ps-pill">
+              Кадров: <b>{board.scenes.reduce((n, sc) => n + sc.frames.length, 0)}</b> · с фото{' '}
+              <b>
+                {board.scenes.reduce(
+                  (n, sc) => n + sc.frames.filter(f => f.files.some(x => x.kind === 'image')).length,
+                  0
+                )}
+              </b>
+            </span>
+          )}
+          <button
+            disabled={busy}
+            onClick={() => {
+              setPlan(null);
+              setTick(t => t + 1);
+            }}
+          >
+            Обновить
+          </button>
+        </div>
+      </header>
       {!storageOK && (
         <p role="alert">Черновик не сохранён браузером. Сохрани сценарий до ухода со страницы.</p>
       )}
@@ -253,7 +264,7 @@ export default function ProductionStoryboard({
           {notice}
         </p>
       )}
-      <div className="twocol">
+      <div className="ps-pick">
         <label>
           Проект раскадровки
           <select
@@ -438,12 +449,20 @@ export default function ProductionStoryboard({
           )}
           {board.scenes.map(scene => (
             <article key={scene.id} className="ps-scene">
-              <div className="panel-title">
+              <div className="ps-scene-head">
                 <button className="ps-heading" onClick={() => inspect(scene.id)}>
                   <small>СЦЕНА {String(scene.number).padStart(2, '0')}</small>
                   <h3>{scene.title} ↗</h3>
                 </button>
-                <small>Кадров: {scene.frames.length}</small>
+                {(() => {
+                  const done = scene.frames.filter(f => f.files.some(x => x.kind === 'image')).length;
+                  const all = scene.frames.length;
+                  return (
+                    <span className={'ps-prog' + (all && done === all ? ' ok' : '')}>
+                      {done} из {all} с фото
+                    </span>
+                  );
+                })()}
               </div>
               <p className="ps-text">{scene.notes || 'Описание пока не добавлено'}</p>
               <div className="ps-cast">
@@ -468,35 +487,71 @@ export default function ProductionStoryboard({
                       frame.files.find(f => f.id === frame.selection.selected_video_file_id) ||
                       frame.files.find(f => f.kind === 'video');
                   return (
-                    <article key={frame.id} className="ps-frame">
-                      {image ? (
-                        <img
-                          src={image.asset_id ? `/api/library/${image.asset_id}/thumbnail` : image.url}
-                          alt={frame.title}
-                          loading="lazy"
-                        />
-                      ) : (
-                        <div className="ps-empty">Фото пока нет</div>
-                      )}
-                      <b>
-                        {scene.number}.{frame.number} · {frame.title}
-                      </b>
+                    <article key={frame.id} className={'ps-frame' + (image ? '' : ' none')}>
+                      <div className="ps-shot">
+                        {image ? (
+                          <button
+                            className="ps-zoom"
+                            title="Открыть крупно"
+                            onClick={() => {
+                              const list = scene.frames
+                                .map(fr => {
+                                  const im =
+                                    fr.files.find(f => f.id === fr.selection.selected_image_file_id) ||
+                                    fr.files.find(f => f.kind === 'image');
+                                  return im
+                                    ? {
+                                        url: im.asset_id ? `/api/library/${im.asset_id}/file` : im.url,
+                                        title: `${scene.number}.${fr.number} · ${fr.title}`,
+                                        id: fr.id,
+                                      }
+                                    : null;
+                                })
+                                .filter(Boolean) as (LightboxItem & {id: string})[];
+                              setView({
+                                items: list,
+                                index: Math.max(
+                                  0,
+                                  list.findIndex(x => x.id === frame.id)
+                                ),
+                              });
+                            }}
+                          >
+                            <img
+                              src={image.asset_id ? `/api/library/${image.asset_id}/thumbnail` : image.url}
+                              alt={frame.title}
+                              loading="lazy"
+                            />
+                          </button>
+                        ) : (
+                          <div className="ps-empty">нет изображения</div>
+                        )}
+                        <span className="ps-tag">
+                          {scene.number}.{frame.number}
+                        </span>
+                        {image && frame.selection.selected_image_file_id && (
+                          <span className="ps-main">главный</span>
+                        )}
+                        {video && (
+                          <span className="ps-vid">
+                            {frame.selection.selected_video_file_id ? 'видео ✓' : 'видео'}
+                          </span>
+                        )}
+                      </div>
+                      <b>{frame.title}</b>
                       <small>
                         {image
                           ? frame.selection.selected_image_file_id
-                            ? 'Основное фото'
-                            : 'Последнее изображение · не утверждено'
-                          : 'Запланирован'}
-                        {video
-                          ? frame.selection.selected_video_file_id
-                            ? ' · Финальный дубль'
-                            : ' · Есть видео'
-                          : ''}
+                            ? 'основное фото утверждено'
+                            : 'последнее фото · не утверждено'
+                          : 'запланирован'}
                       </small>
-                      <button disabled={busy} onClick={() => openFrame(frame)}>
-                        Открыть кадр в студии
-                      </button>
-                      <button onClick={() => inspect(frame.id)}>Файлы и описание ↗</button>
+                      <div className="ps-acts">
+                        <button disabled={busy} onClick={() => openFrame(frame)}>
+                          В студию
+                        </button>
+                        <button onClick={() => inspect(frame.id)}>Файлы ↗</button>
+                      </div>
                     </article>
                   );
                 })}
@@ -534,6 +589,14 @@ export default function ProductionStoryboard({
             </div>
           </details>
         </>
+      )}
+      {view && (
+        <Lightbox
+          items={view.items}
+          index={view.index}
+          onIndex={i => setView(v => (v ? {...v, index: i} : v))}
+          onClose={() => setView(null)}
+        />
       )}
       {editorStack.length > 0 && (
         <ProductionEntityEditor

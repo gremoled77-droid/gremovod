@@ -382,3 +382,13 @@ section.panel {
     padding: 10px 14px;
   }
 }
+
+/* Экраны нового дизайна занимают всю ширину рабочей области */
+.app main.storyboard-main,
+.app main.create-main,
+.app main.home-main {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  box-sizing: border-box;
+}

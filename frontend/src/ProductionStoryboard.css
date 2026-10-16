@@ -1,9 +1,63 @@
+.ps-board {
+  width: 100%;
+  box-sizing: border-box;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 26px 28px 60px;
+}
+.ps-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+.ps-eyebrow {
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  color: var(--accent);
+  font-weight: 600;
+}
+.ps-top h2 {
+  margin: 6px 0 0;
+  font-size: 30px;
+  letter-spacing: -0.02em;
+}
+.ps-top-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+.ps-pill {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 99px;
+  padding: 6px 14px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.ps-pill b {
+  color: var(--text);
+}
+.ps-pick {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 12px;
+}
 .ps-board .ps-scene {
-  border: 1px solid #394056;
-  border-radius: 14px;
-  padding: 20px;
-  margin: 20px 0;
-  background: #ffffff04;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 18px 20px 14px;
+  margin: 18px 0;
+  background: linear-gradient(160deg, #15171c, #101216);
+}
+.ps-scene-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
 }
 .ps-board .ps-heading {
   display: block;
@@ -11,58 +65,151 @@
   border: none;
   text-align: left;
   padding: 0;
+  color: var(--text);
+}
+.ps-heading small {
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  color: var(--accent);
 }
 .ps-heading h3 {
-  margin: 5px 0;
+  margin: 4px 0 0;
+  font-size: 19px;
+}
+.ps-prog {
+  font-size: 12px;
+  padding: 4px 12px;
+  border-radius: 99px;
+  color: var(--accent);
+  background: rgba(242, 177, 52, 0.1);
+  white-space: nowrap;
+}
+.ps-prog.ok {
+  color: var(--ok);
+  background: rgba(94, 194, 122, 0.1);
 }
 .ps-board .ps-text,
 .ps-script article p {
   white-space: pre-wrap;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.55;
+  max-height: 4.7em;
+  overflow: hidden;
 }
 .ps-frames {
   display: flex;
   gap: 14px;
-  overflow: auto;
-  padding: 10px 0;
-  margin-bottom: 12px;
+  overflow-x: auto;
+  padding: 10px 2px 12px;
+  scroll-snap-type: x proximity;
 }
 .ps-frame {
-  flex: 0 0 220px;
+  flex: 0 0 214px;
   display: flex;
   flex-direction: column;
-  gap: 9px;
-  padding: 10px;
-  border: 1px solid #3b4358;
-  border-radius: 10px;
-  align-items: stretch;
+  gap: 7px;
+  scroll-snap-align: start;
 }
-.ps-frame img,
-.ps-empty {
+.ps-shot {
+  position: relative;
+  aspect-ratio: 16 / 10;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #0b0c0f;
+  border: 1px solid var(--border);
+}
+.ps-frame:hover .ps-shot {
+  border-color: var(--accent);
+}
+.ps-zoom {
+  display: block;
   width: 100%;
-  height: 130px;
-  object-fit: contain;
-  background: #111725;
-  border-radius: 7px;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: zoom-in;
+}
+.ps-shot img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
 }
 .ps-empty {
+  height: 100%;
   display: grid;
   place-items: center;
-  color: #aba5bd;
+  font-size: 12px;
+  color: var(--muted);
+  background: repeating-linear-gradient(135deg, #14161b 0 12px, #181b21 12px 24px);
+  border-radius: 0;
+}
+.ps-frame.none .ps-shot {
+  border-style: dashed;
+}
+.ps-tag,
+.ps-main,
+.ps-vid {
+  position: absolute;
+  font-size: 11px;
+  padding: 2px 9px;
+  border-radius: 99px;
+  background: #0e0f12d0;
+}
+.ps-tag {
+  top: 8px;
+  left: 8px;
+}
+.ps-main {
+  bottom: 8px;
+  right: 8px;
+  color: var(--ok);
+}
+.ps-vid {
+  top: 8px;
+  right: 8px;
+  color: var(--info);
+}
+.ps-frame b {
+  font-size: 13px;
+  font-weight: 500;
 }
 .ps-frame small {
   font-size: 11px;
-  color: #b5afc6;
+  color: var(--muted);
+  margin-top: -3px;
+}
+.ps-acts {
+  display: flex;
+  gap: 6px;
+}
+.ps-acts button {
+  flex: 1;
+  padding: 6px 8px;
+  font-size: 12px;
+  border-radius: 10px;
 }
 .ps-script {
-  padding: 15px;
-  border: 1px solid #45405c;
-  border-radius: 10px;
+  padding: 16px;
+  border: 1px solid var(--border-strong);
+  border-radius: 16px;
+  background: var(--surface);
 }
 .ps-script article {
   margin: 12px 0;
   padding: 12px;
   background: #ffffff06;
-  border-radius: 8px;
+  border-radius: 10px;
+}
+@media (max-width: 700px) {
+  .ps-board {
+    padding: 16px 14px 48px;
+  }
+  .ps-pick {
+    grid-template-columns: 1fr;
+  }
 }
 main.storyboard-main {
   grid-template-columns: minmax(0, 1fr);
@@ -140,4 +287,11 @@ main.storyboard-main {
   flex-wrap: wrap;
   gap: 8px;
   margin: 12px 0;
+}
+.app main.storyboard-main {
+  display: block;
+  padding: 0;
+}
+.app main.storyboard-main > .content {
+  padding: 0;
 }

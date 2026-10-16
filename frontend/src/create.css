@@ -151,7 +151,7 @@
   min-height: 0;
   overflow-y: auto;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
   gap: 12px;
   align-content: start;
 }
@@ -170,7 +170,7 @@
   width: 100%;
   display: block;
   object-fit: cover;
-  max-height: 46vh;
+  aspect-ratio: 4 / 3;
 }
 .cs-cap {
   padding: 10px 12px;
