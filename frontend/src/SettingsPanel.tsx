@@ -2,6 +2,7 @@ import type {ReactNode} from 'react';
 import {Settings} from 'lucide-react';
 import {PAID_LLM_ENABLED} from './api';
 import ArchivedProjects from './ArchivedProjects';
+import ChatLinkSetting from './ChatLinkSetting';
 
 type Props = {
   children?: ReactNode;
@@ -74,6 +75,8 @@ export default function SettingsPanel({
           <div>{children}</div>
         </details>
       )}
+      <hr />
+      <ChatLinkSetting />
       <hr />
       <ArchivedProjects onRestored={onProjectsChanged} />
       <h3>Окружение студии</h3>

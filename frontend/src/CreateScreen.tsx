@@ -5,6 +5,7 @@ import GenerationReview, {type GenerationRequest} from './GenerationReview';
 import {type ActivityItem} from './useActivity';
 import {useSharedActivity} from './ActivityContext';
 import Lightbox, {type LightboxItem} from './Lightbox';
+import {DEFAULT_CHAT_URL, copyTextFor, getChatUrl} from './chatLink';
 
 type OptionSpec = {
   values?: (string | number)[];
@@ -217,12 +218,22 @@ function CreateScreenBody({projectId, heroes}: {projectId: string; heroes: Hero[
     }
   };
 
-  const external = async () => {
+  /** Копирует промпт и создаёт ожидающее внешнее задание; с openChat ещё открывает чат ChatGPT. */
+  const external = async (openChat = false) => {
     setError('');
     if (!prompt.trim()) return setError('Напиши промпт');
+    const roles = refs.map((_, i) => (i === 0 ? 'главный референс' : 'референс'));
+    // Буфер записываем сразу, пока жив жест нажатия: после запроса к серверу телефон его не даст.
+    const localText = copyTextFor(prompt, roles);
+    const copied = navigator.clipboard
+      ? navigator.clipboard.writeText(localText).then(
+          () => true,
+          () => false
+        )
+      : Promise.resolve(false);
     try {
       const target = selected.find(id => specs[id]) || 'gpt-image-2.5';
-      const job = await json(
+      await json(
         await apiFetch('/api/external-jobs', {
           method: 'POST',
           headers: {'Content-Type': 'application/json'},
@@ -232,21 +243,33 @@ function CreateScreenBody({projectId, heroes}: {projectId: string; heroes: Hero[
             target,
             prompt,
             service: 'chatgpt',
-            references: refs.map((asset_id, i) => ({
-              asset_id,
-              role: i === 0 ? 'главный референс' : 'референс',
-            })),
+            references: refs.map((asset_id, i) => ({asset_id, role: roles[i]})),
           }),
         })
       );
-      await navigator.clipboard.writeText(job.copy_text || prompt).catch(() => undefined);
-      setNotice('Промпт скопирован. Сгенерируй в ChatGPT и верни картинку кнопкой «Вставить результат».');
       reset();
+      const ok = await copied;
+      const chat = getChatUrl();
+      const where = openChat
+        ? chat
+          ? 'Открываю твой чат ChatGPT.'
+          : 'Ссылка на чат не задана (Настройки), открываю ChatGPT.'
+        : 'Сгенерируй в ChatGPT';
+      setNotice(
+        ok
+          ? `Промпт скопирован. ${where} Потом верни картинку кнопкой «Вставить результат» или «Файл…».`
+          : `Не удалось скопировать в буфер — скопируй промпт вручную из поля ниже. ${where}`
+      );
+      if (openChat) {
+        const url = chat || DEFAULT_CHAT_URL;
+        // На телефоне уходим в приложение ChatGPT; на компьютере чат открывается во вкладке рядом.
+        if (window.matchMedia('(max-width: 700px)').matches) window.location.href = url;
+        else window.open(url, '_blank', 'noopener');
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
   };
-
   const attach = async (jobId: string, file: File) => {
     try {
       const form = new FormData();
@@ -642,8 +665,11 @@ function CreateScreenBody({projectId, heroes}: {projectId: string; heroes: Hero[
               {refs.length} реф. · {total} {total === 1 ? 'модель' : 'моделей'}
             </span>
             <span className="cs-spacer" />
-            <button disabled={!projectId} onClick={external}>
+            <button disabled={!projectId} onClick={() => void external()}>
               Скопировать для ChatGPT
+            </button>
+            <button className="cs-send-chat" disabled={!projectId} onClick={() => void external(true)}>
+              Отправить в ChatGPT
             </button>
             <button className="primary" disabled={busy || !projectId} onClick={start}>
               {busy ? 'Готовлю…' : 'Сгенерировать'}

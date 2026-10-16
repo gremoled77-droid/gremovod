@@ -1,7 +1,10 @@
 /** Лимит запуска по умолчанию и порог, выше которого нужна отдельная галочка. */
 export const DEFAULT_LIMIT_USD = 2;
 export const SAFE_LIMIT_USD = 2;
-export const LIMIT_PRESETS = [1, 2, 5, 10, 20, 50];
+export const LIMIT_PRESETS = [0.1, 0.25, 0.5, 1, 2, 5, 10, 20, 50];
+
+/** Подпись быстрой суммы: центы — «25¢», доллары — «$2». */
+export const presetLabel = (v: number) => (v < 1 ? Math.round(v * 100) + '¢' : '$' + v);
 export const LIMIT_SLIDER_MAX = 50;
 
 /** Стартовое значение: $2, а если оценка больше — ближайший доллар вверх. */

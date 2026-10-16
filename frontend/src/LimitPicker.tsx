@@ -1,4 +1,4 @@
-import {LIMIT_PRESETS, LIMIT_SLIDER_MAX, SAFE_LIMIT_USD, limitNeedsConfirm} from './spendLimit';
+import {LIMIT_PRESETS, LIMIT_SLIDER_MAX, limitNeedsConfirm, presetLabel} from './spendLimit';
 
 /** Выбор лимита: быстрые суммы, ползунок по доллару и точное поле. Выше $2 нужна отдельная галочка. */
 export default function LimitPicker({
@@ -34,7 +34,7 @@ export default function LimitPicker({
             disabled={disabled || v < total}
             onClick={() => set(String(v))}
           >
-            ${v}
+            {presetLabel(v)}
           </button>
         ))}
       </div>
@@ -69,7 +69,7 @@ export default function LimitPicker({
             onChange={e => onHighConfirmed(e.target.checked)}
             disabled={disabled}
           />{' '}
-          Лимит выше ${SAFE_LIMIT_USD}: понимаю, что запуск может стоить до ${n || 0}
+          Подтверждаю генерацию (лимит выше $2: до ${n || 0})
         </label>
       )}
     </div>

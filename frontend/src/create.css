@@ -494,3 +494,21 @@
     opacity: 1;
   }
 }
+
+/* Кнопка отправки в ChatGPT: на телефоне — главная, на всю ширину */
+.cs-send-chat {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+@media (max-width: 700px) {
+  .cs-prompt .cs-row {
+    flex-wrap: wrap;
+  }
+  .cs-send-chat {
+    order: -1;
+    flex: 1 1 100%;
+    background: var(--accent);
+    color: var(--accent-ink);
+    font-weight: 600;
+  }
+}
