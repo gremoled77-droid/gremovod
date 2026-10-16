@@ -33,6 +33,7 @@ import ConnectionsPanel from './ConnectionsPanel';
 import GenerationReview, {type GenerationRequest} from './GenerationReview';
 import AssetLibrary from './AssetLibrary';
 import CreateScreen from './CreateScreen';
+import HomeScreen from './HomeScreen';
 import GenerationWatcher from './GenerationWatcher';
 import {ActivityProvider} from './ActivityContext';
 import StageNav from './StageNav';
@@ -190,7 +191,8 @@ function App() {
     | 'settings'
     | 'storyboard'
     | 'create'
-  >('studio');
+    | 'home'
+  >('home');
   const [audioFile, setAudioFile] = useState('');
   const [audioDuration, setAudioDuration] = useState(0);
   const [audioSegments, setAudioSegments] = useState<{start: number; end: number; duration: number}[]>([]);
@@ -1150,7 +1152,7 @@ function App() {
             )}
           </section>
         ) : (
-          <main className={mode === 'storyboard' ? 'storyboard-main' : mode === 'create' ? 'create-main' : ''}>
+          <main className={mode === 'storyboard' ? 'storyboard-main' : mode === 'create' ? 'create-main' : mode === 'home' ? 'home-main' : ''}>
             <aside className="sidebar">
               <ProjectHeader
                 id={projectId}
@@ -1563,6 +1565,14 @@ function App() {
                     заменяет проверку изображений человеком.
                   </p>
                 </section>
+              ) : mode === 'home' ? (
+                <HomeScreen
+                  projectId={projectId}
+                  projectName={projectName}
+                  projects={projects}
+                  onMode={setMode}
+                  onOpenProject={id => void load(id)}
+                />
               ) : mode === 'create' ? (
                 <CreateScreen
                   projectId={projectId}

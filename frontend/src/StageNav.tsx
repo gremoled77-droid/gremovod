@@ -12,7 +12,8 @@ export type Mode =
   | 'files'
   | 'settings'
   | 'storyboard'
-  | 'create';
+  | 'create'
+  | 'home';
 
 type Item = {key: string; mode: Mode; label: string; hint?: string; icon: ReactNode};
 
@@ -70,6 +71,19 @@ export default function StageNav({
           <small>Studio</small>
         </div>
       </div>
+      <button
+        className={'nav-item' + (mode === 'home' ? ' nav-active' : '')}
+        aria-current={mode === 'home' ? 'page' : undefined}
+        onClick={() => onMode('home')}
+      >
+        <span className="nav-icon" aria-hidden="true">
+          ⌂
+        </span>
+        <span className="nav-text">
+          <b>Старт</b>
+          <small>обзор проекта</small>
+        </span>
+      </button>
       <div className="nav-group-title">Эпизод</div>
       {STAGES.map(s => render(s, s.key === activeStage))}
       <div className="nav-group-title">Инструменты</div>
