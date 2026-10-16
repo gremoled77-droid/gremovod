@@ -13,7 +13,7 @@ import {
   type Edge,
 } from '@xyflow/react';
 import {apiFetch} from './api';
-import useActivity from './useActivity';
+import {useSharedActivity} from './ActivityContext';
 import {buildSteps, canConnect, type NodeKind, type Step} from './workflowPlan';
 
 type Graph = {nodes: Node[]; edges: Edge[]};
@@ -125,7 +125,7 @@ export default function WorkflowPanel({
   edges: Edge[];
   onChange: (update: (graph: Graph) => Graph) => void;
 }) {
-  const {items, reset} = useActivity(projectId);
+  const {items, reset} = useSharedActivity();
   const [library, setLibrary] = useState<Lib[]>([]);
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');

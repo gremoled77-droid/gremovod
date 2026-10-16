@@ -34,12 +34,15 @@ import GenerationReview, {type GenerationRequest} from './GenerationReview';
 import AssetLibrary from './AssetLibrary';
 import CreateScreen from './CreateScreen';
 import GenerationWatcher from './GenerationWatcher';
+import {ActivityProvider} from './ActivityContext';
+import StageNav from './StageNav';
+import Dock, {countActive} from './Dock';
+import useActivity from './useActivity';
 import AgentPanel from './AgentPanel';
 import {lazy, Suspense, useCallback, useEffect, useRef, useState} from 'react';
 import type {Node, Edge} from '@xyflow/react';
 import {
   MessageSquare,
-  GitBranch,
   Plus,
   RefreshCw,
   Download,
@@ -172,6 +175,7 @@ function App() {
     nodeId: string;
   } | null>(null);
   const [storyboardDemoOpen, setStoryboardDemoOpen] = useState(false);
+  const [dockOpen, setDockOpen] = useState(false);
   const [demoVisited, setDemoVisited] = useState(false);
   const [mode, setMode] = useState<
     | 'studio'
@@ -201,6 +205,8 @@ function App() {
   const [assetCategory, setAssetCategory] = useState('real_references');
   const [assetNote, setAssetNote] = useState('');
   const [projectId, setProjectId] = useState('');
+  const activity = useActivity(projectId);
+  const activeCount = countActive(activity.items);
   const [projectName, setProjectName] = useState('Новый клип');
   const [projects, setProjects] = useState<{id: string; title: string}[]>([]);
   const [titleEditing, setTitleEditing] = useState(true);
@@ -1075,361 +1081,500 @@ function App() {
         ? 'Проверка API…'
         : 'Backend недоступен';
   return (
-    <div className="app">
-      <Suspense fallback={<p>Открываем демо…</p>}>
-        {demoVisited && (
-          <StoryboardDemo open={storyboardDemoOpen} onClose={() => setStoryboardDemoOpen(false)} />
-        )}
-      </Suspense>
-      <header>
-        <div className="brand">
-          <span className="logo">◆</span>
-          <div>
-            <b>AI WORKFLOW STUDIO</b>
-            <small>Локальная AI-студия</small>
-          </div>
-        </div>
-        <div className="top-actions">
-          <button onClick={() => setMode('connections')} className={mode === 'connections' ? 'active' : ''}>
-            Подключения
-          </button>
-          <span className={'status ' + apiHealth} role="status">
-            ● {apiStatus}
-          </span>
-          <button
-            onClick={() => {
-              void checkHealth();
-              void refresh();
-            }}
-          >
-            Проверить API
-          </button>
-          <button onClick={() => setMode('create')} className={mode === 'create' ? 'active' : ''}>
-            Создать
-          </button>
-          <button onClick={() => setMode('studio')} className={mode === 'studio' ? 'active' : ''}>
-            ▤ Студия
-          </button>
-          <button onClick={() => setMode('storyboard')} className={mode === 'storyboard' ? 'active' : ''}>
-            Раскадровка
-          </button>
-          <button
-            onClick={() => {
-              setDemoVisited(true);
-              setStoryboardDemoOpen(true);
-            }}
-          >
-            Раскадровка · демо
-          </button>
-          <button onClick={() => setMode('files')} className={mode === 'files' ? 'active' : ''}>
-            Папки проекта
-          </button>
-          <button onClick={() => setMode('scene')} className={mode === 'scene' ? 'active' : ''}>
-            Сцена
-          </button>
-          <button onClick={() => setMode('refine')} className={mode === 'refine' ? 'active' : ''}>
-            Допилить
-          </button>
-          <button onClick={() => setMode('economics')} className={mode === 'economics' ? 'active' : ''}>
-            Экономика
-          </button>
-          <button onClick={() => setMode('agents')} className={mode === 'agents' ? 'active' : ''}>
-            ☁ Агенты
-          </button>
-          <button onClick={() => setMode('styles')} className={mode === 'styles' ? 'active' : ''}>
-            <Palette size={15} /> Мир и стиль
-          </button>
-          <button onClick={() => setMode('graph')} className={mode === 'graph' ? 'active' : ''}>
-            <GitBranch size={15} /> Узлы
-          </button>
-          <div className="project-global-actions">
-            <button
-              disabled={startup !== 'ready' || !!busy}
-              onClick={() => void requestProjectChange({type: 'new'})}
-            >
-              <Plus size={16} /> Новый проект
-            </button>
-            <button
-              className={'settings-button ' + (mode === 'settings' ? 'active' : '')}
-              aria-label="Настройки"
-              title="Настройки"
-              onClick={() => setMode('settings')}
-            >
-              <Settings size={19} />
-            </button>
-          </div>
-        </div>
-      </header>
-      {startup !== 'ready' ? (
-        <section className="panel startup-panel" aria-live="polite">
-          {startup === 'loading' ? (
-            <p>Открываем последний сохранённый проект…</p>
-          ) : (
-            <>
-              <p role="alert">{error}</p>
-              <button onClick={() => setStartupAttempt(x => x + 1)}>Повторить открытие проекта</button>
-            </>
+    <ActivityProvider value={activity}>
+      <div className="app shell">
+        <StageNav
+          mode={mode}
+          onMode={setMode}
+          onDemo={() => {
+            setDemoVisited(true);
+            setStoryboardDemoOpen(true);
+          }}
+        />
+        <Suspense fallback={<p>Открываем демо…</p>}>
+          {demoVisited && (
+            <StoryboardDemo open={storyboardDemoOpen} onClose={() => setStoryboardDemoOpen(false)} />
           )}
-        </section>
-      ) : (
-        <main className={mode === 'storyboard' ? 'storyboard-main' : ''}>
-          <aside className="sidebar">
-            <ProjectHeader
-              id={projectId}
-              name={projectName}
-              editing={titleEditing}
-              dirty={projectDirty}
-              busy={!!busy || saving.current}
-              onName={setProjectName}
-              onEdit={() => setTitleEditing(true)}
-              onCancel={() => {
-                setProjectName(baseProject.current?.title || projectName);
-                setTitleEditing(false);
+        </Suspense>
+        <header className="topbar">
+          <div className="topbar-project">
+            <span className="topbar-title">{projectName || 'Проект'}</span>
+            <span className={'status ' + apiHealth} role="status">
+              ● {apiStatus}
+            </span>
+          </div>
+          <div className="top-actions">
+            <button
+              className={'dock-toggle' + (dockOpen ? ' active' : '')}
+              onClick={() => setDockOpen(v => !v)}
+              aria-pressed={dockOpen}
+            >
+              Очередь{activeCount ? ` · ${activeCount}` : ''}
+            </button>
+            <button
+              onClick={() => {
+                void checkHealth();
+                void refresh();
               }}
-              onSave={() => void save()}
-            />
-            <label>
-              Открыть проект
-              <select value={projectId} disabled={!!busy} onChange={e => void load(e.target.value)}>
-                <option value="" disabled>
-                  {projects.length ? 'Выбери сохранённый проект' : 'Нет сохранённых проектов'}
-                </option>
-                {projects.map(p => (
-                  <option key={p.id} value={p.id}>
-                    {p.title}
+            >
+              Проверить API
+            </button>
+            <div className="project-global-actions">
+              <button
+                disabled={startup !== 'ready' || !!busy}
+                onClick={() => void requestProjectChange({type: 'new'})}
+              >
+                <Plus size={16} /> Новый проект
+              </button>
+              <button
+                className={'settings-button ' + (mode === 'settings' ? 'active' : '')}
+                aria-label="Настройки"
+                title="Настройки"
+                onClick={() => setMode('settings')}
+              >
+                <Settings size={19} />
+              </button>
+            </div>
+          </div>
+        </header>
+        {dockOpen && <Dock projectId={projectId} onClose={() => setDockOpen(false)} />}
+        {startup !== 'ready' ? (
+          <section className="panel startup-panel" aria-live="polite">
+            {startup === 'loading' ? (
+              <p>Открываем последний сохранённый проект…</p>
+            ) : (
+              <>
+                <p role="alert">{error}</p>
+                <button onClick={() => setStartupAttempt(x => x + 1)}>Повторить открытие проекта</button>
+              </>
+            )}
+          </section>
+        ) : (
+          <main className={mode === 'storyboard' ? 'storyboard-main' : ''}>
+            <aside className="sidebar">
+              <ProjectHeader
+                id={projectId}
+                name={projectName}
+                editing={titleEditing}
+                dirty={projectDirty}
+                busy={!!busy || saving.current}
+                onName={setProjectName}
+                onEdit={() => setTitleEditing(true)}
+                onCancel={() => {
+                  setProjectName(baseProject.current?.title || projectName);
+                  setTitleEditing(false);
+                }}
+                onSave={() => void save()}
+              />
+              <label>
+                Открыть проект
+                <select value={projectId} disabled={!!busy} onChange={e => void load(e.target.value)}>
+                  <option value="" disabled>
+                    {projects.length ? 'Выбери сохранённый проект' : 'Нет сохранённых проектов'}
+                  </option>
+                  {projects.map(p => (
+                    <option key={p.id} value={p.id}>
+                      {p.title}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <hr />
+              <hr />
+              <h3>
+                <ShieldCheck size={16} /> Character Vault
+              </h3>
+              <button className="secondary" onClick={mkChar}>
+                <Plus size={14} /> Новый персонаж
+              </button>
+              <select
+                value={state.selectedCharacter}
+                onChange={e => change({selectedCharacter: e.target.value})}
+              >
+                <option value="">Без персонажа</option>
+                {state.characters.map(c => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
                   </option>
                 ))}
               </select>
-            </label>
-            <hr />
-            <hr />
-            <h3>
-              <ShieldCheck size={16} /> Character Vault
-            </h3>
-            <button className="secondary" onClick={mkChar}>
-              <Plus size={14} /> Новый персонаж
-            </button>
-            <select
-              value={state.selectedCharacter}
-              onChange={e => change({selectedCharacter: e.target.value})}
-            >
-              <option value="">Без персонажа</option>
-              {state.characters.map(c => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-            {character && (
-              <div className="char-editor">
-                <CharacterReferences
-                  key={character.id}
-                  projectId={projectId}
-                  characterId={character.id}
-                  name={character.name}
-                  identity={character.identity}
-                  workingImage={
-                    character.working_asset_id
-                      ? '/api/library/' + character.working_asset_id + '/file'
-                      : undefined
-                  }
-                  busy={!!busy}
-                  ensureProject={ensureProject}
-                  onName={name => updateChar({name})}
-                  onIdentity={identity => updateChar({identity})}
-                  onRecognized={result =>
-                    setState(current => ({
-                      ...current,
-                      characters: current.characters.map(item => {
-                        if (item.id !== character.id) return item;
-                        const identity = {...item.identity};
-                        for (const key of Object.keys(result.identity) as (keyof Character['identity'])[]) {
-                          if ((identity[key] || '') === (result.baseline_identity[key] || ''))
-                            identity[key] = result.identity[key];
-                        }
-                        return {...item, identity};
-                      }),
-                    }))
-                  }
-                >
-                  <h4>Профиль конкретной модели</h4>
-                  <select value={profileModel} onChange={e => setProfileModel(e.target.value)}>
-                    {models.map(([k]) => (
-                      <option key={k} value={k}>
-                        {k}
-                      </option>
-                    ))}
-                  </select>
-                  <label>
-                    Особые инструкции
-                    <textarea
-                      rows={3}
-                      value={character.profiles[profileModel]?.prompt_notes || ''}
-                      onChange={e =>
-                        updateChar({
-                          profiles: {
-                            ...character.profiles,
-                            [profileModel]: {
-                              reference_urls: character.profiles[profileModel]?.reference_urls || '',
-                              prompt_notes: e.target.value,
-                            },
-                          },
-                        })
-                      }
-                    />
-                  </label>
-                  <label>
-                    Референсы только для этой модели
-                    <textarea
-                      rows={2}
-                      value={character.profiles[profileModel]?.reference_urls || ''}
-                      onChange={e =>
-                        updateChar({
-                          profiles: {
-                            ...character.profiles,
-                            [profileModel]: {
-                              prompt_notes: character.profiles[profileModel]?.prompt_notes || '',
-                              reference_urls: e.target.value,
-                            },
-                          },
-                        })
-                      }
-                    />
-                  </label>
-                  <p className="muted">
-                    Выбери любую модель выше. Профили и референсы хранятся отдельно и подставляются при
-                    запуске.
-                  </p>
-                  <h4>Папки и файлы персонажа</h4>
-                  <p className="muted">
-                    Сначала сохрани проект, затем загружай исходники. Категория rejected — негативные примеры,
-                    они не подаются как референсы.
-                  </p>
-                  <select value={assetCategory} onChange={e => setAssetCategory(e.target.value)}>
-                    {[
-                      ['real_references', 'Реальные референсы'],
-                      ['candidate_generations', 'Кандидаты на утверждение'],
-                      ['approved_generations', 'Утверждённые'],
-                      ['archived_generations', 'Архив образов'],
-                      ['rejected_generations', 'Неудачные'],
-                      ['model_references', 'Для конкретной модели'],
-                    ].map(([v, n]) => (
-                      <option key={v} value={v}>
-                        {n}
-                      </option>
-                    ))}
-                  </select>
-                  <input
-                    placeholder="Комментарий или ошибка"
-                    value={assetNote}
-                    onChange={e => setAssetNote(e.target.value)}
-                  />
-                  <input
-                    type="file"
-                    accept="image/png,image/jpeg,image/webp"
-                    onChange={e => {
-                      const f = e.target.files?.[0];
-                      if (!f || !projectId || !character) return;
-                      work('asset', async () => {
-                        const fd = new FormData();
-                        fd.append('file', f);
-                        fd.append('category', assetCategory);
-                        fd.append('model_id', assetCategory === 'model_references' ? profileModel : '');
-                        fd.append('note', assetNote);
-                        await json(
-                          await apiFetch(`/api/characters/${projectId}/${character.id}/assets`, {
-                            method: 'POST',
-                            body: fd,
-                          })
-                        );
-                        setAssetList(
-                          await json(await apiFetch(`/api/characters/${projectId}/${character.id}/assets`))
-                        );
-                        setNotice('Референс сохранён');
-                      });
-                    }}
-                  />
-                  <button
-                    className="secondary"
-                    onClick={() =>
-                      work('assets', async () => {
-                        if (!projectId || !character)
-                          throw Error('Сначала сохрани проект и выбери персонажа');
-                        setAssetList(
-                          await json(await apiFetch(`/api/characters/${projectId}/${character.id}/assets`))
-                        );
-                      })
+              {character && (
+                <div className="char-editor">
+                  <CharacterReferences
+                    key={character.id}
+                    projectId={projectId}
+                    characterId={character.id}
+                    name={character.name}
+                    identity={character.identity}
+                    workingImage={
+                      character.working_asset_id
+                        ? '/api/library/' + character.working_asset_id + '/file'
+                        : undefined
+                    }
+                    busy={!!busy}
+                    ensureProject={ensureProject}
+                    onName={name => updateChar({name})}
+                    onIdentity={identity => updateChar({identity})}
+                    onRecognized={result =>
+                      setState(current => ({
+                        ...current,
+                        characters: current.characters.map(item => {
+                          if (item.id !== character.id) return item;
+                          const identity = {...item.identity};
+                          for (const key of Object.keys(result.identity) as (keyof Character['identity'])[]) {
+                            if ((identity[key] || '') === (result.baseline_identity[key] || ''))
+                              identity[key] = result.identity[key];
+                          }
+                          return {...item, identity};
+                        }),
+                      }))
                     }
                   >
-                    Показать файлы персонажа
-                  </button>
-                  <div className="asset-grid">
-                    {assetList.map(a => (
-                      <div key={a.id} className="asset-card">
-                        <img src={a.url} alt={a.original_name} />
-                        <small>
-                          {a.category} · {a.original_name}
-                        </small>
-                        <small>{a.note}</small>
-                        <button
-                          onClick={() =>
-                            work('remove', async () => {
-                              await json(await apiFetch('/api/character-assets/' + a.id, {method: 'DELETE'}));
-                              setAssetList(v => v.filter(x => x.id !== a.id));
+                    <h4>Профиль конкретной модели</h4>
+                    <select value={profileModel} onChange={e => setProfileModel(e.target.value)}>
+                      {models.map(([k]) => (
+                        <option key={k} value={k}>
+                          {k}
+                        </option>
+                      ))}
+                    </select>
+                    <label>
+                      Особые инструкции
+                      <textarea
+                        rows={3}
+                        value={character.profiles[profileModel]?.prompt_notes || ''}
+                        onChange={e =>
+                          updateChar({
+                            profiles: {
+                              ...character.profiles,
+                              [profileModel]: {
+                                reference_urls: character.profiles[profileModel]?.reference_urls || '',
+                                prompt_notes: e.target.value,
+                              },
+                            },
+                          })
+                        }
+                      />
+                    </label>
+                    <label>
+                      Референсы только для этой модели
+                      <textarea
+                        rows={2}
+                        value={character.profiles[profileModel]?.reference_urls || ''}
+                        onChange={e =>
+                          updateChar({
+                            profiles: {
+                              ...character.profiles,
+                              [profileModel]: {
+                                prompt_notes: character.profiles[profileModel]?.prompt_notes || '',
+                                reference_urls: e.target.value,
+                              },
+                            },
+                          })
+                        }
+                      />
+                    </label>
+                    <p className="muted">
+                      Выбери любую модель выше. Профили и референсы хранятся отдельно и подставляются при
+                      запуске.
+                    </p>
+                    <h4>Папки и файлы персонажа</h4>
+                    <p className="muted">
+                      Сначала сохрани проект, затем загружай исходники. Категория rejected — негативные
+                      примеры, они не подаются как референсы.
+                    </p>
+                    <select value={assetCategory} onChange={e => setAssetCategory(e.target.value)}>
+                      {[
+                        ['real_references', 'Реальные референсы'],
+                        ['candidate_generations', 'Кандидаты на утверждение'],
+                        ['approved_generations', 'Утверждённые'],
+                        ['archived_generations', 'Архив образов'],
+                        ['rejected_generations', 'Неудачные'],
+                        ['model_references', 'Для конкретной модели'],
+                      ].map(([v, n]) => (
+                        <option key={v} value={v}>
+                          {n}
+                        </option>
+                      ))}
+                    </select>
+                    <input
+                      placeholder="Комментарий или ошибка"
+                      value={assetNote}
+                      onChange={e => setAssetNote(e.target.value)}
+                    />
+                    <input
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp"
+                      onChange={e => {
+                        const f = e.target.files?.[0];
+                        if (!f || !projectId || !character) return;
+                        work('asset', async () => {
+                          const fd = new FormData();
+                          fd.append('file', f);
+                          fd.append('category', assetCategory);
+                          fd.append('model_id', assetCategory === 'model_references' ? profileModel : '');
+                          fd.append('note', assetNote);
+                          await json(
+                            await apiFetch(`/api/characters/${projectId}/${character.id}/assets`, {
+                              method: 'POST',
+                              body: fd,
                             })
-                          }
-                        >
-                          Удалить
+                          );
+                          setAssetList(
+                            await json(await apiFetch(`/api/characters/${projectId}/${character.id}/assets`))
+                          );
+                          setNotice('Референс сохранён');
+                        });
+                      }}
+                    />
+                    <button
+                      className="secondary"
+                      onClick={() =>
+                        work('assets', async () => {
+                          if (!projectId || !character)
+                            throw Error('Сначала сохрани проект и выбери персонажа');
+                          setAssetList(
+                            await json(await apiFetch(`/api/characters/${projectId}/${character.id}/assets`))
+                          );
+                        })
+                      }
+                    >
+                      Показать файлы персонажа
+                    </button>
+                    <div className="asset-grid">
+                      {assetList.map(a => (
+                        <div key={a.id} className="asset-card">
+                          <img src={a.url} alt={a.original_name} />
+                          <small>
+                            {a.category} · {a.original_name}
+                          </small>
+                          <small>{a.note}</small>
+                          <button
+                            onClick={() =>
+                              work('remove', async () => {
+                                await json(
+                                  await apiFetch('/api/character-assets/' + a.id, {method: 'DELETE'})
+                                );
+                                setAssetList(v => v.filter(x => x.id !== a.id));
+                              })
+                            }
+                          >
+                            Удалить
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </CharacterReferences>
+                </div>
+              )}
+            </aside>
+            <div className="content">
+              {conflict && (
+                <div className="alert" role="alert">
+                  {conflict}
+                  <div className="chips">
+                    <button onClick={downloadDraft}>Скачать локальный черновик</button>
+                    <button onClick={() => load(projectId)}>Загрузить серверную версию</button>
+                  </div>
+                </div>
+              )}
+              {error && (
+                <div className="alert">
+                  {error}
+                  <button onClick={() => setError('')}>✕</button>
+                </div>
+              )}
+              {notice && <div className="notice">{notice}</div>}
+              {mode === 'settings' ? (
+                <SettingsPanel
+                  provider={provider}
+                  model={llm}
+                  busy={!!busy}
+                  diagnostics={diagnostics}
+                  onProvider={value => {
+                    setProvider(value);
+                    setLlm(value === 'openai' ? 'gpt-4.1-mini' : 'gpt-5.6-luna');
+                  }}
+                  onModel={setLlm}
+                  onConnections={() => setMode('connections')}
+                  onDiagnose={() =>
+                    void work('diagnose', async () =>
+                      setDiagnostics(await json(await apiFetch('/api/diagnostics')))
+                    )
+                  }
+                >
+                  <>
+                    <section className="panel">
+                      <div className="panel-title">
+                        <h2>① Prompt Director + GPT</h2>
+                        <CinemaInfo topic="narrative" />
+                        <MessageSquare size={20} />
+                      </div>
+                      <label>
+                        Режиссёрское задание
+                        <textarea
+                          rows={4}
+                          value={state.brief}
+                          onChange={e => change({brief: e.target.value})}
+                        />
+                      </label>
+                      <div className="chat-history">
+                        {messages.length ? (
+                          messages.map((m, i) => (
+                            <div key={i} className={'bubble ' + m.role}>
+                              {m.content}
+                            </div>
+                          ))
+                        ) : (
+                          <span className="muted">
+                            Чат сохраняет контекст в текущей сессии. Создай сцену, затем адаптируй её для
+                            выбранных моделей.
+                          </span>
+                        )}
+                      </div>
+                      <div className="chat-controls">
+                        <input
+                          value={chatText}
+                          onChange={e => setChatText(e.target.value)}
+                          onKeyDown={e => e.key === 'Enter' && !e.shiftKey && sendChat()}
+                          placeholder="Спроси GPT о сцене или промпте…"
+                        />
+                        <button className="primary" disabled={!PAID_LLM_ENABLED || !!busy} onClick={sendChat}>
+                          Отправить
                         </button>
                       </div>
-                    ))}
+                    </section>
+                    {modelPanel('image')}
+                  </>
+                </SettingsPanel>
+              ) : mode === 'storyboard' ? (
+                <ProductionStoryboard
+                  onInspect={(productionId, nodeId) => {
+                    setProductionTarget({productionId, nodeId});
+                    setMode('files');
+                  }}
+                  onOpenProject={id => {
+                    void load(id);
+                    setMode('studio');
+                  }}
+                />
+              ) : mode === 'files' ? (
+                <ProductionPanel
+                  initialLocation={productionTarget}
+                  projectId={projectId}
+                  onOpenProject={(id, characterId) => {
+                    void load(id).then(() => {
+                      if (characterId)
+                        setState(s => ({
+                          ...s,
+                          selectedCharacter: characterId,
+                        }));
+                      setMode('studio');
+                    });
+                  }}
+                />
+              ) : mode === 'connections' ? (
+                <ConnectionsPanel />
+              ) : mode === 'agents' ? (
+                <AgentPanel
+                  projectId={projectId}
+                  brief={state.brief}
+                  character={character}
+                  style={state.style}
+                  onApply={prompt => {
+                    change({brief: prompt});
+                    setMode('studio');
+                  }}
+                />
+              ) : mode === 'refine' ? (
+                <RefinePanel
+                  {...replacementControls}
+                  projectId={projectId}
+                  draft={state.refinement || EMPTY_REFINE}
+                  onChange={refinement => change({refinement})}
+                  ensureProject={ensureProject}
+                  onAsset={() => setLibraryRevision(x => x + 1)}
+                  revision={libraryRevision}
+                />
+              ) : mode === 'scene' ? (
+                <ScenePanel
+                  onFrameCatalogue={() => setCatalogue('frame')}
+                  onCameraCatalogue={() => setCatalogue('camera')}
+                  frameCatalogue={frameCatalogue}
+                  composition={state.composition}
+                  onComposition={chooseComposition}
+                  cameraPresets={cameraPresets}
+                  camera={state.camera}
+                  onCamera={chooseCamera}
+                  scene={state.scene || EMPTY_SCENE}
+                  onChange={scene => change({scene})}
+                  projectId={projectId}
+                  revision={libraryRevision}
+                  models={models.map(([id, v]) => ({
+                    id,
+                    kind: v.kind,
+                    enabled: !!v.launch_enabled,
+                  }))}
+                  ensureProject={ensureProject}
+                  onAsset={() => setLibraryRevision(x => x + 1)}
+                  onGenerate={(target, prompt) => void sceneGenerate(target, prompt)}
+                />
+              ) : mode === 'economics' ? (
+                <EconomicsPanel projectId={projectId} revision={libraryRevision} />
+              ) : mode === 'styles' ? (
+                <section className="panel">
+                  <div className="panel-title">
+                    <h2>Библия мира / Style Library</h2>
+                    <Palette size={22} />
                   </div>
-                </CharacterReferences>
-              </div>
-            )}
-          </aside>
-          <div className="content">
-            {conflict && (
-              <div className="alert" role="alert">
-                {conflict}
-                <div className="chips">
-                  <button onClick={downloadDraft}>Скачать локальный черновик</button>
-                  <button onClick={() => load(projectId)}>Загрузить серверную версию</button>
-                </div>
-              </div>
-            )}
-            {error && (
-              <div className="alert">
-                {error}
-                <button onClick={() => setError('')}>✕</button>
-              </div>
-            )}
-            {notice && <div className="notice">{notice}</div>}
-            {mode === 'settings' ? (
-              <SettingsPanel
-                provider={provider}
-                model={llm}
-                busy={!!busy}
-                diagnostics={diagnostics}
-                onProvider={value => {
-                  setProvider(value);
-                  setLlm(value === 'openai' ? 'gpt-4.1-mini' : 'gpt-5.6-luna');
-                }}
-                onModel={setLlm}
-                onConnections={() => setMode('connections')}
-                onDiagnose={() =>
-                  void work('diagnose', async () =>
-                    setDiagnostics(await json(await apiFetch('/api/diagnostics')))
-                  )
-                }
-              >
+                  <p className="muted">
+                    Единый стиль сохраняется вместе с проектом. Это канон визуального мира, а не случайный
+                    пресет. Применяй его при постановке задач агентам и проверке результатов.
+                  </p>
+                  {(
+                    [
+                      ['look', 'Визуальный стиль'],
+                      ['palette', 'Палитра'],
+                      ['lighting', 'Освещение'],
+                      ['camera', 'Камера и оптика'],
+                      ['environment', 'Среда и локации'],
+                      ['rules', 'Неизменные правила'],
+                      ['avoid', 'Что запрещено'],
+                    ] as [keyof StyleBible, string][]
+                  ).map(([k, label]) => (
+                    <label key={k}>
+                      {label}
+                      <textarea
+                        rows={3}
+                        value={state.style?.[k] || ''}
+                        onChange={e =>
+                          change({
+                            style: {...state.style, [k]: e.target.value},
+                          })
+                        }
+                      />
+                    </label>
+                  ))}
+                  <button className="primary" disabled={!!busy} onClick={save}>
+                    Сохранить стиль проекта
+                  </button>
+                  <p className="muted">
+                    Для «Таксиста Грэма» добавляй утверждённые референсы в Character Vault. Библия мира не
+                    заменяет проверку изображений человеком.
+                  </p>
+                </section>
+              ) : mode === 'create' ? (
+                <CreateScreen
+                  projectId={projectId}
+                  heroes={state.characters.map(c => ({
+                    id: c.id,
+                    name: c.name,
+                  }))}
+                />
+              ) : mode === 'studio' ? (
                 <>
                   <section className="panel">
-                    <div className="panel-title">
-                      <h2>① Prompt Director + GPT</h2>
-                      <CinemaInfo topic="narrative" />
-                      <MessageSquare size={20} />
-                    </div>
+                    <h2>Задание ролика</h2>
                     <label>
                       Режиссёрское задание
                       <textarea
@@ -1438,518 +1583,360 @@ function App() {
                         onChange={e => change({brief: e.target.value})}
                       />
                     </label>
-                    <div className="chat-history">
-                      {messages.length ? (
-                        messages.map((m, i) => (
-                          <div key={i} className={'bubble ' + m.role}>
-                            {m.content}
-                          </div>
-                        ))
-                      ) : (
-                        <span className="muted">
-                          Чат сохраняет контекст в текущей сессии. Создай сцену, затем адаптируй её для
-                          выбранных моделей.
-                        </span>
-                      )}
-                    </div>
-                    <div className="chat-controls">
-                      <input
-                        value={chatText}
-                        onChange={e => setChatText(e.target.value)}
-                        onKeyDown={e => e.key === 'Enter' && !e.shiftKey && sendChat()}
-                        placeholder="Спроси GPT о сцене или промпте…"
-                      />
-                      <button className="primary" disabled={!PAID_LLM_ENABLED || !!busy} onClick={sendChat}>
-                        Отправить
-                      </button>
-                    </div>
+                    <button onClick={() => setMode('scene')}>Собрать сцену из исходников →</button>
                   </section>
-                  {modelPanel('image')}
-                </>
-              </SettingsPanel>
-            ) : mode === 'storyboard' ? (
-              <ProductionStoryboard
-                onInspect={(productionId, nodeId) => {
-                  setProductionTarget({productionId, nodeId});
-                  setMode('files');
-                }}
-                onOpenProject={id => {
-                  void load(id);
-                  setMode('studio');
-                }}
-              />
-            ) : mode === 'files' ? (
-              <ProductionPanel
-                initialLocation={productionTarget}
-                projectId={projectId}
-                onOpenProject={(id, characterId) => {
-                  void load(id).then(() => {
-                    if (characterId)
-                      setState(s => ({
-                        ...s,
-                        selectedCharacter: characterId,
-                      }));
-                    setMode('studio');
-                  });
-                }}
-              />
-            ) : mode === 'connections' ? (
-              <ConnectionsPanel />
-            ) : mode === 'agents' ? (
-              <AgentPanel
-                projectId={projectId}
-                brief={state.brief}
-                character={character}
-                style={state.style}
-                onApply={prompt => {
-                  change({brief: prompt});
-                  setMode('studio');
-                }}
-              />
-            ) : mode === 'refine' ? (
-              <RefinePanel
-                {...replacementControls}
-                projectId={projectId}
-                draft={state.refinement || EMPTY_REFINE}
-                onChange={refinement => change({refinement})}
-                ensureProject={ensureProject}
-                onAsset={() => setLibraryRevision(x => x + 1)}
-                revision={libraryRevision}
-              />
-            ) : mode === 'scene' ? (
-              <ScenePanel
-                onFrameCatalogue={() => setCatalogue('frame')}
-                onCameraCatalogue={() => setCatalogue('camera')}
-                frameCatalogue={frameCatalogue}
-                composition={state.composition}
-                onComposition={chooseComposition}
-                cameraPresets={cameraPresets}
-                camera={state.camera}
-                onCamera={chooseCamera}
-                scene={state.scene || EMPTY_SCENE}
-                onChange={scene => change({scene})}
-                projectId={projectId}
-                revision={libraryRevision}
-                models={models.map(([id, v]) => ({
-                  id,
-                  kind: v.kind,
-                  enabled: !!v.launch_enabled,
-                }))}
-                ensureProject={ensureProject}
-                onAsset={() => setLibraryRevision(x => x + 1)}
-                onGenerate={(target, prompt) => void sceneGenerate(target, prompt)}
-              />
-            ) : mode === 'economics' ? (
-              <EconomicsPanel projectId={projectId} revision={libraryRevision} />
-            ) : mode === 'styles' ? (
-              <section className="panel">
-                <div className="panel-title">
-                  <h2>Библия мира / Style Library</h2>
-                  <Palette size={22} />
-                </div>
-                <p className="muted">
-                  Единый стиль сохраняется вместе с проектом. Это канон визуального мира, а не случайный
-                  пресет. Применяй его при постановке задач агентам и проверке результатов.
-                </p>
-                {(
-                  [
-                    ['look', 'Визуальный стиль'],
-                    ['palette', 'Палитра'],
-                    ['lighting', 'Освещение'],
-                    ['camera', 'Камера и оптика'],
-                    ['environment', 'Среда и локации'],
-                    ['rules', 'Неизменные правила'],
-                    ['avoid', 'Что запрещено'],
-                  ] as [keyof StyleBible, string][]
-                ).map(([k, label]) => (
-                  <label key={k}>
-                    {label}
-                    <textarea
-                      rows={3}
-                      value={state.style?.[k] || ''}
-                      onChange={e =>
-                        change({
-                          style: {...state.style, [k]: e.target.value},
-                        })
+                  <section className="panel photo-setup" aria-label="Фото">
+                    <h2>Фото · постановка и промпт</h2>
+                    <FrameSelector
+                      catalogue={frameCatalogue}
+                      value={state.composition}
+                      onChange={chooseComposition}
+                      onCatalogue={() => setCatalogue('frame')}
+                    />
+                    {frameError && <p role="alert">{frameError}</p>}
+                    <ChatGPTPanel
+                      {...replacementControls}
+                      projectId={projectId}
+                      ensureProject={ensureProject}
+                      onPrompt={(prompt, target, _movement, frame) =>
+                        setState(s => ({
+                          ...s,
+                          prompts: {...s.prompts, [target]: prompt},
+                          compositionPromptBasis: {
+                            ...s.compositionPromptBasis,
+                            [target]: frameBasis(frame),
+                          },
+                        }))
                       }
+                      onAsset={() => setLibraryRevision(x => x + 1)}
                     />
-                  </label>
-                ))}
-                <button className="primary" disabled={!!busy} onClick={save}>
-                  Сохранить стиль проекта
-                </button>
-                <p className="muted">
-                  Для «Таксиста Грэма» добавляй утверждённые референсы в Character Vault. Библия мира не
-                  заменяет проверку изображений человеком.
-                </p>
-              </section>
-            ) : mode === 'create' ? (
-              <CreateScreen
-                projectId={projectId}
-                heroes={state.characters.map(c => ({
-                  id: c.id,
-                  name: c.name,
-                }))}
-              />
-            ) : mode === 'studio' ? (
-              <>
-                <section className="panel">
-                  <h2>Задание ролика</h2>
-                  <label>
-                    Режиссёрское задание
-                    <textarea rows={4} value={state.brief} onChange={e => change({brief: e.target.value})} />
-                  </label>
-                  <button onClick={() => setMode('scene')}>Собрать сцену из исходников →</button>
-                </section>
-                <section className="panel photo-setup" aria-label="Фото">
-                  <h2>Фото · постановка и промпт</h2>
-                  <FrameSelector
-                    catalogue={frameCatalogue}
-                    value={state.composition}
-                    onChange={chooseComposition}
-                    onCatalogue={() => setCatalogue('frame')}
-                  />
-                  {frameError && <p role="alert">{frameError}</p>}
-                  <ChatGPTPanel
-                    {...replacementControls}
-                    projectId={projectId}
-                    ensureProject={ensureProject}
-                    onPrompt={(prompt, target, _movement, frame) =>
-                      setState(s => ({
-                        ...s,
-                        prompts: {...s.prompts, [target]: prompt},
-                        compositionPromptBasis: {
-                          ...s.compositionPromptBasis,
-                          [target]: frameBasis(frame),
-                        },
-                      }))
-                    }
-                    onAsset={() => setLibraryRevision(x => x + 1)}
-                  />
-                </section>
-                {modelPanel('video')}
-                <section className="panel">
-                  <div className="panel-title">
-                    <h2>④ Audio Lab — референсы голоса</h2>
-                    <CinemaInfo topic="sound" />
-                    <Music size={19} />
-                  </div>
-                  <p className="muted">
-                    Загрузи собственный или разрешённый медиафайл. Сервис предлагает фрагменты по паузам,
-                    затем ты вручную выбираешь лучший дубль. Экспорт WAV подходит для дальнейшей загрузки в
-                    разрешённый сервис озвучки.
-                  </p>
-                  <label className="upload-area">
-                    <Upload size={18} /> Импорт MP3 / WAV / MP4 / MOV / WEBM (до 100 МБ)
-                    <input
-                      type="file"
-                      accept="audio/*,video/mp4,video/quicktime,video/webm,.mkv"
-                      onChange={e => e.target.files?.[0] && uploadAudio(e.target.files[0])}
-                    />
-                  </label>
-                  {audioFile && (
-                    <>
-                      <audio src={audioFile} controls />
-                      <div className="audio-actions">
-                        <button className="secondary" disabled={!!busy} onClick={analyzeAudio}>
-                          Найти интервалы по паузам
-                        </button>
-                        <span className="muted">Длительность: {audioDuration.toFixed(1)} сек.</span>
-                      </div>
-                      {audioSegments.length > 0 && (
-                        <div className="chips">
-                          {audioSegments.map((s, i) => (
-                            <button
-                              key={i}
-                              className="secondary"
-                              onClick={() => {
-                                setAudioStart(s.start);
-                                setAudioEnd(s.end);
-                              }}
-                            >
-                              {s.start}–{s.end} c
-                            </button>
-                          ))}
+                  </section>
+                  {modelPanel('video')}
+                  <section className="panel">
+                    <div className="panel-title">
+                      <h2>④ Audio Lab — референсы голоса</h2>
+                      <CinemaInfo topic="sound" />
+                      <Music size={19} />
+                    </div>
+                    <p className="muted">
+                      Загрузи собственный или разрешённый медиафайл. Сервис предлагает фрагменты по паузам,
+                      затем ты вручную выбираешь лучший дубль. Экспорт WAV подходит для дальнейшей загрузки в
+                      разрешённый сервис озвучки.
+                    </p>
+                    <label className="upload-area">
+                      <Upload size={18} /> Импорт MP3 / WAV / MP4 / MOV / WEBM (до 100 МБ)
+                      <input
+                        type="file"
+                        accept="audio/*,video/mp4,video/quicktime,video/webm,.mkv"
+                        onChange={e => e.target.files?.[0] && uploadAudio(e.target.files[0])}
+                      />
+                    </label>
+                    {audioFile && (
+                      <>
+                        <audio src={audioFile} controls />
+                        <div className="audio-actions">
+                          <button className="secondary" disabled={!!busy} onClick={analyzeAudio}>
+                            Найти интервалы по паузам
+                          </button>
+                          <span className="muted">Длительность: {audioDuration.toFixed(1)} сек.</span>
                         </div>
-                      )}
-                      <div className="param-grid">
-                        <label>
-                          От (сек)
-                          <input
-                            type="number"
-                            min="0"
-                            step="0.1"
-                            value={audioStart}
-                            onChange={e => setAudioStart(Number(e.target.value))}
-                          />
-                        </label>
-                        <label>
-                          До (сек)
-                          <input
-                            type="number"
-                            min="0"
-                            step="0.1"
-                            value={audioEnd}
-                            onChange={e => setAudioEnd(Number(e.target.value))}
-                          />
-                        </label>
+                        {audioSegments.length > 0 && (
+                          <div className="chips">
+                            {audioSegments.map((s, i) => (
+                              <button
+                                key={i}
+                                className="secondary"
+                                onClick={() => {
+                                  setAudioStart(s.start);
+                                  setAudioEnd(s.end);
+                                }}
+                              >
+                                {s.start}–{s.end} c
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                        <div className="param-grid">
+                          <label>
+                            От (сек)
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.1"
+                              value={audioStart}
+                              onChange={e => setAudioStart(Number(e.target.value))}
+                            />
+                          </label>
+                          <label>
+                            До (сек)
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.1"
+                              value={audioEnd}
+                              onChange={e => setAudioEnd(Number(e.target.value))}
+                            />
+                          </label>
+                          <label className="inline-checkbox">
+                            <input
+                              type="checkbox"
+                              checked={denoise}
+                              onChange={e => setDenoise(e.target.checked)}
+                            />{' '}
+                            Лёгкая очистка
+                          </label>
+                        </div>
                         <label className="inline-checkbox">
                           <input
                             type="checkbox"
-                            checked={denoise}
-                            onChange={e => setDenoise(e.target.checked)}
+                            checked={audioConsent}
+                            onChange={e => setAudioConsent(e.target.checked)}
                           />{' '}
-                          Лёгкая очистка
+                          Подтверждаю права на использование голоса и разрешение на создание голосового
+                          референса
                         </label>
-                      </div>
-                      <label className="inline-checkbox">
-                        <input
-                          type="checkbox"
-                          checked={audioConsent}
-                          onChange={e => setAudioConsent(e.target.checked)}
-                        />{' '}
-                        Подтверждаю права на использование голоса и разрешение на создание голосового
-                        референса
-                      </label>
-                      <button className="primary" disabled={!!busy || !audioConsent} onClick={cutAudio}>
-                        ✂ Вырезать и подготовить WAV
-                      </button>
-                      {audioResult && (
-                        <div className="audio-result">
-                          <audio controls src={audioResult} />
-                          <a href={audioResult} download>
-                            Скачать подготовленный WAV ↓
-                          </a>
-                          <p className="muted">
-                            Передавать в ElevenLabs/Fish Audio следует только при соблюдении их правил и
-                            разрешений. Прямая отправка API ещё не подключена.
-                          </p>
-                        </div>
-                      )}
-                    </>
-                  )}
-                </section>
-                <section className="panel">
-                  <h2>⑤ Очередь и галерея</h2>
-                  <NativeGallery {...replacementControls} projectId={projectId} onRefine={refineAsset} />
-                  <button className="secondary" onClick={refresh}>
-                    <RefreshCw size={14} /> Обновить список
-                  </button>
-                  <div className="jobs">
-                    {jobs.length === 0 ? (
-                      <p className="muted">Задач через API пока нет.</p>
-                    ) : (
-                      jobs.map(j => (
-                        <div className="job" key={j.id}>
-                          <div className="jobtop">
-                            <b>
-                              {j.kind} · {j.provider}
-                            </b>
-                            <span>{j.status}</span>
-                            <button onClick={() => poll(j.id)} disabled={!!busy}>
-                              Проверить
-                            </button>
+                        <button className="primary" disabled={!!busy || !audioConsent} onClick={cutAudio}>
+                          ✂ Вырезать и подготовить WAV
+                        </button>
+                        {audioResult && (
+                          <div className="audio-result">
+                            <audio controls src={audioResult} />
+                            <a href={audioResult} download>
+                              Скачать подготовленный WAV ↓
+                            </a>
+                            <p className="muted">
+                              Передавать в ElevenLabs/Fish Audio следует только при соблюдении их правил и
+                              разрешений. Прямая отправка API ещё не подключена.
+                            </p>
                           </div>
-                          <small>Task ID: {j.task_id || '—'}</small>
-                          {j.delivery && (
-                            <div>
-                              <p>
-                                {j.delivery.state === 'saved'
-                                  ? `Сохранено в библиотеке: ${j.delivery.saved}/${j.delivery.total}`
-                                  : j.delivery.state === 'retry'
-                                    ? 'Скачивание будет повторено автоматически'
-                                    : 'Требуется проверить скачивание'}
-                              </p>
-                              {j.delivery.error && <p role="alert">{j.delivery.error}</p>}
-                              {j.delivery.state !== 'saved' && (
-                                <button
-                                  disabled={!!busy}
-                                  onClick={() =>
-                                    work('retry-download', async () => {
-                                      await json(
-                                        await apiFetch(`/api/jobs/${j.id}/retry-download`, {method: 'POST'})
-                                      );
-                                      setLibraryRevision(x => x + 1);
-                                      await refresh();
-                                    })
-                                  }
-                                >
-                                  Повторить скачивание без генерации
-                                </button>
-                              )}
+                        )}
+                      </>
+                    )}
+                  </section>
+                  <section className="panel">
+                    <h2>⑤ Очередь и галерея</h2>
+                    <NativeGallery {...replacementControls} projectId={projectId} onRefine={refineAsset} />
+                    <button className="secondary" onClick={refresh}>
+                      <RefreshCw size={14} /> Обновить список
+                    </button>
+                    <div className="jobs">
+                      {jobs.length === 0 ? (
+                        <p className="muted">Задач через API пока нет.</p>
+                      ) : (
+                        jobs.map(j => (
+                          <div className="job" key={j.id}>
+                            <div className="jobtop">
+                              <b>
+                                {j.kind} · {j.provider}
+                              </b>
+                              <span>{j.status}</span>
+                              <button onClick={() => poll(j.id)} disabled={!!busy}>
+                                Проверить
+                              </button>
                             </div>
-                          )}
-                          {j.provider === 'piapi' &&
-                            ['submission_unknown', 'submitting'].includes(j.status) &&
-                            !j.task_id && <RecoverJob jobId={j.id} onRecovered={() => void refresh()} />}{' '}
-                          {j.kind === 'audio' && j.response?.asset_id && (
-                            <div>
-                              <audio src={'/api/library/' + j.response.asset_id + '/file'} controls />
-                              <a href={'/api/library/' + j.response.asset_id + '/file'} download>
-                                Скачать реплику
-                              </a>
-                            </div>
-                          )}
-                          <div className="results">
-                            {extract(j).map((link, i) => (
-                              <div key={i} className="result">
-                                {j.kind === 'video' ? (
-                                  <video src={link} controls />
-                                ) : (
-                                  <img src={link} alt="Результат генерации" />
-                                )}
-                                <a href={link} target="_blank" rel="noreferrer">
-                                  <Download size={13} /> Открыть
-                                </a>
-                                {j.status === 'completed' && (
-                                  <button disabled={!!busy} onClick={() => saveImage(j.id, i)}>
-                                    Сохранить в библиотеку
-                                  </button>
-                                )}
-                                {j.kind === 'image' && (
+                            <small>Task ID: {j.task_id || '—'}</small>
+                            {j.delivery && (
+                              <div>
+                                <p>
+                                  {j.delivery.state === 'saved'
+                                    ? `Сохранено в библиотеке: ${j.delivery.saved}/${j.delivery.total}`
+                                    : j.delivery.state === 'retry'
+                                      ? 'Скачивание будет повторено автоматически'
+                                      : 'Требуется проверить скачивание'}
+                                </p>
+                                {j.delivery.error && <p role="alert">{j.delivery.error}</p>}
+                                {j.delivery.state !== 'saved' && (
                                   <button
-                                    className="primary"
-                                    onClick={() => {
-                                      change({videoReference: link});
-                                      setSelectedJob(j.id);
-                                      setNotice('Кадр передан в Video Lab');
-                                    }}
+                                    disabled={!!busy}
+                                    onClick={() =>
+                                      work('retry-download', async () => {
+                                        await json(
+                                          await apiFetch(`/api/jobs/${j.id}/retry-download`, {method: 'POST'})
+                                        );
+                                        setLibraryRevision(x => x + 1);
+                                        await refresh();
+                                      })
+                                    }
                                   >
-                                    Использовать для видео
+                                    Повторить скачивание без генерации
                                   </button>
                                 )}
                               </div>
-                            ))}
+                            )}
+                            {j.provider === 'piapi' &&
+                              ['submission_unknown', 'submitting'].includes(j.status) &&
+                              !j.task_id && (
+                                <RecoverJob jobId={j.id} onRecovered={() => void refresh()} />
+                              )}{' '}
+                            {j.kind === 'audio' && j.response?.asset_id && (
+                              <div>
+                                <audio src={'/api/library/' + j.response.asset_id + '/file'} controls />
+                                <a href={'/api/library/' + j.response.asset_id + '/file'} download>
+                                  Скачать реплику
+                                </a>
+                              </div>
+                            )}
+                            <div className="results">
+                              {extract(j).map((link, i) => (
+                                <div key={i} className="result">
+                                  {j.kind === 'video' ? (
+                                    <video src={link} controls />
+                                  ) : (
+                                    <img src={link} alt="Результат генерации" />
+                                  )}
+                                  <a href={link} target="_blank" rel="noreferrer">
+                                    <Download size={13} /> Открыть
+                                  </a>
+                                  {j.status === 'completed' && (
+                                    <button disabled={!!busy} onClick={() => saveImage(j.id, i)}>
+                                      Сохранить в библиотеку
+                                    </button>
+                                  )}
+                                  {j.kind === 'image' && (
+                                    <button
+                                      className="primary"
+                                      onClick={() => {
+                                        change({videoReference: link});
+                                        setSelectedJob(j.id);
+                                        setNotice('Кадр передан в Video Lab');
+                                      }}
+                                    >
+                                      Использовать для видео
+                                    </button>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                            {selectedJob === j.id && <small>Выбран для видео ✓</small>}
                           </div>
-                          {selectedJob === j.id && <small>Выбран для видео ✓</small>}
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </section>
-                <AssetLibrary
-                  {...replacementControls}
-                  onRefine={refineAsset}
-                  onScene={addToScene}
-                  projectId={projectId}
-                  revision={libraryRevision}
-                  onUse={(link, id) => {
-                    change({videoReference: link, videoAssetId: id});
-                    setNotice('Изображение из библиотеки выбрано для Video Lab');
-                  }}
-                />
-              </>
-            ) : (
-              <Suspense fallback={<p>Открываем редактор узлов…</p>}>
-                <GraphPanel
-                  projectId={projectId}
-                  nodes={state.nodes}
-                  edges={state.edges}
-                  onChange={update => setState(s => ({...s, ...update(s)}))}
-                />
-              </Suspense>
-            )}
-            <footer>Workflow Studio · ChatGPT · сцены · экономика ролика</footer>
-          </div>
-        </main>
-      )}
-      {pendingProjectChange && (
-        <div className="modal-backdrop">
-          <section
-            className="panel project-switch-dialog"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="project-switch-title"
-          >
-            <h2 id="project-switch-title">Сохранить изменения проекта?</h2>
-            <p>В «{projectName}» есть несохранённые изменения.</p>
-            {error && <p role="alert">{error}</p>}
-            <div className="project-save-actions">
-              <button className="primary" disabled={!!busy} onClick={() => void finishProjectChange(true)}>
-                Сохранить и продолжить
-              </button>
-              <button disabled={!!busy} onClick={() => void finishProjectChange(false)}>
-                Продолжить без сохранения
-              </button>
-              <button autoFocus disabled={!!busy} onClick={() => setPendingProjectChange(null)}>
-                Остаться в проекте
-              </button>
+                        ))
+                      )}
+                    </div>
+                  </section>
+                  <AssetLibrary
+                    {...replacementControls}
+                    onRefine={refineAsset}
+                    onScene={addToScene}
+                    projectId={projectId}
+                    revision={libraryRevision}
+                    onUse={(link, id) => {
+                      change({videoReference: link, videoAssetId: id});
+                      setNotice('Изображение из библиотеки выбрано для Video Lab');
+                    }}
+                  />
+                </>
+              ) : (
+                <Suspense fallback={<p>Открываем редактор узлов…</p>}>
+                  <GraphPanel
+                    projectId={projectId}
+                    nodes={state.nodes}
+                    edges={state.edges}
+                    onChange={update => setState(s => ({...s, ...update(s)}))}
+                  />
+                </Suspense>
+              )}
+              <footer>Workflow Studio · ChatGPT · сцены · экономика ролика</footer>
             </div>
-          </section>
-        </div>
-      )}
-      {catalogue && (
-        <div
-          className="modal-backdrop"
-          onClick={e => {
-            if (e.target === e.currentTarget) setCatalogue(null);
-          }}
-        >
-          <section
-            className="panel catalogue-dialog"
-            role="dialog"
-            aria-modal="true"
-            aria-label={catalogue === 'frame' ? 'Каталог композиций фото' : 'Каталог движений видео'}
-            onKeyDown={e => {
-              if (e.key === 'Escape') setCatalogue(null);
+          </main>
+        )}
+        {pendingProjectChange && (
+          <div className="modal-backdrop">
+            <section
+              className="panel project-switch-dialog"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="project-switch-title"
+            >
+              <h2 id="project-switch-title">Сохранить изменения проекта?</h2>
+              <p>В «{projectName}» есть несохранённые изменения.</p>
+              {error && <p role="alert">{error}</p>}
+              <div className="project-save-actions">
+                <button className="primary" disabled={!!busy} onClick={() => void finishProjectChange(true)}>
+                  Сохранить и продолжить
+                </button>
+                <button disabled={!!busy} onClick={() => void finishProjectChange(false)}>
+                  Продолжить без сохранения
+                </button>
+                <button autoFocus disabled={!!busy} onClick={() => setPendingProjectChange(null)}>
+                  Остаться в проекте
+                </button>
+              </div>
+            </section>
+          </div>
+        )}
+        {catalogue && (
+          <div
+            className="modal-backdrop"
+            onClick={e => {
+              if (e.target === e.currentTarget) setCatalogue(null);
             }}
           >
-            <div className="catalogue-toolbar">
-              <b>
-                {catalogue === 'frame' ? 'Фото / сцена · ракурс и свет' : 'Видео / сцена · движение камеры'}
-              </b>
-              <button autoFocus onClick={() => setCatalogue(null)}>
-                Закрыть каталог
-              </button>
-            </div>
-            {catalogue === 'frame' ? (
-              <FramePanel
-                catalogue={frameCatalogue}
-                value={state.composition}
-                onChange={chooseComposition}
-                onImage={() => setCatalogue(null)}
-                error={frameError}
-              />
-            ) : (
-              <CameraPanel
-                setupEnabled={!!frameCatalogue.capabilities?.prompt_setup}
-                presets={cameraPresets}
-                value={state.camera}
-                onChange={chooseCamera}
-                onVideo={() => setCatalogue(null)}
-                error={cameraError}
-              />
-            )}
-          </section>
-        </div>
-      )}
-      {promptRequest && (
-        <PromptComposer
-          request={promptRequest}
-          onClose={() => setPromptRequest(null)}
-          onComposed={prompt => {
-            setState(s => ({
-              ...s,
-              prompts: {...s.prompts, [promptRequest.target]: prompt},
-            }));
-            setPromptRequest(null);
-            setNotice('Промпт подготовлен через API и сохранён в истории проекта');
-          }}
-        />
-      )}
-      {projectId && <GenerationWatcher projectId={projectId} onOpen={() => setMode('create')} />}
-      {generationRequest && (
-        <GenerationReview
-          request={generationRequest}
-          onClose={() => setGenerationRequest(null)}
-          onSubmitted={() => {
-            setGenerationRequest(null);
-            setNotice('Заявка сохранена в очереди. Проверяй её статус перед повторным запуском.');
-            void refresh();
-          }}
-        />
-      )}
-    </div>
+            <section
+              className="panel catalogue-dialog"
+              role="dialog"
+              aria-modal="true"
+              aria-label={catalogue === 'frame' ? 'Каталог композиций фото' : 'Каталог движений видео'}
+              onKeyDown={e => {
+                if (e.key === 'Escape') setCatalogue(null);
+              }}
+            >
+              <div className="catalogue-toolbar">
+                <b>
+                  {catalogue === 'frame' ? 'Фото / сцена · ракурс и свет' : 'Видео / сцена · движение камеры'}
+                </b>
+                <button autoFocus onClick={() => setCatalogue(null)}>
+                  Закрыть каталог
+                </button>
+              </div>
+              {catalogue === 'frame' ? (
+                <FramePanel
+                  catalogue={frameCatalogue}
+                  value={state.composition}
+                  onChange={chooseComposition}
+                  onImage={() => setCatalogue(null)}
+                  error={frameError}
+                />
+              ) : (
+                <CameraPanel
+                  setupEnabled={!!frameCatalogue.capabilities?.prompt_setup}
+                  presets={cameraPresets}
+                  value={state.camera}
+                  onChange={chooseCamera}
+                  onVideo={() => setCatalogue(null)}
+                  error={cameraError}
+                />
+              )}
+            </section>
+          </div>
+        )}
+        {promptRequest && (
+          <PromptComposer
+            request={promptRequest}
+            onClose={() => setPromptRequest(null)}
+            onComposed={prompt => {
+              setState(s => ({
+                ...s,
+                prompts: {...s.prompts, [promptRequest.target]: prompt},
+              }));
+              setPromptRequest(null);
+              setNotice('Промпт подготовлен через API и сохранён в истории проекта');
+            }}
+          />
+        )}
+        {projectId && <GenerationWatcher projectId={projectId} onOpen={() => setMode('create')} />}
+        {generationRequest && (
+          <GenerationReview
+            request={generationRequest}
+            onClose={() => setGenerationRequest(null)}
+            onSubmitted={() => {
+              setGenerationRequest(null);
+              setNotice('Заявка сохранена в очереди. Проверяй её статус перед повторным запуском.');
+              void refresh();
+            }}
+          />
+        )}
+      </div>
+    </ActivityProvider>
   );
 }
 export default App;

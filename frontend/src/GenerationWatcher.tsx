@@ -1,6 +1,7 @@
 import {useEffect, useRef, useState} from 'react';
 import {apiFetch} from './api';
-import useActivity, {type ActivityItem} from './useActivity';
+import {type ActivityItem} from './useActivity';
+import {useSharedActivity} from './ActivityContext';
 
 /** Интервалы опроса провайдера, мс. Потом подберём под конкретные модели через MODEL_POLL_MS. */
 export const POLL_MS = {image: 5000, video: 15000};
@@ -24,7 +25,7 @@ type Toast = {key: string; kind: 'ok' | 'bad'; title: string; text: string};
 
 /** Невидимый наблюдатель: опрашивает API по активным заданиям и показывает пузырьки о готовности. */
 export default function GenerationWatcher({projectId, onOpen}: {projectId: string; onOpen: () => void}) {
-  const {items, reset} = useActivity(projectId);
+  const {items, reset} = useSharedActivity();
   const [toasts, setToasts] = useState<Toast[]>([]);
   const previous = useRef<Record<string, string> | null>(null);
   const lastPoll = useRef<Record<string, number>>({});

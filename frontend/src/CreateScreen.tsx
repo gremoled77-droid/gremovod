@@ -1,7 +1,8 @@
 import {useEffect, useMemo, useRef, useState} from 'react';
 import {apiFetch} from './api';
 import GenerationReview, {type GenerationRequest} from './GenerationReview';
-import useActivity, {type ActivityItem} from './useActivity';
+import {type ActivityItem} from './useActivity';
+import {useSharedActivity} from './ActivityContext';
 
 type OptionSpec = {
   values?: (string | number)[];
@@ -45,7 +46,7 @@ async function json(r: Response) {
 type TempItem = {asset_id: string; days_left: number; expired: boolean; protected: string};
 
 export default function CreateScreen({projectId, heroes}: {projectId: string; heroes: Hero[]}) {
-  const {items, error: feedError, reset} = useActivity(projectId);
+  const {items, error: feedError, reset} = useSharedActivity();
   const [specs, setSpecs] = useState<Record<string, Spec>>({});
   const [library, setLibrary] = useState<LibAsset[]>([]);
   const [prompt, setPrompt] = useState('');
