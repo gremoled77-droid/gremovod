@@ -26,6 +26,7 @@ export default function CharactersScreen({
   onCreate,
   onToWorld,
   onNext,
+  builder,
   results,
 }: {
   projectId: string;
@@ -37,6 +38,7 @@ export default function CharactersScreen({
   onCreate: () => void;
   onToWorld: () => void;
   onNext: () => void;
+  builder: ReactNode;
   results: ReactNode;
 }) {
   const hero = heroes.find(h => h.id === selectedId);
@@ -179,6 +181,7 @@ export default function CharactersScreen({
           библиотеке: выбери лучшую и нажми «Заменить персонажа».
         </p>
       </div>
+      {builder}
       {results}
       {request && (
         <GenerationReview

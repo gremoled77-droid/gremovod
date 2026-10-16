@@ -32,6 +32,7 @@ import ChatGPTPanel from './ChatGPTPanel';
 import WorldFromBrief from './WorldFromBrief';
 import AttachmentMenu, {AttachmentStrip} from './AttachmentMenu';
 import CharactersScreen from './CharactersScreen';
+import FrameBuilder from './FrameBuilder';
 import ScenePanel, {EMPTY_SCENE, type Scene} from './ScenePanel';
 import EconomicsPanel from './EconomicsPanel';
 import PromptComposer, {type PromptRequest} from './PromptComposer';
@@ -1885,6 +1886,20 @@ function App() {
                   onCreate={mkChar}
                   onToWorld={() => setMode('styles')}
                   onNext={() => setMode('storyboard')}
+                  builder={
+                    <FrameBuilder
+                      projectId={projectId}
+                      ensureProject={ensureProject}
+                      heroes={state.characters}
+                      world={state.style}
+                      brief={state.brief}
+                      locationAssetIds={(state.scene || EMPTY_SCENE).assets
+                        .filter(a => a.role === 'location')
+                        .map(a => a.asset_id)}
+                      revision={libraryRevision}
+                      onSent={() => setMode('storyboard')}
+                    />
+                  }
                   results={
                     <AssetLibrary
                       {...replacementControls}

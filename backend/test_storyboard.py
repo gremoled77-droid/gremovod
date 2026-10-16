@@ -137,3 +137,60 @@ class StoryboardTests(unittest.TestCase):
         for parent,items in [(first['id'],[other['id']]),(first['id'],[ids[0],ids[0]]),('foreign',[ids[0]]),(self.series['id'],[ids[0]])]:
             self.assertEqual(self.order(again,parent,items).status_code,400,(parent,items))
         self.assertEqual(self.client.put(self.path.replace(self.pid,'wrong-project')+'/order',json={'base_revision':again['revision'],'parent_id':first['id'],'node_ids':ids}).status_code,404)
+
+    def image(self,color='blue',project=None):
+        import io
+        from PIL import Image
+        content=io.BytesIO();Image.new('RGB',(32,48),color).save(content,format='PNG')
+        r=self.client.post('/api/library/import-image',data={'project_id':project or self.project},files={'file':('image.png',content.getvalue(),'image/png')})
+        self.assertEqual(r.status_code,200,r.text);return r.json()['id']
+
+    def send(self,board,**extra):
+        body={'base_revision':board['revision'],'request_id':uuid.uuid4().hex,**extra}
+        return body,self.client.post(self.path+'/frames',json=body)
+
+    def test_send_frames_creates_scene_frames_main_take_and_cast_idempotently(self):
+        board=self.prepare();place=self.new('location','Минск');first=self.image('red');second=self.image('green')
+        body,done=self.send(board,scene_title='Двор',frames=[{'asset_id':first,'title':'Общий'},{'asset_id':second,'title':'Крупный'}],
+                            character_node_ids=[self.char['id']],location_node_id=place['id'])
+        self.assertEqual(done.status_code,200,done.text);result=done.json();self.assertFalse(result['replayed'])
+        saved=self.client.get(self.path).json();scene=saved['scenes'][0]
+        self.assertEqual(scene['id'],result['scene_id']);self.assertEqual(scene['title'],'Двор')
+        self.assertEqual([f['title'] for f in scene['frames']],['Общий','Крупный']);self.assertEqual([f['number'] for f in scene['frames']],[1,2])
+        self.assertEqual(scene['selection']['character_node_ids'],[self.char['id']]);self.assertEqual(scene['selection']['location_node_id'],place['id'])
+        for frame,asset in zip(scene['frames'],[first,second]):
+            chosen=next(x for x in frame['files'] if x['id']==frame['selection']['selected_image_file_id'])
+            self.assertEqual(chosen['asset_id'],asset);self.assertTrue((main.PRODUCTIONS_ROOT/chosen['relative_path']).is_file())
+        self.assertEqual(result['revision'],saved['revision'])
+        # Повтор с тем же request_id ничего не дублирует, другой состав под тем же id отклоняется.
+        again=self.client.post(self.path+'/frames',json=body);self.assertEqual(again.status_code,200,again.text);self.assertTrue(again.json()['replayed'])
+        self.assertEqual(len(self.client.get(self.path).json()['scenes'][0]['frames']),2)
+        altered={**body,'frames':body['frames'][:1]};self.assertEqual(self.client.post(self.path+'/frames',json=altered).status_code,409)
+
+    def test_send_frames_appends_to_existing_scene_and_keeps_cast(self):
+        board=self.prepare();place=self.new('location','Двор');first=self.image('red');second=self.image('green')
+        _,one=self.send(board,scene_title='Двор',frames=[{'asset_id':first,'title':'Общий'}],location_node_id=place['id'])
+        self.assertEqual(one.status_code,200,one.text);board=self.client.get(self.path).json();scene=board['scenes'][0]
+        _,two=self.send(board,scene_id=scene['id'],frames=[{'asset_id':second,'title':'Крупный'}],character_node_ids=[self.char['id']])
+        self.assertEqual(two.status_code,200,two.text);saved=self.client.get(self.path).json()['scenes'][0]
+        self.assertEqual([f['number'] for f in saved['frames']],[1,2]);self.assertEqual([f['title'] for f in saved['frames']],['Общий','Крупный'])
+        self.assertEqual(saved['selection']['location_node_id'],place['id']);self.assertEqual(saved['selection']['character_node_ids'],[self.char['id']])
+
+    def test_send_frames_rejects_bad_requests_without_creating_anything(self):
+        board=self.prepare();good=self.image('red');other=self.client.post('/api/projects',json={'title':'Other','state':{}}).json()['id']
+        foreign=self.image('blue',other);frame=[{'asset_id':good,'title':'Кадр'}]
+        cases=[(dict(scene_title='А',scene_id='x',frames=frame),400),(dict(frames=frame),400),
+               (dict(scene_title='А',frames=[{'asset_id':foreign,'title':'Кадр'}]),404),
+               (dict(scene_title='А',frames=[{'asset_id':'missing','title':'Кадр'}]),404),
+               (dict(scene_title='А',frames=frame+frame),409),(dict(scene_id='foreign',frames=frame),400),
+               (dict(scene_title='А',frames=frame,character_node_ids=['nope']),400),
+               (dict(scene_title='А',frames=frame,location_node_id=self.char['id']),400),(dict(scene_title='А',frames=[]),422)]
+        for extra,status in cases:
+            self.assertEqual(self.send(board,**extra)[1].status_code,status,extra)
+        self.assertFalse(self.client.get(self.path).json()['scenes'])
+        _,created=self.send(board,scene_title='Двор',frames=frame);self.assertEqual(created.status_code,200,created.text)
+        stale=self.send(board,scene_title='Другая',frames=frame)[1];self.assertEqual(stale.status_code,409)
+        fresh=self.client.get(self.path).json()
+        self.assertEqual(self.send(fresh,scene_title='Двор',frames=frame)[1].status_code,409)
+        scene=fresh['scenes'][0];self.assertEqual(self.send(fresh,scene_id=scene['id'],frames=frame)[1].status_code,409)
+        self.assertEqual(self.client.post(self.path.replace(self.pid,'wrong-project')+'/frames',json={'base_revision':fresh['revision'],'request_id':uuid.uuid4().hex,'scene_title':'Z','frames':frame}).status_code,404)
