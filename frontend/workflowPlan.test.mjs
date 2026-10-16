@@ -66,3 +66,22 @@ test('LLM принимает только текст и другие LLM', async
   assert.equal(canConnect(n('r', 0, {kind: 'reference'}), llm), false);
   assert.equal(canConnect(llm, n('i', 1, {kind: 'image'})), true);
 });
+
+test('цены узлов: оцениваются узлы с моделью и текстом, LLM — по тарифу', async () => {
+  const {priceRequests, llmPrices} = await import('./src/workflowPriceModel.ts');
+  const nodes = [
+    n('t', 0, {kind: 'text', text: 'Грэм у такси'}),
+    n('l', 100, {kind: 'llm', model: 'gpt-5.6-luna', title: 'LLM'}),
+    n('i', 200, {kind: 'image', model: 'seedream-5-lite', title: 'Кадр'}),
+    n('i2', 300, {kind: 'image', title: 'Без модели'}),
+  ];
+  const edges = [e('t', 'l'), e('l', 'i'), e('l', 'i2')];
+  const requests = priceRequests(nodes, edges, {});
+  assert.deepEqual(
+    requests.map(r => r.nodeId),
+    ['i']
+  );
+  assert.ok(requests[0].prompt.length > 0);
+  const llm = llmPrices(nodes, edges);
+  assert.ok(llm.l > 0 && llm.l < 0.01);
+});

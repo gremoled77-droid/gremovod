@@ -27,6 +27,7 @@ import {
   type Step,
   VIDEO_MODELS,
 } from './workflowPlan';
+import {useNodePrices} from './workflowPrices';
 import {LLM_MAX_TOKENS, LLM_MODELS, llmEstimate} from './llmPricing';
 
 type Graph = {nodes: Node[]; edges: Edge[]};
@@ -99,10 +100,15 @@ type Ctx = {
   results: Record<string, string>;
   status: Record<string, string>;
   library: Lib[];
+  prices: Record<string, number | null>;
   run: (ids: string[]) => void;
   upload: (accept: string, done: (asset: Lib) => void) => void;
 };
 // Контекст, а не глобальная переменная: узлы перерисовываются, когда меняется библиотека или результаты.
+/** Цена с нужной точностью: копейки LLM видны, крупные суммы без лишних знаков. */
+const formatPrice = (usd: number) =>
+  usd < 0.01 ? usd.toFixed(4) : usd < 1 ? usd.toFixed(3) : usd.toFixed(2);
+
 const WfCtx = createContext<Ctx | null>(null);
 
 function Block({id, data, selected}: {id: string; data: Record<string, any>; selected?: boolean}) {
@@ -355,6 +361,11 @@ function Block({id, data, selected}: {id: string; data: Record<string, any>; sel
           <span className={'wf-chip ' + (state ? 'st-' + state : '')}>
             {STATUS_LABEL[state] || state || 'не запускался'}
           </span>
+          {ctx.prices[id] != null && (
+            <span className="wf-price" title="Оценка цены запуска узла">
+              {kind === 'llm' ? 'до ' : ''}${formatPrice(ctx.prices[id] as number)}
+            </span>
+          )}
           <button className="nodrag wf-run" onClick={() => ctx.run([id])}>
             {kind === 'llm'
               ? data.output
@@ -703,12 +714,14 @@ export default function WorkflowPanel({
     setPlusOpen(false);
   };
 
+  const {prices, total: graphTotal, pending: pricesPending} = useNodePrices(projectId, nodes, edges, results);
   const ctxValue: Ctx = {
     patch,
     remove,
     results,
     status: {...status, ...llmState},
     library,
+    prices,
     run: ids => void prepare(ids),
     upload,
   };
@@ -866,6 +879,13 @@ export default function WorkflowPanel({
                 if (list.length) void onFiles(list);
               }}
             />
+            <span
+              className="wf-total"
+              title="Оценка по всем узлам; точная цена и лимит — в окне подтверждения"
+            >
+              Весь граф: <b>${formatPrice(graphTotal)}</b>
+              {pricesPending ? ' …' : ''}
+            </span>
             <button className="primary" disabled={running || !projectId} onClick={() => void prepare()}>
               {running ? 'Выполняется…' : '▶ Запустить всё'}
             </button>
