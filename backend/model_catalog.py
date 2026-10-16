@@ -80,9 +80,14 @@ for _id in ('seedream-5-pro','nano-banana-2.1','qwen-image-2.1','gpt-image-2','g
 # --- Лимиты провайдера (PiAPI) могут отличаться, не проверено вживую. None = лимит в инструкции не указан.
 _REF_PROFILES = {
     'seedance-2.0': {
-        'ref_limits': {'image':9,'video':3,'audio':3,'total':None,'duration_max_s':15},
+        'ref_limits': {'image':9,'video':3,'audio':3,'total':15,'video_total_s':15.4,'audio_total_s':15,
+                       'duration_min_s':4,'duration_max_s':15,
+                       'note':'по документации PiAPI (17.10.2026); аудио одно не принимается, нужен ещё образ или видео'},
         'ref_syntax': {'style':'at_numbered','image':'@image{n}','video':'@video{n}','audio':'@audio{n}',
-                       'rule':'каждому тегу одна роль в первой строке промпта; параметры Seedance 2 в PiAPI не проверены'}},
+                       'piapi':{'model':'seedance','task_types':['seedance-2','seedance-2-fast','seedance-2-mini'],
+                                'less_restriction_suffix':'-less-restriction','modes':['text_to_video','first_last_frames','omni_reference'],
+                                'asset':'asset://{asset_id}','asset_only_on':'less-restriction'},
+                       'rule':'каждому тегу одна роль в первой строке промпта; asset:// только у -less-restriction'}},
     'seedance-2.5': {
         'ref_limits': {'image':30,'video':10,'audio':10,'total':50,'video_total_s':30,'audio_total_s':30,
                        'duration_min_s':4,'duration_max_s':30,
@@ -108,12 +113,18 @@ _REF_PROFILES = {
                        'duration_min_s':3,'duration_max_s':15,'shots_max':6,'prompt_chars':2500,
                        'note':'лимиты у провайдеров отличаются; голос задаётся элементом, не отдельным аудио'},
         'ref_syntax': {'style':'at_name','element':'@{name}','alternatives':['<<<element_{n}>>>','<<<image_{n}>>>','<<<video_{n}>>>','<<<voice_{n}>>>','@Image{n}'],
-                       'provider_dependent':True,'rule':'сверять формат с документацией PiAPI; @имя повторять в каждом плане'}},
+                       'piapi':{'model':'kling','task_type':'omni_video_generation','image':'@image_{n}','video':'@video',
+                                'fields':['prompt','version','resolution','duration','aspect_ratio','enable_audio','multi_shots','video','images','keep_original_audio'],
+                                'elements_and_voice':False},
+                       'provider_dependent':True,'rule':'через PiAPI теги @image_N и @video; @имя и <<<element_n>>> относятся к интерфейсу kling.ai'}},
     'kling-3.0': {
         'ref_limits': {'image':2,'first_last':True,'multishot_with_last_frame':False,'images_per_element':3,
                        'duration_min_s':3,'duration_max_s':15,'shots_max':6,'prompt_chars':2500,
                        'note':'режим Start+Last Frame; в мультишоте доступен только первый кадр'},
-        'ref_syntax': {'style':'positional','fields':['image','image_tail'],'alt':'frame: first|last (индексы 0 и -1)',
+        'ref_syntax': {'style':'positional','fields':['image_url','image_tail_url'],'alt':'у других провайдеров image/image_tail или frame: first|last',
+                       'piapi':{'model':'kling','task_type':'video_generation','versions':['3.0','3.0-turbo'],
+                                'fields':['prompt','version','mode','image_url','image_tail_url','duration','aspect_ratio','enable_audio','prefer_multi_shots','multi_shots'],
+                                'turbo_audio':False,'turbo_multishot':False},
                        'provider_dependent':True,'rule':'ласт-кадр делать из старт-кадра; промпт описывает только переход'}},
 }
 for _id, _profile in _REF_PROFILES.items():

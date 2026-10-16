@@ -11,6 +11,7 @@
 | FlashMovieAI Seedance Director v1.2.0 | каркас промпта с `CUT`, русская речь кириллицей, аудио-авторитет, журнал непрерывности | `video-seedance-2-5/references/directing-and-dialogue.md` |
 | Видео Practice Ai «5 правил режиссуры» | пять столпов, 5 вопросов, формула кадра | `skills/cinema-five-pillars`, `backend/prompt_rules.py`, заготовки «Кадров» |
 | Проверки Codex по PiAPI (`docs/PIAPI_MODELS_2026-10-16.md`, `docs/official-prompts/*`, `docs/SEEDANCE_25_480P_5S_PROMPT.md`) | реальные поля, цены, теги, проверенные вызовы | поправки к Seedance 2.5 и MiniMax H3, `model_catalog.py` |
+| Страницы PiAPI, сохранённые 17.10.2026: `seedance2-piapi`, `seedance-private-asset-piapi`, `kling3-piapi`, `kling3-omni-piapi` (`docs/official-prompts/*`, добавлены в `scripts/fetch_prompt_docs.py`) | реальные имена полей, цены, теги, ограничения | `video-seedance-2-0`, `video-kling-3-omni`, `video-kling-3-start-end-frame`, `model_catalog.py` |
 | Ветка `codex/work` (книги, комедия, Мак-ки, навыки этапов) | `skills/gremovod-*`, `docs/*` | см. ниже |
 
 ## Модели
@@ -18,10 +19,10 @@
 | Модель | Через PiAPI и студию | Теги референсов | Лимиты референсов | Статус |
 |---|---|---|---|---|
 | Seedance 2.5 | `seedance-2.5`, 480p/720p/1080p, 4–30 с, `edit`/`extend`, черновой режим | `@image1`, `@video1`, `@audio1` | 30 / 10 / 10; видео и аудио до 30 с каждое | в запуске (480p, 5 с по цене проверен); видео и аудио-референсы адаптером не отправляются |
-| Seedance 2.0 | отдельная страница PiAPI «Seedance 2», Private Asset Library | как у 2.5 | 9 / 3 / 3, до 15 с | не включена, параметры не проверены |
+| Seedance 2.0 | `seedance-2`, `-fast`, `-mini` (+ `-less-restriction`), режимы `text_to_video`, `first_last_frames`, `omni_reference`, 4–15 с | `@image1`, `@video1`, `@audio1`; ассеты `asset://<id>` (только `-less-restriction`) | 9 / 3 / 3, всего до 15; видео до 15.4 с, аудио до 15 с | не включена, страницы сохранены 17.10 |
 | MiniMax H3 | `txt2video`, `img2video` (первый кадр) | теги не отправляются | один первый кадр | в запуске, проверен 16.10 |
-| Kling 3.0 Omni | страница PiAPI «Kling 3.0 omni» (в локальной документации нет) | `@имя` или `<<<element_n>>>` по провайдеру | до 7 картинок (4 при видео), 1 видео | не включена |
-| Kling 3.0 Start+Last Frame | страница PiAPI «Kling 3.0» | позиции кадров, не теги | 2 кадра; мультишот без ласт-кадра | не включена |
+| Kling 3.0 Omni | `kling` / `omni_video_generation`, поля `images`, `video`, `multi_shots`, `resolution` | `@image_1`, `@image_2`, `@video` (через PiAPI) | картинки списком; с видео не больше 4; мультишот без видео | не включена, страница сохранена 17.10 |
+| Kling 3.0 Start+Last Frame | `kling` / `video_generation`, `image_url` + `image_tail_url`, `version` 3.0 или 3.0-turbo | позиции кадров, не теги | 2 кадра; turbo без звука и мультишота | не включена, страница сохранена 17.10 |
 | FLUX 3 | в локальной документации PiAPI нет | мультиреференса нет (Omni: Soon) | 4 режима: t2v, i2v, Keyframes, v2v | не включена |
 
 ## Расхождения, найденные при сведении
@@ -31,7 +32,11 @@
 3. **Seedance 2.5: продление и правка.** Инструкция описывает их общими словами, у PiAPI это `omni_reference_task_type` (`edit`, `extend`) с жёсткими `aspect_ratio: adaptive` и `duration`. Тип должен совпадать с формулировкой промпта, иначе задача падает.
 4. **Черновики.** Схему «черновик на 2.0, финал на 2.5» дополняет черновой режим самой 2.5 (480p, затем 1080p по `draft_task_id`, 7 дней).
 5. **Русская речь.** У Kling нативной русской речи нет (EN/CN/JP/KR/ES). Для Seedance 2.5 и FLUX 3 язык нужно проверять тестом; практичный путь: готовая дорожка (ElevenLabs/Fish) как аудиореференс или озвучка в CapCut.
-6. **Правила ChatGPT в студии.** `SEEDANCE_RULES` запрещает `@videoN` и `@audioN` без реально переданных файлов; это согласуется с текущим адаптером.
+6. **Теги Kling.** В инструкциях `@Имя` и `<<<element_1>>>`, через PiAPI `@image_1` и `@video` (с подчёркиванием, у Seedance без него: `@image1`). Привязки элемента и голоса в схеме Omni PiAPI нет.
+7. **Поля Start+Last Frame.** В инструкциях `image`/`image_tail` или `frame`, у PiAPI `image_url` и `image_tail_url`. Запрет «ласт-кадр только в одношотовом режиме» взят из документации kie.ai; PiAPI его не оговаривает.
+8. **Private Asset Library** доступна только на `-less-restriction` вариантах Seedance 2 (мягкая модерация), на строгих `asset://` даёт 422. Использовать ли этот уровень, решает владелец.
+9. **Пиковые часы Seedance 2** 09:00–15:00 GMT (12:00–18:00 в Минске): очередь может быть очень длинной.
+10. **Правила ChatGPT в студии.** `SEEDANCE_RULES` запрещает `@videoN` и `@audioN` без реально переданных файлов; это согласуется с текущим адаптером.
 
 ## Что взято из `codex/work`
 
@@ -47,8 +52,8 @@
 ## Очередь проверок и задач
 
 1. Адаптер Seedance 2.5: отправлять `video_urls`, `audio_urls`, `omni_reference_task_type`, `draft`; живой тест `edit`/`extend` с малой суммой (по разрешению владельца).
-2. Kling 3.0 Omni и Start+Last Frame: сохранить страницы PiAPI в `docs/official-prompts/` и сверить имена полей (`image_tail`, элементы, голос).
+2. Kling Elements: сохранить страницу PiAPI «Kling Elements Video Generation API» (элементы и голос в схеме Omni отсутствуют) и сверить с `video-kling-3-omni`. Сделано: страницы Kling 3.0 и Kling 3.0 omni (17.10).
 3. FLUX 3: выяснить, есть ли он у PiAPI; пока навык описывает модель по инструкции владельца.
-4. Seedance 2 и Private Asset Library: сохранить страницы PiAPI, проверить формат asset ID.
+4. Seedance 2: решение владельца про `-less-restriction` ради Private Asset Library; живой тест загрузки и ссылки `asset://` на 480p, 4 с с малой суммой. Сделано: страницы Seedance 2 и Private Asset Library сохранены (17.10).
 5. Живая проверка русской речи: Seedance 2.5 с аудиореференсом на коротком отрезке.
 6. Нативная русская речь у Kling и FLUX 3: не ожидать, озвучку класть дорожкой.
