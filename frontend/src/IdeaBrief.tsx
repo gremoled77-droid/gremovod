@@ -1,0 +1,290 @@
+import {useEffect, useRef, useState} from 'react';
+import {Mic, Paperclip, RotateCw, Send, Square, X} from 'lucide-react';
+import {apiFetch} from './api';
+import {responseJson} from './ChatGPTPanel';
+import {IDEA_LLM_MODELS, LLM_MAX_TOKENS, ideaEstimate} from './llmPricing';
+
+type Asset = {id: string; url: string; thumbnail_url?: string | null; metadata?: {original_name?: string}};
+
+const SYSTEM =
+  'Ты сценарист-помощник мультсериала про таксиста Грэма (ВАЗ-2106, Минск). По заданию режиссёра составь компактный план ролика на русском: логлайн, настроение, 4-6 кадров (что в кадре, камера, свет), реплики героев. Без вступлений и пояснений.';
+
+type Recognition = {
+  lang: string;
+  continuous: boolean;
+  interimResults: boolean;
+  onresult: ((e: any) => void) | null;
+  onerror: ((e: any) => void) | null;
+  onend: (() => void) | null;
+  start: () => void;
+  stop: () => void;
+};
+const speechCtor = (): (new () => Recognition) | null => {
+  const w = window as any;
+  return w.SpeechRecognition || w.webkitSpeechRecognition || null;
+};
+
+/** Экран «Идея»: задание, отправка в LLM, голосовой ввод, результат с перегенерацией и референсами. */
+export default function IdeaBrief({
+  projectId,
+  brief,
+  onBrief,
+  result,
+  onResult,
+  model,
+  onModel,
+  refs,
+  onRefs,
+  world,
+  onNext,
+  onScene,
+}: {
+  projectId: string;
+  brief: string;
+  onBrief: (v: string) => void;
+  result: string;
+  onResult: (v: string) => void;
+  model: string;
+  onModel: (v: string) => void;
+  refs: string[];
+  onRefs: (ids: string[]) => void;
+  world: string;
+  onNext: () => void;
+  onScene: () => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [listening, setListening] = useState(false);
+  const [assets, setAssets] = useState<Asset[]>([]);
+  const area = useRef<HTMLTextAreaElement>(null);
+  const resultArea = useRef<HTMLTextAreaElement>(null);
+  const files = useRef<HTMLInputElement>(null);
+  const rec = useRef<Recognition | null>(null);
+  const base = useRef('');
+  const Speech = speechCtor();
+  const micOk = !!Speech && window.isSecureContext;
+
+  const grow = (el: HTMLTextAreaElement | null) => {
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = el.scrollHeight + (el.offsetHeight - el.clientHeight) + 'px';
+  };
+  useEffect(() => grow(area.current), [brief]);
+  useEffect(() => grow(resultArea.current), [result, busy]);
+  useEffect(() => {
+    if (!refs.length || !projectId) return setAssets([]);
+    void apiFetch('/api/library?project_id=' + encodeURIComponent(projectId))
+      .then(r => (r.ok ? r.json() : []))
+      .then((list: Asset[]) => setAssets(list.filter(a => refs.includes(a.id))))
+      .catch(() => undefined);
+  }, [refs, projectId]);
+  useEffect(() => () => rec.current?.stop(), []);
+
+  const messages = () => [
+    {role: 'system', content: SYSTEM + (world.trim() ? '\nМир проекта: ' + world.trim() : '')},
+    {role: 'user', content: brief.trim()},
+  ];
+  const chars = messages().reduce((n, m) => n + m.content.length, 0);
+  const price = ideaEstimate(model, chars);
+
+  const send = async () => {
+    setError('');
+    if (!brief.trim()) return setError('Сначала напиши задание ролика');
+    if (!projectId) return setError('Сначала сохрани проект');
+    if (price > 0.02 && !window.confirm(`Запрос стоит до $${price.toFixed(3)}. Отправить?`)) return;
+    setBusy(true);
+    try {
+      const msgs = messages();
+      const quote = await responseJson(
+        await apiFetch('/api/llm/estimate', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({project_id: projectId, model, messages: msgs, max_tokens: LLM_MAX_TOKENS}),
+        })
+      );
+      const answer = await responseJson(
+        await apiFetch('/api/llm/chat', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({
+            provider: 'piapi',
+            project_id: projectId,
+            model,
+            max_tokens: LLM_MAX_TOKENS,
+            messages: msgs,
+            approved: true,
+            quote_token: quote.quote_token,
+            max_cost_usd: quote.estimated_usd,
+            request_id: crypto.randomUUID(),
+          }),
+        })
+      );
+      const text = String(answer.choices?.[0]?.message?.content || '').trim();
+      if (!text) throw new Error('LLM вернул пустой ответ');
+      onResult(text);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const toggleMic = () => {
+    if (listening) return rec.current?.stop();
+    if (!Speech) return;
+    const r = new Speech();
+    r.lang = 'ru-RU';
+    r.continuous = true;
+    r.interimResults = true;
+    base.current = brief ? brief.replace(/\s+$/, '') + ' ' : '';
+    r.onresult = e => {
+      let text = '';
+      for (let i = 0; i < e.results.length; i++) text += e.results[i][0].transcript;
+      onBrief(base.current + text);
+    };
+    r.onerror = e => {
+      setError(
+        e.error === 'not-allowed' ? 'Нет доступа к микрофону' : 'Не удалось распознать речь: ' + e.error
+      );
+      setListening(false);
+    };
+    r.onend = () => setListening(false);
+    rec.current = r;
+    setListening(true);
+    r.start();
+  };
+
+  const attach = async (list: FileList | null) => {
+    if (!list?.length || !projectId) return;
+    setError('');
+    try {
+      const ids: string[] = [];
+      for (const file of Array.from(list)) {
+        const form = new FormData();
+        form.append('project_id', projectId);
+        form.append('file', file);
+        const asset: Asset = await responseJson(
+          await apiFetch('/api/library/import-reference', {method: 'POST', body: form})
+        );
+        ids.push(asset.id);
+      }
+      onRefs([...refs, ...ids]);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  };
+
+  const actions = (
+    <div className="idea-brief-actions">
+      {result && <button onClick={() => onBrief(result)}>Принять как задание</button>}
+      <button className="primary" onClick={onNext}>
+        Дальше: мир и герои →
+      </button>
+      <button onClick={onScene}>Собрать сцену из исходников</button>
+    </div>
+  );
+
+  return (
+    <section className="idea-brief">
+      <div className="idea-head">
+        <span className="idea-n">1</span>
+        <div>
+          <h2>Задание ролика</h2>
+          <small>Кто, где, что происходит и какое настроение. Можно надиктовать голосом.</small>
+        </div>
+      </div>
+      <textarea
+        ref={area}
+        rows={3}
+        value={brief}
+        placeholder="Например: тизер про Грэма, первые кадры рядом с авто"
+        onChange={e => onBrief(e.target.value)}
+      />
+      <div className="idea-send">
+        <small className="muted">{brief.trim() ? `≈ до $${price.toFixed(4)}` : ''}</small>
+        <select value={model} onChange={e => onModel(e.target.value)} aria-label="Модель LLM">
+          {Object.entries(IDEA_LLM_MODELS).map(([id, m]) => (
+            <option key={id} value={id}>
+              {m.label}
+            </option>
+          ))}
+        </select>
+        <button
+          className={'idea-mic' + (listening ? ' on' : '')}
+          onClick={toggleMic}
+          disabled={!micOk}
+          aria-label={listening ? 'Остановить запись' : 'Надиктовать голосом'}
+          title={
+            micOk
+              ? listening
+                ? 'Остановить запись'
+                : 'Надиктовать голосом (русский)'
+              : 'Голосовой ввод работает в Chrome/Safari на localhost или по https'
+          }
+        >
+          {listening ? <Square size={16} /> : <Mic size={18} />}
+        </button>
+        <button className="primary idea-go" onClick={() => void send()} disabled={busy}>
+          <Send size={15} /> {busy ? 'Думаю…' : 'Отправить в LLM'}
+        </button>
+      </div>
+      {error && (
+        <p className="alert" role="alert">
+          {error}
+        </p>
+      )}
+
+      {result || busy ? (
+        <div className="idea-result">
+          <div className="idea-result-bar">
+            <b>Результат</b>
+            <div>
+              <button onClick={() => void send()} disabled={busy} title="Повторный запрос в LLM">
+                <RotateCw size={14} /> Обновить
+              </button>
+              <button
+                onClick={() => files.current?.click()}
+                title="Файл уйдёт на экраны «Мир» и «Раскадровка»"
+              >
+                <Paperclip size={14} /> Прикрепить референс
+              </button>
+              <input
+                ref={files}
+                type="file"
+                accept="image/*"
+                multiple
+                hidden
+                onChange={e => {
+                  void attach(e.target.files);
+                  e.target.value = '';
+                }}
+              />
+            </div>
+          </div>
+          <textarea
+            ref={resultArea}
+            value={busy ? 'LLM пишет план…' : result}
+            readOnly={busy}
+            onChange={e => onResult(e.target.value)}
+          />
+          {assets.length > 0 && (
+            <div className="idea-refs" aria-label="Референсы">
+              {assets.map(a => (
+                <span key={a.id}>
+                  <img src={a.thumbnail_url || a.url} alt={a.metadata?.original_name || 'Референс'} />
+                  <button aria-label="Открепить" onClick={() => onRefs(refs.filter(x => x !== a.id))}>
+                    <X size={12} />
+                  </button>
+                </span>
+              ))}
+              <small className="muted">Уйдут на «Мир» и «Раскадровку»</small>
+            </div>
+          )}
+          {actions}
+        </div>
+      ) : (
+        actions
+      )}
+    </section>
+  );
+}

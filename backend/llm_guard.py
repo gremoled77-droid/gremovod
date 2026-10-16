@@ -10,8 +10,8 @@ from datetime import datetime, timezone
 from fastapi import HTTPException
 from pydantic import BaseModel, Field
 
-# USD за 1 млн токенов (piapi.ai/docs/llm-api/completions, акционные цены на 2026-10-16). GPT-6 Astra намеренно нет: дорого и без проверенной цены.
-PRICES = {'gpt-5.6-luna': (0.02, 0.12), 'gpt-5.6-terra': (0.2, 1.2), 'gpt-5.6-sol': (0.5, 3.0)}
+# USD за 1 млн токенов (piapi.ai/docs/llm-api/completions, акционные цены на 2026-10-16). GPT-6 Astra дорогая: её предлагает только экран «Идея», в узлах Воркфлоу её нет.
+PRICES = {'gpt-5.6-luna': (0.02, 0.12), 'gpt-5.6-terra': (0.2, 1.2), 'gpt-5.6-sol': (0.5, 3.0), 'gpt-6-astra': (2.0, 10.0)}
 MAX_OUTPUT_TOKENS = 2000
 MAX_INPUT_CHARS = 30000
 ROLES = {'system', 'user', 'assistant'}
