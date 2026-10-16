@@ -6,6 +6,11 @@ import {type ActivityItem} from './useActivity';
 import {useSharedActivity} from './ActivityContext';
 import Lightbox, {type LightboxItem} from './Lightbox';
 import {DEFAULT_CHAT_URL, copyTextFor, getChatUrl} from './chatLink';
+import {
+  buildReplaceInFramePrompt,
+  buildReplaceInVideoPrompt,
+  replacementRefs,
+} from './replaceCharacterPrompt';
 
 type OptionSpec = {
   values?: (string | number)[];
@@ -28,7 +33,7 @@ type LibAsset = {
   provider_reference_url?: string | null;
   metadata: {kind?: string; favorite?: boolean};
 };
-type Hero = {id: string; name: string};
+type Hero = {id: string; name: string; assetId?: string};
 
 const LABELS: Record<string, string> = {
   'seedream-5-pro': 'Seedream 5 Pro',
@@ -163,6 +168,19 @@ function CreateScreenBody({projectId, heroes}: {projectId: string; heroes: Hero[
   const toggleRef = (id: string) => setRefs(r => (r.includes(id) ? r.filter(x => x !== id) : [...r, id]));
 
   const toggle = (id: string) => setSelected(s => (s.includes(id) ? s.filter(x => x !== id) : [...s, id]));
+
+  /** Кнопка «Заменить героя»: ставит промпт замены и референсы (кадр, герой). Запуск обычный: цена и подтверждение. */
+  const replaceHero = (frameId: string, heroId: string) => {
+    const hero = heroes.find(h => h.id === heroId);
+    if (!hero?.assetId)
+      return setError(`У героя «${hero?.name ?? ''}» нет рабочего образа: добавь его в Character Vault`);
+    setError('');
+    setPrompt(buildReplaceInFramePrompt());
+    setRefs(replacementRefs(frameId, hero.assetId));
+    setNotice(
+      `Замена героя на «${hero.name}»: референсы (кадр, герой) и промпт поставлены. Выбери модель справа и запусти, цена и подтверждение как обычно.`
+    );
+  };
 
   const ensureCloudUrl = async (assetId: string) => {
     const a = byId[assetId];
@@ -745,6 +763,29 @@ function CreateScreenBody({projectId, heroes}: {projectId: string; heroes: Hero[
                       <button onClick={() => toggleRef(aid)} title="Использовать как референс">
                         {refs.includes(aid) ? '✓ реф.' : '+ реф.'}
                       </button>
+                      {item.kind === 'image' && (
+                        <select
+                          value=""
+                          title="Подставить героя вместо персонажа в этом кадре (кадр и герой станут референсами)"
+                          onChange={e => e.target.value && replaceHero(aid, e.target.value)}
+                        >
+                          <option value="">Заменить героя ▾</option>
+                          {heroes.map(h => (
+                            <option key={h.id} value={h.id} disabled={!h.assetId}>
+                              {h.name}
+                              {h.assetId ? '' : ' (нет образа)'}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                      {item.kind === 'video' && (
+                        <button
+                          title="Скопировать промпт замены героя в видео (Kling 3.0 Omni: исходное видео и картинка героя)"
+                          onClick={() => void copyPrompt(buildReplaceInVideoPrompt())}
+                        >
+                          Промпт замены героя
+                        </button>
+                      )}
                       <select value="" onChange={e => e.target.value && toHero(aid, e.target.value)}>
                         <option value="">В героя ▾</option>
                         {heroes.map(h => (
