@@ -279,5 +279,57 @@
     "text_file": "hunyuan-usage-piapi.txt",
     "sha256": "616f6016c04332026eb38f2f907d01324b56a2ed6039daf8c480b37bc55da84f",
     "text_chars": 6292
+  },
+  {
+    "id": "seedance2-piapi",
+    "publisher": "PiAPI",
+    "url": "https://piapi.ai/docs/seedance-api/seedance-2",
+    "retrieved_at": "2026-10-16T21:33:48.303867+00:00",
+    "http_status": 200,
+    "final_url": "https://piapi.ai/docs/seedance-api/seedance-2",
+    "status": "downloaded",
+    "raw_file": "seedance2-piapi.html",
+    "text_file": "seedance2-piapi.txt",
+    "sha256": "f8941a27b58cb71153c1f28b0908033e7344851b9ee4b28408ab155def94997f",
+    "text_chars": 17436
+  },
+  {
+    "id": "seedance-private-asset-piapi",
+    "publisher": "PiAPI",
+    "url": "https://piapi.ai/docs/seedance-api/private-asset",
+    "retrieved_at": "2026-10-16T21:33:50.467890+00:00",
+    "http_status": 200,
+    "final_url": "https://piapi.ai/docs/seedance-api/private-asset",
+    "status": "downloaded",
+    "raw_file": "seedance-private-asset-piapi.html",
+    "text_file": "seedance-private-asset-piapi.txt",
+    "sha256": "85f64ee597b1c346fc8d35eb74c7d942971038737a68459e1c2ee44a105a160f",
+    "text_chars": 21501
+  },
+  {
+    "id": "kling3-piapi",
+    "publisher": "PiAPI",
+    "url": "https://piapi.ai/docs/kling-api/kling-3-api",
+    "retrieved_at": "2026-10-16T21:33:51.745510+00:00",
+    "http_status": 200,
+    "final_url": "https://piapi.ai/docs/kling-api/kling-3-api",
+    "status": "downloaded",
+    "raw_file": "kling3-piapi.html",
+    "text_file": "kling3-piapi.txt",
+    "sha256": "95a4a5ca49a82002c6ce6234c8d2536ea0c7de1757a107b7323af21a24611d5d",
+    "text_chars": 8464
+  },
+  {
+    "id": "kling3-omni-piapi",
+    "publisher": "PiAPI",
+    "url": "https://piapi.ai/docs/kling-api/kling-3-omni-api",
+    "retrieved_at": "2026-10-16T21:33:55.842554+00:00",
+    "http_status": 200,
+    "final_url": "https://piapi.ai/docs/kling-api/kling-3-omni-api",
+    "status": "downloaded",
+    "raw_file": "kling3-omni-piapi.html",
+    "text_file": "kling3-omni-piapi.txt",
+    "sha256": "62537f1cae81309e0d4792118bc6f47c325a03814d885fc18d0ff77a7d2cd650",
+    "text_chars": 8339
   }
 ]

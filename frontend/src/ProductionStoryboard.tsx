@@ -6,6 +6,7 @@ import {useEffect, useRef, useState} from 'react';
 import {apiFetch} from './api';
 import {responseJson} from './ChatGPTPanel';
 import Lightbox, {type LightboxItem} from './Lightbox';
+import CinemaInfo from './CinemaInfo';
 import {analyzeAsset, shotPoints, TensionGraph, useVisualPlans, VisualPlanForm} from './VisualPlanPanel';
 import {emptyPlan, planFromAnalysis} from './visualPlan';
 import VisualRulesForm from './VisualRulesForm';
@@ -315,6 +316,7 @@ export default function ProductionStoryboard({
         <div>
           <span className="ps-eyebrow">РАСКАДРОВКА · РАБОЧАЯ ДОСКА</span>
           <h2>{nodes.find(n => n.id === sid)?.title || 'Сценарий и раскадровка'}</h2>
+          <CinemaInfo topic="composition" />
         </div>
         <div className="ps-top-actions">
           {board && (

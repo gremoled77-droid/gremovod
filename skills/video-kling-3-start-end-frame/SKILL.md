@@ -16,7 +16,11 @@ description: "Use when animating between two storyboard frames with Kling 3.0 (S
 ## Как передать кадры
 
 - Интерфейс kling.ai: Image to Video → «Add End Frame».
-- API: одна картинка = первый кадр, две = первый и последний; либо `frame: first/last`, индексы 0 и -1, либо поля `image` и `image_tail`.
+- **PiAPI (`model: "kling"`, `task_type: "video_generation"`)**: старт-кадр в `image_url`, финальный в `image_tail_url` (оба в примере «image to video» страницы `docs/official-prompts/kling3-piapi.txt`). Остальные поля `input`: `prompt`, `version` (`"3.0"` или `"3.0-turbo"`), `mode` (в примере `std`), `duration` (3–15, по умолчанию 5), `aspect_ratio`, `enable_audio`, `prefer_multi_shots`, `multi_shots`. Другие провайдеры используют `image`/`image_tail` или `frame: first|last`.
+- `3.0-turbo` быстрее, но без звука и без мультишота (`enable_audio: true` с turbo отклоняется).
+- Мультишот: `multi_shots: [{prompt, duration}, …]`, до 6 планов, сумма не больше 15 с; при нём общие `prompt` и `duration` игнорируются. Документация PiAPI не запрещает `image_tail_url` вместе с мультишотом явно, но запрет «ласт-кадр только в одношотовом режиме» взят из документации kie.ai и интерфейса Kling: не сочетать.
+- Цена за секунду: 3.0 на 720p без звука $0.10, со звуком $0.15; 1080p $0.15 и $0.20; 3.0-turbo $0.13 (720p) и $0.19 (1080p), только без звука.
+- Через Omni (`omni_video_generation`) два ключевых кадра задаются тегами `@image_1`/`@image_2` в промпте, а не `image_tail_url` (см. `video-kling-3-omni`).
 - Соотношение сторон подхватывается из картинок, но оно должно быть одинаковым (и желательно разрешение).
 
 ## Как готовить пару

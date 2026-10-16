@@ -6,9 +6,15 @@ const source = await readFile(new URL('./src/visualPlan.ts', import.meta.url), '
 const compiled = ts.transpileModule(source, {
   compilerOptions: {module: ts.ModuleKind.ES2020, target: ts.ScriptTarget.ES2020},
 }).outputText;
-const {tensionWarnings, sectorJumps, emptyPlan, planFromAnalysis, describeAnalysis} = await import(
-  'data:text/javascript;base64,' + Buffer.from(compiled).toString('base64')
-);
+const {
+  appendBlock,
+  BALANCE_LABELS,
+  tensionWarnings,
+  sectorJumps,
+  emptyPlan,
+  planFromAnalysis,
+  describeAnalysis,
+} = await import('data:text/javascript;base64,' + Buffer.from(compiled).toString('base64'));
 const shot = (label, story, visual, extra = {}) => ({
   id: label,
   label,
@@ -71,4 +77,28 @@ test('analysis fills only empty plan fields', () => {
   assert.equal(filled.sector_start, 3);
   assert.equal(filled.sector_end, 3);
   assert.ok(describeAnalysis(analysis).some(t => t.includes('мягкий фон')));
+});
+
+test('план: баланс и противовес по умолчанию пусты, подписи на русском', () => {
+  const plan = emptyPlan();
+  assert.equal(plan.balance, '');
+  assert.equal(plan.counterweight, '');
+  assert.deepEqual(Object.keys(BALANCE_LABELS), ['', 'stable', 'tense']);
+  const analysis = {
+    tone: {hint: ''},
+    lines: {dominant: ''},
+    attention: {sector: 5},
+    visual_intensity: 4,
+  };
+  const next = planFromAnalysis({...plan, balance: 'tense', counterweight: 'лампа'}, analysis);
+  assert.equal(next.balance, 'tense');
+  assert.equal(next.counterweight, 'лампа');
+});
+
+test('блок композиции добавляется в промпт один раз', () => {
+  const block = 'VISUAL COMPOSITION BRIEF (x)\nFocal point: center';
+  const once = appendBlock('Грэм в машине', block, 'VISUAL COMPOSITION BRIEF');
+  assert.equal(once, 'Грэм в машине\n\n' + block);
+  assert.equal(appendBlock(once, block, 'VISUAL COMPOSITION BRIEF'), once);
+  assert.equal(appendBlock('текст', '', 'VISUAL COMPOSITION BRIEF'), 'текст');
 });

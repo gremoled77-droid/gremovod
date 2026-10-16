@@ -5,6 +5,7 @@ import CinemaInfo from './CinemaInfo';
 import {
   describeAnalysis,
   emptyPlan,
+  BALANCE_LABELS,
   LINE_LABELS,
   planFromAnalysis,
   SHAPE_LABELS,
@@ -284,6 +285,15 @@ export function VisualPlanForm({
             {options(TONE_LABELS)}
           </select>
         </label>
+        <label>
+          Баланс / напряжение
+          <select
+            value={draft.balance}
+            onChange={e => set('balance', e.target.value as VisualPlan['balance'])}
+          >
+            {options(BALANCE_LABELS)}
+          </select>
+        </label>
         {kind === 'frame' && sectorPick('sector_start', 'Внимание в начале (сектор 1–9)')}
         {kind === 'frame' && sectorPick('sector_end', 'Внимание в конце (сектор 1–9)')}
       </div>
@@ -298,6 +308,15 @@ export function VisualPlanForm({
           />
         </label>
       )}
+      <label className="vp-wide">
+        Противовес (что уравновешивает главный объект)
+        <input
+          maxLength={300}
+          placeholder="например: маленькая лампа далеко слева"
+          value={draft.counterweight}
+          onChange={e => set('counterweight', e.target.value)}
+        />
+      </label>
       <label className="vp-wide">
         Заметка
         <input maxLength={500} value={draft.note} onChange={e => set('note', e.target.value)} />

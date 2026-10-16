@@ -181,3 +181,12 @@ def register(app, studio):
             return {'prompt': ''}
         with studio.connect() as db:
             return {'prompt': visual_plan.rules_text(db, membership['production_id'], membership['node_id'])}
+
+    @app.get('/api/projects/{project_id}/composition-brief')
+    def project_composition(project_id: str):
+        studio.project(project_id)
+        membership = folders.link(studio, project_id)
+        with studio.connect() as db:
+            if not membership or not membership['node_id']:
+                return {'prompt': visual_plan.composition_brief(db, '', '')}
+            return {'prompt': visual_plan.composition_brief(db, membership['production_id'], membership['node_id'])}
