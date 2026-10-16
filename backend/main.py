@@ -29,7 +29,7 @@ MEDIA=(DATA or ROOT)/'media'
 MEDIA.mkdir(exist_ok=True)
 BASE='https://api.piapi.ai'
 PIAPI_KEY_FILE=ROOT.parent/'PIAPI_API_KEY.txt'
-app=FastAPI(title='AI Workflow Studio', version='0.2.0')
+app=FastAPI(title='AI Workflow Studio', version='0.3.0')
 app.include_router(connections_router)
 app.add_middleware(CORSMiddleware,allow_origins=['http://127.0.0.1:5173','http://localhost:5173'],allow_methods=['*'],allow_headers=['*'])
 
@@ -67,7 +67,7 @@ class Project(BaseModel):
     base_revision:int|None=Field(default=None,ge=0)
 
 @app.get('/api/health')
-def health(): return {'ok':True,'version':'0.2.0','mode':'local'}
+def health(): return {'ok':True,'version':'0.3.0','mode':'local'}
 
 @app.get('/api/projects')
 def projects():
