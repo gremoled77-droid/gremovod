@@ -519,3 +519,79 @@ main.storyboard-main {
   margin: 4px 0 0;
   padding-left: 18px;
 }
+
+.ps-badge.s-on {
+  background: rgba(190, 120, 240, 0.22);
+}
+.snd {
+  display: grid;
+  gap: 12px;
+}
+.snd-voices {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+.snd-note {
+  grid-column: 1 / -1;
+}
+.snd-col,
+.snd-frame {
+  display: grid;
+  gap: 8px;
+  align-content: start;
+}
+.snd-voice,
+.snd-frame {
+  padding: 10px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  display: grid;
+  gap: 6px;
+}
+.snd-row,
+.snd-frame header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+}
+.snd-add {
+  display: grid;
+  gap: 6px;
+  border: 1px dashed rgba(255, 255, 255, 0.2);
+  border-radius: 10px;
+}
+.snd-frame ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.snd-cue {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 6px;
+  align-items: end;
+  padding: 8px;
+  border-left: 3px solid rgba(242, 177, 52, 0.6);
+  background: rgba(255, 255, 255, 0.03);
+}
+.snd-cue > b,
+.snd-cue > textarea,
+.snd-cue > audio,
+.snd-cue > .chips {
+  grid-column: 1 / -1;
+}
+.snd-cue label {
+  display: grid;
+  gap: 2px;
+  font-size: 12px;
+}
+@media (max-width: 760px) {
+  .snd-voices {
+    grid-template-columns: 1fr;
+  }
+}

@@ -33,6 +33,7 @@ import WorldFromBrief from './WorldFromBrief';
 import {passportText} from './worldBible';
 import AttachmentMenu, {AttachmentStrip} from './AttachmentMenu';
 import CharactersScreen from './CharactersScreen';
+import SoundScreen from './SoundScreen';
 import FrameBuilder from './FrameBuilder';
 import ScenePanel, {EMPTY_SCENE, type Scene} from './ScenePanel';
 import EconomicsPanel from './EconomicsPanel';
@@ -1970,7 +1971,7 @@ function App() {
                   />
                 </>
               ) : mode === 'audio' ? (
-                <>{audioPanel()}</>
+                <SoundScreen projectId={projectId} audioLab={audioPanel()} />
               ) : mode === 'archive' ? (
                 <AssetLibrary
                   {...replacementControls}

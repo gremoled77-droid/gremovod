@@ -14,6 +14,7 @@ import FrameTakes from './FrameTakes';
 import SceneCast from './SceneCast';
 import AnimateDialog from './AnimateDialog';
 import FrameCast from './FrameCast';
+import {soundLabel, sceneSound, type Cue, type FrameSound} from './soundCues';
 import {frameStatus, photoLabel, sceneVideoCount, videoLabel, type Pending} from './frameStatus';
 import UpscaleButton from './UpscaleButton';
 import {moveItem} from './boardOrder';
@@ -99,7 +100,8 @@ export default function ProductionStoryboard({
   }, [location?.production_id, location?.series?.id]);
   const [nodes, setNodes] = useState<Node[]>([]),
     [board, setBoard] = useState<Board | null>(null),
-    [tick, setTick] = useState(0);
+    [tick, setTick] = useState(0),
+    [sound, setSound] = useState<Record<string, Cue[]>>({});
   const [drafts, setDrafts] = useState<Record<string, string>>(() =>
       readLocal('studio:storyboard-drafts', {})
     ),
@@ -213,6 +215,19 @@ export default function ProductionStoryboard({
       live = false;
     };
   }, [pid, sid, tick, path]);
+  useEffect(() => {
+    let live = true;
+    if (pid && sid)
+      void apiFetch(`/api/productions/${pid}/series/${sid}/sound`)
+        .then(r => (r.ok ? r.json() : []))
+        .then((rows: FrameSound[]) => {
+          if (live) setSound(Object.fromEntries(rows.map(r => [r.frame_id, r.cues])));
+        })
+        .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, [pid, sid, tick]);
   useEffect(() => {
     if (pid && sid && nodes.some(n => n.id === sid)) writeLocal('studio:board-location', {pid, sid});
   }, [pid, sid, nodes]);
@@ -658,6 +673,14 @@ export default function ProductionStoryboard({
                     </span>
                   );
                 })()}
+                {(() => {
+                  const {done, all} = sceneSound(scene.frames.map(f => ({cues: sound[f.id] || []})));
+                  return (
+                    <span className={'ps-prog' + (all && done === all ? ' ok' : '')}>
+                      звук {done} из {all}
+                    </span>
+                  );
+                })()}
               </div>
               <p className="ps-text">{scene.notes || 'Описание пока не добавлено'}</p>
               <SceneCast
@@ -749,6 +772,9 @@ export default function ProductionStoryboard({
                           <div className="ps-badges" aria-label="Статус кадра">
                             <span className={'ps-badge ' + st.photo}>{photoLabel(st)}</span>
                             <span className={'ps-badge v-' + st.video}>{videoLabel(st)}</span>
+                            <span className={'ps-badge s-' + (sound[frame.id]?.length ? 'on' : 'off')}>
+                              {soundLabel(sound[frame.id] || [])}
+                            </span>
                           </div>
                         );
                       })()}
