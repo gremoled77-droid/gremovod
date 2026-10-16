@@ -73,3 +73,49 @@ MODEL_SPECS['minimax-h3']={
 # gpt-image-2.5-sunburst (правки) и референсы GPT Image не проверялись и остаются выключенными.
 for _id in ('seedream-5-pro','nano-banana-2.1','qwen-image-2.1','gpt-image-2','gpt-image-2.5','minimax-h3'):
     MODEL_SPECS[_id].update({'launch_enabled':True,'verified_at':'2026-10-16','prompt_only':False})
+
+
+# --- Референсы и синтаксис тегов видеомоделей (16.10.2026). Справочные поля из инструкций владельца
+# --- и практикума GORA ACADEMY (см. skills/video-*): API они не вызывают и launch_enabled/цены не меняют.
+# --- Лимиты провайдера (PiAPI) могут отличаться, не проверено вживую. None = лимит в инструкции не указан.
+_REF_PROFILES = {
+    'seedance-2.0': {
+        'ref_limits': {'image':9,'video':3,'audio':3,'total':None,'duration_max_s':15},
+        'ref_syntax': {'style':'at_numbered','image':'@Image{n}','video':'@Video{n}','audio':'@Audio{n}',
+                       'rule':'каждому тегу одна роль в первой строке промпта'}},
+    'seedance-2.5': {
+        'ref_limits': {'image':30,'video':10,'audio':10,'total':50,'duration_max_s':30},
+        'ref_syntax': {'style':'at_numbered','image':'@Image{n}','video':'@Video{n}','audio':'@Audio{n}',
+                       'rule':'каждому тегу одна роль; продление и локальная правка через @Video1'}},
+    'flux-3': {
+        'ref_limits': {'image':None,'video':1,'audio':0,'total':None,
+                       'note':'мультиреференса нет (Omni Reference: Soon); картинки только как старт-кадр или Keyframes по порядку'},
+        'ref_syntax': {'style':'none','modes':['t2v','i2v','keyframes','video_continuation'],
+                       'rule':'порядок загрузки = порядок кадров; идентичность держит дословное описание субъекта (CASTLE)'}},
+    'minimax-h3': {
+        'ref_limits': {'image':9,'video':3,'audio':3,'total':12,'video_total_s':15,'audio_total_s':15,
+                       'duration_min_s':4,'duration_max_s':15,
+                       'note':'Omni Reference взаимоисключающ с First/Last Frame; адаптер студии пока отдаёт 1 картинку (max_refs)'},
+        'ref_syntax': {'style':'words_numbered','image':'Image {n}','video':'Video {n}','audio':'Audio {n}',
+                       'rule':'назначать роль, не описывать содержимое; после имени обращаться по имени'}},
+    'kling-3.0-omni': {
+        'ref_limits': {'image':7,'image_with_video':4,'video':1,'audio':0,'elements':3,'images_per_element':4,
+                       'video_max_s':10,'element_video_s':[3,8],'voice_s':[3,30],
+                       'duration_min_s':3,'duration_max_s':15,'shots_max':6,'prompt_chars':2500,
+                       'note':'лимиты у провайдеров отличаются; голос задаётся элементом, не отдельным аудио'},
+        'ref_syntax': {'style':'at_name','element':'@{name}','alternatives':['<<<element_{n}>>>','<<<image_{n}>>>','<<<video_{n}>>>','<<<voice_{n}>>>','@Image{n}'],
+                       'provider_dependent':True,'rule':'сверять формат с документацией PiAPI; @имя повторять в каждом плане'}},
+    'kling-3.0': {
+        'ref_limits': {'image':2,'first_last':True,'multishot_with_last_frame':False,'images_per_element':3,
+                       'duration_min_s':3,'duration_max_s':15,'shots_max':6,'prompt_chars':2500,
+                       'note':'режим Start+Last Frame; в мультишоте доступен только первый кадр'},
+        'ref_syntax': {'style':'positional','fields':['image','image_tail'],'alt':'frame: first|last (индексы 0 и -1)',
+                       'provider_dependent':True,'rule':'ласт-кадр делать из старт-кадра; промпт описывает только переход'}},
+}
+for _id, _profile in _REF_PROFILES.items():
+    if _id not in MODEL_SPECS:
+        _limits = _profile['ref_limits']
+        MODEL_SPECS[_id] = {'launch_enabled':False,'kind':'video','model':_id,'task_type':_id,
+                            'max_refs':_limits.get('image') or 1,'docs':'skills/video-'+_id.replace('.', '-')+'/SKILL.md',
+                            'prompt_only':True}
+    MODEL_SPECS[_id].update(_profile)

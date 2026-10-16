@@ -1,0 +1,86 @@
+---
+name: "video-kling-3-omni"
+description: "Use when writing a prompt for Kling 3.0 Omni (kling-v3-omni): @element references, voice binding, multi-shot (up to 6 shots / 15 s), Omni Edit; for recurring characters in the GremoVOD series."
+---
+
+# Kling 3.0 Omni — промпты для видео
+
+Статус: правила из инструкции владельца, **вживую через студию не проверены**, модель не включена в запуск. Синтаксис тегов и лимиты зависят от провайдера: сверять с документацией PiAPI.
+
+## Omni или обычная 3.0
+
+Сцена придумывается с нуля — обычная 3.0 (`kling-v3`). Нужен конкретный герой, машина или голос из ролика в ролик — Omni (`kling-v3-omni`). Только в Omni: мульти-референс картинками, видео-элемент персонажа, привязка голоса. Только в обычной 3.0: Start Frame + Element и 3+ персонажей (см. скилл `video-kling-3-start-end-frame` для двух кадров).
+
+## Референсы и теги
+
+Всё (картинки, видео, элементы, голос, текст) модель сводит в одну инструкцию.
+
+- В интерфейсе: `@Имя` (`@Grem`, `@VAZ`) и выбор элемента из списка.
+- В официальном описании синтаксиса: `<<<element_1>>>`, `<<<image_1>>>`, `<<<video_1>>>`, `<<<voice_1>>>`. У провайдеров бывает `@Image1`, `@element_1`. Брать формат из документации своей платформы.
+- Типы: element держит идентичность; image — стиль или старт-кадр; video — движение и актёрская подача; voice — голос.
+- Элемент из картинок: 2–4 кадра одного субъекта с разных ракурсов, одинаковый свет и качество (коллаж ракурсов героя: `../video-seedance-2-0/references/character-sheet-and-storyboard.md`).
+- Видео-элемент: 3–8 с, один человек в кадре (подтягивает и внешность, и тембр).
+- Голос: 5–30 с чистой речи (минимум 3 с); из видео-элемента подхватывается автоматически.
+
+## Лимиты
+
+| Параметр | Значение |
+|---|---|
+| Картинки/элементы без видео на входе | до 7 |
+| С видео на входе | до 4 |
+| Видео за генерацию | одно, 3–10 с, до 200 МБ, до 2K |
+| Видео для создания элемента | 3–8 с |
+| Картинка | от 300x300, до 10 МБ, jpg/png, стороны не уже 1:4 |
+| Субъектов в кадре | до 3 |
+| Длительность | 3–15 с (по умолчанию 5), до 6 планов |
+| Промпт | до 2500 символов, негативный тоже |
+| Формат | 16:9, 9:16, 1:1; режимы std, pro, 4K |
+
+## Структура промпта
+
+Сначала подключить и назвать все референсы, по одной задаче на каждый. Затем: сцена и локация → персонажи через `@теги` и их действия → действие с таймингом → камера → аудио (кто, что, на каком языке, с какой подачей) → стиль, свет, палитра → формат и длительность.
+
+**Описывать действие и камеру, не внешность.** Внешность держит элемент; переописание лица и одежды ведёт к дрейфу.
+
+## Мультишот
+
+Intelligence mode — один описательный промпт, модель сама раскладывает планы. Customize — планы расписываются вручную. `@теги` повторять в каждом плане, где герой есть.
+
+Формат А: `Shot 1 (3s): Medium shot. @Grem ... Camera: slow dolly in. Audio: ...`
+Формат Б: `[00:00 - 00:03] Medium shot: ... Audio: ...` (удобен, когда важны реплики по секундам).
+
+## Шаблон
+
+```
+Elements: @Grem (character, 3 images, voice bound), @VAZ (car element, 2 images)
+Shot 1 (3s): Wide shot. @VAZ rolls into a wet Minsk courtyard at dusk. Camera: slow tracking from the side. Audio: tires on wet asphalt, engine idle.
+Shot 2 (4s): Medium close-up through the windshield. @Grem checks the meter and sighs. Camera: locked, eye level. Audio: room tone in the car.
+Shot 3 (4s): Close-up. @Grem looks into the lens and says in English, dry and tired — @Grem: "Another night shift." Camera: static.
+Style: stylized 3D cartoon, warm amber vs cold teal. Format: 9:16, 11 seconds, pro mode.
+Consistent element identity, clothing and voice across all shots. No morphing, no deformation, no flickering, no ghosting. Stable facial features during camera movement and occlusions. Realistic physics and lighting. Product shape, color and typography accurate throughout.
+```
+
+## Правка внутри видео (Omni Edit)
+
+Меняет фон, костюм, добавляет и убирает персонажей. Замена актёра: отснять референсное видео (до 10 с), подключить элемент нового героя, модель сохраняет движение, тайминг и камеру. Видео + до 4 картинок + до 3 элементов.
+
+## Голос
+
+Нативное аудио: EN, CN, JP, KR, ES. **Русской речи нет**: реплики для лип-синка писать по-английски либо снимать без речи и накладывать озвучку из ElevenLabs/Fish Audio в монтаже. Держать говорящее лицо в кадре и реплику короткой.
+
+## Порядок работы
+
+1. Собрать героя в сильной image-модели, получить ракурсы.
+2. Создать элемент (2–4 картинки, понятное имя), привязать голос.
+3. Написать промпт про действие и камеру.
+4. Тест на 3–5 с, проверка с разных ракурсов.
+5. Только потом мультишот.
+6. Дрейф идентичности: менять один вход за раз.
+
+## Чего избегать
+
+Переописывать внешность; вешать три задачи на один референс; грузить в один элемент несогласованные картинки (разный свет, стрижка); больше 4 картинок при видео-входе; видео длиннее 10 с (8 с для элемента); сразу 15-секундный мультишот.
+
+## Технический хвост
+
+`Consistent element identity, clothing and voice across all shots. No morphing, no deformation, no flickering, no ghosting. Stable facial features during camera movement and occlusions. Realistic physics and lighting. Product shape, color and typography accurate throughout.`
