@@ -160,6 +160,24 @@ class UpscaleAdapterTests(unittest.TestCase):
         self.assertEqual(output_urls({'data': {'output': None, 'task_result': None}}), [])
 
 
+class SeedTests(unittest.TestCase):
+    """seed есть в документации PiAPI только у MiniMax H3: необязательный, без него тело запроса прежнее."""
+
+    def test_minimax_seed_is_optional_and_checked(self):
+        without, _ = preview('minimax-h3')
+        self.assertNotIn('seed', without['input'])
+        with_seed, cost = preview('minimax-h3', options={'seed': 42})
+        self.assertEqual(with_seed['input']['seed'], 42)
+        self.assertEqual(cost, 0.15)  # seed цену не меняет
+        for bad in (-1, 2 ** 31, 'abc', 1.5, True):
+            with self.assertRaises(HTTPException, msg=str(bad)):
+                preview('minimax-h3', options={'seed': bad})
+
+    def test_other_video_models_do_not_take_seed(self):
+        with self.assertRaises(HTTPException):
+            preview('seedance-2.5', options={'seed': 1})
+
+
 if __name__ == '__main__':
     unittest.main()
 

@@ -11,7 +11,7 @@ import {
   type Option,
 } from './operatorPrompt';
 
-function Chips({
+export function Chips({
   label,
   options,
   value,

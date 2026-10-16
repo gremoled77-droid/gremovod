@@ -468,3 +468,54 @@ main.storyboard-main {
   display: grid;
   gap: 4px;
 }
+
+.ps-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 2px 0;
+}
+.ps-badge {
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 11px;
+  background: rgba(255, 255, 255, 0.08);
+}
+.ps-badge.approved,
+.ps-badge.v-main {
+  background: rgba(110, 200, 130, 0.22);
+}
+.ps-badge.v-pending {
+  background: rgba(242, 177, 52, 0.25);
+}
+.ps-badge.v-takes {
+  background: rgba(120, 160, 240, 0.22);
+}
+.an {
+  display: grid;
+  gap: 8px;
+  max-width: 760px;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+.an-photo {
+  max-width: 220px;
+  border-radius: 10px;
+}
+.an-row,
+.an-flags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 10px;
+}
+.an-warn {
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(242, 177, 52, 0.18);
+  font-size: 13px;
+}
+.an-warn ul {
+  margin: 4px 0 0;
+  padding-left: 18px;
+}

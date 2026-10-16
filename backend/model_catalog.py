@@ -66,7 +66,9 @@ MODEL_SPECS['minimax-h3']={
     'price_per_second_usd':{'480p':0.03,'768p':0.05,'1080p':0.07},
     'options':{'resolution':{'values':['480p','768p','1080p'],'default':'480p'},
                'duration':{'min':5,'max':15,'default':5},
-               'aspect_ratio':{'values':['16:9','9:16','1:1'],'default':'16:9'}}}
+               'aspect_ratio':{'values':['16:9','9:16','1:1'],'default':'16:9'},
+               # seed: по документации PiAPI необязательное целое «для воспроизводимости»; диапазон в доках не указан, не проверялся вживую.
+               'seed':{'min':0,'max':2147483647,'optional':True}}}
 
 
 # --- Живая проверка 16.10.2026 (scripts/live_piapi_test.py): отправка, статус, результат и списание совпали с оценкой.

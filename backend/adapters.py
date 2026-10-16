@@ -35,6 +35,8 @@ def pick_options(spec, options):
         _bad('Неподдерживаемый параметр модели: ' + ', '.join(sorted(unknown)))
     result = {}
     for name, rule in schema.items():
+        if rule.get('optional') and name not in options:
+            continue  # необязательный параметр без значения в запрос не попадает
         value = options.get(name, rule.get('default'))
         if 'values' in rule:
             if value not in rule['values']:

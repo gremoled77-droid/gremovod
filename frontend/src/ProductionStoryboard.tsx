@@ -12,7 +12,9 @@ import VisualRulesForm from './VisualRulesForm';
 import EditListPanel from './EditListPanel';
 import FrameTakes from './FrameTakes';
 import SceneCast from './SceneCast';
+import AnimateDialog from './AnimateDialog';
 import FrameCast from './FrameCast';
+import {frameStatus, photoLabel, sceneVideoCount, videoLabel, type Pending} from './frameStatus';
 import UpscaleButton from './UpscaleButton';
 import {moveItem} from './boardOrder';
 import {patchEntity, putOrder, type EntityPatch} from './boardApi';
@@ -111,6 +113,9 @@ export default function ProductionStoryboard({
     [notice, setNotice] = useState(''),
     [showScript, setShowScript] = useState(false),
     [showOutline, setShowOutline] = useState(false),
+    [animate, setAnimate] = useState<{frame: Frame; heroes: {name: string}[]} | null>(null),
+    [pending, setPending] = useState<Record<string, Pending>>(() => readLocal('studio:video-pending', {})),
+    [onlyNoVideo, setOnlyNoVideo] = useState(false),
     [importMode, setImportMode] = useState<'append' | 'update'>('append');
   const visual = useVisualPlans(pid, sid);
   const [estimating, setEstimating] = useState(false);
@@ -311,6 +316,19 @@ export default function ProductionStoryboard({
       setNotice(message);
     });
   }
+  /** Пока идёт генерация видео, доска сама обновляется раз в 20 секунд: готовый клип появится в карточке кадра. */
+  useEffect(() => {
+    if (!Object.keys(pending).length) return;
+    const timer = setInterval(() => setTick(t => t + 1), 20000);
+    return () => clearInterval(timer);
+  }, [pending]);
+  function launched(frame: Frame, videosBefore: number) {
+    const next = {...pending, [frame.id]: {since: Date.now(), videosBefore}};
+    setPending(next);
+    writeLocal('studio:video-pending', next);
+    setAnimate(null);
+    setNotice('Видео запущено. Готовый клип появится в карточке кадра: доска обновляется сама.');
+  }
   function openFrame(frame: Frame) {
     void perform(async () => {
       const bound = await request(`/api/productions/${pid}/nodes/${frame.id}/open-project`, {});
@@ -434,12 +452,25 @@ export default function ProductionStoryboard({
           <SeriesEconomics key={pid + sid} pid={pid} sid={sid} />
           <div className="chips">
             <button onClick={() => setShowScript(s => !s)}>Вставить сценарий</button>
+            <label>
+              <input type="checkbox" checked={onlyNoVideo} onChange={e => setOnlyNoVideo(e.target.checked)} />{' '}
+              только кадры без видео
+            </label>
             {outlineContext && (
               <button onClick={() => setShowOutline(true)}>Разбить на сцены и кадры (GPT)</button>
             )}
             <button onClick={() => inspect(sid)}>Файлы и описание серии ↗</button>
           </div>
           <VisualRulesForm key={sid} pid={pid} nid={sid} />
+          {animate && (
+            <AnimateDialog
+              pid={pid}
+              frame={animate.frame}
+              heroes={animate.heroes}
+              onClose={() => setAnimate(null)}
+              onLaunched={before => launched(animate.frame, before)}
+            />
+          )}
           {showOutline && outlineContext && board && (
             <OutlineDialog
               pid={pid}
@@ -619,6 +650,14 @@ export default function ProductionStoryboard({
                     </span>
                   );
                 })()}
+                {(() => {
+                  const {done, all} = sceneVideoCount(scene.frames);
+                  return (
+                    <span className={'ps-prog' + (all && done === all ? ' ok' : '')}>
+                      видео {done} из {all}
+                    </span>
+                  );
+                })()}
               </div>
               <p className="ps-text">{scene.notes || 'Описание пока не добавлено'}</p>
               <SceneCast
@@ -636,6 +675,7 @@ export default function ProductionStoryboard({
               />
               <div className="ps-frames">
                 {scene.frames.map((frame, frameIndex) => {
+                  if (onlyNoVideo && frame.selection.selected_video_file_id) return null;
                   const image =
                       frame.files.find(f => f.id === frame.selection.selected_image_file_id) ||
                       frame.files.find(f => f.kind === 'image'),
@@ -703,6 +743,15 @@ export default function ProductionStoryboard({
                             : 'последнее фото · не утверждено'
                           : 'запланирован'}
                       </small>
+                      {(() => {
+                        const st = frameStatus(frame.files, frame.selection, pending[frame.id], Date.now());
+                        return (
+                          <div className="ps-badges" aria-label="Статус кадра">
+                            <span className={'ps-badge ' + st.photo}>{photoLabel(st)}</span>
+                            <span className={'ps-badge v-' + st.video}>{videoLabel(st)}</span>
+                          </div>
+                        );
+                      })()}
                       <FrameCast
                         id={frame.id}
                         pid={pid}
@@ -733,6 +782,29 @@ export default function ProductionStoryboard({
                         }
                       />
                       <div className="ps-acts">
+                        <button
+                          className="primary"
+                          disabled={busy || !frame.selection.selected_image_file_id}
+                          title={
+                            frame.selection.selected_image_file_id
+                              ? 'Оживить главное фото кадра'
+                              : 'Сначала утверди главное фото'
+                          }
+                          onClick={() =>
+                            setAnimate({
+                              frame,
+                              heroes: (frame.selection.character_node_ids.length ||
+                              frame.selection.location_node_id
+                                ? frame.selection.character_node_ids
+                                : scene.selection.character_node_ids
+                              )
+                                .map(id => ({name: nodes.find(n => n.id === id)?.title || ''}))
+                                .filter(h => h.name),
+                            })
+                          }
+                        >
+                          Оживить
+                        </button>
                         <button disabled={busy} onClick={() => openFrame(frame)}>
                           В студию
                         </button>
