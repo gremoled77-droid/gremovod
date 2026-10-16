@@ -60,7 +60,7 @@ export default function SettingsPanel({
           <select value={model} disabled={busy} onChange={e => onModel(e.target.value)}>
             {(provider === 'openai'
               ? ['gpt-4.1-mini', 'gpt-4.1', 'gpt-5-mini']
-              : ['gpt-5.6-luna', 'gpt-5.6-terra', 'gpt-5.6-sol']
+              : ['gpt-5.6-luna', 'gpt-5.6-terra', 'gpt-5.6-sol', 'gpt-6-astra']
             ).map(item => (
               <option key={item}>{item}</option>
             ))}

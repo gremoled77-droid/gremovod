@@ -1,6 +1,7 @@
 """Каталог моделей и допустимых LLM. Вынесено из main.py без изменения содержимого."""
 
-ALLOWED_CHAT={'gpt-5.6-luna','gpt-5.6-terra','gpt-5.6-sol'}
+# gpt-6-astra дорогая: только для сценария и промптов (Идея, Настройки), пока не появится GPT-6.1 Sol. В узлах Воркфлоу её нет.
+ALLOWED_CHAT={'gpt-5.6-luna','gpt-5.6-terra','gpt-5.6-sol','gpt-6-astra'}
 IMAGE_TASKS={'seedream-5-pro','seedream-5-lite','gpt-image-2','nano-banana-2','qwen-image-2.1'}
 VIDEO_MODELS={'seedance','kling','wan','veo','sora','hailuo'}
 
