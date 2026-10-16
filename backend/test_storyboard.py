@@ -103,3 +103,37 @@ class StoryboardTests(unittest.TestCase):
         self.assertTrue(self.client.post(self.path+'/import',json=update).json()['replayed'])
         bad={**update,'request_id':uuid.uuid4().hex,'base_revision':saved['revision'],'scene_node_ids':['foreign']}
         self.assertEqual(self.client.post(self.path+'/import',json=bad).status_code,400)
+
+    def order(self,board,parent,ids):
+        return self.client.put(self.path+'/order',json={'base_revision':board['revision'],'parent_id':parent,'node_ids':ids})
+
+    def test_reorder_changes_only_numbers_and_rejects_stale_or_foreign_ids(self):
+        board=self.prepare()
+        self.assertEqual(self.client.post(self.path+'/import',json=self.body(board)).status_code,200)
+        board=self.client.get(self.path).json();first,second=board['scenes']
+        frames=[self.new('frame',f'Кадр {i}',first['id']) for i in (1,2,3)]
+        other=self.new('frame','Чужой кадр',second['id'])
+        board=self.client.get(self.path).json()
+        # Порядок сцен: меняются только number, папки и ID остаются.
+        done=self.order(board,self.series['id'],[second['id'],first['id']])
+        self.assertEqual(done.status_code,200,done.text)
+        saved=self.client.get(self.path).json()
+        self.assertEqual([s['id'] for s in saved['scenes']],[second['id'],first['id']])
+        self.assertEqual([s['number'] for s in saved['scenes']],[1,2])
+        self.assertEqual([s['relative_dir'] for s in saved['scenes']],[second['relative_dir'],first['relative_dir']])
+        self.assertTrue((main.PRODUCTIONS_ROOT/first['relative_dir']).is_dir())
+        self.assertEqual(done.json()['revision'],saved['revision'])
+        # Устаревшая ревизия не применяется.
+        self.assertEqual(self.order(board,self.series['id'],[first['id'],second['id']]).status_code,409)
+        # Кадры: неполный список ставит названные первыми, остальные следуют в прежнем порядке.
+        ids=[f['id'] for f in frames]
+        part=self.order(saved,first['id'],[ids[2]])
+        self.assertEqual(part.status_code,200,part.text)
+        again=self.client.get(self.path).json()
+        scene=next(s for s in again['scenes'] if s['id']==first['id'])
+        self.assertEqual([f['id'] for f in scene['frames']],[ids[2],ids[0],ids[1]])
+        self.assertEqual([f['number'] for f in scene['frames']],[1,2,3])
+        # Чужой кадр, повтор и чужой родитель отклоняются.
+        for parent,items in [(first['id'],[other['id']]),(first['id'],[ids[0],ids[0]]),('foreign',[ids[0]]),(self.series['id'],[ids[0]])]:
+            self.assertEqual(self.order(again,parent,items).status_code,400,(parent,items))
+        self.assertEqual(self.client.put(self.path.replace(self.pid,'wrong-project')+'/order',json={'base_revision':again['revision'],'parent_id':first['id'],'node_ids':ids}).status_code,404)

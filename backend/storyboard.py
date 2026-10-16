@@ -59,6 +59,33 @@ class ImportScript(BaseModel):
     scene_node_ids:list[str|None]=Field(default_factory=list,max_length=100)
 
 
+class Reorder(BaseModel):
+    base_revision:str=Field(min_length=64,max_length=64)
+    parent_id:str=Field(min_length=1,max_length=100)  # серия (порядок сцен) или сцена серии (порядок кадров)
+    node_ids:list[str]=Field(min_length=1,max_length=500)
+
+
+def reorder(db,pid,sid,body):
+    """Новый порядок детей одного родителя: меняется только number. Папки на диске не переименовываются."""
+    _,nodes,_,revision=snapshot(db,pid,sid)
+    if body.base_revision!=revision:raise HTTPException(409,'Доска изменилась. Обнови её и повтори перестановку.')
+    scenes={n['id'] for n in nodes if n['kind']=='episode' and n['parent_id']==sid}
+    if body.parent_id==sid:kind='episode'
+    elif body.parent_id in scenes:kind='frame'
+    else:raise HTTPException(400,'Порядок меняется внутри серии или сцены этой серии')
+    siblings=[n for n in nodes if n['kind']==kind and n['parent_id']==body.parent_id]
+    known={n['id'] for n in siblings}
+    if len(set(body.node_ids))!=len(body.node_ids) or not set(body.node_ids)<=known:
+        raise HTTPException(400,'Список содержит повтор или карточку другого родителя')
+    # Скрытые с доски кадры (архивные рабочие проекты) остаются после видимых в прежнем порядке.
+    rest=[n['id'] for n in sorted(siblings,key=lambda n:(n['number'],n['id'])) if n['id'] not in body.node_ids]
+    order=list(body.node_ids)+rest
+    current={n['id']:n['number'] for n in siblings}
+    for number,nid in enumerate(order,1):
+        if current[nid]!=number:db.execute('UPDATE production_nodes SET number=? WHERE id=?',(number,nid))
+    return order
+
+
 def register(app,studio):
     @app.on_event('startup')
     def setup():
@@ -87,6 +114,14 @@ def register(app,studio):
                 _,selection,_=state(db,pid,item['id'])
                 scenes.append({**item,'frames':frames,'selection':selection})
         return {'series':parent,'scenes':scenes,'script':script,'revision':revision}
+
+    @app.put('/api/productions/{pid}/series/{sid}/storyboard/order')
+    def set_order(pid:str,sid:str,body:Reorder):
+        with studio.connect() as db:
+            db.execute('BEGIN IMMEDIATE')
+            order=reorder(db,pid,sid,body)
+            _,_,_,revision=snapshot(db,pid,sid)
+        return {'order':order,'revision':revision}
 
     @app.post('/api/productions/{pid}/series/{sid}/storyboard/preview')
     def preview(pid:str,sid:str,body:ImportScript):
