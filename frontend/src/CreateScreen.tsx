@@ -1136,6 +1136,7 @@ function CreateScreenBody({projectId, heroes}: {projectId: string; heroes: Hero[
       )}
       {queue[0] && (
         <GenerationReview
+          key={`${queue[0].model_id}-${queue.length}`}
           request={queue[0]}
           onClose={() => setQueue([])}
           onSubmitted={() => {
