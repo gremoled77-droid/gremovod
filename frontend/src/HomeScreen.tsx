@@ -11,6 +11,18 @@ type Budget = {
   daily_reserved_usd: number;
 };
 type Project = {id: string; title: string};
+type Media = {
+  id: string;
+  url: string;
+  thumbnail_url: string | null;
+  metadata?: {kind?: string; original_name?: string};
+};
+type Reel = 'video' | 'image' | 'audio';
+const REELS: {id: Reel; label: string}[] = [
+  {id: 'video', label: 'Видео'},
+  {id: 'image', label: 'Кадры'},
+  {id: 'audio', label: 'Звук'},
+];
 
 const STEPS: {mode: Mode; n: string; title: string; text: string}[] = [
   {mode: 'studio', n: '1', title: 'Идея', text: 'Задание ролика, шутка, сюжет'},
@@ -50,7 +62,11 @@ export default function HomeScreen({
   const {items} = useSharedActivity();
   const [budget, setBudget] = useState<Budget | null>(null);
   const [view, setView] = useState(-1);
-  const [images, setImages] = useState<{id: string; url: string; thumbnail_url: string | null}[]>([]);
+  const [images, setImages] = useState<Media[]>([]);
+  const [clips, setClips] = useState<Media[]>([]);
+  const [sounds, setSounds] = useState<Media[]>([]);
+  const [reel, setReel] = useState<Reel>('image');
+  const [playing, setPlaying] = useState('');
 
   useEffect(() => {
     if (!projectId) return;
@@ -63,7 +79,12 @@ export default function HomeScreen({
     if (!projectId) return;
     void apiFetch('/api/library?project_id=' + encodeURIComponent(projectId))
       .then(r => (r.ok ? r.json() : []))
-      .then(list => setImages(list.filter((a: any) => (a.metadata?.kind || 'image') === 'image').slice(0, 8)))
+      .then((list: Media[]) => {
+        const of = (kind: string) => list.filter(a => (a.metadata?.kind || 'image') === kind);
+        setImages(of('image').slice(0, 8));
+        setClips(of('video').slice(0, 12));
+        setSounds(of('audio').slice(0, 12));
+      })
       .catch(() => undefined);
   }, [projectId, items]);
 
@@ -160,19 +181,82 @@ export default function HomeScreen({
         </button>
       </header>
 
-      <div className="home-film" aria-label="Последние кадры">
-        <div className="home-perf" aria-hidden="true" />
-        <div className="home-frames">
-          {images.slice(0, 6).map((a, i) => (
-            <button key={a.id} onClick={() => setView(i)} aria-label={'Открыть кадр ' + (i + 1)}>
-              <img src={a.thumbnail_url || a.url} alt="" />
-              <span>{String(i + 1).padStart(2, '0')}</span>
+      <div className="home-film" aria-label="Плёнка проекта">
+        <div className="home-reels" role="tablist" aria-label="Что показать на плёнке">
+          {REELS.map(r => (
+            <button
+              key={r.id}
+              role="tab"
+              aria-selected={reel === r.id}
+              className={reel === r.id ? 'on' : ''}
+              onClick={() => {
+                setReel(r.id);
+                setPlaying('');
+              }}
+            >
+              {r.label}
+              <em>{r.id === 'video' ? clips.length : r.id === 'audio' ? sounds.length : images.length}</em>
             </button>
           ))}
-          {!images.length && (
-            <div className="home-frames-empty">Плёнка пуста. Первый кадр рождается на экране «Кадры».</div>
-          )}
         </div>
+        <div className="home-perf" aria-hidden="true" />
+        {reel === 'image' && (
+          <div className="home-frames">
+            {images.slice(0, 6).map((a, i) => (
+              <button key={a.id} onClick={() => setView(i)} aria-label={'Открыть кадр ' + (i + 1)}>
+                <img src={a.thumbnail_url || a.url} alt="" />
+                <span>{String(i + 1).padStart(2, '0')}</span>
+              </button>
+            ))}
+            {!images.length && (
+              <div className="home-frames-empty">Плёнка пуста. Первый кадр рождается на экране «Кадры».</div>
+            )}
+          </div>
+        )}
+        {reel === 'video' && (
+          <div className="home-frames">
+            {clips.map((a, i) => (
+              <div key={a.id} className="home-clip">
+                <video
+                  src={a.url}
+                  controls={playing === a.id}
+                  autoPlay={playing === a.id}
+                  preload="metadata"
+                  playsInline
+                />
+                {playing !== a.id && (
+                  <button
+                    className="home-play"
+                    aria-label={'Играть клип ' + (i + 1)}
+                    onClick={() => setPlaying(a.id)}
+                  >
+                    ▶
+                  </button>
+                )}
+                <span>{String(i + 1).padStart(2, '0')}</span>
+              </div>
+            ))}
+            {!clips.length && (
+              <div className="home-frames-empty">Клипов пока нет. Оживи кадр на экране «Видео».</div>
+            )}
+          </div>
+        )}
+        {reel === 'audio' && (
+          <div className="home-sounds">
+            {sounds.map((a, i) => (
+              <div key={a.id} className="home-sound">
+                <span className="home-sound-n">{String(i + 1).padStart(2, '0')}</span>
+                <b>{a.metadata?.original_name || 'Дорожка ' + (i + 1)}</b>
+                <audio src={a.url} controls preload="none" />
+              </div>
+            ))}
+            {!sounds.length && (
+              <div className="home-frames-empty">
+                Звука пока нет. Голос и музыка делаются на экране «Звук».
+              </div>
+            )}
+          </div>
+        )}
         <div className="home-perf" aria-hidden="true" />
       </div>
 
