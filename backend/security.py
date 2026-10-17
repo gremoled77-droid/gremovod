@@ -40,10 +40,35 @@ class BudgetLimits(BaseModel):
     daily_usd: float = Field(default=2, ge=0, le=1000, allow_inf_nan=False)
 
 
+def released(status, response):
+    """Резерв снимается только с заданий, которые точно ничего не стоили: провайдер отклонил заявку до создания
+    задачи (в ответе только detail) или сам сообщил списание 0 (PiAPI: meta.usage.consume). Всё неясное остаётся в резерве."""
+    if status not in {'failed', 'cancelled'}:
+        return False
+    try:
+        value = json.loads(response or '{}')
+    except (TypeError, ValueError):
+        return False
+    if not isinstance(value, dict):
+        return False
+    task = value.get('data')
+    if task is None:
+        return 'detail' in value and 'task_id' not in value
+    usage = ((task.get('meta') or {}).get('usage') or {}) if isinstance(task, dict) else {}
+    consume = usage.get('consume')
+    return isinstance(consume, (int, float)) and not isinstance(consume, bool) and consume == 0
+
+
+def reservations(db):
+    """Одобренные запуски, которые держат бюджет: без заданий, чей резерв уже снят."""
+    rows = db.execute('SELECT a.estimated_usd,j.project_id,j.created_at,j.status,j.response FROM generation_approvals a JOIN jobs j ON j.id=a.job_id').fetchall()
+    return [r for r in rows if not released(r['status'], r['response'])]
+
+
 def budget_state(db, project_id):
     config = db.execute('SELECT project_usd,daily_usd FROM spending_limits WHERE id=1').fetchone()
     today = datetime.now(MOSCOW).date().isoformat()
-    rows = db.execute('SELECT a.estimated_usd,j.project_id,j.created_at FROM generation_approvals a JOIN jobs j ON j.id=a.job_id').fetchall()
+    rows = reservations(db)
     project_used = sum(r['estimated_usd'] for r in rows if r['project_id'] == project_id)
     daily_used = sum(r['estimated_usd'] for r in rows if datetime.fromisoformat(r['created_at']).astimezone(MOSCOW).date().isoformat() == today)
     return {'project_limit_usd':config['project_usd'], 'daily_limit_usd':config['daily_usd'], 'project_reserved_usd':round(project_used,6), 'daily_reserved_usd':round(daily_used,6), 'day_moscow':today}
