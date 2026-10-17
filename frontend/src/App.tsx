@@ -1,4 +1,5 @@
 import ProductionStoryboard from './ProductionStoryboard';
+import StoryPlanBoard from './StoryPlanBoard';
 import CharacterReferences from './CharacterReferences';
 import SettingsPanel from './SettingsPanel';
 import StageFooter from './StageFooter';
@@ -2012,6 +2013,7 @@ function App() {
                 />
               ) : mode === 'studio' ? (
                 <>
+                  <StoryPlanBoard location={workspaceLocation} brief={state.brief} />
                   <div className="idea-layout">
                     <div className="idea-col">
                       <IdeaBrief
