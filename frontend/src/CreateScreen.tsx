@@ -21,6 +21,7 @@ import {
   type DirectorGroup,
 } from './directorPresets';
 import {appendBlock} from './visualPlan';
+import PriceTable from './PriceTable';
 
 type OptionSpec = {
   values?: (string | number)[];
@@ -985,6 +986,7 @@ function CreateScreenBody({projectId, heroes}: {projectId: string; heroes: Hero[
           <b>Модели</b>
         </div>
         {models.map(modelCard)}
+        <PriceTable specs={specs} labels={LABELS} models={ORDER} />
         <div className="cs-note">
           Перед отправкой покажу точную цену и попрошу подтверждение. Ручная попытка в ChatGPT стоит $0 по
           API.
