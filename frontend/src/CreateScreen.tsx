@@ -624,12 +624,10 @@ function CreateScreenBody({projectId, heroes}: {projectId: string; heroes: Hero[
   const results = items.filter(
     i => (i.kind === 'image' || i.kind === 'video') && i.status !== 'waiting_external'
   );
+  // Крутилка только у заданий, которые действительно в работе: отменённые и завершённые без файла её не получают.
   const pending = items.filter(
     i =>
-      i.status !== 'waiting_external' &&
-      i.status !== 'completed' &&
-      i.status !== 'succeeded' &&
-      i.status !== 'failed' &&
+      ['queued', 'running', 'processing', 'saving'].includes(i.status) &&
       (i.kind === 'image' || i.kind === 'video') &&
       !i.asset_ids.length
   );
