@@ -83,15 +83,15 @@ const COLUMN_X: Record<NodeKind, number> = {
   text: 40,
   reference: 40,
   file: 40,
-  llm: 330,
-  image: 620,
-  video: 900,
+  llm: 340,
+  image: 660,
+  video: 980,
   audio: 40,
 };
 function slot(kind: NodeKind, nodes: Node[]) {
   const x = COLUMN_X[kind];
   const below = nodes.filter(n => Math.abs(n.position.x - x) < 160).map(n => n.position.y);
-  return {x, y: below.length ? Math.max(...below) + 300 : 40};
+  return {x, y: below.length ? Math.max(...below) + 350 : 40};
 }
 async function json(r: Response) {
   const d = await r.json().catch(() => ({}));
