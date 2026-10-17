@@ -16,7 +16,7 @@ def check_budget(db,project_id,cost):
     limit=db.execute('SELECT limit_usd FROM production_series_limits WHERE series_id=?',(parent['parent_id'],)).fetchone()
     if not limit or limit['limit_usd'] is None:return
     owned=projects(db,parent['parent_id'])
-    reserved=sum(r['estimated_usd'] for r in db.execute('SELECT a.estimated_usd,j.project_id FROM generation_approvals a JOIN jobs j ON j.id=a.job_id') if r['project_id'] in owned)
+    from backend import security;reserved=sum(r['estimated_usd'] for r in security.reservations(db) if r['project_id'] in owned)
     from backend import llm_guard
     reserved+=llm_guard.summary(db,owned)['usd']
     if reserved+cost>limit['limit_usd']+1e-9:raise HTTPException(400,'Превышен общий бюджет серии. Измени лимит на доске раскадровки.')
@@ -50,7 +50,7 @@ def register(app,studio):
                 (id=? OR parent_id=? OR parent_id IN (SELECT id FROM production_nodes WHERE parent_id=?))''',(pid,sid,sid,sid))}
             recipients={r['id']:json.loads(r['request']).get('context',{}).get('entity',{}).get('node_id') for r in db.execute('SELECT id,request FROM native_chat_jobs')}
             limit=db.execute('SELECT limit_usd FROM production_series_limits WHERE series_id=?',(sid,)).fetchone()
-            reserved=sum(r['estimated_usd'] for r in db.execute('SELECT a.estimated_usd,j.project_id FROM generation_approvals a JOIN jobs j ON j.id=a.job_id') if r['project_id'] in owned)
+            from backend import security;reserved=sum(r['estimated_usd'] for r in security.reservations(db) if r['project_id'] in owned)
             from backend import llm_guard
             llm=llm_guard.summary(db,owned)
         jobs={}
