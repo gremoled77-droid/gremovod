@@ -58,6 +58,8 @@
 
 ## Где что лежит
 
+- [docs/SCREENWRITING_RESEARCH_2026-10-16.md](docs/SCREENWRITING_RESEARCH_2026-10-16.md) — исследование выбранных разделов девяти сценарных файлов, завершённое 17 октября. Новые навыки: `gremovod-series-development`, `gremovod-script-rewrite`, `gremovod-dialogue-subtext`; они дополняют маршруты восьми страниц. Локальная памятка применения: `output/gremovod-screenwriting/WORKFLOW_APPLICATION_v1.md`, не публикуется в Git. Полное чтение всех книг не заявляется.
+
 - [docs/COMEDY_CHARACTER_TOOLS_2026-10-16.md](docs/COMEDY_CHARACTER_TOOLS_2026-10-16.md) — рассмотренные разделы Каплана/Мартина и применение к юмористическому сериалу. Навыки `gremovod-character-comedy` и `gremovod-comedy-staging` подключаются из восьми страниц; [реестр книг](docs/BOOKS_STUDY_REGISTER_2026-10-16.md) отделяет чтение от извлечения текста. Персонажные примеры и предложения к канону остаются локально.
 
 - [docs/STAGE_SKILLS_2026-10-16.md](docs/STAGE_SKILLS_2026-10-16.md) — карта восьми страниц и их навыков `skills/gremovod-stage-*/`. Для творческого задания начинать с нужной страницы, затем читать связанные тематические навыки. Первый этап Макки: `gremovod-world-design`, `gremovod-character-dramaturgy` и дополнения нарратива/сценария; границы изучения в `docs/MCKEE_STORY_FOUNDATION_2026-10-16.md`. Код автоматического подключения к страницам этим пакетом не меняется.
