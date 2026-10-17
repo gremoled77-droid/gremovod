@@ -142,3 +142,7 @@
     grid-template-columns: 1fr 1fr;
   }
 }
+.vp-form .cinema-info-body {
+  left: 0;
+  right: auto;
+}

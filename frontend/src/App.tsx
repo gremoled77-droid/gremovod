@@ -1835,6 +1835,7 @@ function App() {
                   <section className="panel world-bible">
                     <div className="panel-title">
                       <h2>Библия мира</h2>
+                      <CinemaInfo topic="world" />
                       <Palette size={22} />
                     </div>
                     <p className="muted">
