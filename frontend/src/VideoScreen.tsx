@@ -7,6 +7,7 @@ import CameraFramePanel from './CameraFramePanel';
 import GenerationReview, {type GenerationRequest} from './GenerationReview';
 import {AddReferenceModal, LibraryPickModal, LocationModal} from './FrameSources';
 import {cents, price} from './PriceTable';
+import {loadVideoDraft, saveVideoDraft} from './videoDraft';
 
 type OptionSpec = {values?: (string | number)[]; default?: string | number; min?: number; max?: number};
 type Spec = {
@@ -40,24 +41,6 @@ const LABELS: Record<string, string> = {
 const ORDER = Object.keys(LABELS);
 const PROVIDERS: Record<string, string> = {piapi: 'PiAPI'};
 const MOVE_ONLY = ['move' as const];
-const draftKey = (projectId: string) => `studio:video-draft:v1:${projectId}`;
-
-type Draft = {
-  prompt: string;
-  base: string;
-  refs: string[];
-  model: string;
-  values: Record<string, string | number>;
-};
-
-function loadDraft(projectId: string): Partial<Draft> {
-  try {
-    return JSON.parse(localStorage.getItem(draftKey(projectId)) || '{}') as Partial<Draft>;
-  } catch {
-    return {};
-  }
-}
-
 async function json(r: Response) {
   const d = await r.json().catch(() => ({}));
   if (!r.ok) throw Error(typeof d.detail === 'string' ? d.detail : 'Запрос не выполнен');
@@ -81,7 +64,7 @@ export default function VideoScreen(props: {projectId: string; world?: string}) 
 }
 
 function VideoScreenBody({projectId, world = ''}: {projectId: string; world?: string}) {
-  const [restored] = useState(() => loadDraft(projectId));
+  const [restored] = useState(() => loadVideoDraft(projectId));
   const {items, error: feedError, reset} = useSharedActivity();
   const [specs, setSpecs] = useState<Record<string, Spec>>({});
   const [library, setLibrary] = useState<LibAsset[]>([]);
@@ -98,11 +81,7 @@ function VideoScreenBody({projectId, world = ''}: {projectId: string; world?: st
   const [cost, setCost] = useState<number | null>(null);
 
   useEffect(() => {
-    try {
-      localStorage.setItem(draftKey(projectId), JSON.stringify({prompt, base, refs, model, values}));
-    } catch {
-      /* без черновика экран работает */
-    }
+    saveVideoDraft(projectId, {prompt, base, refs, model, values});
   }, [projectId, prompt, base, refs, model, values]);
 
   const loadLibrary = async () => {
