@@ -162,7 +162,11 @@ for _base, _prices in (('seedream-5-lite', {'2K':0.065,'3K':0.065}), ('seedream-
 # --- поэтому при втором API-сервисе достаточно добавить его ключ и ссылки; код экрана не меняется.
 # --- Ссылки на страницы моделей владелец даст позже: пока берём только адреса docs на домене провайдера.
 PROVIDER_HOSTS = {'piapi': 'piapi.ai'}
-PAGE_URLS = {}  # {model_id: {provider: url}}: явные ссылки имеют приоритет над docs
+PAGE_URLS = {  # {model_id: {provider: url}}: явные ссылки имеют приоритет над docs
+    'gpt-image-2': {'piapi': 'https://piapi.ai/gpt-images-2-0'},
+    # Страницы GPT Image 2.5 и Qwen Image 2.1 у PiAPI не найдены: у Qwen — общая страница qwen-image (про 2.1 на ней не сказано).
+    'qwen-image-2.1': {'piapi': 'https://piapi.ai/qwen-image'},
+}
 for _id, _spec in MODEL_SPECS.items():
     _spec.setdefault('provider', 'piapi')
     _urls = dict(PAGE_URLS.get(_id, {}))
