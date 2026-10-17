@@ -21,7 +21,7 @@ import {
   type DirectorGroup,
 } from './directorPresets';
 import {appendBlock} from './visualPlan';
-import PriceTable, {cents, useOptionPrices} from './PriceTable';
+import PriceTable, {cents, useModelRange, useOptionPrices} from './PriceTable';
 
 type OptionSpec = {
   values?: (string | number)[];
@@ -50,13 +50,27 @@ type Hero = {id: string; name: string; assetId?: string};
 
 const LABELS: Record<string, string> = {
   'seedream-5-pro': 'Seedream 5 Pro',
-  'seedream-5-lite': 'Seedream 5 Fast',
+  'seedream-5-lite': 'Seedream 5 Lite',
+  'seedream-5-lite-less-restriction': 'Seedream 5 Lite · less restriction',
+  'seedream-5-pro-less-restriction': 'Seedream 5 Pro · less restriction',
   'gpt-image-2': 'GPT Image 2.0',
   'gpt-image-2.5': 'GPT Image 2.5',
   'nano-banana-2.1': 'Nano Banana 2.1',
   'qwen-image-2.1': 'Qwen Image 2.1',
 };
-const ORDER = Object.keys(LABELS);
+/** Модели, у которых в карточке можно выбрать вариант; остальные id из LABELS показываются отдельными боксами. */
+const FAMILIES: Record<string, string[]> = {
+  'seedream-5-pro': ['seedream-5-pro', 'seedream-5-pro-less-restriction'],
+  'seedream-5-lite': ['seedream-5-lite', 'seedream-5-lite-less-restriction'],
+};
+const MEMBERS = new Set(Object.values(FAMILIES).flat());
+const ORDER = Object.keys(LABELS).filter(id => !MEMBERS.has(id) || id in FAMILIES);
+const VARIANT_NAMES: Record<string, string> = {
+  'seedream-5-pro': 'Pro',
+  'seedream-5-pro-less-restriction': 'Pro · less restriction',
+  'seedream-5-lite': 'Lite',
+  'seedream-5-lite-less-restriction': 'Lite · less restriction',
+};
 /** Названия API-сервисов; новый сервис добавляется сюда и в каталог бэкенда (provider, page_urls). */
 const PROVIDERS: Record<string, string> = {piapi: 'PiAPI'};
 
@@ -93,6 +107,12 @@ function ModelInfo({spec}: {spec: Spec}) {
   );
 }
 
+/** Цена или диапазон цен в заголовке бокса: видна, даже когда модель выключена. */
+function ModelRange({id, schema}: {id: string; schema: Record<string, OptionSpec> | undefined}) {
+  const range = useModelRange(id, schema);
+  return range ? <> · {range}</> : null;
+}
+
 function ModelOptions({
   id,
   schema,
@@ -105,8 +125,16 @@ function ModelOptions({
   onChange: (key: string, value: string | number) => void;
 }) {
   const prices = useOptionPrices(id, schema, current);
+  const priced = ['variant', 'quality', 'size', 'resolution'].some(k => schema[k]?.values);
+  const flat = useModelRange(id, schema);
   return (
     <div className="cs-model-opts">
+      {!priced && flat && (
+        <label>
+          <span>цена за картинку</span>
+          <b className="cs-flat-price">{flat}</b>
+        </label>
+      )}
       {Object.entries(schema).map(([key, sp]) => (
         <label key={key}>
           <span>{key}</span>
@@ -181,6 +209,7 @@ function CreateScreenBody({projectId, heroes}: {projectId: string; heroes: Hero[
     }
   }
   const [selected, setSelected] = useState<string[]>(restored.selected);
+  const [pick, setPick] = useState<Record<string, string>>({});
   const [options, setOptions] = useState<Record<string, Record<string, string | number>>>(restored.options);
   const [refs, setRefs] = useState<string[]>(restored.refs);
   const [queue, setQueue] = useState<GenerationRequest[]>([]);
@@ -627,9 +656,15 @@ function CreateScreenBody({projectId, heroes}: {projectId: string; heroes: Hero[
     });
   };
 
-  const modelCard = (id: string) => {
+  const modelCard = (base: string) => {
+    const family = FAMILIES[base];
+    const id = family ? (family.find(m => selected.includes(m)) ?? pick[base] ?? base) : base;
     const on = selected.includes(id);
     const o = specs[id]?.options;
+    const choose = (next: string) => {
+      setPick(p => ({...p, [base]: next}));
+      setSelected(s => s.map(x => (x === id ? next : x)));
+    };
     return (
       <div key={id} className={'cs-model' + (on ? ' on' : '')}>
         <div
@@ -653,10 +688,26 @@ function CreateScreenBody({projectId, heroes}: {projectId: string; heroes: Hero[
             <small>
               {PROVIDERS[specs[id].provider || 'piapi'] || specs[id].provider}
               {specs[id].launch_enabled === false ? ' · проверяется' : ''}
+              <ModelRange id={id} schema={specs[id].options} />
             </small>
           </span>
           <em>{on ? 'вкл' : 'выкл'}</em>
         </div>
+        {on && family && (
+          <label className="cs-variant">
+            <span>модель</span>
+            <select value={id} onChange={e => choose(e.target.value)}>
+              {family
+                .filter(m => specs[m])
+                .map(m => (
+                  <option key={m} value={m}>
+                    {VARIANT_NAMES[m] || m}
+                    {specs[m].launch_enabled === false ? ' · не проверена' : ''}
+                  </option>
+                ))}
+            </select>
+          </label>
+        )}
         {on && o && (
           <ModelOptions
             id={id}
@@ -1058,7 +1109,7 @@ function CreateScreenBody({projectId, heroes}: {projectId: string; heroes: Hero[
           <b>Модели</b>
         </div>
         {models.map(modelCard)}
-        <PriceTable specs={specs} labels={LABELS} models={ORDER} />
+        <PriceTable specs={specs} labels={LABELS} models={Object.keys(LABELS)} />
         <div className="cs-note">
           Перед отправкой покажу точную цену и попрошу подтверждение. Ручная попытка в ChatGPT стоит $0 по
           API.

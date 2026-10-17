@@ -708,3 +708,26 @@ a.cs-info:hover {
   opacity: 0.35;
   cursor: help;
 }
+
+/* Выбор варианта модели внутри бокса (Seedream Lite / Pro и их less restriction) */
+.cs-variant {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px 3px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.cs-variant select {
+  height: 28px;
+  min-height: 0;
+  padding: 0 24px 0 8px;
+  font-size: 12px;
+  max-width: 170px;
+  border-radius: 8px;
+}
+.cs-flat-price {
+  color: var(--text);
+  font-weight: 600;
+}

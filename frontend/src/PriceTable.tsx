@@ -78,6 +78,32 @@ export function useOptionPrices(
   return prices;
 }
 
+/** Диапазон цен модели по всем размерам, качествам и вариантам: «0,4–6 ¢» или одна цена, как у Qwen. */
+export function useModelRange(model: string, schema: Record<string, Rule> | undefined) {
+  const [range, setRange] = useState('');
+  useEffect(() => {
+    let live = true;
+    void (async () => {
+      const dims = PRICE_KEYS.filter(k => schema?.[k]?.values?.length).map(
+        k => [k, schema![k].values!] as [string, (string | number)[]]
+      );
+      const found: number[] = [];
+      for (const o of combos(dims)) {
+        const p = await price(model, o);
+        if (p !== null) found.push(p);
+      }
+      if (!live || !found.length) return;
+      const lo = Math.min(...found);
+      const hi = Math.max(...found);
+      setRange(lo === hi ? cents(lo) : cents(lo).replace(' ¢', '') + '–' + cents(hi));
+    })();
+    return () => {
+      live = false;
+    };
+  }, [model, schema]);
+  return range;
+}
+
 /** Цены за одну картинку по каждой модели, размеру и качеству. Считает сервер по тем же формулам, что и оценка перед запуском; сети не трогает. */
 export default function PriceTable({
   specs,

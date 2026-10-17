@@ -66,7 +66,7 @@ const STATUS_LABEL: Record<string, string> = {
   error: 'ошибка',
 };
 const IMAGE_MODELS: Record<string, string> = {
-  'seedream-5-lite': 'Seedream 5 Fast',
+  'seedream-5-lite': 'Seedream 5 Lite',
   'seedream-5-pro': 'Seedream 5 Pro',
   'gpt-image-2': 'GPT Image 2.0',
   'gpt-image-2.5': 'GPT Image 2.5',
