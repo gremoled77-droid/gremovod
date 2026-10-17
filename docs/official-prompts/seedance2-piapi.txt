@@ -1,0 +1,1028 @@
+Seedance 2 - Seedance API - PiAPI docs
+PiAPI
+Home
+Workspace
+Home
+Workspace
+Seedance
+Copy Page
+Get Started
+Overview
+Quickstart
+Make Instruction: How to Use PiAPI to Build a Workflow on Make?
+Endpoints
+Seedance
+Less-Restriction Models Guide
+Private Asset Library
+Seedance 2.5
+POST
+Seedance 2
+POST
+Video Watermark Remover
+POST
+Get task
+GET
+Seedream
+Seedream 5
+Get Task
+Byteaudio
+Seed-audio
+Get Task
+Kling
+Lipsync With PiAPI Kling API Examples
+Motion Brush With PiAPI Kling API Example
+Kling Elements Video Generation API
+Kling Effects Video Generation
+Cancel Task
+Cancel Task
+Cancel Tasks
+Get Task
+Create Task
+Kling Virtual Try-On
+Kling Effects
+Kling Sound
+Kling Avatar
+Kling Motion Control
+Kling Turbo
+Kling 3.0
+Kling omni
+Kling o1
+Kling 3.0 omni
+Get Task
+Minimax
+Generate Video
+MiniMax Speech
+MiniMax Image
+Get Task
+Sora2
+Sora2-preview Text to Video
+Sora2 Text to Video
+Sora2-Pro Text to Video
+Sora2 Remove Watermark
+Get task
+Tools
+File Upload API
+Remove Background API
+Remove Background-Get Task
+Segment With Prompt API
+Segment With Prompt API-Get Task
+Image Upscale(Super Resolution) API
+Image Upscale-Get Task
+Video Upscale
+Video Upscale-Get Task
+Video Remove Background
+Video Remove Background-Get task
+Video Remove Subtitle
+Video Remove Subtitle-Get task
+Skin Tokens
+Skin Tokens-Get task
+Gemini
+Gemini-2.5-flash-image
+Nano Banana Pro
+Nano Banana 2
+Get task
+GPT image
+GPT-image API
+LLM
+How To Avoid Timeouts in Completion API
+LLM API | Basic Completions
+Omni Human
+OmniHuman 1.5
+Get task
+Flux
+Flux with LoRA and Controlnet
+Available LoRA and Controlnet
+Flux API with Redux Variation, Fill, Inpaint and Outpaint
+Create Task
+Text to Image
+Image to Image
+Kontext
+Get task
+Qwen Image
+Text to Image
+Image Edit
+Get task
+Z-Image
+Text to Image
+Get task
+Faceswap
+Multi Faceswap
+Image Faceswap
+Video Faceswap
+Get Task
+WanX
+Generate WanX Task with LoRA Using PiAPI
+Available LoRA Types for Wanx
+Use Cases for Wanx LoRA
+Use Cases for Wanx Control Camera
+Create Task
+Get Task
+Wan
+Wan2.6 Text to Video
+Wan2.6 Image to Video
+Get task
+Hailuo
+Generate Video
+Get Task
+Veo3
+Veo3 Text to Video
+Veo3 Image to Video
+Veo3.1 Text to Video
+Veo3.1 Image to Video
+Get task
+Skyreels
+Create Task
+Get Task
+Framepack
+Create Task
+Get Task
+Hunyuan Video
+How to Make a Hunyuan API Call
+Available Hunyuan Lora models
+Get Task
+Generate Video
+Luma Dream Machine
+Create Task
+Get Task
+Suno(service stopped)
+Music(service stopped)
+Lyrics(service stopped)
+Get task
+Song(Udio)
+Song API Task Creation Examples
+[Udio] Song Extend
+Get Task
+Create Task
+[Udio] Generate Lyrics
+Mmaudio
+Get Task
+Generate Audio
+DiffRhythm
+Generate Audio
+Get Task
+Ace Step
+Create Task
+Text to Audio
+Audio to Audio
+Audio Edit
+Audio Extend
+Get Task
+TTS
+Zeroshot Text-to-Speech F5-TTS
+Get Task
+Trellis
+Trellis Create Task
+Trellis2 Create Task
+Get Task
+Meshy
+Meshy Create Task
+Get Task
+Pixal3D
+Pixal3D Create Task
+Get Task
+Joycaption
+Image Caption
+Get Task
+Midjourney
+PiAPI Penalties on Midjourney Usage
+Detailed Explaination on Midjourney Task Result
+Midjourney V7 API Instructions
+Create Task
+Imagine
+Upscale
+Variation
+Reroll
+Describe
+Seed
+Blend
+Inpaint
+Outpaint
+Pan
+Cancel Task
+Cancel Task
+Cancel Tasks
+Get Task
+AI Hug
+Get Task
+Create Task
+PiAPI Account Management
+PiAPI Account Info
+Task List Info
+User Task History
+Resources
+Change Log
+Output Storage
+Unified API Schema
+Webhook
+Bulk Generation Service
+Billings
+PiAPI MCP Server
+Workspace Manual
+Host-your-account (HYA) | Back-up Account
+Host-your-account (HYA) | Debug Checklist
+Host-your-account (HYA) | Connected Account Status
+Announcements
+PiAPI 2025 January 1st Pricing Update
+The discontinued support for midjourney
+Sunsetting Suno
+Schemas
+Schemas
+motion brush
+Create Task
+camera control
+Cancel Params
+Float2 Point
+Control Points
+txt2video-1.3b
+txt2video-14b
+txt2video-14b-lora
+img2video-14b
+img2video-14b-lora
+img2video-14b-keyframe
+img2video-14b-control-camera
+wan22-txt2video-14b
+wan22-img2video-14b
+hunyuan-txt2video-lora
+Trellis API/text-to-3D
+Trellis API/image-to-3D
+Trellis2 API/image-to-3D
+Kling omni multi shot
+VideoGenerationRequest
+TaskRequest
+TaskConfig
+TaskInput
+TaskResponse
+ErrorResponse
+Response
+Unified-Task-Response
+RequestBodies
+Unified-Task-Request-Body
+config
+control_net_setting
+lora_setting
+VideoGenerationResponse
+Pixal3D API/image-to-3D
+Seedance
+Copy Page
+Seedance 2
+POST
+https://api.piapi.ai
+/api/v1/task
+Try it
+Overview
+#
+Seedance 2.0 provides high-quality video generation from text prompts, with multiple modes supporting text-to-video, first/last frame control, and multi-modal omni references (images / videos / audio). This document describes the available models, pricing, modes, usage guidelines, and the syntax for referencing media in your prompts.
+Currently available models
+#
+Three tiers. Each tier has a standard (strict moderation) variant and a less-restriction variant:
+Model
+Tier
+Content moderation
+seedance-2
+Pro, higher quality
+Strict, SFW
+seedance-2-fast
+Fast, lower cost
+Strict, SFW
+seedance-2-mini
+Mini, lowest cost
+Strict, SFW
+seedance-2-less-restriction
+Pro
+Less restrictive, NSFW
+seedance-2-fast-less-restriction
+Fast
+Less restrictive, NSFW
+seedance-2-mini-less-restriction
+Mini
+Less restrictive, NSFW
+The
+-less-restriction
+variants apply a more permissive content review. They accept exactly the same input schema as the strict variants but bill at a +10% markup (see Pricing). They are not retried on content rejection — see Content Moderation below.
+Deprecated task types (auto-redirected)
+#
+The following legacy task types continue to be accepted for backwards compatibility and are silently redirected to the strict formal models. Please migrate to the active models above:
+Deprecated task type
+Now equivalent to
+seedance-2-preview
+seedance-2
+seedance-2-fast-preview
+seedance-2-fast
+seedance-2-preview-vip
+seedance-2
+seedance-2-fast-preview-vip
+seedance-2-fast
+Existing clients sending the deprecated task types will continue to work without code changes. Note that the formal models default to 480p resolution; if you previously relied on the preview-vip default of 720p, pass
+resolution: "720p"
+explicitly to preserve output quality.
+Pricing
+#
+Price per second(USD)
+Limited-time promotion:
+Seedance 2.0 Fast and Mini prices below are temporarily discounted and remain in effect until further notice.
+Model
+480p
+720 p
+1080p
+seedance-2
+$0.10
+$0.20
+$0.50
+seedance-2-fast
+$0.048
+$0.096
+seedance-2-mini
+$0.042
+$0.084
+seedance-2-less-restriction
+$0.11
+$0.22
+$0.55
+seedance-2-fast-less-restriction
+$0.053
+$0.106
+seedance-2-mini-less-restriction
+$0.046
+$0.092
+The
+-less-restriction
+variants are priced at an
+approximately +10% markup
+, rounded to the listed per-second rate, over the matching strict tier and resolution.
+seedance-2-fast
+/
+seedance-2-fast-less-restriction
+/
+seedance-2-mini
+/
+seedance-2-mini-less-restriction
+do
+not
+support 1080p output.
+Cost calculation:
+Without input videos:
+credits = unit_price × output_duration
+With input videos:
+credits = unit_price × output_duration + (unit_price / 2) × total_input_video_duration
+Duration Limits
+#
+Maximum output duration:
+15 seconds
+(API enforces integer 4–15).
+Maximum total input video duration:
+15.4 seconds
+(sum of all reference videos).
+Modes
+#
+The
+mode
+parameter determines how references are used and which parameters take effect.
+mode
+is
+optional
+— when omitted, it is automatically inferred from the input:
+No references →
+text_to_video
+1–2 images only (no videos, no audios) →
+first_last_frames
+Any other combination of references →
+omni_reference
+You may also pass
+mode
+explicitly to enforce strict validation.
+text_to_video
+#
+Pure text-to-video generation. No references accepted.
+duration
+: user-controlled (4–15s)
+aspect_ratio
+: user-controlled (6 options)
+first_last_frames
+#
+Use 1–2 images as the first and/or last frame of the generated video.
+image_urls
+: 1–2 images required. Only images accepted — video and audio URLs are rejected.
+duration
+: user-controlled (4–15s)
+aspect_ratio
+: user-controlled (6 options), or
+auto
+to derive from the first image
+Supported image formats: jpg, jpeg, png, webp, bmp
+omni_reference
+#
+Use 1–15 mixed references (images, videos, audio) for flexible multi-modal generation.
+image_urls
+: optional, up to 9 images as style/content references
+video_urls
+: optional, up to 3 videos as motion/style references (formats: mp4, mov; maximum file size 100 MB)
+audio_urls
+: optional, up to 3 audio references as soundtrack (mp3/wav only,
+must be ≤15 seconds total
+)
+duration
+: user-controlled (4–15s)
+aspect_ratio
+: user-controlled (6 options)
+Audio-only is not allowed
+— at least one image or video reference must be provided alongside audio.
+Total references (images + videos + audios) must be between 1 and 15.
+Supported on all six task types including
+seedance-2-mini
+/
+seedance-2-mini-less-restriction
+(Mini supports the same reference-to-video capability as Pro and Fast).
+Important Notes & Special Cases
+#
+Parameter behavior by mode
+#
+Parameter
+text_to_video
+first_last_frames
+omni_reference
+duration
+User input (4–15)
+User input (4–15)
+User input (4–15)
+aspect_ratio
+User input (6 options)
+User input or
+auto
+(from image)
+User input (6 options)
+image_urls
+Not allowed
+1–2 required
+optional (maximum 9)
+video_urls
+Not allowed
+Not allowed
+optional (maximum 3)
+audio_urls
+Not allowed
+Not allowed
+optional (maximum 3)
+Aspect ratio
+#
+Supported values:
+21:9
+,
+16:9
+,
+4:3
+,
+1:1
+,
+3:4
+,
+9:16
+. The value
+auto
+is only available in
+first_last_frames
+mode (derives from the first image).
+Default:
+16:9
+(
+auto
+becomes
+16:9
+if no image is provided).
+Duration
+#
+Range: 4 to 15 seconds (any integer).
+Default: 5 seconds (when omitted or out of range).
+Resolution
+#
+Supported values:
+480p
+,
+720p
+,
+1080p
+.
+Default:
+480p
+for Pro and Fast tiers;
+720p
+for Mini tiers
+(
+seedance-2-mini
+/
+seedance-2-mini-less-restriction
+) — Mini's quality at 480p is the lowest in the lineup, so the default leans toward 720p.
+1080p
+is not supported on the
+seedance-2-fast
+/
+seedance-2-fast-less-restriction
+/
+seedance-2-mini
+/
+seedance-2-mini-less-restriction
+tiers.
+Audio constraints
+#
+Audio references are only accepted in
+omni_reference
+mode.
+Supported formats:
+mp3
+,
+wav
+only.
+Maximum total audio duration:
+15 seconds
+. The upstream silently rejects longer audio (the upload will time out with no explicit error message); the API pre-validates duration to surface this early.
+Audio-only submissions are rejected — at least one image or video must accompany any audio references.
+Content moderation
+#
+All models apply content moderation. Submissions found to contain disallowed content are rejected and your credits are refunded.
+seedance-2
+/
+seedance-2-fast
+(strict)
+: on a content rejection, the task may be retried once via an alternate review path that typically resolves prompts flagged for style / advertising / character intent.
+seedance-2-mini
+(strict)
+: same retry behavior as Pro and Fast strict, but limited to plain text-to-video at 720p. Mini requests at 480p, or with reference videos / audios, have no retry path — a content rejection is final and credits are refunded.
+seedance-2-less-restriction
+/
+seedance-2-fast-less-restriction
+/
+seedance-2-mini-less-restriction
+: the primary review is itself less restrictive, and there is
+no further retry
+on rejection — a rejection is final, your credits are refunded, and the task ends with a content-violation error.
+Peak hours
+#
+From 09:00 to 15:00 GMT, Seedance experiences high traffic. Queue times may extend to several hours during this period.
+Using References in Prompts
+#
+When you include references, you can mention them in the prompt using
+@
+-syntax.
+Syntax
+#
+@image1
+,
+@image2
+, … — reference images by position in
+image_urls
+(1-based)
+@video1
+,
+@video2
+, … — reference videos by position in
+video_urls
+(1-based)
+@audio1
+,
+@audio2
+, … — reference audios by position in
+audio_urls
+(1-based)
+Chinese format also supported:
+@图片1
+,
+@视频1
+,
+@音频1
+(with or without
+_
+between the type and the number)
+Examples
+#
+Single image
+#
+The cat in @image1 walks through a garden
+Image + video + audio
+#
+Apply @image1 artistic style with @video1 motion and @audio1 soundtrack
+Morphing
+#
+@image1 transforms into @image2
+Validation
+#
+If your prompt references a material that was not provided (e.g.
+@image3
+but only 2 images supplied), the request is rejected with a descriptive error message. The same applies to
+@videoN
+and
+@audioN
+.
+Using Private Assets
+#
+The Private Asset Library lets you reference uploaded characters, products, scenes, or audio across tasks instead of re-fetching the same URL every time. It also unlocks a one-call submission flow where the service uploads your inputs for you.
+Available on
+-less-restriction
+models only. Strict variants do not accept asset references — they will reject the request with HTTP 422.
+Two modes
+#
+Mode
+How you reference inputs
+When to use
+Manual
+Upload to the library once (see
+Private Asset Library guide
+), then pass
+asset://<asset_id>
+strings in
+image_urls
+/
+video_urls
+/
+audio_urls
+.
+A stable cast / product library reused across many tasks. The asset is pre-vetted once and referenced for free thereafter.
+Auto-upload
+Set
+auto_upload_assets: true
+and pass raw URLs as you would normally. The service uploads each non-
+asset://
+URL as an ephemeral asset, runs the task, and cleans up afterwards.
+Each task uses fresh references (on-demand user content, throwaway avatars). No manual upload / delete bookkeeping.
+Both modes can be
+mixed in the same request
+. Explicit
+asset://
+items pass through untouched while raw URLs are auto-ingested.
+Quick reference — auto-upload
+#
+{
+"model"
+:
+"seedance"
+,
+"task_type"
+:
+"seedance-2-fast-less-restriction"
+,
+"input"
+:
+{
+"prompt"
+:
+"A cinematic 5-second scene blending Image 1 and Image 2"
+,
+"image_urls"
+:
+[
+"https://your-cdn.com/character-a.png"
+,
+"https://your-cdn.com/character-b.png"
+]
+,
+"auto_upload_assets"
+:
+true
+,
+"asset_retention_hours"
+:
+3
+,
+"aspect_ratio"
+:
+"16:9"
+,
+"duration"
+:
+5
+,
+"resolution"
+:
+"720p"
+}
+}
+The task starts with a brief ingestion phase (typically 30–90 s for the first reference) before generation begins.
+Quick reference — manual + mixed
+#
+{
+"model"
+:
+"seedance"
+,
+"task_type"
+:
+"seedance-2-fast-less-restriction"
+,
+"input"
+:
+{
+"prompt"
+:
+"Image 1 walks through Image 2 at sunset"
+,
+"image_urls"
+:
+[
+"asset://asset-20260608154633-rv7g2"
+,
+"https://your-cdn.com/scene-today.png"
+]
+,
+"auto_upload_assets"
+:
+true
+,
+"aspect_ratio"
+:
+"16:9"
+,
+"duration"
+:
+5
+}
+}
+The
+asset://
+item is referenced as-is; the raw URL becomes an ephemeral asset for this task only.
+Things to know
+#
+The two ephemeral parameters (
+auto_upload_assets
+,
+asset_retention_hours
+) are
+ignored on strict task types
+— strict requests with raw URLs continue to behave exactly as before.
+Strict task types
+reject
+any
+asset://
+reference (HTTP 422). Switch to a
+-less-restriction
+variant if you need asset references.
+Ephemeral assets do not consume your manual per-plan quota — they use a separate per-plan concurrency cap. See the
+Private Asset Library guide
+for the full lifecycle, quotas, and error codes.
+Tips
+#
+Use publicly accessible URLs (e.g. hosted on a CDN or cloud storage). Signed / expiring URLs may fail.
+Keep input videos short (5–15 seconds) for best results.
+Describe the desired output clearly in your prompt.
+Request
+Header Params
+Generate Code
+Body Params
+application/json
+Generate Code
+Examples
+text to video
+first & last frames
+omni reference (video with @mention)
+{
+"model"
+:
+"seedance"
+,
+"task_type"
+:
+"seedance-2-fast"
+,
+"input"
+:
+{
+"prompt"
+:
+"A woman sings and strums her guitar"
+,
+"mode"
+:
+"text_to_video"
+,
+"duration"
+:
+5
+,
+"aspect_ratio"
+:
+"16:9"
+}
+,
+"config"
+:
+{
+"webhook_config"
+:
+{
+"endpoint"
+:
+"https://your-webhook-endpoint.example.com/callback"
+,
+"secret"
+:
+""
+}
+}
+}
+Request Code Samples
+Shell
+JavaScript
+Java
+Swift
+Go
+PHP
+Python
+HTTP
+C
+C#
+Objective-C
+Ruby
+OCaml
+Dart
+R
+Request
+Request Example
+Shell
+JavaScript
+Java
+Swift
+cURL
+text to video
+first & last frames
+omni reference (video with @mention)
+curl
+--location
+'https://api.piapi.ai/api/v1/task'
+\
+--header
+'X-API-Key;'
+\
+--header
+'Content-Type: application/json'
+\
+--data
+'{
+    "model": "seedance",
+    "task_type": "seedance-2-fast",
+    "input": {
+        "prompt": "A woman sings and strums her guitar",
+        "mode": "text_to_video",
+        "duration": 5,
+        "aspect_ratio": "16:9"
+    },
+    "config": {
+        "webhook_config": {
+            "endpoint": "https://your-webhook-endpoint.example.com/callback",
+            "secret": ""
+        }
+    }
+}'
+Responses
+🟢
+200
+Success
+application/json
+Generate Code
+Body
+application/json
+Generate Code
+Examples
+Task created (pending)
+Completed
+{
+"code"
+:
+200
+,
+"data"
+:
+{
+"task_id"
+:
+"07ed43de-465d-43b1-b62c-44249b14d818"
+,
+"model"
+:
+"seedance"
+,
+"task_type"
+:
+"seedance-2-fast"
+,
+"status"
+:
+"pending"
+,
+"config"
+:
+{
+"service_mode"
+:
+""
+,
+"webhook_config"
+:
+{
+"endpoint"
+:
+""
+,
+"secret"
+:
+""
+}
+}
+,
+"input"
+:
+{
+"prompt"
+:
+"A woman sings and strums her guitar"
+,
+"mode"
+:
+"text_to_video"
+,
+"duration"
+:
+5
+,
+"aspect_ratio"
+:
+"16:9"
+}
+,
+"output"
+:
+null
+,
+"meta"
+:
+{
+"created_at"
+:
+"2026-04-05T13:33:26.10346684Z"
+,
+"started_at"
+:
+"0001-01-01T00:00:00Z"
+,
+"ended_at"
+:
+"0001-01-01T00:00:00Z"
+,
+"usage"
+:
+{
+"type"
+:
+"point"
+,
+"frozen"
+:
+4000000
+,
+"consume"
+:
+0
+}
+,
+"is_using_private_pool"
+:
+false
+}
+,
+"detail"
+:
+null
+,
+"logs"
+:
+[
+]
+,
+"error"
+:
+{
+"code"
+:
+0
+,
+"raw_message"
+:
+""
+,
+"message"
+:
+""
+,
+"detail"
+:
+null
+}
+}
+,
+"message"
+:
+"success"
+}
+Modified at
+2026-09-17 02:40:05
+Previous
+Seedance 2.5
+Next
+Video Watermark Remover
+LLMs.txt

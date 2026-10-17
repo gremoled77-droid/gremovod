@@ -61,7 +61,9 @@
 - `TODO.md` — список пожеланий и задач (актуальный). `CHANGES.md` — история версий (сейчас 0.3.0).
 - `docs/` — решения и проверки: `PIAPI_MODELS_2026-10-16.md` (каталог и живые тесты), `CLOUD_DEPLOY.md` (Docker/Caddy, не проверялся на сервере), `TECHNICAL_SPEC.md`, `ARCHITECTURE_PLAN_2026-10-16.md`.
 - `skills/gremovod-screenplay/` — формат сценария для ChatGPT.
-- `skills/cinema-*/` — пять навыков по киноязыку (нарратив и жанр, мизансцена, камера, монтаж, звук) по Lewis «Essential Cinema». Контекст и статус значков «I» в интерфейсе: `docs/CINEMA_KNOWLEDGE_2026-10-16.md`.
+- `skills/cinema-*/` — навыки по киноязыку: пять по Lewis «Essential Cinema» (нарратив и жанр, мизансцена, камера, монтаж, звук), `cinema-visual-structure` (Block) и по Mercado «The Filmmaker's Eye» — `cinema-image-system` (идея, мир), `cinema-character-framing` (персонажи), `cinema-composition`, `cinema-lens-language`, а `cinema-shot-design` сводит их в порядок решений по карточке кадра. Контекст и статус значков «I» в интерфейсе: `docs/CINEMA_KNOWLEDGE_2026-10-16.md`; выжимка Mercado: `docs/MERCADO_FILMMAKERS_EYE_2026-10-16.md`.
+- `skills/cinema-five-pillars/` — пять столпов киноязыка (Practice Ai), чек-лист из 5 вопросов и формула кадра. **Обращаться к нему, когда разбираем написание промптов в ChatGPT для создания кадров**: связан с `backend/prompt_rules.py` (`PILLARS_RULES`) и заготовками «Кадров» (`frontend/src/directorPresets.ts`).
+- `skills/video-*/` — правила промптов по видеомоделям (Seedance 2.0/2.5, FLUX 3, MiniMax H3, Kling 3.0 Omni и Start+Last Frame); не проверены вживую, лимиты референсов в `model_catalog.py` (`ref_limits`, `ref_syntax`).
 - Живой скрипт проверки PiAPI: `scripts/live_piapi_test.py` (платный!).
 
 ## Открытые задачи (кратко, полный список в TODO.md)

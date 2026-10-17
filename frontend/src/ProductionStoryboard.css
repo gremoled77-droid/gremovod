@@ -295,3 +295,98 @@ main.storyboard-main {
 .app main.storyboard-main > .content {
   padding: 0;
 }
+
+/* Порядок сцен и кадров, дубли кадра, правка состава сцены */
+.ps-order {
+  display: inline-flex;
+  gap: 4px;
+  flex: none;
+}
+.ps-board .ps-order button {
+  flex: none;
+  width: 30px;
+  min-width: 30px;
+  padding: 4px 0;
+  font-size: 11px;
+  line-height: 1;
+}
+.ps-scene-head > .ps-order {
+  flex-direction: column;
+}
+.ps-acts .ps-order {
+  margin-left: auto;
+}
+.ps-takes {
+  margin: 6px 0;
+  font-size: 12px;
+}
+.ps-takes summary {
+  cursor: pointer;
+  color: var(--muted);
+}
+.ps-take-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+.ps-board .ps-take {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  width: 64px;
+  padding: 3px;
+  border-radius: 8px;
+  font-size: 10px;
+}
+.ps-take img,
+.ps-take-video {
+  width: 56px;
+  height: 56px;
+  object-fit: cover;
+  border-radius: 6px;
+  background: var(--surface-2);
+  display: grid;
+  place-items: center;
+}
+.ps-board .ps-take.on {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: #3a2f12;
+}
+.ps-cast-empty {
+  color: var(--muted);
+  font-size: 12px;
+  align-self: center;
+}
+.ps-cast-edit {
+  flex-basis: 100%;
+  font-size: 13px;
+}
+.ps-cast-edit summary {
+  cursor: pointer;
+  color: var(--muted);
+}
+.ps-cast-edit fieldset {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin: 8px 0;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 8px 12px;
+}
+.ps-cast-edit label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.ps-cast-location {
+  gap: 10px;
+}
+@media (max-width: 700px) {
+  .ps-acts {
+    flex-wrap: wrap;
+  }
+}

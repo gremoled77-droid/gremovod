@@ -124,3 +124,21 @@
   border-radius: 8px;
   padding: 8px;
 }
+
+.vp-norm {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  margin: 10px 0;
+  padding: 8px 12px;
+}
+.vp-hero-row {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr)) auto;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+@media (max-width: 720px) {
+  .vp-hero-row {
+    grid-template-columns: 1fr 1fr;
+  }
+}

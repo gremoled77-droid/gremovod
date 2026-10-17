@@ -29,6 +29,23 @@ class VisualPlan(BaseModel):
     beats: str = Field(default='', max_length=3000)
 
 
+class SeriesNorm(BaseModel):
+    """Series norm (Mercado): frame format, the 'normal' lens and standing angle/color rules."""
+    format: str = Field(default='', max_length=100)
+    normal_lens: str = Field(default='', max_length=200)
+    angle_rules: str = Field(default='', max_length=300)
+    color_rules: str = Field(default='', max_length=300)
+
+
+class HeroFrame(BaseModel):
+    """Hero frame (Mercado): one emotional state -> shot size, angle, lens, air around the gaze."""
+    state: str = Field(default='', max_length=100)
+    size: str = Field(default='', max_length=100)
+    angle: str = Field(default='', max_length=100)
+    lens: str = Field(default='', max_length=100)
+    looking_room: str = Field(default='', max_length=100)
+
+
 class VisualRules(BaseModel):
     space: Literal['', 'deep', 'flat', 'limited', 'ambiguous'] = ''
     line: Literal['', 'horizontal', 'vertical', 'diagonal', 'mixed'] = ''
@@ -38,6 +55,8 @@ class VisualRules(BaseModel):
     camera: str = Field(default='', max_length=300)
     rhythm: str = Field(default='', max_length=300)
     note: str = Field(default='', max_length=500)
+    norm: SeriesNorm = Field(default_factory=SeriesNorm)
+    hero_frames: list[HeroFrame] = Field(default_factory=list, max_length=8)
 
 
 RULE_KINDS = ('series', 'episode', 'location', 'character')
@@ -85,7 +104,28 @@ def rule_clauses(data):
             parts.append(f'{label}: {data[key].strip()}')
     if data.get('note', '').strip():
         parts.append(data['note'].strip())
+    parts += norm_clauses(data.get('norm')) + hero_frame_clauses(data.get('hero_frames'))
     return parts
+
+
+def norm_clauses(norm):
+    norm = norm if isinstance(norm, dict) else {}
+    labels = (('format', 'series frame format'), ('normal_lens', 'normal lens of the series (use it by default)'),
+              ('angle_rules', 'angle rules'), ('color_rules', 'color rules'))
+    return [f'{label}: {norm[key].strip()}' for key, label in labels if str(norm.get(key, '')).strip()]
+
+
+def hero_frame_clauses(frames):
+    """One clause per filled state: 'when <state>: size ..., angle ..., lens ..., looking room ...'."""
+    out = []
+    for item in frames if isinstance(frames, list) else []:
+        if not isinstance(item, dict) or not str(item.get('state', '')).strip():
+            continue
+        bits = [f'{label} {item[key].strip()}' for key, label in (('size', 'shot size'), ('angle', 'angle'), ('lens', 'lens'),
+                ('looking_room', 'looking room')) if str(item.get(key, '')).strip()]
+        if bits:
+            out.append(f'when {item["state"].strip()}: ' + ', '.join(bits))
+    return out
 
 
 def stored(db, table, nid):
@@ -222,7 +262,7 @@ def register(app, studio):
             node = db.execute('SELECT kind FROM production_nodes WHERE id=? AND production_id=?', (nid, pid)).fetchone()
             if not node:
                 raise HTTPException(404, 'Карточка не найдена в этом проекте')
-            return {'rules': clean_rules(stored(db, 'visual_rules', nid)), 'editable': node['kind'] in RULE_KINDS, 'prompt': rules_text(db, pid, nid)}
+            return {'rules': clean_rules(stored(db, 'visual_rules', nid)), 'kind': node['kind'], 'editable': node['kind'] in RULE_KINDS, 'prompt': rules_text(db, pid, nid)}
 
     @app.put('/api/productions/{pid}/nodes/{nid}/visual-rules')
     def write_rules(pid: str, nid: str, body: VisualRules):
@@ -235,4 +275,4 @@ def register(app, studio):
             data = body.model_dump()
             db.execute('INSERT INTO visual_rules(node_id,data,updated_at) VALUES(?,?,?) ON CONFLICT(node_id) DO UPDATE SET data=excluded.data,updated_at=excluded.updated_at',
                        (nid, json.dumps(data, ensure_ascii=False), studio.now()))
-            return {'rules': data, 'editable': True, 'prompt': rules_text(db, pid, nid)}
+            return {'rules': data, 'kind': node['kind'], 'editable': True, 'prompt': rules_text(db, pid, nid)}

@@ -1,4 +1,5 @@
 import {existsSync} from 'node:fs';
+import {dirname, join, resolve} from 'node:path';
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {execFileSync} from 'node:child_process';
@@ -19,9 +20,18 @@ const bundled = await build({
 const {frameBasis, frameOutdated, carCompatible, cameraBasis, cameraOutdated} = await import(
   'data:text/javascript;base64,' + Buffer.from(bundled.outputFiles[0].text).toString('base64')
 );
-const winPython = new URL('../.venv/Scripts/python.exe', import.meta.url).pathname.replace(/^\/(\w:)/, '$1');
-const python = process.env.STUDIO_PYTHON || (existsSync(winPython) ? winPython : 'python3');
 const cwd = new URL('..', import.meta.url).pathname.replace(/^\/(\w:)/, '$1');
+// В рабочих копиях git (.worktrees/*, .claude/worktrees/*) своего .venv нет: он лежит в корне проекта выше,
+// поэтому ищем .venv вверх по папкам, иначе берём системный python3 (в нём может не быть fastapi).
+function findVenvPython(from) {
+  for (let dir = resolve(from); ; dir = dirname(dir)) {
+    for (const rel of ['.venv/Scripts/python.exe', '.venv/bin/python']) {
+      if (existsSync(join(dir, rel))) return join(dir, rel);
+    }
+    if (dirname(dir) === dir) return null;
+  }
+}
+const python = process.env.STUDIO_PYTHON || findVenvPython(cwd) || 'python3';
 const legacy = {
   frame_id: 'profile',
   lighting_id: 'rim',

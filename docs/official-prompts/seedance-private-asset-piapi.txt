@@ -1,0 +1,1201 @@
+Private Asset Library - PiAPI docs
+PiAPI
+Home
+Workspace
+Home
+Workspace
+Seedance
+Copy Page
+Get Started
+Overview
+Quickstart
+Make Instruction: How to Use PiAPI to Build a Workflow on Make?
+Endpoints
+Seedance
+Less-Restriction Models Guide
+Private Asset Library
+Seedance 2.5
+POST
+Seedance 2
+POST
+Video Watermark Remover
+POST
+Get task
+GET
+Seedream
+Seedream 5
+Get Task
+Byteaudio
+Seed-audio
+Get Task
+Kling
+Lipsync With PiAPI Kling API Examples
+Motion Brush With PiAPI Kling API Example
+Kling Elements Video Generation API
+Kling Effects Video Generation
+Cancel Task
+Cancel Task
+Cancel Tasks
+Get Task
+Create Task
+Kling Virtual Try-On
+Kling Effects
+Kling Sound
+Kling Avatar
+Kling Motion Control
+Kling Turbo
+Kling 3.0
+Kling omni
+Kling o1
+Kling 3.0 omni
+Get Task
+Minimax
+Generate Video
+MiniMax Speech
+MiniMax Image
+Get Task
+Sora2
+Sora2-preview Text to Video
+Sora2 Text to Video
+Sora2-Pro Text to Video
+Sora2 Remove Watermark
+Get task
+Tools
+File Upload API
+Remove Background API
+Remove Background-Get Task
+Segment With Prompt API
+Segment With Prompt API-Get Task
+Image Upscale(Super Resolution) API
+Image Upscale-Get Task
+Video Upscale
+Video Upscale-Get Task
+Video Remove Background
+Video Remove Background-Get task
+Video Remove Subtitle
+Video Remove Subtitle-Get task
+Skin Tokens
+Skin Tokens-Get task
+Gemini
+Gemini-2.5-flash-image
+Nano Banana Pro
+Nano Banana 2
+Get task
+GPT image
+GPT-image API
+LLM
+How To Avoid Timeouts in Completion API
+LLM API | Basic Completions
+Omni Human
+OmniHuman 1.5
+Get task
+Flux
+Flux with LoRA and Controlnet
+Available LoRA and Controlnet
+Flux API with Redux Variation, Fill, Inpaint and Outpaint
+Create Task
+Text to Image
+Image to Image
+Kontext
+Get task
+Qwen Image
+Text to Image
+Image Edit
+Get task
+Z-Image
+Text to Image
+Get task
+Faceswap
+Multi Faceswap
+Image Faceswap
+Video Faceswap
+Get Task
+WanX
+Generate WanX Task with LoRA Using PiAPI
+Available LoRA Types for Wanx
+Use Cases for Wanx LoRA
+Use Cases for Wanx Control Camera
+Create Task
+Get Task
+Wan
+Wan2.6 Text to Video
+Wan2.6 Image to Video
+Get task
+Hailuo
+Generate Video
+Get Task
+Veo3
+Veo3 Text to Video
+Veo3 Image to Video
+Veo3.1 Text to Video
+Veo3.1 Image to Video
+Get task
+Skyreels
+Create Task
+Get Task
+Framepack
+Create Task
+Get Task
+Hunyuan Video
+How to Make a Hunyuan API Call
+Available Hunyuan Lora models
+Get Task
+Generate Video
+Luma Dream Machine
+Create Task
+Get Task
+Suno(service stopped)
+Music(service stopped)
+Lyrics(service stopped)
+Get task
+Song(Udio)
+Song API Task Creation Examples
+[Udio] Song Extend
+Get Task
+Create Task
+[Udio] Generate Lyrics
+Mmaudio
+Get Task
+Generate Audio
+DiffRhythm
+Generate Audio
+Get Task
+Ace Step
+Create Task
+Text to Audio
+Audio to Audio
+Audio Edit
+Audio Extend
+Get Task
+TTS
+Zeroshot Text-to-Speech F5-TTS
+Get Task
+Trellis
+Trellis Create Task
+Trellis2 Create Task
+Get Task
+Meshy
+Meshy Create Task
+Get Task
+Pixal3D
+Pixal3D Create Task
+Get Task
+Joycaption
+Image Caption
+Get Task
+Midjourney
+PiAPI Penalties on Midjourney Usage
+Detailed Explaination on Midjourney Task Result
+Midjourney V7 API Instructions
+Create Task
+Imagine
+Upscale
+Variation
+Reroll
+Describe
+Seed
+Blend
+Inpaint
+Outpaint
+Pan
+Cancel Task
+Cancel Task
+Cancel Tasks
+Get Task
+AI Hug
+Get Task
+Create Task
+PiAPI Account Management
+PiAPI Account Info
+Task List Info
+User Task History
+Resources
+Change Log
+Output Storage
+Unified API Schema
+Webhook
+Bulk Generation Service
+Billings
+PiAPI MCP Server
+Workspace Manual
+Host-your-account (HYA) | Back-up Account
+Host-your-account (HYA) | Debug Checklist
+Host-your-account (HYA) | Connected Account Status
+Announcements
+PiAPI 2025 January 1st Pricing Update
+The discontinued support for midjourney
+Sunsetting Suno
+Schemas
+Schemas
+motion brush
+Create Task
+camera control
+Cancel Params
+Float2 Point
+Control Points
+txt2video-1.3b
+txt2video-14b
+txt2video-14b-lora
+img2video-14b
+img2video-14b-lora
+img2video-14b-keyframe
+img2video-14b-control-camera
+wan22-txt2video-14b
+wan22-img2video-14b
+hunyuan-txt2video-lora
+Trellis API/text-to-3D
+Trellis API/image-to-3D
+Trellis2 API/image-to-3D
+Kling omni multi shot
+VideoGenerationRequest
+TaskRequest
+TaskConfig
+TaskInput
+TaskResponse
+ErrorResponse
+Response
+Unified-Task-Response
+RequestBodies
+Unified-Task-Request-Body
+config
+control_net_setting
+lora_setting
+VideoGenerationResponse
+Pixal3D API/image-to-3D
+Seedance
+Copy Page
+Private Asset Library
+Private Asset Library — API Guide
+#
+For face / character / scene reference asset management and video generation with the Seedance 2.0 model family.
+0. Overview
+#
+PiApi's Private Asset Library lets you upload face photos, character reference images, video clips, or audio references once, obtain a stable
+asset_id
+, and then reference it as
+asset://<asset_id>
+in your Seedance video-generation tasks. Once an asset reaches the
+Active
+state, every subsequent generation that references it benefits from
+stable character consistency across shots and skips re-processing of that asset on every request
+.
+Typical use cases
+:
+Multi-shot short films where the same character appears across cuts
+Multiple characters in the same scene that need separate references in the prompt
+Workflows where you want assets vetted up-front instead of re-checked on every generation
+What deserves to be an asset
+#
+The general rule:
+only references that need to stay visually consistent should be uploaded as assets — usually people, characters, or product subjects.
+Everything else (scene backgrounds, props, ambient imagery) can stay as raw URLs and be consumed once by the task, with no asset bookkeeping.
+This leads to two operating modes that are designed to be combined:
+Managed assets
+— you call
+POST /api/v1/asset/upload
+(Section 3) and reuse the resulting
+asset://<id>
+across many tasks. The asset is pre-vetted once, then referenced for free. Counts toward your per-plan quota (Section 2), TTL is auto-refreshed on every reference.
+Ephemeral assets
+— you set
+auto_upload_assets: true
+on your task and pass raw URLs directly (Section 7). The service uploads them, runs your task, and cleans them up after the retention window. Independent per-plan cap (Section 7.5), no manual lifecycle work.
+Picking the right pattern
+#
+Match your workflow to one of these patterns. The right answer is almost always one of the bottom two — pure single-mode usage is the exception, not the default.
+Pattern
+Recommended setup
+When it fits
+Managed only
+Upload your cast (Section 3) → reference
+asset://...
+in every task.
+auto_upload_assets
+omitted.
+A stable cast / brand library that you generate against repeatedly. The cast is small, well-defined, and reused so often that upfront vetting pays back many times.
+Ephemeral only
+Pass raw URLs in
+image_urls
+/
+video_urls
+/
+audio_urls
+. Set
+auto_upload_assets: true
+.
+Every task uses fresh references (on-demand user content, throwaway avatars, A/B variants). You don't want to track or clean up asset state at all.
+Mixed — managed cast + ephemeral additions
+image_urls: ["asset://main-character", "https://cdn/guest-of-the-day.png"]
+with
+auto_upload_assets: true
+.
+A stable protagonist appears in every task, but each task also brings in a one-off guest character, secondary actor, or variant. Main cast stays canonical; the rotating cast is ingested per-task.
+Mixed — managed cast + raw scenery
+image_urls: ["asset://main-character", "https://cdn/scene-today.png"]
+with
+auto_upload_assets: false
+(or omitted).
+A stable cast plus a varying scene / background / prop image. The scene doesn't need cross-task consistency, so don't waste your ephemeral cap or quota on it — let it pass through as a raw URL consumed once.
+Rule of thumb
+: a reference that will appear in
+more than one
+future task → make it a managed asset. A reference that will only ever be used
+once
+→ ephemeral (if you want auto cleanup) or raw URL (if it's just a background that doesn't need to be vetted as an asset at all).
+Asset lifecycle
+:
+1
+.
+Upload → the service asynchronously fetches the URL and ingests the file (usually seconds to a few minutes)
+2
+.
+Status transitions:
+Processing
+→
+Active
+(usable) or
+Failed
+(fetch failed / asset rejected / multi-face violation)
+3
+.
+Idle assets are garbage-collected after the per-plan TTL; calls to
+list
+/
+get
+/ Seedance references refresh
+last_used_at
+4
+.
+Explicit deletion is also supported; when the last asset of a group is deleted, the group itself is cleaned up automatically
+1. Authentication
+#
+All endpoints use the
+X-API-Key
+HTTP header. Asset endpoints additionally require an account plan ≥
+hobbyist
+.
+2. Quota and TTL (per plan)
+#
+Plan
+Max Assets
+TTL (auto-purged when idle)
+hobbyist
+500
+3 days
+developer
+2000
+7 days
+premium
+5000
+15 days
+enterprise
+10000
+15 days
+Assets in the
+Failed
+state
+do not count toward your quota
+.
+The numbers above apply to
+persistent assets
+(uploaded via Section 3). If you only want one-off references for a single task, see Section 7 (auto-upload mode) — those use a separate pool with an independent hard cap and do not consume your per-plan quota.
+3. Upload Assets
+#
+3.1 Single upload
+#
+Request fields
+:
+Field
+Required
+Description
+url
+✅
+Publicly reachable URL.
+Must remain reachable for at least 24 hours
+so the service can fetch it asynchronously.
+asset_type
+optional
+Image
+/
+Video
+/
+Audio
+. Inferred from the URL suffix when omitted.
+name
+optional
+Display name for the asset. Defaults to the last path segment (e.g.
+example1.png
+).
+Supported types and constraints
+:
+Type
+Extensions
+Size limit
+Other
+Image
+jpeg / jpg / png / webp / bmp / tiff / gif / heic / heif
+< 30 MB
+Aspect ratio (0.4, 2.5); width/height (300, 6000) px
+Video
+mp4 / mov
+≤ 50 MB
+480p / 720p / 1080p; 2–15 s; 24–60 FPS
+Audio
+mp3 / wav
+≤ 15 MB
+2–15 s
+Response
+(HTTP 202):
+{
+"asset_id"
+:
+"asset-20260607154123-6nxk8"
+,
+"status"
+:
+"Processing"
+,
+"upload_at"
+:
+"2026-06-07T15:41:23Z"
+,
+"expires_at"
+:
+"2026-06-22T15:41:23Z"
+}
+3.2 Batch upload (up to 5 items)
+#
+Response
+(HTTP 202):
+{
+"total"
+:
+4
+,
+"success"
+:
+4
+,
+"failed"
+:
+0
+,
+"results"
+:
+[
+{
+"asset_id"
+:
+"asset-20260607154123-aaaa1"
+,
+"status"
+:
+"Processing"
+}
+,
+{
+"asset_id"
+:
+"asset-20260607154124-bbbb2"
+,
+"status"
+:
+"Processing"
+}
+,
+{
+"asset_id"
+:
+"asset-20260607154124-cccc3"
+,
+"status"
+:
+"Processing"
+}
+,
+{
+"asset_id"
+:
+"asset-20260607154125-dddd4"
+,
+"status"
+:
+"Processing"
+}
+]
+}
+Individual failures do not block the batch; failed items carry an
+error
+field describing the cause.
+4. Query Asset Status
+#
+Newly uploaded assets start in
+Processing
+. Poll until they reach
+Active
+before referencing them in a generation request.
+4.1 List (with quota info)
+#
+Query parameters
+:
+Param
+Default
+Description
+page
+1
+Page number
+size
+20
+Page size (≤ 100)
+status
+all
+Comma-separated subset, e.g.
+active,processing,failed
+order
+-last_used_at
+Sort key;
+-
+prefix for descending order
+Response
+:
+{
+"items"
+:
+[
+{
+"asset_id"
+:
+"asset-20260607154123-aaaa1"
+,
+"name"
+:
+"char-female"
+,
+"asset_type"
+:
+"Image"
+,
+"status"
+:
+"Active"
+,
+"url"
+:
+"https://your-cdn.com/example1.png"
+,
+"last_used_at"
+:
+"2026-06-07T15:41:23Z"
+,
+"expires_at"
+:
+"2026-06-22T15:41:23Z"
+,
+"created_at"
+:
+"2026-06-07T15:41:23Z"
+}
+]
+,
+"total"
+:
+4
+,
+"page"
+:
+1
+,
+"size"
+:
+20
+,
+"quota"
+:
+{
+"used"
+:
+4
+,
+"limit"
+:
+500
+,
+"ttl_days"
+:
+15
+}
+}
+The
+url
+field echoes back the original URL you uploaded with — keep it persistent if you want it as a thumbnail preview source.
+4.2 Single asset details
+#
+Calling this also refreshes
+last_used_at
+(preventing LRU purge).
+Response
+:
+{
+"asset_id"
+:
+"asset-20260607154123-aaaa1"
+,
+"name"
+:
+"char-female"
+,
+"asset_type"
+:
+"Image"
+,
+"status"
+:
+"Active"
+,
+"url"
+:
+"https://your-cdn.com/example1.png"
+,
+"last_used_at"
+:
+"2026-06-07T15:50:00Z"
+,
+"expires_at"
+:
+"2026-06-22T15:50:00Z"
+,
+"created_at"
+:
+"2026-06-07T15:41:23Z"
+}
+When
+status=Failed
+, the response carries an
+error
+object with details:
+{
+"asset_id"
+:
+"asset-..."
+,
+"status"
+:
+"Failed"
+,
+"error"
+:
+{
+"code"
+:
+"ImageFormatNotSupported"
+,
+"message"
+:
+"Image format heif is not supported by current version"
+}
+}
+5. Delete Assets
+#
+5.1 Single delete
+#
+Response
+: HTTP 204 (empty body).
+5.2 Batch delete
+#
+Response
+:
+{
+"deleted"
+:
+4
+,
+"failed"
+:
+0
+,
+"results"
+:
+[
+{
+"asset_id"
+:
+"asset-...aaaa1"
+,
+"status"
+:
+"deleted"
+}
+,
+{
+"asset_id"
+:
+"asset-...bbbb2"
+,
+"status"
+:
+"deleted"
+}
+,
+{
+"asset_id"
+:
+"asset-...cccc3"
+,
+"status"
+:
+"deleted"
+}
+,
+{
+"asset_id"
+:
+"asset-...dddd4"
+,
+"status"
+:
+"deleted"
+}
+]
+}
+6. Generate Video with Assets (Seedance)
+#
+The bridge between the asset library and Seedance: reference your assets as
+asset://<asset_id>
+instead of a regular URL.
+6.1 Important constraints
+#
+✅
+Supported task types
+:
+seedance-2-less-restriction
+(std) and
+seedance-2-fast-less-restriction
+(fast)
+❌
+Not supported
+: strict variants (
+seedance-2
+/
+seedance-2-fast
+); requests carrying
+asset://
+references will fast-fail. Use the corresponding
+-less-restriction
+variant instead.
+✅ In the prompt, reference assets using the literal
+Image 1 / Image 2 / Video 1 / Audio 1
+notation. The index matches the position inside
+image_urls / video_urls / audio_urls
+.
+✅ The alternative
+@image1 / @video2 / @audio1
+reference syntax is also accepted; the service rewrites it to the canonical form automatically.
+6.2 Submit a task
+#
+Response
+:
+{
+"code"
+:
+200
+,
+"data"
+:
+{
+"task_id"
+:
+"3f5ab17a-0b2e-44a3-b31d-3e6075e2b974"
+,
+"status"
+:
+"pending"
+}
+,
+"message"
+:
+"success"
+}
+On submission the service validates:
+1
+.
+Every
+asset://
+reference belongs to the calling account
+2
+.
+Each referenced asset has
+status=Active
+3
+.
+task_type
+is one of the
+-less-restriction
+variants
+If any check fails the request is rejected before being billed.
+6.3 Poll task status
+#
+In-progress response
+:
+{
+"code"
+:
+200
+,
+"data"
+:
+{
+"task_id"
+:
+"3f5ab17a-..."
+,
+"status"
+:
+"processing"
+}
+}
+Completed response
+:
+{
+"code"
+:
+200
+,
+"data"
+:
+{
+"task_id"
+:
+"3f5ab17a-..."
+,
+"status"
+:
+"completed"
+,
+"input"
+:
+{
+"prompt"
+:
+"Cinematic. Photo realistic. A cyber female Image 1 stands in courtyard Image 3. Cyber warrior Image 2 next to her. Cyber boss Image 4 emerges. 5s scene."
+,
+"image_urls"
+:
+[
+"asset://asset-...aaaa1"
+,
+"asset://asset-...bbbb2"
+,
+"asset://asset-...cccc3"
+,
+"asset://asset-...dddd4"
+]
+,
+"aspect_ratio"
+:
+"16:9"
+,
+"duration"
+:
+5
+,
+"resolution"
+:
+"720p"
+}
+,
+"output"
+:
+{
+"video"
+:
+"https://img.theapi.app/ephemeral/026610ac-5b23-4105-ac06-30f2044f304d.mp4"
+}
+,
+"meta"
+:
+{
+"usage"
+:
+{
+"type"
+:
+"point"
+,
+"consume"
+:
+10000000
+}
+}
+}
+}
+The video URL is valid for 24 hours — download or consume it within that window.
+6.4 Status state machine
+#
+status
+Meaning
+pending
+Accepted, queued for scheduling
+processing
+Generation in progress
+completed
+Success;
+output.video
+is ready
+failed
+Failure; inspect
+error.message
+7. Auto-upload mode (single API call)
+#
+For workflows where you'd rather skip uploading assets manually, set
+auto_upload_assets: true
+on your Seedance task. Any non-
+asset://
+URL inside
+image_urls
+/
+video_urls
+/
+audio_urls
+is auto-ingested as an
+ephemeral
+private asset before the task runs, and cleaned up afterwards.
+7.1 When auto-upload fits
+#
+Use auto-upload when at least one reference in the task is a
+one-off
+that you won't reuse later — typically an on-demand input from your downstream user, or an A/B variant. If every reference will be reused across many tasks, prefer the managed path in Section 3.
+You can also
+mix both modes in one request
+: explicit
+asset://...
+references pass through untouched while raw URLs get auto-ingested. See the Overview's pattern table for the four common combinations and when each one is the right choice.
+7.2 Submit a task with auto-upload
+#
+7.3 Parameters
+#
+Field
+Type
+Default
+Notes
+auto_upload_assets
+bool
+false
+Enable auto-upload. Requires a
+-less-restriction
+task type.
+asset_retention_hours
+int
+3
+Clamped to
+[3, 8]
+. How long the auto-uploaded asset stays after the task completes — useful if you want follow-up tasks to reference the same inputs.
+7.4 Lifecycle
+#
+Before the task starts
+: each raw URL becomes an ephemeral asset bound to this task. Auto-uploaded assets appear in
+GET /api/v1/asset/list
+with
+lifecycle: "ephemeral"
+.
+First task latency
+: expect 30–90 s of additional latency for upstream ingestion before generation begins.
+On task success
+: ephemeral assets persist for
+asset_retention_hours
+so follow-up tasks can reference them by their assigned
+asset://<id>
+. After that window the service deletes them automatically.
+On task failure
+: ephemeral assets are deleted immediately. Re-submit your task with corrected URLs.
+Manual control
+: you may delete an ephemeral asset earlier via
+DELETE /api/v1/asset/:asset_id
+at any time.
+7.5 Quota for auto-uploaded assets
+#
+Auto-uploaded assets
+do not consume your per-plan quota
+from Section 2. They use an independent per-plan hard cap on
+concurrent ephemeral assets
+:
+Plan
+Concurrent ephemeral cap
+hobbyist
+200
+developer
+500
+premium
+1000
+enterprise
+2000
+If you hit the cap (typically by parallel-submitting many tasks with raw URLs), the next upload returns HTTP
+429 ephemeral asset hard cap reached
+. Wait for in-flight tasks to complete, delete some ephemeral assets via Section 5, or upgrade to a higher plan.
+7.6 Mixing both modes
+#
+You can combine managed and ephemeral references in one request. Two patterns differ only by the
+auto_upload_assets
+flag:
+Pattern A — managed cast + ephemeral guest (
+auto_upload_assets: true
+)
+Use when the additional reference is itself a
+character / subject
+that should be vetted as an asset (so the model can lock onto it), but it only appears in this one task.
+{
+  "input": {
+    "image_urls": [
+      "asset://asset-20260607154123-aaaa1",  // recurring protagonist (Section 3)
+      "https://your-cdn.com/guest-actor.png" // one-off guest — auto-ingested as ephemeral asset
+    ],
+    "auto_upload_assets": true,
+    "asset_retention_hours": 3
+  }
+}
+Pattern B — managed cast + raw scenery (
+auto_upload_assets: false
+)
+Use when the additional reference is
+not a character
+— a scene background, a prop, an ambient image. There's no consistency requirement, so it shouldn't waste your ephemeral cap or trigger asset ingestion at all; just hand the URL to the model directly.
+{
+  "input": {
+    "image_urls": [
+      "asset://asset-20260607154123-aaaa1",  // recurring protagonist (Section 3)
+      "https://your-cdn.com/scene-today.png" // background — consumed once, not made into an asset
+    ],
+    "auto_upload_assets": false
+  }
+}
+In both patterns, the managed
+asset://
+reference gets its TTL refreshed (same as Sections 4.1 / 4.2).
+8. End-to-end example (Python)
+#
+9. Common errors
+#
+HTTP
+Message
+Meaning / Resolution
+400
+invalid request: 'url' is required
+Missing
+url
+field on upload
+400
+unsupported asset_type: xxx
+The file extension is not in the whitelist
+400
+quota exceeded: plan hobbyist allows 50 assets, currently 50
+Quota full — delete old assets or upgrade plan
+400
+auto_upload_assets requires a -less-restriction task type
+Auto-upload mode only works with
+seedance-2-less-restriction
+or
+seedance-2-fast-less-restriction
+400
+auto-upload image url[N] timed out waiting for ingestion
+Auto-upload failed to ingest within 90 s — verify the URL is reachable and the file is valid
+400
+auto-upload image url[N] rejected: <reason>
+Upstream rejected the file (format / size / safety) — fix the asset and retry
+403
+asset not owned by this account
+The referenced
+asset_id
+belongs to another account
+404
+asset not found
+Wrong
+asset_id
+or already deleted
+409
+asset still processing
+Wait a few seconds and retry
+422
+asset:// references are only allowed on -less-restriction task types
+Switch
+task_type
+to
+seedance-2-(fast-)less-restriction
+422
+asset xxx status=Failed
+The referenced asset failed processing; GET its details to see why
+429
+ephemeral asset hard cap reached: plan <plan> allows N concurrent ephemeral assets
+Too many auto-upload assets in flight — wait, delete some, or upgrade plan (Section 7.5)
+10. Best practices
+#
+1
+.
+URL persistence
+— the URL you upload must remain reachable until ingestion completes. Once an asset reaches
+status=Active
+the original URL is no longer required, but keeping it alive for at least 24 hours is the safe default.
+2
+.
+Asset reuse
+— for persistent assets (Section 3), upload once and reference unlimited times. Every reference refreshes
+last_used_at
+, so frequently-used assets never hit the LRU TTL.
+3
+.
+Only promote what needs consistency
+— characters / people / product subjects benefit from being assets (managed or ephemeral) because the model can lock onto them. Scenes, backgrounds, and props don't — pass them as raw URLs with
+auto_upload_assets: false
+so they don't consume your ephemeral cap. See the Overview's pattern table for the four common combinations.
+4
+.
+Tune
+asset_retention_hours
+— if you only ever submit a single task per upload, leave it at the default
+3
+. If you chain follow-up tasks (e.g. an edit pass on the same characters), set it closer to
+8
+so the assets stick around long enough to be reused without re-ingesting.
+5
+.
+Prompt reference order
+—
+Image 1
+maps to
+image_urls[0]
+,
+Image 2
+to
+image_urls[1]
+, etc. Indexes beyond the array length are ignored by the model.
+6
+.
+Mixing media types
+—
+image_urls
+,
+video_urls
+, and
+audio_urls
+can all appear in the same request, with the prompt referencing each via
+Image N / Video N / Audio N
+.
+7
+.
+Quota visualization
+— every
+list
+response contains
+quota.{used, limit, ttl_days}
+for persistent assets. Surface this on your dashboard so users know when they are close to the limit.
+8
+.
+Failed-asset hygiene
+—
+Failed
+assets do not count toward quota, but they still clutter the list. Delete them explicitly to keep the view clean.
+Modified at
+2026-08-01 02:07:20
+Previous
+Less-Restriction Models Guide
+Next
+Seedance 2.5
+LLMs.txt
