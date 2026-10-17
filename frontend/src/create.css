@@ -996,15 +996,3 @@ a.cs-info:hover {
   width: 100%;
   box-sizing: border-box;
 }
-
-/* Корзина на карточке результата: справа вверху, зеркально к сердечку */
-.cs-trash-big {
-  left: auto;
-  right: 10px;
-  display: grid;
-  place-items: center;
-}
-.cs-trash-big:hover {
-  background: var(--bad);
-  color: #fff;
-}
