@@ -36,6 +36,8 @@ type Spec = {
   options?: Record<string, OptionSpec>;
   variants?: Record<string, unknown>;
   api_refs?: number;
+  provider?: string;
+  page_urls?: Record<string, string>;
 };
 type LibAsset = {
   id: string;
@@ -55,6 +57,8 @@ const LABELS: Record<string, string> = {
   'qwen-image-2.1': 'Qwen Image 2.1',
 };
 const ORDER = Object.keys(LABELS);
+/** Названия API-сервисов; новый сервис добавляется сюда и в каталог бэкенда (provider, page_urls). */
+const PROVIDERS: Record<string, string> = {piapi: 'PiAPI'};
 
 async function json(r: Response) {
   const d = await r.json().catch(() => ({}));
@@ -63,6 +67,31 @@ async function json(r: Response) {
 }
 
 type TempItem = {asset_id: string; days_left: number; expired: boolean; protected: string};
+
+/** Серая «i» в кружке: страница модели у её API-сервиса (ссылка берётся из каталога бэкенда). */
+function ModelInfo({spec}: {spec: Spec}) {
+  const provider = spec.provider || 'piapi';
+  const url = spec.page_urls?.[provider];
+  const name = PROVIDERS[provider] || provider;
+  return url ? (
+    <a
+      className="cs-info"
+      href={url}
+      target="_blank"
+      rel="noreferrer"
+      title={`Страница модели на ${name}`}
+      aria-label={`Страница модели на ${name}`}
+      onClick={e => e.stopPropagation()}
+      onKeyDown={e => e.stopPropagation()}
+    >
+      i
+    </a>
+  ) : (
+    <span className="cs-info off" title={`Ссылка на страницу модели у ${name} пока не задана`}>
+      i
+    </span>
+  );
+}
 
 function ModelOptions({
   id,
@@ -603,13 +632,31 @@ function CreateScreenBody({projectId, heroes}: {projectId: string; heroes: Hero[
     const o = specs[id]?.options;
     return (
       <div key={id} className={'cs-model' + (on ? ' on' : '')}>
-        <button type="button" className="cs-model-head" onClick={() => toggle(id)} aria-pressed={on}>
+        <div
+          role="button"
+          tabIndex={0}
+          className="cs-model-head"
+          onClick={() => toggle(id)}
+          onKeyDown={e => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              toggle(id);
+            }
+          }}
+          aria-pressed={on}
+        >
           <span>
-            <b>{LABELS[id]}</b>
-            <small>PiAPI{specs[id].launch_enabled === false ? ' · проверяется' : ''}</small>
+            <b>
+              {LABELS[id]}
+              <ModelInfo spec={specs[id]} />
+            </b>
+            <small>
+              {PROVIDERS[specs[id].provider || 'piapi'] || specs[id].provider}
+              {specs[id].launch_enabled === false ? ' · проверяется' : ''}
+            </small>
           </span>
           <em>{on ? 'вкл' : 'выкл'}</em>
-        </button>
+        </div>
         {on && o && (
           <ModelOptions
             id={id}

@@ -138,3 +138,19 @@ for _id, _profile in _REF_PROFILES.items():
                             'max_refs':_limits.get('image') or 1,'docs':'skills/video-'+_id.replace('.', '-')+'/SKILL.md',
                             'prompt_only':True}
     MODEL_SPECS[_id].update(_profile)
+
+
+# --- Страница модели у провайдера (кнопка «i» в «Кадрах»). Интерфейс берёт ссылку из page_urls[provider],
+# --- поэтому при втором API-сервисе достаточно добавить его ключ и ссылки; код экрана не меняется.
+# --- Ссылки на страницы моделей владелец даст позже: пока берём только адреса docs на домене провайдера.
+PROVIDER_HOSTS = {'piapi': 'piapi.ai'}
+PAGE_URLS = {}  # {model_id: {provider: url}}: явные ссылки имеют приоритет над docs
+for _id, _spec in MODEL_SPECS.items():
+    _spec.setdefault('provider', 'piapi')
+    _urls = dict(PAGE_URLS.get(_id, {}))
+    _docs = str(_spec.get('docs') or '')
+    for _name, _host in PROVIDER_HOSTS.items():
+        _parts = _docs.split('/')
+        if _name not in _urls and _docs.startswith('https://') and len(_parts) > 2 and _parts[2].endswith(_host):
+            _urls[_name] = _docs
+    _spec['page_urls'] = _urls

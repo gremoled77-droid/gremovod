@@ -682,3 +682,29 @@
 .cs-model-opts select {
   padding-right: 24px;
 }
+
+/* Серая «i» в кружке после названия модели */
+.cs-info {
+  display: inline-grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  margin-left: 6px;
+  vertical-align: 1px;
+  border: 1px solid var(--border-strong);
+  border-radius: 50%;
+  color: var(--muted);
+  font-size: 10px;
+  font-style: italic;
+  font-weight: 600;
+  line-height: 1;
+  text-decoration: none;
+}
+a.cs-info:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.cs-info.off {
+  opacity: 0.35;
+  cursor: help;
+}
