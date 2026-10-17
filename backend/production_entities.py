@@ -5,6 +5,7 @@ from pathlib import Path
 from fastapi import HTTPException
 from pydantic import BaseModel,Field
 from backend import production_folders as folders
+from backend import shot_direction
 
 
 def state(db,pid,nid):
@@ -39,9 +40,15 @@ class Update(BaseModel):
     location_node_id:str|None=None
     selected_image_file_id:str|None=None
     selected_video_file_id:str|None=None
+    shooting:shot_direction.Direction|None=None
 
 
 def validate(db,pid,node,body):
+    if body.shooting is not None:
+        if node['kind']!='frame':raise HTTPException(400,'Постановка съёмки доступна только для кадра')
+        shot_direction.validate(body.shooting)
+        for nid in body.shooting.subject_ids or []:
+            if not db.execute("SELECT 1 FROM production_nodes WHERE id=? AND production_id=? AND kind='character'",(nid,pid)).fetchone():raise HTTPException(400,'Персонаж кадра не принадлежит проекту')
     if node['kind']!='episode' and (body.character_node_ids or body.location_node_id):raise HTTPException(400,'Состав закрепляется за сценой')
     if len(set(body.character_node_ids))!=len(body.character_node_ids):raise HTTPException(400,'Персонаж выбран дважды')
     for nid,kind in [(nid,'character') for nid in body.character_node_ids]+([(body.location_node_id,'location')] if body.location_node_id else []):
@@ -63,7 +70,10 @@ def context(studio,body):
         if node['kind']=='frame':
             scene_node,scene_data,_=state(db,body.production_id,node['parent_id'])
             related.append(scene_node)
-        for nid in scene_data['character_node_ids']+([scene_data['location_node_id']] if scene_data['location_node_id'] else []):
+        subjects=scene_data['character_node_ids']
+        shooting=data.get('shooting') if node['kind']=='frame' else None
+        if shooting and shooting.get('subject_ids') is not None:subjects=shooting['subject_ids']
+        for nid in subjects+([scene_data['location_node_id']] if scene_data['location_node_id'] else []):
             item=db.execute('SELECT * FROM production_nodes WHERE id=? AND production_id=?',(nid,body.production_id)).fetchone()
             if item:related.append(dict(item))
         refs=[];seen=set()
@@ -86,7 +96,10 @@ def context(studio,body):
         if node['kind']=='character':
             project=db.execute('SELECT state FROM projects WHERE id=?',(common['source_project_id'],)).fetchone()
             character=next((c for c in json.loads(project['state']).get('characters',[]) if c['id']==node['character_id']),None)
-    return {'brief':node['notes']+('\n\n'+style if style else '')+'\n\nЗАДАНИЕ: '+body.entity_instruction,'references':refs,'character':character,
+    direction=shot_direction.instructions(shooting,video=studio.MODEL_SPECS[body.target].get('kind')=='video') if shooting else ''
+    if shooting and shooting.get('subject_ids') is not None:
+        direction+='\nVISIBLE SUBJECTS: '+(', '.join(n['title'] for n in related if n['kind']=='character') or 'No characters; environment or object shot')+'. Only these characters appear in the frame.'
+    return {'brief':node['notes']+('\n\n'+style if style else '')+('\n\n'+direction if direction else '')+'\n\nЗАДАНИЕ: '+body.entity_instruction,'references':refs,'character':character,
             'scene':{'participants':[{'id':n['id'],'kind':n['kind'],'name':n['title'],'description':n['notes']} for n in related]},
             'entity':{'production_id':body.production_id,'node_id':node['id'],'kind':node['kind'],'title':node['title'],'character_id':node.get('character_id'),'revision':revision},
             'capabilities':studio.MODEL_SPECS[body.target],'rules_version':studio.RULES_VERSION,
@@ -144,7 +157,7 @@ def register(app,studio):
             catalog=[dict(r) for r in db.execute("SELECT id,title,kind FROM production_nodes WHERE production_id=? AND kind IN ('character','location') ORDER BY title",(pid,))]
         character=None
         if node['kind']=='character':character=next((c for c in studio.project(common['source_project_id'])['state'].get('characters',[]) if c['id']==node['character_id']),None)
-        return {'node':node,'data':data,'revision':revision,'files':files,'jobs':jobs[:30],'catalogue':catalog,'owner_project_id':owner,'character':character,'groups':folders.GROUPS[node['kind']]}
+        return {'node':node,'data':data,'revision':revision,'files':files,'jobs':jobs[:30],'catalogue':catalog,'owner_project_id':owner,'character':character,'groups':folders.GROUPS[node['kind']],'shooting_catalogue':shot_direction.catalogue()}
 
     @app.put('/api/productions/{pid}/nodes/{nid}/editor')
     def save(pid:str,nid:str,body:Update):
@@ -154,6 +167,9 @@ def register(app,studio):
             if revision!=body.base_revision:raise HTTPException(409,'Карточка изменилась в другом окне. Черновик сохранён; обнови данные перед повторным сохранением')
             validate(db,pid,node,body)
             data=body.model_dump(exclude={'base_revision','notes'})
+            if data['shooting'] is None:
+                data.pop('shooting')
+                if 'shooting' not in body.model_fields_set and old.get('shooting') is not None:data['shooting']=old['shooting']
             db.execute('UPDATE production_nodes SET notes=? WHERE id=?',(body.notes,nid))
             db.execute('INSERT INTO production_entity_state(node_id,data,updated_at) VALUES(?,?,?) ON CONFLICT(node_id) DO UPDATE SET data=excluded.data,updated_at=excluded.updated_at',(nid,json.dumps(data),studio.now()))
             # A final VIDEO take drives the economic outcome. A keyframe is not a finished-video use.

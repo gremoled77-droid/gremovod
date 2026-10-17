@@ -5,12 +5,14 @@ import ReplaceCharacterButton, {type CharacterVersion} from './ReplaceCharacterB
 import CharacterVoicePanel from './CharacterVoicePanel';
 import VisualRulesForm from './VisualRulesForm';
 import {readLocal, writeLocal, clearLocal} from './localDrafts';
+import ShotDirectionForm, {type ShotDirection, type ShootingCatalogue} from './ShotDirectionForm';
 
 type Selection = {
   character_node_ids: string[];
   location_node_id: string | null;
   selected_image_file_id: string | null;
   selected_video_file_id: string | null;
+  shooting?: ShotDirection | null;
 };
 type FileItem = {id: string; asset_id: string | null; kind: string; filename: string; url: string};
 type Job = {
@@ -33,6 +35,7 @@ type Editor = {
   owner_project_id: string;
   groups: string[];
   character: CharacterVersion | null;
+  shooting_catalogue?: ShootingCatalogue;
 };
 type Draft = Selection & {base_revision: string; notes: string};
 const LABEL: Record<string, string> = {
@@ -282,6 +285,18 @@ export default function ProductionEntityEditor({
               />
             </label>
             <VisualRulesForm pid={pid} nid={nid} />
+            {editor.node.kind === 'frame' &&
+              (editor.shooting_catalogue ? (
+                <ShotDirectionForm
+                  value={draft.shooting}
+                  catalogue={editor.shooting_catalogue}
+                  characters={editor.catalogue.filter(c => c.kind === 'character')}
+                  disabled={busy}
+                  onChange={shooting => update({shooting})}
+                />
+              ) : (
+                <p role="status">Для настроек съёмки обнови и перезапусти backend.</p>
+              ))}
             {editor.node.kind === 'episode' && (
               <>
                 <fieldset>

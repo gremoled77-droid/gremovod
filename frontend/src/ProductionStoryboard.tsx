@@ -633,7 +633,7 @@ export default function ProductionStoryboard({
                         <button disabled={busy} onClick={() => openFrame(frame)}>
                           В студию
                         </button>
-                        <button onClick={() => inspect(frame.id)}>Файлы ↗</button>
+                        <button onClick={() => inspect(frame.id)}>Съёмка и файлы ↗</button>
                       </div>
                       <VisualPlanForm
                         kind="frame"
