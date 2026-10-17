@@ -814,6 +814,8 @@ from backend import series_economics
 series_economics.register(app,sys.modules[__name__])
 from backend import character_voice
 character_voice.register(app,sys.modules[__name__])
+from backend import sound
+sound.register(app,sys.modules[__name__])
 camera_movements.register(app)
 frame_composition.register(app)
 from backend import reel_recipes

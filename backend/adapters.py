@@ -37,6 +37,8 @@ def pick_options(spec, options):
         _bad('Неподдерживаемый параметр модели: ' + ', '.join(sorted(unknown)))
     result = {}
     for name, rule in schema.items():
+        if rule.get('optional') and name not in options:
+            continue  # необязательный параметр без значения в запрос не попадает
         value = options.get(name, rule.get('default'))
         if 'values' in rule:
             if value not in rule['values']:
@@ -259,7 +261,28 @@ def describe_seedance_25(spec, payload):
     return lines
 
 
+# ---------- Image Upscale (PiAPI Qubico/image-toolkit): ПРЕДПРОСМОТР, запуск выключен до живой проверки ----------
+def build_image_upscale(spec, body):
+    """Один публичный HTTPS-URL, множитель 2 или 4. Размеры входа (in_width/in_height) нужны только для оценки цены."""
+    if len(body.reference_urls) != 1:
+        _bad('Апскейлу нужна ровно одна картинка-референс')
+    check_refs(body.reference_urls, 1)
+    options = pick_options(spec, body.options)
+    return {'model': spec['model'], 'task_type': spec['task_type'],
+            'input': {'image': body.reference_urls[0], 'scale': options['scale']},
+            'dims': {'w': options['in_width'], 'h': options['in_height']}}
+
+
+def cost_image_upscale(spec, payload):
+    """$0.001 за мегапиксель результата (1 Мп = 1024²), минимум $0.001. Без размеров входа берётся максимум 2048×2048."""
+    scale = payload['input']['scale']
+    dims = payload.get('dims') or {'w': spec['max_input_px'], 'h': spec['max_input_px']}
+    mpx = dims['w'] * dims['h'] * scale * scale / (1024 * 1024)
+    return max(spec['min_price_usd'], round(mpx * spec['price_per_mpx_usd'], 4))
+
+
 REGISTRY = {
+    'image_upscale': (build_image_upscale, cost_image_upscale),
     'unified_image': (build_unified_image, cost_unified_image),
     'gpt_image': (build_gpt_image, cost_gpt_image),
     'minimax_h3': (build_minimax_h3, cost_minimax_h3),
@@ -296,4 +319,6 @@ def wire_body(spec, payload):
     Служебное поле billing (для оценки цены) провайдеру не уходит."""
     if spec.get('adapter') == 'gpt_image':
         return {'model': payload['model'], **payload['input']}
+    if spec.get('adapter') == 'image_upscale':  # dims нужны только для оценки цены
+        return {k: payload[k] for k in ('model', 'task_type', 'input')}
     return {key: value for key, value in payload.items() if key != 'billing'}

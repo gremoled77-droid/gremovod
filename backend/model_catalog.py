@@ -66,7 +66,9 @@ MODEL_SPECS['minimax-h3']={
     'price_per_second_usd':{'480p':0.03,'768p':0.05,'1080p':0.07},
     'options':{'resolution':{'values':['480p','768p','1080p'],'default':'480p'},
                'duration':{'min':5,'max':15,'default':5},
-               'aspect_ratio':{'values':['16:9','9:16','1:1'],'default':'16:9'}}}
+               'aspect_ratio':{'values':['16:9','9:16','1:1'],'default':'16:9'},
+               # seed: по документации PiAPI необязательное целое «для воспроизводимости»; диапазон в доках не указан, не проверялся вживую.
+               'seed':{'min':0,'max':2147483647,'optional':True}}}
 
 
 # Seedance 2.5: адаптер сам валидирует картинки, видео, аудио, edit/extend и draft (backend/adapters.py).
@@ -77,6 +79,19 @@ MODEL_SPECS['seedance-2.5']['adapter']='seedance_25'
 # gpt-image-2.5-sunburst (правки) и референсы GPT Image не проверялись и остаются выключенными.
 for _id in ('seedream-5-pro','nano-banana-2.1','qwen-image-2.1','gpt-image-2','gpt-image-2.5','minimax-h3'):
     MODEL_SPECS[_id].update({'launch_enabled':True,'verified_at':'2026-10-16','prompt_only':False})
+
+# --- Апскейл изображений PiAPI (docs: piapi.ai/docs/image-editing-api/super-resolution-api, прочитано 16.10.2026).
+# Параметры и цена взяты из документации, живой вызов НЕ делался: launch_enabled=False, только предпросмотр.
+# Расхождение в доках: пример ответа показывает data.output, схема описывает data.task_result.task_output.image_url.
+MODEL_SPECS['image-upscale']={
+    'launch_enabled':False,'kind':'image','tool':True,'adapter':'image_upscale','prompt_only':False,
+    'model':'Qubico/image-toolkit','task_type':'upscale','max_refs':1,'api_refs':1,'ref_field':'image',
+    'price_per_mpx_usd':0.001,'min_price_usd':0.001,'max_input_px':2048,
+    'options':{'scale':{'values':[2,4],'default':2},
+               'in_width':{'min':1,'max':2048,'default':2048},
+               'in_height':{'min':1,'max':2048,'default':2048}},
+    'docs':'https://piapi.ai/docs/image-editing-api/super-resolution-api'}
+
 
 
 # --- Референсы и синтаксис тегов видеомоделей (16.10.2026). Справочные поля из инструкций владельца

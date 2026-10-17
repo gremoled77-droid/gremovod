@@ -52,7 +52,9 @@ def inspect_image(content):
         raise HTTPException(422,'Результат не является допустимым PNG, JPEG или WebP')
 
 def output_urls(response,kind='image'):
-    output=(response.get('data') or {}).get('output') or {}
+    data=response.get('data') or {}
+    # Апскейл по схеме PiAPI отдаёт результат в task_result.task_output (в примере ответа — в output).
+    output=data.get('output') or ((data.get('task_result') or {}).get('task_output') if isinstance(data.get('task_result'),dict) else None) or {}
     if not isinstance(output,dict): return []
     result=[]
     def collect(value):

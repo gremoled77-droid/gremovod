@@ -1,5 +1,5 @@
 /** Сдвигает элемент списка на delta позиций; null, если сдвиг невозможен. */
-export function moveItem(ids: string[], index: number, delta: number): string[] | null {
+export function moveItem<T>(ids: T[], index: number, delta: number): T[] | null {
   const target = index + delta;
   if (index < 0 || index >= ids.length || target < 0 || target >= ids.length || delta === 0) return null;
   const next = ids.slice();
