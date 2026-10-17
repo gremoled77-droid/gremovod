@@ -528,3 +528,154 @@
   color: var(--text);
   font-variant-numeric: tabular-nums;
 }
+
+/* Типизированные порты: цвет круга = тип данных (текст, изображение, аудио, видео) */
+.wf-node .wf-handle {
+  width: 13px;
+  height: 13px;
+  background: var(--pc, var(--kc));
+  border: 3px solid var(--bg);
+  box-shadow: 0 0 0 1px var(--pc, var(--kc));
+}
+.wf-node .wf-handle.target {
+  background: var(--bg);
+  border: 2px solid var(--pc);
+  box-shadow: none;
+}
+.wf-node .wf-handle.connectingto,
+.wf-node .wf-handle:hover {
+  background: var(--pc);
+}
+.wf-node-head .wf-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 500;
+}
+.wf-icon {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1;
+  flex: none;
+}
+.wf-icon:hover,
+.wf-icon.on {
+  background: var(--surface-2);
+  color: var(--text);
+}
+.wf-menu-wrap {
+  position: relative;
+  flex: none;
+}
+.wf-menu {
+  position: absolute;
+  right: 0;
+  top: 100%;
+  z-index: 20;
+  min-width: 170px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px;
+  background: var(--surface-2);
+  border: 1px solid var(--border-strong);
+  border-radius: 12px;
+  box-shadow: 0 14px 34px #000a;
+}
+.wf-menu.up {
+  top: auto;
+  bottom: 100%;
+  margin-bottom: 6px;
+}
+.wf-menu button {
+  text-align: left;
+  border: 0;
+  background: transparent;
+  padding: 7px 9px;
+  border-radius: 8px;
+  font-size: 12px;
+}
+.wf-menu button:hover {
+  background: var(--border-strong);
+}
+.wf-menu button.danger {
+  color: var(--bad);
+}
+.wf-menu small {
+  padding: 4px 9px;
+  color: var(--muted);
+  font-size: 11px;
+}
+.wf-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  border-radius: 10px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+}
+.wf-settings label {
+  display: grid;
+  grid-template-columns: 70px 1fr;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 11px;
+}
+.wf-result-actions {
+  display: flex;
+  gap: 8px;
+  padding: 0 12px 10px;
+}
+.wf-result-actions > button,
+.wf-result-actions .wf-menu-wrap {
+  flex: 1;
+}
+.wf-result-actions .wf-menu-wrap > button {
+  width: 100%;
+}
+.wf-result-actions button {
+  padding: 8px 6px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.wf-result-actions .primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+.wf-node-foot {
+  flex-wrap: wrap;
+  justify-content: flex-start;
+}
+.wf-param {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 99px;
+  background: var(--surface-2);
+  color: var(--text);
+}
+.wf-price {
+  margin-left: auto;
+  color: var(--accent);
+  font-weight: 600;
+  font-size: 12px;
+}
+.wf-node-foot .wf-run {
+  margin-left: auto;
+}
+.wf-node-foot .wf-price + .wf-run {
+  margin-left: 0;
+}
