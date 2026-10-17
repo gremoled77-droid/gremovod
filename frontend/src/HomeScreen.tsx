@@ -3,6 +3,7 @@ import {apiFetch} from './api';
 import {useSharedActivity} from './ActivityContext';
 import type {Mode} from './StageNav';
 import Lightbox from './Lightbox';
+import {loadCreateDraft, saveCreateDraft} from './createDraft';
 
 type Budget = {
   project_limit_usd: number;
@@ -11,6 +12,19 @@ type Budget = {
   daily_reserved_usd: number;
 };
 type Project = {id: string; title: string};
+type Media = {
+  id: string;
+  url: string;
+  thumbnail_url: string | null;
+  metadata?: {kind?: string; original_name?: string; width?: number; height?: number};
+};
+type Cost = {actual_usd?: number | null; estimated_usd?: number | null};
+type Reel = 'video' | 'image' | 'audio';
+const REELS: {id: Reel; label: string}[] = [
+  {id: 'video', label: 'Видео'},
+  {id: 'image', label: 'Кадры'},
+  {id: 'audio', label: 'Звук'},
+];
 
 const STEPS: {mode: Mode; n: string; title: string; text: string}[] = [
   {mode: 'studio', n: '1', title: 'Идея', text: 'Задание ролика, шутка, сюжет'},
@@ -50,7 +64,12 @@ export default function HomeScreen({
   const {items} = useSharedActivity();
   const [budget, setBudget] = useState<Budget | null>(null);
   const [view, setView] = useState(-1);
-  const [images, setImages] = useState<{id: string; url: string; thumbnail_url: string | null}[]>([]);
+  const [images, setImages] = useState<Media[]>([]);
+  const [clips, setClips] = useState<Media[]>([]);
+  const [sounds, setSounds] = useState<Media[]>([]);
+  const [reel, setReel] = useState<Reel>('image');
+  const [playing, setPlaying] = useState('');
+  const [costs, setCosts] = useState<Record<string, Cost>>({});
 
   useEffect(() => {
     if (!projectId) return;
@@ -63,9 +82,55 @@ export default function HomeScreen({
     if (!projectId) return;
     void apiFetch('/api/library?project_id=' + encodeURIComponent(projectId))
       .then(r => (r.ok ? r.json() : []))
-      .then(list => setImages(list.filter((a: any) => (a.metadata?.kind || 'image') === 'image').slice(0, 8)))
+      .then((list: Media[]) => {
+        const of = (kind: string) => list.filter(a => (a.metadata?.kind || 'image') === kind);
+        setImages(of('image').slice(0, 8));
+        setClips(of('video').slice(0, 12));
+        setSounds(of('audio').slice(0, 12));
+      })
       .catch(() => undefined);
   }, [projectId, items]);
+
+  useEffect(() => {
+    if (!projectId) return;
+    void apiFetch('/api/economics?project_id=' + encodeURIComponent(projectId))
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => {
+        const map: Record<string, Cost> = {};
+        for (const a of d?.jobs || []) map[a.id] = a;
+        setCosts(map);
+      })
+      .catch(() => undefined);
+  }, [projectId, items]);
+
+  const captionOf = (a: Media) => {
+    const job = items.find(i => i.asset_ids.includes(a.id));
+    const cost = job ? costs[job.id] : undefined;
+    const usd =
+      cost?.actual_usd ?? cost?.estimated_usd ?? (job && !job.provider.startsWith('piapi') ? 0 : null);
+    const size = a.metadata?.width && a.metadata?.height ? `${a.metadata.width}×${a.metadata.height}` : '';
+    const cents = usd === null || usd === undefined ? '' : `${(usd * 100).toFixed(usd * 100 < 10 ? 1 : 0)} ¢`;
+    return [job?.model, size, cents].filter(Boolean).join(' · ');
+  };
+  /** «Редактировать»: кадр уходит в «Кадры» уже прикреплённым референсом для правки через ChatGPT. */
+  const editAsset = (a: Media) => {
+    const draft = loadCreateDraft(projectId);
+    saveCreateDraft(projectId, {
+      ...draft,
+      refs: [a.id, ...draft.refs.filter(id => id !== a.id)],
+      selected: ['gpt-image-2.5'],
+      prompt: 'Отредактируй изображение: ',
+    });
+    setView(-1);
+    onMode('create');
+  };
+  const trashAsset = async (a: Media) => {
+    if (!window.confirm('Убрать кадр в корзину? Его можно вернуть в течение 30 дней.')) return;
+    const r = await apiFetch(`/api/library/${a.id}/trash`, {method: 'POST'});
+    if (!r.ok) return window.alert('Не удалось убрать: кадр используется в проекте или недоступен');
+    setView(-1);
+    setImages(list => list.filter(x => x.id !== a.id));
+  };
 
   const waiting = items.filter(i => i.status === 'waiting_external');
   const active = items.filter(i => ['queued', 'running', 'processing'].includes(i.status));
@@ -160,19 +225,82 @@ export default function HomeScreen({
         </button>
       </header>
 
-      <div className="home-film" aria-label="Последние кадры">
-        <div className="home-perf" aria-hidden="true" />
-        <div className="home-frames">
-          {images.slice(0, 6).map((a, i) => (
-            <button key={a.id} onClick={() => setView(i)} aria-label={'Открыть кадр ' + (i + 1)}>
-              <img src={a.thumbnail_url || a.url} alt="" />
-              <span>{String(i + 1).padStart(2, '0')}</span>
+      <div className="home-film" aria-label="Плёнка проекта">
+        <div className="home-reels" role="tablist" aria-label="Что показать на плёнке">
+          {REELS.map(r => (
+            <button
+              key={r.id}
+              role="tab"
+              aria-selected={reel === r.id}
+              className={reel === r.id ? 'on' : ''}
+              onClick={() => {
+                setReel(r.id);
+                setPlaying('');
+              }}
+            >
+              {r.label}
+              <em>{r.id === 'video' ? clips.length : r.id === 'audio' ? sounds.length : images.length}</em>
             </button>
           ))}
-          {!images.length && (
-            <div className="home-frames-empty">Плёнка пуста. Первый кадр рождается на экране «Кадры».</div>
-          )}
         </div>
+        <div className="home-perf" aria-hidden="true" />
+        {reel === 'image' && (
+          <div className="home-frames">
+            {images.slice(0, 6).map((a, i) => (
+              <button key={a.id} onClick={() => setView(i)} aria-label={'Открыть кадр ' + (i + 1)}>
+                <img src={a.thumbnail_url || a.url} alt="" />
+                <span>{String(i + 1).padStart(2, '0')}</span>
+              </button>
+            ))}
+            {!images.length && (
+              <div className="home-frames-empty">Плёнка пуста. Первый кадр рождается на экране «Кадры».</div>
+            )}
+          </div>
+        )}
+        {reel === 'video' && (
+          <div className="home-frames">
+            {clips.map((a, i) => (
+              <div key={a.id} className="home-clip">
+                <video
+                  src={a.url}
+                  controls={playing === a.id}
+                  autoPlay={playing === a.id}
+                  preload="metadata"
+                  playsInline
+                />
+                {playing !== a.id && (
+                  <button
+                    className="home-play"
+                    aria-label={'Играть клип ' + (i + 1)}
+                    onClick={() => setPlaying(a.id)}
+                  >
+                    ▶
+                  </button>
+                )}
+                <span>{String(i + 1).padStart(2, '0')}</span>
+              </div>
+            ))}
+            {!clips.length && (
+              <div className="home-frames-empty">Клипов пока нет. Оживи кадр на экране «Видео».</div>
+            )}
+          </div>
+        )}
+        {reel === 'audio' && (
+          <div className="home-sounds">
+            {sounds.map((a, i) => (
+              <div key={a.id} className="home-sound">
+                <span className="home-sound-n">{String(i + 1).padStart(2, '0')}</span>
+                <b>{a.metadata?.original_name || 'Дорожка ' + (i + 1)}</b>
+                <audio src={a.url} controls preload="none" />
+              </div>
+            ))}
+            {!sounds.length && (
+              <div className="home-frames-empty">
+                Звука пока нет. Голос и музыка делаются на экране «Звук».
+              </div>
+            )}
+          </div>
+        )}
         <div className="home-perf" aria-hidden="true" />
       </div>
 
@@ -238,7 +366,13 @@ export default function HomeScreen({
       </div>
       {view >= 0 && (
         <Lightbox
-          items={images.slice(0, 6).map((a, i) => ({url: a.url, title: 'Кадр ' + (i + 1)}))}
+          items={images.slice(0, 6).map((a, i) => ({
+            url: a.url,
+            title: 'Кадр ' + (i + 1),
+            caption: captionOf(a),
+            onEdit: () => editAsset(a),
+            onTrash: () => void trashAsset(a),
+          }))}
           index={view}
           onIndex={setView}
           onClose={() => setView(-1)}

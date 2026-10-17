@@ -474,3 +474,115 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* Плёнка: переключатель Видео / Кадры / Звук и плееры прямо на экране */
+.home-reels {
+  display: flex;
+  gap: 6px;
+  padding: 8px 10px 4px;
+}
+.home-reels button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 32px;
+  padding: 0 14px;
+  border: 1px solid var(--border);
+  border-radius: 99px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.home-reels button em {
+  font-style: normal;
+  font-size: 11px;
+  letter-spacing: 0;
+  opacity: 0.7;
+}
+.home-reels button:hover {
+  color: var(--text);
+}
+.home-reels button.on {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--accent);
+}
+.home-clip {
+  position: relative;
+  border: 1px solid #23262e;
+  border-radius: 6px;
+  overflow: hidden;
+  aspect-ratio: 4 / 3;
+  background: #0b0c0f;
+}
+.home-clip video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+.home-clip span {
+  position: absolute;
+  left: 6px;
+  top: 5px;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  color: #ffd27a;
+  text-shadow: 0 1px 3px #000;
+  pointer-events: none;
+}
+.home-frames .home-clip .home-play {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 48px;
+  height: 48px;
+  aspect-ratio: auto;
+  border: 0;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: 16px;
+  padding-left: 3px;
+  display: grid;
+  place-items: center;
+}
+.home-frames .home-clip .home-play:hover {
+  transform: scale(1.08);
+}
+.home-sounds {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 8px;
+  padding: 8px;
+}
+.home-sound {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 6px 10px;
+  align-items: center;
+  padding: 10px 12px;
+  border: 1px solid #23262e;
+  border-radius: 8px;
+  background: #0b0c0f;
+}
+.home-sound b {
+  font-size: 13px;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.home-sound-n {
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  color: #ffd27a;
+}
+.home-sound audio {
+  grid-column: 1 / -1;
+  width: 100%;
+  height: 34px;
+}

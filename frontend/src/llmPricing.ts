@@ -13,3 +13,15 @@ export function llmEstimate(model: string, inputChars: number, maxTokens = LLM_M
   const inputTokens = Math.ceil(inputChars / 2.5) + 50;
   return (inputTokens * price.input + maxTokens * price.output) / 1_000_000;
 }
+
+/** Для экрана «Идея»: те же модели плюс GPT-6 Astra (дорогая, только для сценария и промптов). */
+export const IDEA_LLM_MODELS: Record<string, {label: string; input: number; output: number}> = {
+  ...LLM_MODELS,
+  'gpt-6-astra': {label: 'GPT-6 Astra', input: 2, output: 10},
+};
+export function ideaEstimate(model: string, inputChars: number, maxTokens = LLM_MAX_TOKENS): number {
+  const price = IDEA_LLM_MODELS[model];
+  if (!price) return 0;
+  const inputTokens = Math.ceil(inputChars / 2) + 40;
+  return (inputTokens * price.input + maxTokens * price.output) / 1_000_000;
+}
