@@ -15,7 +15,7 @@ export default function CameraFramePanel({
   prompt,
   onPrompt,
   extra,
-  categories = ['angle', 'size', 'light'],
+  categories = ['size', 'angle', 'comp', 'light'],
 }: {
   prompt: string;
   onPrompt: (update: (current: string) => string) => void;
@@ -24,7 +24,7 @@ export default function CameraFramePanel({
   categories?: FrameCat[];
 }) {
   const [open, setOpen] = useState(false);
-  const [cat, setCat] = useState<FrameCat>('angle');
+  const [cat, setCat] = useState<FrameCat>('size');
   const cats = FRAME_CATS.filter(c => categories.includes(c.id));
   const chosen = selectedFrameItems(prompt).filter(i => categories.includes(i.cat));
   const chosenIds = new Set(chosen.map(i => i.id));
@@ -55,7 +55,7 @@ export default function CameraFramePanel({
               </button>
             </span>
           ))}
-          {!chosen.length && <span className="cf-hint">ракурс, план, движение, свет</span>}
+          {!chosen.length && <span className="cf-hint">план, ракурс, композиция, свет</span>}
         </div>
         {extra}
       </div>
@@ -95,7 +95,7 @@ export default function CameraFramePanel({
             ))}
           </div>
           <small className="muted">
-            Фраза уходит в строки FRAME и LIGHT промпта; в каждой группе выбирается один вариант.
+            Фраза уходит в строки FRAME, DOMINANT и LIGHT промпта; в каждой группе выбирается один вариант.
           </small>
         </div>
       )}

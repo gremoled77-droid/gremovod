@@ -1895,6 +1895,14 @@ function App() {
                     name: c.name,
                     assetId: c.working_asset_id,
                   }))}
+                  world={[
+                    state.style?.look,
+                    state.style?.palette,
+                    state.style?.lighting,
+                    state.style?.environment,
+                  ]
+                    .filter(Boolean)
+                    .join('. ')}
                 />
               ) : mode === 'video' ? (
                 <>

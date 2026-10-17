@@ -1,4 +1,5 @@
 import {useEffect, useMemo, useRef, useState} from 'react';
+import {Trash2} from 'lucide-react';
 import {apiFetch} from './api';
 import {loadCreateDraft, saveCreateDraft} from './createDraft';
 import GenerationReview, {type GenerationRequest} from './GenerationReview';
@@ -12,7 +13,7 @@ import {
   buildReplaceInVideoPrompt,
   replacementRefs,
 } from './replaceCharacterPrompt';
-import {appendBlock} from './visualPlan';
+import {AddReferenceModal, LocationModal} from './FrameSources';
 import CameraFramePanel from './CameraFramePanel';
 import PriceTable, {cents, useModelRange, useOptionPrices} from './PriceTable';
 
@@ -158,11 +159,19 @@ function ModelOptions({
   );
 }
 
-export default function CreateScreen(props: {projectId: string; heroes: Hero[]}) {
+export default function CreateScreen(props: {projectId: string; heroes: Hero[]; world?: string}) {
   return <CreateScreenBody key={props.projectId} {...props} />;
 }
 
-function CreateScreenBody({projectId, heroes}: {projectId: string; heroes: Hero[]}) {
+function CreateScreenBody({
+  projectId,
+  heroes,
+  world = '',
+}: {
+  projectId: string;
+  heroes: Hero[];
+  world?: string;
+}) {
   const [restored] = useState(() => loadCreateDraft(projectId));
   const [draftSaved, setDraftSaved] = useState(true);
   const {items, error: feedError, reset} = useSharedActivity();
@@ -184,15 +193,7 @@ function CreateScreenBody({projectId, heroes}: {projectId: string; heroes: Hero[
       setError(e instanceof Error ? e.message : String(e));
     }
   }
-  async function addComposition() {
-    setError('');
-    try {
-      const data = await json(await apiFetch(`/api/projects/${projectId}/composition-brief`));
-      setPrompt(current => appendBlock(current, data.prompt, 'VISUAL COMPOSITION BRIEF'));
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    }
-  }
+  const [source, setSource] = useState<'' | 'hero' | 'location'>('');
   const [selected, setSelected] = useState<string[]>(restored.selected);
   const [pick, setPick] = useState<Record<string, string>>({});
   const [options, setOptions] = useState<Record<string, Record<string, string | number>>>(restored.options);
@@ -917,6 +918,15 @@ function CreateScreenBody({projectId, heroes}: {projectId: string; heroes: Hero[
                   >
                     {a.metadata.favorite ? '♥' : '♡'}
                   </button>
+                  <button
+                    type="button"
+                    className="cs-heart cs-heart-big cs-trash-big"
+                    aria-label="В корзину"
+                    title="Убрать из ленты в корзину (30 дней)"
+                    onClick={() => void trashAsset(aid)}
+                  >
+                    <Trash2 size={16} />
+                  </button>
                   <div className="cs-cap">
                     <div>
                       <b>{LABELS[item.model] || item.model}</b>
@@ -1030,17 +1040,25 @@ function CreateScreenBody({projectId, heroes}: {projectId: string; heroes: Hero[
               <div className="cf-extra">
                 <button
                   disabled={!projectId}
+                  aria-label="Добавить персонажа или референс"
+                  title="Добавить персонажа или загрузить свой референс"
+                  onClick={() => setSource('hero')}
+                >
+                  ＋
+                </button>
+                <button
+                  disabled={!projectId}
+                  title="Выбрать готовую локацию или создать новую по мотивам мира"
+                  onClick={() => setSource('location')}
+                >
+                  Локация
+                </button>
+                <button
+                  disabled={!projectId}
                   title="Добавить в промпт визуальные правила серии, локации и героев этого кадра"
                   onClick={() => void addVisualRules()}
                 >
                   ＋ Правила серии
-                </button>
-                <button
-                  disabled={!projectId}
-                  title="Добавить в промпт блок композиции: доминанта, баланс или напряжение, противовес из плана кадра"
-                  onClick={() => void addComposition()}
-                >
-                  ＋ Композиция кадра
                 </button>
                 <CinemaInfo topic="composition" />
                 <CinemaInfo topic="lens" />
@@ -1080,6 +1098,33 @@ function CreateScreenBody({projectId, heroes}: {projectId: string; heroes: Hero[
         </div>
       </aside>
 
+      {source === 'hero' && (
+        <AddReferenceModal
+          projectId={projectId}
+          refs={refs}
+          onAdd={id => setRefs(r => (r.includes(id) ? r : [...r, id]))}
+          onUploaded={id => {
+            setRefs(r => (r.includes(id) ? r : [...r, id]));
+            void loadLibrary();
+          }}
+          onClose={() => setSource('')}
+        />
+      )}
+      {source === 'location' && (
+        <LocationModal
+          projectId={projectId}
+          refs={refs}
+          world={world}
+          onAdd={id => setRefs(r => (r.includes(id) ? r : [...r, id]))}
+          onCreate={brief => {
+            setPrompt(cur => (cur.trim() ? cur.trimEnd() + '\n\n' + brief : brief));
+            setNotice(
+              'Промпт локации добавлен: выбери модель и сгенерируй, результат появится в библиотеке.'
+            );
+          }}
+          onClose={() => setSource('')}
+        />
+      )}
       {view && (
         <Lightbox
           items={view.items}

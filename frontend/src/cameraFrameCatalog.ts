@@ -1,10 +1,11 @@
-/** Каталог панели «Камера и кадр»: ракурс, план, движение, свет. Фразы идут в промпт строками FRAME / CAMERA / LIGHT. */
-export type FrameCat = 'angle' | 'size' | 'move' | 'light';
+/** Каталог панели «Камера и кадр»: план, ракурс, композиция, движение, свет. Фразы идут в промпт строками FRAME / DOMINANT / CAMERA / LIGHT. */
+export type FrameCat = 'angle' | 'size' | 'comp' | 'move' | 'light';
 export type FrameItem = {id: string; cat: FrameCat; ru: string; en: string};
 
-export const FRAME_CATS: {id: FrameCat; label: string; line: 'FRAME' | 'CAMERA' | 'LIGHT'}[] = [
-  {id: 'angle', label: 'Ракурс', line: 'FRAME'},
+export const FRAME_CATS: {id: FrameCat; label: string; line: 'FRAME' | 'DOMINANT' | 'CAMERA' | 'LIGHT'}[] = [
   {id: 'size', label: 'План', line: 'FRAME'},
+  {id: 'angle', label: 'Ракурс', line: 'FRAME'},
+  {id: 'comp', label: 'Композиция', line: 'DOMINANT'},
   {id: 'move', label: 'Движение', line: 'CAMERA'},
   {id: 'light', label: 'Свет', line: 'LIGHT'},
 ];
@@ -23,6 +24,25 @@ export const FRAME_ITEMS: FrameItem[] = [
   {id: 'ms', cat: 'size', ru: 'Средний', en: 'medium shot'},
   {id: 'ws', cat: 'size', ru: 'Общий', en: 'wide shot showing the environment'},
   {id: 'ews', cat: 'size', ru: 'Дальний', en: 'extreme wide establishing shot'},
+
+  {
+    id: 'thirds',
+    cat: 'comp',
+    ru: 'Правило третей',
+    en: 'subject on the left third with space in front of the gaze',
+  },
+  {id: 'center', cat: 'comp', ru: 'По центру', en: 'centered symmetrical composition'},
+  {id: 'space', cat: 'comp', ru: 'Пустота вокруг', en: 'small subject at the edge with large negative space'},
+  {id: 'lines', cat: 'comp', ru: 'Ведущие линии', en: 'leading lines pointing to the subject'},
+  {id: 'framed', cat: 'comp', ru: 'Кадр в кадре', en: 'subject framed by a window or doorway'},
+  {
+    id: 'layers',
+    cat: 'comp',
+    ru: 'Слои глубины',
+    en: 'clear foreground, midground and background layers with overlap',
+  },
+  {id: 'sil', cat: 'comp', ru: 'Силуэт', en: 'strong silhouette against a bright background'},
+  {id: 'diag', cat: 'comp', ru: 'Диагональ', en: 'diagonal composition with tilted lines'},
 
   {id: 'static', cat: 'move', ru: 'Статика', en: 'static locked-off camera'},
   {id: 'push', cat: 'move', ru: 'Наезд', en: 'slow push in'},
@@ -50,7 +70,7 @@ const known = new Set(FRAME_ITEMS.map(i => i.en));
 /** Фразы каталога, уже стоящие в строках FRAME / CAMERA / LIGHT промпта. */
 export function selectedFrameItems(prompt: string): FrameItem[] {
   const out: FrameItem[] = [];
-  for (const label of ['FRAME', 'CAMERA', 'LIGHT']) {
+  for (const label of ['FRAME', 'DOMINANT', 'CAMERA', 'LIGHT']) {
     const match = prompt.match(lineRe(label));
     if (!match) continue;
     const parts = match[1].split(/\s*;\s*/);

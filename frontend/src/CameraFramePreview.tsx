@@ -255,6 +255,86 @@ function Angle({id}: {id: string}) {
   return id === 'dutch' ? <g transform="rotate(-14 40 30)">{scene}</g> : scene;
 }
 
+const COMPS: Record<string, ReactNode> = {
+  thirds: (
+    <>
+      <path d="M27 0V60M53 0V60M0 20H80M0 40H80" stroke="currentColor" opacity="0.3" strokeDasharray="2 3" />
+      <Person x={27} y={54} s={0.9} />
+      <circle cx="27" cy="20" r="2.4" fill={ACCENT} />
+      <path d="M36 22H62M58 19L62 22L58 25" fill="none" stroke={ACCENT} strokeWidth="1.2" />
+    </>
+  ),
+  center: (
+    <>
+      <path d="M40 0V60" stroke={ACCENT} strokeDasharray="2 3" />
+      <rect x="6" y="22" width="16" height="30" fill="currentColor" opacity="0.2" />
+      <rect x="58" y="22" width="16" height="30" fill="currentColor" opacity="0.2" />
+      <Person />
+    </>
+  ),
+  space: (
+    <>
+      <Person x={14} y={54} s={0.5} />
+      <rect
+        x="3"
+        y="3"
+        width="74"
+        height="54"
+        fill="none"
+        stroke={ACCENT}
+        strokeWidth="1.2"
+        strokeDasharray="3 3"
+      />
+    </>
+  ),
+  lines: (
+    <>
+      <path
+        d="M0 58L40 30M80 58L40 30M0 36L40 30M80 36L40 30M10 0L40 28M70 0L40 28"
+        stroke={ACCENT}
+        strokeWidth="1"
+        opacity="0.7"
+      />
+      <Person x={40} y={50} s={0.6} />
+    </>
+  ),
+  framed: (
+    <>
+      <Person x={40} y={50} s={0.6} />
+      <path d="M0 0H80V60H0Z M18 8V52H62V8Z" fill="currentColor" opacity="0.55" fillRule="evenodd" />
+      <rect x="18" y="8" width="44" height="44" fill="none" stroke={ACCENT} strokeWidth="1.4" />
+    </>
+  ),
+  layers: (
+    <>
+      <rect x="44" y="10" width="30" height="34" fill="currentColor" opacity="0.15" />
+      <Person x={40} y={54} s={0.75} />
+      <path d="M0 60V42Q8 30 24 36L34 60Z" fill="currentColor" opacity="0.6" />
+      <path d="M2 56H78" stroke={ACCENT} strokeWidth="1" strokeDasharray="2 3" />
+    </>
+  ),
+  sil: (
+    <>
+      <defs>
+        <linearGradient id="cf-sil" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#ffd88a" />
+          <stop offset="1" stopColor="#d96a3a" />
+        </linearGradient>
+      </defs>
+      <rect width="80" height="60" fill="url(#cf-sil)" />
+      <Person fill="#0d0d10" opacity={1} />
+    </>
+  ),
+  diag: (
+    <>
+      <path d="M0 50L80 14M0 60L80 24" stroke={ACCENT} strokeWidth="1" opacity="0.6" />
+      <g transform="rotate(-12 40 40)">
+        <Person />
+      </g>
+    </>
+  ),
+};
+
 const LIGHTS: Record<string, {bg: string[]; fx: ReactNode; edge?: string; fill?: string}> = {
   back: {
     bg: ['#2a2a33', '#14141a'],
@@ -333,6 +413,7 @@ export default function CameraFramePreview({cat, id}: {cat: FrameCat; id: string
       {cat === 'size' && SIZES[id]}
       {cat === 'move' && MOVES[id]}
       {cat === 'angle' && <Angle id={id} />}
+      {cat === 'comp' && COMPS[id]}
       {cat === 'light' && <Light id={id} />}
     </svg>
   );
