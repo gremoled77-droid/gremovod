@@ -175,3 +175,11 @@
 ## Отчёт сессии Claude Code от 16.10.2026
 
 Проверка правок Codex, аудит кнопок и логики, предлагаемый порядок работ: `docs/CLAUDE_SESSION_REPORT_2026-10-16.md`. Прочитай перед продолжением.
+
+## Codex: локальный курс света — 17.10.2026
+
+По запросу владельца локально разобраны 16 MP4 (67:58) и двухстраничный PDF из `C:/Users/BLOWKA/Downloads/Pro Cinematography Lighting Skills for Filmmakers & Creators/`. Рядом с каждым видео сохранены английские SRT и TXT с исходным именем; распознавание faster-whisper small CPU/int8, 785 сегментов. Формат SRT и временные границы проверены; непрерывное ручное прослушивание не проводилось. Ошибки ASR и противоречивое вступление Book Light явно отмечены.
+
+Добавлен отдельный `skills/gremovod-cinematic-lighting/` (SKILL.md + references/course-lighting.md), не затрагивая текущие незавершённые правки camera-work и приложения. Навык также установлен в `C:/Users/BLOWKA/Documents/!GREM TAXI/gremovod/skills/gremovod-cinematic-lighting/`, подключён из локального AGENTS.md. Подробный разбор, реестр, исходные JSON ASR и 18 выбранных иллюстраций (включая 2 страницы PDF) сохранены в `gremovod/references/cinematography-lighting-course-2026-10-17/` локального медиапроекта. В source-library.md добавлен указатель. Полные расшифровки и кадры на GitHub не добавляются.
+
+Проверки: quick_validate.py — Skill is valid; SRT 16/16 — формат, число блоков и границы таймкодов pass; визуально проверены 48 обзорных кадров, дополнительный кадр Hard Lighting, пара до/после sider и обе страницы PDF. Промежуточный анализ: `.worktrees/codex/output/lighting-course/` (игнорируется Git). Синхронизация merge origin/main отложена из-за существующих незакоммиченных правок; fetch выполнен. Код, main, процессы студии, базы, канон и платные генерации не затрагивались.
