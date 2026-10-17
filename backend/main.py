@@ -804,4 +804,6 @@ from backend.temp_cleanup import register as register_temp_cleanup
 register_temp_cleanup(app,sys.modules[__name__])
 from backend import remote_access
 remote_access.register(app,sys.modules[__name__])
+from backend import story_plan
+story_plan.register(app,sys.modules[__name__])
 remote_access.mount_frontend(app,ROOT.parent)

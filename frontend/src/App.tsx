@@ -1,4 +1,5 @@
 import ProductionStoryboard from './ProductionStoryboard';
+import StoryPlanBoard from './StoryPlanBoard';
 import CharacterReferences from './CharacterReferences';
 import SettingsPanel from './SettingsPanel';
 import StageFooter from './StageFooter';
@@ -1902,6 +1903,7 @@ function App() {
                 />
               ) : mode === 'studio' ? (
                 <>
+                  <StoryPlanBoard location={workspaceLocation} brief={state.brief} />
                   <section className="panel">
                     <h2>Задание ролика</h2>
                     <p className="muted">
