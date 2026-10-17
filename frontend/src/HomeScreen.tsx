@@ -3,6 +3,7 @@ import {apiFetch} from './api';
 import {useSharedActivity} from './ActivityContext';
 import type {Mode} from './StageNav';
 import Lightbox from './Lightbox';
+import {loadCreateDraft, saveCreateDraft} from './createDraft';
 
 type Budget = {
   project_limit_usd: number;
@@ -15,8 +16,9 @@ type Media = {
   id: string;
   url: string;
   thumbnail_url: string | null;
-  metadata?: {kind?: string; original_name?: string};
+  metadata?: {kind?: string; original_name?: string; width?: number; height?: number};
 };
+type Cost = {actual_usd?: number | null; estimated_usd?: number | null};
 type Reel = 'video' | 'image' | 'audio';
 const REELS: {id: Reel; label: string}[] = [
   {id: 'video', label: 'Видео'},
@@ -67,6 +69,7 @@ export default function HomeScreen({
   const [sounds, setSounds] = useState<Media[]>([]);
   const [reel, setReel] = useState<Reel>('image');
   const [playing, setPlaying] = useState('');
+  const [costs, setCosts] = useState<Record<string, Cost>>({});
 
   useEffect(() => {
     if (!projectId) return;
@@ -87,6 +90,47 @@ export default function HomeScreen({
       })
       .catch(() => undefined);
   }, [projectId, items]);
+
+  useEffect(() => {
+    if (!projectId) return;
+    void apiFetch('/api/economics?project_id=' + encodeURIComponent(projectId))
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => {
+        const map: Record<string, Cost> = {};
+        for (const a of d?.jobs || []) map[a.id] = a;
+        setCosts(map);
+      })
+      .catch(() => undefined);
+  }, [projectId, items]);
+
+  const captionOf = (a: Media) => {
+    const job = items.find(i => i.asset_ids.includes(a.id));
+    const cost = job ? costs[job.id] : undefined;
+    const usd =
+      cost?.actual_usd ?? cost?.estimated_usd ?? (job && !job.provider.startsWith('piapi') ? 0 : null);
+    const size = a.metadata?.width && a.metadata?.height ? `${a.metadata.width}×${a.metadata.height}` : '';
+    const cents = usd === null || usd === undefined ? '' : `${(usd * 100).toFixed(usd * 100 < 10 ? 1 : 0)} ¢`;
+    return [job?.model, size, cents].filter(Boolean).join(' · ');
+  };
+  /** «Редактировать»: кадр уходит в «Кадры» уже прикреплённым референсом для правки через ChatGPT. */
+  const editAsset = (a: Media) => {
+    const draft = loadCreateDraft(projectId);
+    saveCreateDraft(projectId, {
+      ...draft,
+      refs: [a.id, ...draft.refs.filter(id => id !== a.id)],
+      selected: ['gpt-image-2.5'],
+      prompt: 'Отредактируй изображение: ',
+    });
+    setView(-1);
+    onMode('create');
+  };
+  const trashAsset = async (a: Media) => {
+    if (!window.confirm('Убрать кадр в корзину? Его можно вернуть в течение 30 дней.')) return;
+    const r = await apiFetch(`/api/library/${a.id}/trash`, {method: 'POST'});
+    if (!r.ok) return window.alert('Не удалось убрать: кадр используется в проекте или недоступен');
+    setView(-1);
+    setImages(list => list.filter(x => x.id !== a.id));
+  };
 
   const waiting = items.filter(i => i.status === 'waiting_external');
   const active = items.filter(i => ['queued', 'running', 'processing'].includes(i.status));
@@ -322,7 +366,13 @@ export default function HomeScreen({
       </div>
       {view >= 0 && (
         <Lightbox
-          items={images.slice(0, 6).map((a, i) => ({url: a.url, title: 'Кадр ' + (i + 1)}))}
+          items={images.slice(0, 6).map((a, i) => ({
+            url: a.url,
+            title: 'Кадр ' + (i + 1),
+            caption: captionOf(a),
+            onEdit: () => editAsset(a),
+            onTrash: () => void trashAsset(a),
+          }))}
           index={view}
           onIndex={setView}
           onClose={() => setView(-1)}

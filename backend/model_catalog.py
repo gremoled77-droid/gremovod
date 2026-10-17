@@ -69,7 +69,106 @@ MODEL_SPECS['minimax-h3']={
                'aspect_ratio':{'values':['16:9','9:16','1:1'],'default':'16:9'}}}
 
 
+# Seedance 2.5: адаптер сам валидирует картинки, видео, аудио, edit/extend и draft (backend/adapters.py).
+MODEL_SPECS['seedance-2.5']['adapter']='seedance_25'
+
+
 # --- Живая проверка 16.10.2026 (scripts/live_piapi_test.py): отправка, статус, результат и списание совпали с оценкой.
 # gpt-image-2.5-sunburst (правки) и референсы GPT Image не проверялись и остаются выключенными.
 for _id in ('seedream-5-pro','nano-banana-2.1','qwen-image-2.1','gpt-image-2','gpt-image-2.5','minimax-h3'):
     MODEL_SPECS[_id].update({'launch_enabled':True,'verified_at':'2026-10-16','prompt_only':False})
+
+
+# --- Референсы и синтаксис тегов видеомоделей (16.10.2026). Справочные поля из инструкций владельца
+# --- и практикума GORA ACADEMY (см. skills/video-*): API они не вызывают и launch_enabled/цены не меняют.
+# --- Лимиты провайдера (PiAPI) могут отличаться, не проверено вживую. None = лимит в инструкции не указан.
+_REF_PROFILES = {
+    'seedance-2.0': {
+        'ref_limits': {'image':9,'video':3,'audio':3,'total':15,'video_total_s':15.4,'audio_total_s':15,
+                       'duration_min_s':4,'duration_max_s':15,
+                       'note':'по документации PiAPI (17.10.2026); аудио одно не принимается, нужен ещё образ или видео'},
+        'ref_syntax': {'style':'at_numbered','image':'@image{n}','video':'@video{n}','audio':'@audio{n}',
+                       'piapi':{'model':'seedance','task_types':['seedance-2','seedance-2-fast','seedance-2-mini'],
+                                'less_restriction_suffix':'-less-restriction','modes':['text_to_video','first_last_frames','omni_reference'],
+                                'asset':'asset://{asset_id}','asset_only_on':'less-restriction'},
+                       'rule':'каждому тегу одна роль в первой строке промпта; asset:// только у -less-restriction'}},
+    'seedance-2.5': {
+        'ref_limits': {'image':30,'video':10,'audio':10,'total':50,'video_total_s':30,'audio_total_s':30,
+                       'duration_min_s':4,'duration_max_s':30,
+                       'note':'по документации PiAPI; адаптер студии отправляет картинки, видео, аудио, edit/extend и draft (не проверено вживую)'},
+        'ref_syntax': {'style':'at_numbered','image':'@image{n}','video':'@video{n}','audio':'@audio{n}',
+                       'rule':'строчные теги по порядку массивов; ссылка на отсутствующий файл даёт 400',
+                       'tasks':['auto','reference','edit','extend'],'draft_mode':True}},
+    'flux-3': {
+        'ref_limits': {'image':None,'video':1,'audio':0,'total':None,
+                       'note':'мультиреференса нет (Omni Reference: Soon); картинки только как старт-кадр или Keyframes по порядку'},
+        'ref_syntax': {'style':'none','modes':['t2v','i2v','keyframes','video_continuation'],
+                       'rule':'порядок загрузки = порядок кадров; идентичность держит дословное описание субъекта (CASTLE)'}},
+    'minimax-h3': {
+        'ref_limits': {'image':9,'video':3,'audio':3,'total':12,'video_total_s':15,'audio_total_s':15,
+                       'duration_min_s':4,'duration_max_s':15,
+                       'note':'Omni Reference из инструкции владельца (приложение Hailuo); через PiAPI только txt2video и img2video с одним первым кадром (max_refs)'},
+        'ref_syntax': {'style':'words_numbered','image':'Image {n}','video':'Video {n}','audio':'Audio {n}',
+                       'piapi':{'modes':['txt2video','img2video'],'first_frame_only':True,'resolution_case':'lower'},
+                       'rule':'назначать роль, не описывать содержимое; после имени обращаться по имени; в API теги не отправляются'}},
+    'kling-3.0-omni': {
+        'ref_limits': {'image':7,'image_with_video':4,'video':1,'audio':0,'elements':3,'images_per_element':4,
+                       'video_max_s':10,'element_video_s':[3,8],'voice_s':[3,30],
+                       'duration_min_s':3,'duration_max_s':15,'shots_max':6,'prompt_chars':2500,
+                       'note':'лимиты у провайдеров отличаются; голос задаётся элементом, не отдельным аудио'},
+        'ref_syntax': {'style':'at_name','element':'@{name}','alternatives':['<<<element_{n}>>>','<<<image_{n}>>>','<<<video_{n}>>>','<<<voice_{n}>>>','@Image{n}'],
+                       'piapi':{'model':'kling','task_type':'omni_video_generation','image':'@image_{n}','video':'@video',
+                                'fields':['prompt','version','resolution','duration','aspect_ratio','enable_audio','multi_shots','video','images','keep_original_audio'],
+                                'elements_and_voice':False},
+                       'provider_dependent':True,'rule':'через PiAPI теги @image_N и @video; @имя и <<<element_n>>> относятся к интерфейсу kling.ai'}},
+    'kling-3.0': {
+        'ref_limits': {'image':2,'first_last':True,'multishot_with_last_frame':False,'images_per_element':3,
+                       'duration_min_s':3,'duration_max_s':15,'shots_max':6,'prompt_chars':2500,
+                       'note':'режим Start+Last Frame; в мультишоте доступен только первый кадр'},
+        'ref_syntax': {'style':'positional','fields':['image_url','image_tail_url'],'alt':'у других провайдеров image/image_tail или frame: first|last',
+                       'piapi':{'model':'kling','task_type':'video_generation','versions':['3.0','3.0-turbo'],
+                                'fields':['prompt','version','mode','image_url','image_tail_url','duration','aspect_ratio','enable_audio','prefer_multi_shots','multi_shots'],
+                                'turbo_audio':False,'turbo_multishot':False},
+                       'provider_dependent':True,'rule':'ласт-кадр делать из старт-кадра; промпт описывает только переход'}},
+}
+for _id, _profile in _REF_PROFILES.items():
+    if _id not in MODEL_SPECS:
+        _limits = _profile['ref_limits']
+        MODEL_SPECS[_id] = {'launch_enabled':False,'kind':'video','model':_id,'task_type':_id,
+                            'max_refs':_limits.get('image') or 1,'docs':'skills/video-'+_id.replace('.', '-')+'/SKILL.md',
+                            'prompt_only':True}
+    MODEL_SPECS[_id].update(_profile)
+
+
+# --- Seedream 5 Lite: параметры и цена по размеру (раньше шёл по старому пути без схемы параметров).
+# --- Цены по таблице PiAPI (17.10.2026, вставлена владельцем): lite 2K/3K $0.052, pro 1K $0.068, 2K $0.136.
+MODEL_SPECS['seedream-5-lite'].update({
+    'adapter':'unified_image','api_refs':10,'ref_field':'image_urls',
+    'price_by_size':{'2K':0.052,'3K':0.052},
+    'options':{'size':{'values':['2K','3K'],'default':'2K'},
+               'aspect_ratio':{'values':_ASPECT,'default':'1:1'},
+               'output_format':{'values':['png','jpeg','webp'],'default':'png'}}})
+
+# Варианты less-restriction: цены из той же таблицы PiAPI; task_type = имя модели из таблицы. Живой проверки не было,
+# поэтому запуск выключен (только предпросмотр и цена), пока владелец не разрешит пробный вызов.
+for _base, _prices in (('seedream-5-lite', {'2K':0.065,'3K':0.065}), ('seedream-5-pro', {'1K':0.085,'2K':0.17})):
+    _spec = {k: v for k, v in MODEL_SPECS[_base].items() if k not in ('verified_at', 'price_usd')}
+    _spec.update({'launch_enabled':False,'prompt_only':False,'task_type':_base+'-less-restriction',
+                  'price_by_size':_prices,'family':_base})
+    MODEL_SPECS[_base+'-less-restriction'] = _spec
+
+
+# --- Страница модели у провайдера (кнопка «i» в «Кадрах»). Интерфейс берёт ссылку из page_urls[provider],
+# --- поэтому при втором API-сервисе достаточно добавить его ключ и ссылки; код экрана не меняется.
+# --- Ссылки на страницы моделей владелец даст позже: пока берём только адреса docs на домене провайдера.
+PROVIDER_HOSTS = {'piapi': 'piapi.ai'}
+PAGE_URLS = {}  # {model_id: {provider: url}}: явные ссылки имеют приоритет над docs
+for _id, _spec in MODEL_SPECS.items():
+    _spec.setdefault('provider', 'piapi')
+    _urls = dict(PAGE_URLS.get(_id, {}))
+    _docs = str(_spec.get('docs') or '')
+    for _name, _host in PROVIDER_HOSTS.items():
+        _parts = _docs.split('/')
+        if _name not in _urls and _docs.startswith('https://') and len(_parts) > 2 and _parts[2].endswith(_host):
+            _urls[_name] = _docs
+    _spec['page_urls'] = _urls

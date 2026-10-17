@@ -597,3 +597,137 @@
     font-weight: 600;
   }
 }
+
+/* Карточка «I» на экране «Кадры»: экран обрезает содержимое (overflow hidden), поэтому открываем её вверх */
+.cs .cinema-info-body {
+  top: auto;
+  bottom: 30px;
+  right: auto;
+  left: -120px;
+  width: min(380px, 80vw);
+  max-height: min(220px, 40vh);
+  overflow-y: auto;
+}
+
+/* Таблица цен PiAPI под списком моделей */
+.cs-prices {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  padding: 10px 12px;
+  font-size: 12px;
+}
+.cs-prices summary {
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 13px;
+}
+.cs-price-model {
+  margin-top: 12px;
+}
+.cs-price-model b {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 13px;
+}
+.cs-price-model em {
+  color: var(--muted);
+  font-style: normal;
+  font-weight: 400;
+}
+.cs-price-model table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.cs-price-model th,
+.cs-price-model td {
+  padding: 4px 6px;
+  text-align: left;
+  border-top: 1px solid var(--border);
+  white-space: nowrap;
+}
+.cs-price-model th {
+  color: var(--muted);
+  font-weight: 500;
+}
+.cs-price-model td:first-child {
+  color: var(--muted);
+}
+.cs-prices > small {
+  display: block;
+  margin-top: 10px;
+}
+.cs-price-scroll {
+  overflow-x: auto;
+}
+
+/* Компактные параметры модели: строки плотнее, цены в центах помещаются в список */
+.cs-model-opts {
+  gap: 3px;
+  padding: 0 12px 8px;
+}
+.cs-model-opts label {
+  min-height: 0;
+  gap: 6px;
+}
+.cs-model-opts select,
+.cs-model-opts input {
+  height: 28px;
+  min-height: 0;
+  padding: 0 8px;
+  font-size: 12px;
+  max-width: 150px;
+  border-radius: 8px;
+}
+.cs-model-opts select {
+  padding-right: 24px;
+}
+
+/* Серая «i» в кружке после названия модели */
+.cs-info {
+  display: inline-grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  margin-left: 6px;
+  vertical-align: 1px;
+  border: 1px solid var(--border-strong);
+  border-radius: 50%;
+  color: var(--muted);
+  font-size: 10px;
+  font-style: italic;
+  font-weight: 600;
+  line-height: 1;
+  text-decoration: none;
+}
+a.cs-info:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.cs-info.off {
+  opacity: 0.35;
+  cursor: help;
+}
+
+/* Выбор варианта модели внутри бокса (Seedream Lite / Pro и их less restriction) */
+.cs-variant {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px 3px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.cs-variant select {
+  height: 28px;
+  min-height: 0;
+  padding: 0 24px 0 8px;
+  font-size: 12px;
+  max-width: 170px;
+  border-radius: 8px;
+}
+.cs-flat-price {
+  color: var(--text);
+  font-weight: 600;
+}

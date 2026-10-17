@@ -1854,7 +1854,7 @@ function App() {
                           <b>{label}</b>
                           <small>{hint}</small>
                           <textarea
-                            rows={3}
+                            rows={2}
                             value={state.style?.[k] || ''}
                             onChange={e =>
                               change({
@@ -1893,6 +1893,7 @@ function App() {
                   heroes={state.characters.map(c => ({
                     id: c.id,
                     name: c.name,
+                    assetId: c.working_asset_id,
                   }))}
                 />
               ) : mode === 'video' ? (

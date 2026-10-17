@@ -135,6 +135,7 @@ export function CameraSelector({
           <span className="director-eyebrow">DIRECTOR / VIDEO</span>
           <h3>Стартовое меню видео</h3>
           <CinemaInfo topic="camera" />
+          <CinemaInfo topic="lens" />
         </div>
         {onCatalogue && (
           <button type="button" disabled={disabled} onClick={onCatalogue}>

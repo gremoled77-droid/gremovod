@@ -61,7 +61,7 @@ export const BALANCE_LABELS: Record<string, string> = {
 };
 /** Добавляет блок в конец промпта один раз: если маркер уже есть, промпт не меняется. */
 export const appendBlock = (prompt: string, block: string, marker: string) =>
-  !block || prompt.includes(marker) ? prompt : prompt.trimEnd() + '\n\n' + block;
+  !block || prompt.includes(marker) ? prompt : prompt.trim() ? prompt.trimEnd() + '\n\n' + block : block;
 export type ShotPoint = {
   id: string;
   label: string;
@@ -182,4 +182,33 @@ export type VisualRules = {
   camera: string;
   rhythm: string;
   note: string;
+  norm: SeriesNorm;
+  hero_frames: HeroFrame[];
 };
+
+/** «Норма серии»: формат, нормальный объектив, правила ракурса и цвета. */
+export type SeriesNorm = {format: string; normal_lens: string; angle_rules: string; color_rules: string};
+export const NORM_FIELDS: [keyof SeriesNorm, string, string][] = [
+  ['format', 'Формат кадра', '16:9; вертикаль 9:16 пересоздаётся'],
+  ['normal_lens', 'Нормальный объектив', 'лёгкий нормальный (около 40–50 мм), умеренная глубина'],
+  ['angle_rules', 'Правила ракурса', 'на уровне глаз; сверху только при унижении героя'],
+  ['color_rules', 'Правила цвета', 'охра преобладает; красный акцент только в момент выбора'],
+];
+
+/** «Рамка героя»: состояние → размер, ракурс, объектив, воздух по взгляду. */
+export type HeroFrame = {state: string; size: string; angle: string; lens: string; looking_room: string};
+export const HERO_FRAME_FIELDS: [keyof HeroFrame, string][] = [
+  ['state', 'Состояние'],
+  ['size', 'Размер плана'],
+  ['angle', 'Ракурс'],
+  ['lens', 'Объектив'],
+  ['looking_room', 'Воздух по взгляду'],
+];
+export const HERO_FRAME_PRESETS = [
+  'открыт / доверяет',
+  'напряжён / скрывает',
+  'уязвим',
+  'публичная маска',
+  'решимость',
+];
+export const MAX_HERO_FRAMES = 8;

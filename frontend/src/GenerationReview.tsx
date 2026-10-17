@@ -7,8 +7,10 @@ export type GenerationRequest = {
   project_id: string;
   model_id: string;
   prompt: string;
-  options: Record<string, string | number>;
+  options: Record<string, string | number | boolean>;
   reference_urls: string[];
+  video_urls?: string[];
+  audio_urls?: string[];
   node_id?: string;
 };
 type Estimate = {
@@ -18,7 +20,20 @@ type Estimate = {
   source: string;
   verified_at: string;
   note: string;
+  lines?: string[];
 };
+
+/** Что будет оплачено, одной строкой: длительность или тип задачи Seedance. */
+function jobLabel(request: GenerationRequest) {
+  if (request.model_id === 'seedance-2.5') {
+    if (request.options.draft_task_id) return 'финал 1080p по черновику';
+    if (request.options.task === 'edit') return 'правка видео (длина по исходнику)';
+    const label = `${request.options.duration || 5} секунд видео`;
+    return request.options.draft ? `черновик 480p, ${label}` : label;
+  }
+  if (request.model_id === 'hunyuan-i2v') return 'одно видео, длительность и размер по умолчанию провайдера';
+  return 'одно изображение';
+}
 export default function GenerationReview({
   request,
   onClose,
@@ -98,15 +113,13 @@ export default function GenerationReview({
       >
         <h2 id="generation-title">Подтверждение генерации</h2>
         <p>
-          PiAPI · {request.model_id} ·{' '}
-          {request.model_id === 'seedance-2.5'
-            ? `${request.options.duration || 5} секунд видео`
-            : request.model_id === 'hunyuan-i2v'
-              ? 'одно видео, длительность и размер по умолчанию провайдера'
-              : 'одно изображение'}
+          PiAPI · {request.model_id} · {jobLabel(request)}
         </p>
         <p className="muted">
-          Референсов: {request.reference_urls.length}. Задание и ссылки будут переданы PiAPI.
+          Референсов: картинок {request.reference_urls.length}
+          {request.video_urls?.length ? `, видео ${request.video_urls.length}` : ''}
+          {request.audio_urls?.length ? `, аудио ${request.audio_urls.length}` : ''}. Задание и ссылки будут
+          переданы PiAPI.
         </p>
         <details>
           <summary>Проверить промпт и настройки</summary>
@@ -122,6 +135,13 @@ export default function GenerationReview({
             <p>
               Оценка: <b>${estimate.estimated_usd.toFixed(3)}</b>
             </p>
+            {!!estimate.lines?.length && (
+              <ul className="muted">
+                {estimate.lines.map(line => (
+                  <li key={line}>{line}</li>
+                ))}
+              </ul>
+            )}
             <p className="muted">
               {estimate.note}{' '}
               <a href={estimate.source} target="_blank" rel="noreferrer">

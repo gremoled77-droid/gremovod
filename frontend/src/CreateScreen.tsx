@@ -5,8 +5,23 @@ import GenerationReview, {type GenerationRequest} from './GenerationReview';
 import {type ActivityItem} from './useActivity';
 import {useSharedActivity} from './ActivityContext';
 import Lightbox, {type LightboxItem} from './Lightbox';
+import CinemaInfo from './CinemaInfo';
 import {DEFAULT_CHAT_URL, copyTextFor, getChatUrl} from './chatLink';
+import {
+  buildReplaceInFramePrompt,
+  buildReplaceInVideoPrompt,
+  replacementRefs,
+} from './replaceCharacterPrompt';
+import {
+  DIRECTOR_GROUPS,
+  DIRECTOR_PRESETS,
+  DIRECTOR_TEMPLATE,
+  appendDirectorBlock,
+  findDirectorPreset,
+  type DirectorGroup,
+} from './directorPresets';
 import {appendBlock} from './visualPlan';
+import PriceTable, {cents, useModelRange, useOptionPrices} from './PriceTable';
 
 type OptionSpec = {
   values?: (string | number)[];
@@ -21,6 +36,8 @@ type Spec = {
   options?: Record<string, OptionSpec>;
   variants?: Record<string, unknown>;
   api_refs?: number;
+  provider?: string;
+  page_urls?: Record<string, string>;
 };
 type LibAsset = {
   id: string;
@@ -29,17 +46,33 @@ type LibAsset = {
   provider_reference_url?: string | null;
   metadata: {kind?: string; favorite?: boolean};
 };
-type Hero = {id: string; name: string};
+type Hero = {id: string; name: string; assetId?: string};
 
 const LABELS: Record<string, string> = {
   'seedream-5-pro': 'Seedream 5 Pro',
-  'seedream-5-lite': 'Seedream 5 Fast',
+  'seedream-5-lite': 'Seedream 5 Lite',
+  'seedream-5-lite-less-restriction': 'Seedream 5 Lite · less restriction',
+  'seedream-5-pro-less-restriction': 'Seedream 5 Pro · less restriction',
   'gpt-image-2': 'GPT Image 2.0',
   'gpt-image-2.5': 'GPT Image 2.5',
   'nano-banana-2.1': 'Nano Banana 2.1',
   'qwen-image-2.1': 'Qwen Image 2.1',
 };
-const ORDER = Object.keys(LABELS);
+/** Модели, у которых в карточке можно выбрать вариант; остальные id из LABELS показываются отдельными боксами. */
+const FAMILIES: Record<string, string[]> = {
+  'seedream-5-pro': ['seedream-5-pro', 'seedream-5-pro-less-restriction'],
+  'seedream-5-lite': ['seedream-5-lite', 'seedream-5-lite-less-restriction'],
+};
+const MEMBERS = new Set(Object.values(FAMILIES).flat());
+const ORDER = Object.keys(LABELS).filter(id => !MEMBERS.has(id) || id in FAMILIES);
+const VARIANT_NAMES: Record<string, string> = {
+  'seedream-5-pro': 'Pro',
+  'seedream-5-pro-less-restriction': 'Pro · less restriction',
+  'seedream-5-lite': 'Lite',
+  'seedream-5-lite-less-restriction': 'Lite · less restriction',
+};
+/** Названия API-сервисов; новый сервис добавляется сюда и в каталог бэкенда (provider, page_urls). */
+const PROVIDERS: Record<string, string> = {piapi: 'PiAPI'};
 
 async function json(r: Response) {
   const d = await r.json().catch(() => ({}));
@@ -48,6 +81,89 @@ async function json(r: Response) {
 }
 
 type TempItem = {asset_id: string; days_left: number; expired: boolean; protected: string};
+
+/** Серая «i» в кружке: страница модели у её API-сервиса (ссылка берётся из каталога бэкенда). */
+function ModelInfo({spec}: {spec: Spec}) {
+  const provider = spec.provider || 'piapi';
+  const url = spec.page_urls?.[provider];
+  const name = PROVIDERS[provider] || provider;
+  return url ? (
+    <a
+      className="cs-info"
+      href={url}
+      target="_blank"
+      rel="noreferrer"
+      title={`Страница модели на ${name}`}
+      aria-label={`Страница модели на ${name}`}
+      onClick={e => e.stopPropagation()}
+      onKeyDown={e => e.stopPropagation()}
+    >
+      i
+    </a>
+  ) : (
+    <span className="cs-info off" title={`Ссылка на страницу модели у ${name} пока не задана`}>
+      i
+    </span>
+  );
+}
+
+/** Цена или диапазон цен в заголовке бокса: видна, даже когда модель выключена. */
+function ModelRange({id, schema}: {id: string; schema: Record<string, OptionSpec> | undefined}) {
+  const range = useModelRange(id, schema);
+  return range ? <> · {range}</> : null;
+}
+
+function ModelOptions({
+  id,
+  schema,
+  current,
+  onChange,
+}: {
+  id: string;
+  schema: Record<string, OptionSpec>;
+  current: Record<string, string | number>;
+  onChange: (key: string, value: string | number) => void;
+}) {
+  const prices = useOptionPrices(id, schema, current);
+  const priced = ['variant', 'quality', 'size', 'resolution'].some(k => schema[k]?.values);
+  const flat = useModelRange(id, schema);
+  return (
+    <div className="cs-model-opts">
+      {!priced && flat && (
+        <label>
+          <span>цена за картинку</span>
+          <b className="cs-flat-price">{flat}</b>
+        </label>
+      )}
+      {Object.entries(schema).map(([key, sp]) => (
+        <label key={key}>
+          <span>{key}</span>
+          {sp.values ? (
+            <select value={String(current[key])} onChange={e => onChange(key, e.target.value)}>
+              {sp.values.map(v => {
+                const p = prices[key]?.[String(v)];
+                return (
+                  <option key={String(v)} value={String(v)}>
+                    {String(v)}
+                    {p !== undefined && p !== null ? ' · ' + cents(p) : ''}
+                  </option>
+                );
+              })}
+            </select>
+          ) : (
+            <input
+              type="number"
+              min={sp.min}
+              max={sp.max}
+              value={Number(current[key])}
+              onChange={e => onChange(key, Number(e.target.value))}
+            />
+          )}
+        </label>
+      ))}
+    </div>
+  );
+}
 
 export default function CreateScreen(props: {projectId: string; heroes: Hero[]}) {
   return <CreateScreenBody key={props.projectId} {...props} />;
@@ -60,6 +176,14 @@ function CreateScreenBody({projectId, heroes}: {projectId: string; heroes: Hero[
   const [specs, setSpecs] = useState<Record<string, Spec>>({});
   const [library, setLibrary] = useState<LibAsset[]>([]);
   const [prompt, setPrompt] = useState(restored.prompt);
+  /** «Режиссёрский каркас» и заготовки: блок добавляется в конец промпта, строки читает prompt_rules.py. */
+  function addDirectorBlock(text: string, what: string) {
+    setError('');
+    setPrompt(current => appendDirectorBlock(current, text));
+    setNotice(
+      `${what} добавлен в промпт. Заполни пустые строки; для прямой генерации сведи их в один промпт.`
+    );
+  }
   async function addVisualRules() {
     setError('');
     try {
@@ -85,6 +209,7 @@ function CreateScreenBody({projectId, heroes}: {projectId: string; heroes: Hero[
     }
   }
   const [selected, setSelected] = useState<string[]>(restored.selected);
+  const [pick, setPick] = useState<Record<string, string>>({});
   const [options, setOptions] = useState<Record<string, Record<string, string | number>>>(restored.options);
   const [refs, setRefs] = useState<string[]>(restored.refs);
   const [queue, setQueue] = useState<GenerationRequest[]>([]);
@@ -99,6 +224,16 @@ function CreateScreenBody({projectId, heroes}: {projectId: string; heroes: Hero[
   const [videoModel, setVideoModel] = useState(restored.videoModel);
   const [motion, setMotion] = useState(restored.motion);
   const [videoOptions, setVideoOptions] = useState<Record<string, string | number>>(restored.videoOptions);
+  /** Расширенные поля Seedance 2.5: ссылки на видео и аудио, тип задачи, черновик. */
+  const [seedance, setSeedance] = useState({
+    task: 'reference',
+    videos: '',
+    audios: '',
+    videoSeconds: '',
+    audioSeconds: '',
+    draft: false,
+    draftTaskId: '',
+  });
   const [tab, setTab] = useState<'results' | 'favorites' | 'temp'>('results');
   const [temp, setTemp] = useState<TempItem[]>([]);
   const [wouldRemove, setWouldRemove] = useState<string[] | null>(null);
@@ -174,6 +309,19 @@ function CreateScreenBody({projectId, heroes}: {projectId: string; heroes: Hero[
 
   const toggle = (id: string) => setSelected(s => (s.includes(id) ? s.filter(x => x !== id) : [...s, id]));
 
+  /** Кнопка «Заменить героя»: ставит промпт замены и референсы (кадр, герой). Запуск обычный: цена и подтверждение. */
+  const replaceHero = (frameId: string, heroId: string) => {
+    const hero = heroes.find(h => h.id === heroId);
+    if (!hero?.assetId)
+      return setError(`У героя «${hero?.name ?? ''}» нет рабочего образа: добавь его в Character Vault`);
+    setError('');
+    setPrompt(buildReplaceInFramePrompt());
+    setRefs(replacementRefs(frameId, hero.assetId));
+    setNotice(
+      `Замена героя на «${hero.name}»: референсы (кадр, герой) и промпт поставлены. Выбери модель справа и запусти, цена и подтверждение как обычно.`
+    );
+  };
+
   const ensureCloudUrl = async (assetId: string) => {
     const a = byId[assetId];
     if (a?.provider_reference_url) return a.provider_reference_url;
@@ -220,10 +368,45 @@ function CreateScreenBody({projectId, heroes}: {projectId: string; heroes: Hero[
       const url = await ensureCloudUrl(animate);
       const opts = Object.fromEntries(
         Object.entries(videoSpec(videoModel)).map(([k, sp]) => [k, videoOptions[k] ?? sp.default])
-      ) as Record<string, string | number>;
-      setQueue([
-        {project_id: projectId, model_id: videoModel, prompt: motion, options: opts, reference_urls: [url]},
-      ]);
+      ) as Record<string, string | number | boolean>;
+      const request: GenerationRequest = {
+        project_id: projectId,
+        model_id: videoModel,
+        prompt: motion,
+        options: opts,
+        reference_urls: [url],
+      };
+      if (videoModel === 'seedance-2.5') {
+        const lines = (text: string) =>
+          text
+            .split('\n')
+            .map(line => line.trim())
+            .filter(Boolean);
+        const videos = lines(seedance.videos);
+        const audios = lines(seedance.audios);
+        if (seedance.draftTaskId.trim()) {
+          // Финал по черновику: промпт, референсы и длительность берутся из черновика.
+          request.options = {draft_task_id: seedance.draftTaskId.trim(), resolution: '1080p'};
+          request.reference_urls = [];
+        } else {
+          if (seedance.task !== 'reference') request.options.task = seedance.task;
+          if (seedance.draft) {
+            request.options.draft = true;
+            request.options.resolution = '480p';
+          }
+          if (videos.length) request.video_urls = videos;
+          if (audios.length) request.audio_urls = audios;
+          if (videos.length && !Number(seedance.videoSeconds)) {
+            throw Error('Укажи суммарную длину видео-референсов в секундах (до 30)');
+          }
+          if (audios.length && !Number(seedance.audioSeconds)) {
+            throw Error('Укажи суммарную длину аудио-референсов в секундах (до 30)');
+          }
+          if (videos.length) request.options.video_seconds = Number(seedance.videoSeconds);
+          if (audios.length) request.options.audio_seconds = Number(seedance.audioSeconds);
+        }
+      }
+      setQueue([request]);
       setAnimate('');
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -473,46 +656,67 @@ function CreateScreenBody({projectId, heroes}: {projectId: string; heroes: Hero[
     });
   };
 
-  const modelCard = (id: string) => {
+  const modelCard = (base: string) => {
+    const family = FAMILIES[base];
+    const id = family ? (family.find(m => selected.includes(m)) ?? pick[base] ?? base) : base;
     const on = selected.includes(id);
     const o = specs[id]?.options;
+    const choose = (next: string) => {
+      setPick(p => ({...p, [base]: next}));
+      setSelected(s => s.map(x => (x === id ? next : x)));
+    };
     return (
       <div key={id} className={'cs-model' + (on ? ' on' : '')}>
-        <button type="button" className="cs-model-head" onClick={() => toggle(id)} aria-pressed={on}>
+        <div
+          role="button"
+          tabIndex={0}
+          className="cs-model-head"
+          onClick={() => toggle(id)}
+          onKeyDown={e => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              toggle(id);
+            }
+          }}
+          aria-pressed={on}
+        >
           <span>
-            <b>{LABELS[id]}</b>
-            <small>PiAPI{specs[id].launch_enabled === false ? ' · проверяется' : ''}</small>
+            <b>
+              {LABELS[id]}
+              <ModelInfo spec={specs[id]} />
+            </b>
+            <small>
+              {PROVIDERS[specs[id].provider || 'piapi'] || specs[id].provider}
+              {specs[id].launch_enabled === false ? ' · проверяется' : ''}
+              <ModelRange id={id} schema={specs[id].options} />
+            </small>
           </span>
           <em>{on ? 'вкл' : 'выкл'}</em>
-        </button>
+        </div>
+        {on && family && (
+          <label className="cs-variant">
+            <span>модель</span>
+            <select value={id} onChange={e => choose(e.target.value)}>
+              {family
+                .filter(m => specs[m])
+                .map(m => (
+                  <option key={m} value={m}>
+                    {VARIANT_NAMES[m] || m}
+                    {specs[m].launch_enabled === false ? ' · не проверена' : ''}
+                  </option>
+                ))}
+            </select>
+          </label>
+        )}
         {on && o && (
-          <div className="cs-model-opts">
-            {Object.entries(o).map(([key, sp]) => (
-              <label key={key}>
-                <span>{key}</span>
-                {sp.values ? (
-                  <select
-                    value={String(optionValue(id, key, sp))}
-                    onChange={e => setOptions(p => ({...p, [id]: {...p[id], [key]: e.target.value}}))}
-                  >
-                    {sp.values.map(v => (
-                      <option key={String(v)} value={String(v)}>
-                        {String(v)}
-                      </option>
-                    ))}
-                  </select>
-                ) : (
-                  <input
-                    type="number"
-                    min={sp.min}
-                    max={sp.max}
-                    value={Number(optionValue(id, key, sp))}
-                    onChange={e => setOptions(p => ({...p, [id]: {...p[id], [key]: Number(e.target.value)}}))}
-                  />
-                )}
-              </label>
-            ))}
-          </div>
+          <ModelOptions
+            id={id}
+            schema={o}
+            current={Object.fromEntries(
+              Object.entries(o).map(([key, sp]) => [key, optionValue(id, key, sp)])
+            )}
+            onChange={(key, value) => setOptions(p => ({...p, [id]: {...p[id], [key]: value}}))}
+          />
         )}
       </div>
     );
@@ -755,6 +959,29 @@ function CreateScreenBody({projectId, heroes}: {projectId: string; heroes: Hero[
                       <button onClick={() => toggleRef(aid)} title="Использовать как референс">
                         {refs.includes(aid) ? '✓ реф.' : '+ реф.'}
                       </button>
+                      {item.kind === 'image' && (
+                        <select
+                          value=""
+                          title="Подставить героя вместо персонажа в этом кадре (кадр и герой станут референсами)"
+                          onChange={e => e.target.value && replaceHero(aid, e.target.value)}
+                        >
+                          <option value="">Заменить героя ▾</option>
+                          {heroes.map(h => (
+                            <option key={h.id} value={h.id} disabled={!h.assetId}>
+                              {h.name}
+                              {h.assetId ? '' : ' (нет образа)'}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                      {item.kind === 'video' && (
+                        <button
+                          title="Скопировать промпт замены героя в видео (Kling 3.0 Omni: исходное видео и картинка героя)"
+                          onClick={() => void copyPrompt(buildReplaceInVideoPrompt())}
+                        >
+                          Промпт замены героя
+                        </button>
+                      )}
                       <select value="" onChange={e => e.target.value && toHero(aid, e.target.value)}>
                         <option value="">В героя ▾</option>
                         {heroes.map(h => (
@@ -826,12 +1053,41 @@ function CreateScreenBody({projectId, heroes}: {projectId: string; heroes: Hero[
               ＋ Визуальные правила
             </button>
             <button
+              type="button"
+              title="Шесть режиссёрских строк: суть кадра, доминанта, символ, сдвиг, камера, свет (пять столпов киноязыка)"
+              onClick={() => addDirectorBlock(DIRECTOR_TEMPLATE, 'Режиссёрский каркас')}
+            >
+              ＋ Режиссёрский каркас
+            </button>
+            <select
+              value=""
+              aria-label="Заготовки с Грэмом и ВАЗ-2106"
+              title="Готовые заготовки кадра, камеры и истории с Грэмом и ВАЗ-2106"
+              onChange={e => {
+                const preset = findDirectorPreset(e.target.value);
+                if (preset) addDirectorBlock(preset.text, `Заготовка «${preset.title}»`);
+              }}
+            >
+              <option value="">Заготовки ▾</option>
+              {(Object.keys(DIRECTOR_GROUPS) as DirectorGroup[]).map(group => (
+                <optgroup key={group} label={DIRECTOR_GROUPS[group]}>
+                  {DIRECTOR_PRESETS.filter(p => p.group === group).map(p => (
+                    <option key={p.id} value={p.id}>
+                      {p.title}
+                    </option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
+            <button
               disabled={!projectId}
               title="Добавить в промпт блок композиции: доминанта, баланс или напряжение, противовес из плана кадра"
               onClick={() => void addComposition()}
             >
               ＋ Композиция
             </button>
+            <CinemaInfo topic="composition" />
+            <CinemaInfo topic="lens" />
             <button disabled={!projectId} onClick={() => void external()}>
               Скопировать для ChatGPT
             </button>
@@ -853,6 +1109,7 @@ function CreateScreenBody({projectId, heroes}: {projectId: string; heroes: Hero[
           <b>Модели</b>
         </div>
         {models.map(modelCard)}
+        <PriceTable specs={specs} labels={LABELS} models={Object.keys(LABELS)} />
         <div className="cs-note">
           Перед отправкой покажу точную цену и попрошу подтверждение. Ручная попытка в ChatGPT стоит $0 по
           API.
@@ -922,6 +1179,77 @@ function CreateScreenBody({projectId, heroes}: {projectId: string; heroes: Hero[
                 )}
               </label>
             ))}
+            {videoModel === 'seedance-2.5' && (
+              <details>
+                <summary>Видео, аудио, правка и черновик (Seedance 2.5)</summary>
+                <label>
+                  Тип задачи
+                  <select
+                    value={seedance.task}
+                    onChange={e => setSeedance(s => ({...s, task: e.target.value}))}
+                  >
+                    <option value="reference">Генерация по референсам</option>
+                    <option value="edit">Правка видео (In @video1, change …)</option>
+                    <option value="extend">Продление видео (Extend @video1 forward: …)</option>
+                  </select>
+                </label>
+                <label>
+                  Ссылки на видео-референсы (https, по одной в строке; тег @video1, @video2…)
+                  <textarea
+                    rows={2}
+                    value={seedance.videos}
+                    onChange={e => setSeedance(s => ({...s, videos: e.target.value}))}
+                  />
+                </label>
+                <label>
+                  Суммарная длина видео, секунд (до 30)
+                  <input
+                    type="number"
+                    min={0}
+                    max={30}
+                    value={seedance.videoSeconds}
+                    onChange={e => setSeedance(s => ({...s, videoSeconds: e.target.value}))}
+                  />
+                </label>
+                <label>
+                  Ссылки на аудио-референсы (https, по одной в строке; тег @audio1…)
+                  <textarea
+                    rows={2}
+                    value={seedance.audios}
+                    onChange={e => setSeedance(s => ({...s, audios: e.target.value}))}
+                  />
+                </label>
+                <label>
+                  Суммарная длина аудио, секунд (до 30)
+                  <input
+                    type="number"
+                    min={0}
+                    max={30}
+                    value={seedance.audioSeconds}
+                    onChange={e => setSeedance(s => ({...s, audioSeconds: e.target.value}))}
+                  />
+                </label>
+                <label className="inline-checkbox">
+                  <input
+                    type="checkbox"
+                    checked={seedance.draft}
+                    onChange={e => setSeedance(s => ({...s, draft: e.target.checked}))}
+                  />{' '}
+                  Черновик (только 480p, дешевле; финал 1080p делается отдельно)
+                </label>
+                <label>
+                  Финал по черновику: ID задачи-черновика (остальные поля игнорируются)
+                  <input
+                    value={seedance.draftTaskId}
+                    onChange={e => setSeedance(s => ({...s, draftTaskId: e.target.value}))}
+                  />
+                </label>
+                <p className="muted">
+                  Длину референсов сервис не измеряет, её называешь ты: от неё зависит цена. Цена и раскладка
+                  будут в окне подтверждения.
+                </p>
+              </details>
+            )}
             <div className="chips">
               <button className="primary" disabled={busy} onClick={() => void startAnimate()}>
                 {busy ? 'Готовлю…' : 'Дальше: оценка и подтверждение'}
@@ -933,6 +1261,7 @@ function CreateScreenBody({projectId, heroes}: {projectId: string; heroes: Hero[
       )}
       {queue[0] && (
         <GenerationReview
+          key={`${queue[0].model_id}-${queue.length}`}
           request={queue[0]}
           onClose={() => setQueue([])}
           onSubmitted={() => {

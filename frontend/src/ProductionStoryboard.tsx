@@ -6,10 +6,15 @@ import {useEffect, useRef, useState} from 'react';
 import {apiFetch} from './api';
 import {responseJson} from './ChatGPTPanel';
 import Lightbox, {type LightboxItem} from './Lightbox';
+import CinemaInfo from './CinemaInfo';
 import {analyzeAsset, shotPoints, TensionGraph, useVisualPlans, VisualPlanForm} from './VisualPlanPanel';
 import {emptyPlan, planFromAnalysis} from './visualPlan';
 import VisualRulesForm from './VisualRulesForm';
 import EditListPanel from './EditListPanel';
+import FrameTakes from './FrameTakes';
+import SceneCast from './SceneCast';
+import {moveItem} from './boardOrder';
+import {patchEntity, putOrder, type EntityPatch} from './boardApi';
 import './ProductionStoryboard.css';
 
 type Node = {
@@ -282,6 +287,23 @@ export default function ProductionStoryboard({
       setNotice('Кадр создан. Открой его в студии для подготовки изображения.');
     });
   }
+  /** Сдвиг сцены (parentId = серия) или кадра (parentId = сцена) на одну позицию; папки не переименовываются. */
+  function shift(parentId: string, ids: string[], index: number, delta: number) {
+    const next = moveItem(ids, index, delta);
+    if (!next || !board) return;
+    void perform(async () => {
+      await putOrder(path, board.revision, parentId, next);
+      setTick(t => t + 1);
+    });
+  }
+  /** Состав, локация и главный дубль: сохраняются сразу, остальное в карточке не меняется. */
+  function savePatch(nodeId: string, patch: EntityPatch, message: string) {
+    void perform(async () => {
+      await patchEntity(pid, nodeId, patch);
+      setTick(t => t + 1);
+      setNotice(message);
+    });
+  }
   function openFrame(frame: Frame) {
     void perform(async () => {
       const bound = await request(`/api/productions/${pid}/nodes/${frame.id}/open-project`, {});
@@ -294,6 +316,7 @@ export default function ProductionStoryboard({
         <div>
           <span className="ps-eyebrow">РАСКАДРОВКА · РАБОЧАЯ ДОСКА</span>
           <h2>{nodes.find(n => n.id === sid)?.title || 'Сценарий и раскадровка'}</h2>
+          <CinemaInfo topic="composition" />
         </div>
         <div className="ps-top-actions">
           {board && (
@@ -523,9 +546,41 @@ export default function ProductionStoryboard({
               estimating={estimating}
             />
           )}
-          {board.scenes.map(scene => (
+          {board.scenes.map((scene, sceneIndex) => (
             <article key={scene.id} className="ps-scene">
               <div className="ps-scene-head">
+                <span className="ps-order" role="group" aria-label={`Порядок сцены ${scene.title}`}>
+                  <button
+                    disabled={busy || sceneIndex === 0}
+                    title="Сцену выше"
+                    aria-label="Сцену выше"
+                    onClick={() =>
+                      shift(
+                        sid,
+                        board.scenes.map(s => s.id),
+                        sceneIndex,
+                        -1
+                      )
+                    }
+                  >
+                    ▲
+                  </button>
+                  <button
+                    disabled={busy || sceneIndex === board.scenes.length - 1}
+                    title="Сцену ниже"
+                    aria-label="Сцену ниже"
+                    onClick={() =>
+                      shift(
+                        sid,
+                        board.scenes.map(s => s.id),
+                        sceneIndex,
+                        1
+                      )
+                    }
+                  >
+                    ▼
+                  </button>
+                </span>
                 <button className="ps-heading" onClick={() => inspect(scene.id)}>
                   <small>СЦЕНА {String(scene.number).padStart(2, '0')}</small>
                   <h3>{scene.title} ↗</h3>
@@ -541,26 +596,21 @@ export default function ProductionStoryboard({
                 })()}
               </div>
               <p className="ps-text">{scene.notes || 'Описание пока не добавлено'}</p>
-              <div className="ps-cast">
-                {scene.selection.character_node_ids.map(id => (
-                  <button key={id} onClick={() => inspect(id)}>
-                    {nodes.find(n => n.id === id)?.title || 'Персонаж'} ↗
-                  </button>
-                ))}
-                {scene.selection.location_node_id && (
-                  <button onClick={() => inspect(scene.selection.location_node_id!)}>
-                    {nodes.find(n => n.id === scene.selection.location_node_id)?.title || 'Локация'} ↗
-                  </button>
-                )}
-                <button onClick={() => inspect(scene.id)}>Состав сцены и бэкграунд</button>
-              </div>
+              <SceneCast
+                catalogue={nodes}
+                characterIds={scene.selection.character_node_ids}
+                locationId={scene.selection.location_node_id}
+                busy={busy}
+                onOpen={inspect}
+                onChange={patch => savePatch(scene.id, patch, 'Состав сцены сохранён.')}
+              />
               <VisualPlanForm
                 kind="scene"
                 plan={visual.plans[scene.id]}
                 onSave={plan => visual.save(scene.id, plan)}
               />
               <div className="ps-frames">
-                {scene.frames.map(frame => {
+                {scene.frames.map((frame, frameIndex) => {
                   const image =
                       frame.files.find(f => f.id === frame.selection.selected_image_file_id) ||
                       frame.files.find(f => f.kind === 'image'),
@@ -627,11 +677,60 @@ export default function ProductionStoryboard({
                             : 'последнее фото · не утверждено'
                           : 'запланирован'}
                       </small>
+                      <FrameTakes
+                        files={frame.files}
+                        imageId={frame.selection.selected_image_file_id}
+                        videoId={frame.selection.selected_video_file_id}
+                        busy={busy}
+                        onPick={(kind, id) =>
+                          savePatch(
+                            frame.id,
+                            kind === 'image' ? {selected_image_file_id: id} : {selected_video_file_id: id},
+                            id
+                              ? kind === 'image'
+                                ? 'Главное фото выбрано.'
+                                : 'Главное видео выбрано.'
+                              : 'Выбор снят.'
+                          )
+                        }
+                      />
                       <div className="ps-acts">
                         <button disabled={busy} onClick={() => openFrame(frame)}>
                           В студию
                         </button>
                         <button onClick={() => inspect(frame.id)}>Файлы ↗</button>
+                        <span className="ps-order" role="group" aria-label={`Порядок кадра ${frame.title}`}>
+                          <button
+                            disabled={busy || frameIndex === 0}
+                            title="Кадр раньше"
+                            aria-label="Кадр раньше"
+                            onClick={() =>
+                              shift(
+                                scene.id,
+                                scene.frames.map(f => f.id),
+                                frameIndex,
+                                -1
+                              )
+                            }
+                          >
+                            ◀
+                          </button>
+                          <button
+                            disabled={busy || frameIndex === scene.frames.length - 1}
+                            title="Кадр позже"
+                            aria-label="Кадр позже"
+                            onClick={() =>
+                              shift(
+                                scene.id,
+                                scene.frames.map(f => f.id),
+                                frameIndex,
+                                1
+                              )
+                            }
+                          >
+                            ▶
+                          </button>
+                        </span>
                       </div>
                       <VisualPlanForm
                         kind="frame"

@@ -343,27 +343,44 @@ class ModelJobRequest(BaseModel):
     prompt:str=Field(min_length=1)
     options:dict[str,Any]=Field(default_factory=dict)
     reference_urls:list[str]=Field(default_factory=list)
+    video_urls:list[str]=Field(default_factory=list)
+    audio_urls:list[str]=Field(default_factory=list)
     approved:bool=False
     max_cost_usd:float=Field(default=0,ge=0,le=100,allow_inf_nan=False)
     request_id:str|None=None
     quote_token:str=''
     node_id:str|None=Field(default=None,max_length=100)
 
+def seedance_draft(body:ModelJobRequest):
+    """Расчётные данные черновика Seedance из заданий этого проекта (для финала 1080p по draft_task_id)."""
+    task_id=body.options.get('draft_task_id')
+    if not body.project_id or not isinstance(task_id,str): return None
+    with connect() as db: row=db.execute('SELECT status,request FROM jobs WHERE project_id=? AND task_id=?',(body.project_id,task_id)).fetchone()
+    if not row or str(row['status']).lower() in {'failed','cancelled','canceled','submitting','submission_unknown'}: return None
+    request=json.loads(row['request'])
+    payload=request.get('payload') or {}
+    if request.get('model_id')!=body.model_id or not (payload.get('input') or {}).get('draft'): return None
+    return payload.get('billing')
+
 def image_payload(body:ModelJobRequest,enforce_launch:bool=True):
     spec=MODEL_SPECS.get(body.model_id)
     if not spec: raise HTTPException(400,'Модель отсутствует в каталоге')
     if enforce_launch and not spec.get('launch_enabled'): raise HTTPException(400,'Запуск этой модели отключён до проверки схемы и стоимости.')
     if not body.prompt.strip(): raise HTTPException(400,'Промпт не может быть пустым')
+    if (body.video_urls or body.audio_urls) and spec.get('adapter')!='seedance_25': raise HTTPException(400,'Эта модель не принимает видео и аудио референсы')
     if len(body.reference_urls)>spec['max_refs']: raise HTTPException(400,'Превышено число референсов')
     from urllib.parse import urlsplit
-    for ref in body.reference_urls:
+    for ref in [*body.reference_urls,*body.video_urls,*body.audio_urls]:
         parsed=urlsplit(ref)
         if parsed.scheme!='https' or not parsed.hostname or parsed.username or parsed.password or parsed.hostname in {'localhost','127.0.0.1','::1'}:
             raise HTTPException(400,'Нужен публичный HTTPS URL референса; локальный файл нельзя передать провайдеру напрямую')
     is_video=spec['kind']=='video'
-    if is_video:
+    # Главный кадр обязателен только для генерации с картинкой; правка, продление и финал по черновику идут от видео провайдера.
+    without_anchor=spec.get('adapter')=='seedance_25' and (body.options.get('task') in ('edit','extend') or body.options.get('draft_task_id'))
+    if is_video and not without_anchor:
         from backend import production_entities
         production_entities.video_anchor(sys.modules[__name__],body.project_id,body.reference_urls)
+    if spec.get('adapter')=='seedance_25': return adapters.build(spec,body,draft=seedance_draft(body))
     if adapters.handles(spec): return adapters.build(spec,body)
     if spec.get('adapter')=='hunyuan_i2v':
         if body.options:raise HTTPException(400,'В этом тестовом адаптере Hunyuan используются длительность и разрешение провайдера по умолчанию')
@@ -407,6 +424,7 @@ def estimate_image(body:ModelJobRequest):
     if not body.project_id:raise HTTPException(400,'Сначала сохрани проект')
     project(body.project_id)
     return {'quote_token':security.quote(body.project_id,payload,cost),'expires_in_seconds':600,'model_id':body.model_id,'kind':MODEL_SPECS[body.model_id]['kind'],'estimated_usd':cost,'images':0 if MODEL_SPECS[body.model_id]['kind']=='video' else 1,'payload':payload,
+            'lines':adapters.describe(MODEL_SPECS[body.model_id],payload),
             'source':MODEL_SPECS[body.model_id]['docs'],'verified_at':MODEL_SPECS[body.model_id].get('verified_at','2026-10-15'),
             'note':'Оценка по документации провайдера; фактическое списание определяется PiAPI. Лимит относится к одному запуску.'}
 
@@ -419,7 +437,7 @@ def preview_model_job(body:ModelJobRequest):
     cost=generation_cost(body,payload)
     return {'model_id':body.model_id,'kind':spec['kind'],'launch_enabled':bool(spec.get('launch_enabled')),
             'verified_at':spec.get('verified_at'),'path':adapters.submit_path(spec),
-            'wire_body':adapters.wire_body(spec,payload),'estimated_usd':cost,'external_calls':0,
+            'wire_body':adapters.wire_body(spec,payload),'estimated_usd':cost,'lines':adapters.describe(spec,payload),'external_calls':0,
             'note':'Сухой прогон. Запуск выключен, пока параметры и цена не проверены реальным вызовом.' if not spec.get('launch_enabled') else 'Сухой прогон.'}
 
 @app.post('/api/model-jobs')
