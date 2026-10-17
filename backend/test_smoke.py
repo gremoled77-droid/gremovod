@@ -769,6 +769,29 @@ class StudioSmokeTests(unittest.TestCase):
         self.assertEqual(self.client.post('/api/model-jobs',json=body).json()['duplicate'],True)
         main.request_piapi.assert_awaited_once()
 
+    def test_seedance_draft_then_final_uses_project_queue(self):
+        draft_body=self.image_request(model_id='seedance-2.5',prompt='Slow forward dolly',options={'draft':True,'duration':4},
+                                      max_cost_usd=0.6,request_id='draft-request-1234567')
+        main.request_piapi.side_effect=None
+        main.request_piapi.return_value={'data':{'task_id':'draft-task-1','status':'pending'}}
+        self.assertEqual(self.client.post('/api/model-jobs',json=draft_body).status_code,200)
+        wire=main.request_piapi.await_args.args[3]
+        self.assertTrue(wire['input']['draft'])
+        self.assertNotIn('billing',wire)
+        final={k:v for k,v in draft_body.items() if k!='quote_token'}
+        final['options']={'draft_task_id':'draft-task-1'}
+        estimate=self.client.post('/api/model-jobs/estimate',json=final)
+        self.assertEqual(estimate.status_code,200,estimate.text)
+        self.assertEqual(estimate.json()['estimated_usd'],3.2)
+        self.assertEqual(estimate.json()['payload']['input'],{'draft_task_id':'draft-task-1','resolution':'1080p'})
+        self.assertTrue(any('Финал 1080p' in line for line in estimate.json()['lines']))
+        preview=self.client.post('/api/model-jobs/preview',json=final)
+        self.assertEqual(preview.status_code,200,preview.text)
+        self.assertEqual(preview.json()['wire_body']['input'],{'draft_task_id':'draft-task-1','resolution':'1080p'})
+        for bad in ({'draft_task_id':'unknown-task'},{'draft_task_id':'draft-task-1','duration':4}):
+            self.assertEqual(self.client.post('/api/model-jobs/estimate',json={**final,'options':bad}).status_code,400)
+        main.request_piapi.assert_awaited_once()
+
     def test_prompt_api_uses_project_rules_profiles_references_and_history(self):
         state={'brief':'Ночная улица','motionBrief':'Медленный проезд вперёд','style':{'palette':'синий и янтарный'},
                'selectedCharacter':'hero','characters':[{'id':'hero','identity':{'costume':'красная кепка'},'profiles':{

@@ -597,3 +597,14 @@
     font-weight: 600;
   }
 }
+
+/* Карточка «I» на экране «Кадры»: экран обрезает содержимое (overflow hidden), поэтому открываем её вверх */
+.cs .cinema-info-body {
+  top: auto;
+  bottom: 30px;
+  right: auto;
+  left: -120px;
+  width: min(380px, 80vw);
+  max-height: min(220px, 40vh);
+  overflow-y: auto;
+}

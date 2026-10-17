@@ -1893,6 +1893,7 @@ function App() {
                   heroes={state.characters.map(c => ({
                     id: c.id,
                     name: c.name,
+                    assetId: c.working_asset_id,
                   }))}
                 />
               ) : mode === 'video' ? (
