@@ -162,7 +162,7 @@
   width: 100%;
   box-sizing: border-box;
   min-height: 84px;
-  max-height: 60vh;
+  max-height: 15.5em;
   resize: vertical;
   overflow-y: auto;
 }

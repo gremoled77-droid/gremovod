@@ -57,11 +57,14 @@
   font-size: 12px;
 }
 .world-field textarea {
-  margin-top: 6px;
+  margin-top: 4px;
+  min-height: 0;
+  resize: vertical;
 }
-.world-field-look,
-.world-field-rules,
-.world-field-avoid {
+.world-field {
+  padding: 10px 12px;
+}
+.world-field-look {
   grid-column: 1 / -1;
 }
 .world-actions {

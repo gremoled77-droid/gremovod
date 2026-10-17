@@ -177,6 +177,11 @@ export default function IdeaBrief({
   const actions = (
     <div className="idea-brief-actions">
       {result && <button onClick={() => onBrief(result)}>Принять как задание</button>}
+      {result && (
+        <button onClick={() => void send()} disabled={busy} title="Повторный запрос в LLM">
+          <RotateCw size={14} /> Обновить
+        </button>
+      )}
       <button className="primary" onClick={onNext}>
         Дальше: мир и герои →
       </button>
@@ -239,9 +244,6 @@ export default function IdeaBrief({
           <div className="idea-result-bar">
             <b>Результат</b>
             <div>
-              <button onClick={() => void send()} disabled={busy} title="Повторный запрос в LLM">
-                <RotateCw size={14} /> Обновить
-              </button>
               <button
                 onClick={() => files.current?.click()}
                 title="Файл уйдёт на экраны «Мир» и «Раскадровка»"
