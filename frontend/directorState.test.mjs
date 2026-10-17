@@ -1,4 +1,5 @@
 import {existsSync} from 'node:fs';
+import {dirname, join} from 'node:path';
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {execFileSync} from 'node:child_process';
@@ -19,9 +20,20 @@ const bundled = await build({
 const {frameBasis, frameOutdated, carCompatible, cameraBasis, cameraOutdated} = await import(
   'data:text/javascript;base64,' + Buffer.from(bundled.outputFiles[0].text).toString('base64')
 );
-const winPython = new URL('../.venv/Scripts/python.exe', import.meta.url).pathname.replace(/^\/(\w:)/, '$1');
-const python = process.env.STUDIO_PYTHON || (existsSync(winPython) ? winPython : 'python3');
 const cwd = new URL('..', import.meta.url).pathname.replace(/^\/(\w:)/, '$1');
+// В git worktree своего .venv нет: ищем его вверх по каталогам (корень проекта лежит выше .claude/worktrees).
+function findVenvPython() {
+  for (let dir = cwd; ;) {
+    for (const rel of ['.venv/Scripts/python.exe', '.venv/bin/python']) {
+      const candidate = join(dir, rel);
+      if (existsSync(candidate)) return candidate;
+    }
+    const parent = dirname(dir);
+    if (parent === dir) return null;
+    dir = parent;
+  }
+}
+const python = process.env.STUDIO_PYTHON || findVenvPython() || 'python3';
 const legacy = {
   frame_id: 'profile',
   lighting_id: 'rim',
