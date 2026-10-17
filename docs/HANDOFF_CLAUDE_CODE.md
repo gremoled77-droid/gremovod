@@ -237,3 +237,9 @@
 Добавлен отдельный `skills/gremovod-cinematic-lighting/` (SKILL.md + references/course-lighting.md), не затрагивая текущие незавершённые правки camera-work и приложения. Навык также установлен в `C:/Users/BLOWKA/Documents/!GREM TAXI/gremovod/skills/gremovod-cinematic-lighting/`, подключён из локального AGENTS.md. Подробный разбор, реестр, исходные JSON ASR и 18 выбранных иллюстраций (включая 2 страницы PDF) сохранены в `gremovod/references/cinematography-lighting-course-2026-10-17/` локального медиапроекта. В source-library.md добавлен указатель. Полные расшифровки и кадры на GitHub не добавляются.
 
 Проверки: quick_validate.py — Skill is valid; SRT 16/16 — формат, число блоков и границы таймкодов pass; визуально проверены 48 обзорных кадров, дополнительный кадр Hard Lighting, пара до/после sider и обе страницы PDF. Промежуточный анализ: `.worktrees/codex/output/lighting-course/` (игнорируется Git). Синхронизация merge origin/main отложена из-за существующих незакоммиченных правок; fetch выполнен. Код, main, процессы студии, базы, канон и платные генерации не затрагивались.
+
+## Codex: установка SDK ElevenLabs — 17.10.2026
+
+По прямой команде владельца установлены @elevenlabs/react 1.18.0 и @elevenlabs/elevenlabs-js 2.73.0 в frontend рабочей копии codex/work. Изменены только frontend/package.json, frontend/package-lock.json и этот handoff. git fetch origin выполнен, git merge origin/main — Already up to date. npm использовал локальный кэш C:/AI_Workflow_Studio/output/npm-cache из-за ограничений записи в системный кэш.
+
+Проверено: npm ls — обе прямые зависимости установлены; npm install сообщил 0 vulnerabilities; npm run build — pass; npm test с STUDIO_PYTHON=C:/AI_Workflow_Studio/.venv/Scripts/python.exe — 38/38 pass. Первый запуск тестов без STUDIO_PYTHON не смог вызвать python3; код тестов не менялся. Интеграция SDK, вход в аккаунт, API-запросы, загрузка курса и платная транскрибация не выполнялись. main и процессы студии не затронуты.
