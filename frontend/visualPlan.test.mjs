@@ -102,3 +102,7 @@ test('блок композиции добавляется в промпт од�
   assert.equal(appendBlock(once, block, 'VISUAL COMPOSITION BRIEF'), once);
   assert.equal(appendBlock('текст', '', 'VISUAL COMPOSITION BRIEF'), 'текст');
 });
+
+test('блок композиции в пустой промпт — без пустых строк в начале', () => {
+  assert.equal(appendBlock('  \n', 'BLOCK', 'M'), 'BLOCK');
+});

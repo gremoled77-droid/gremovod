@@ -61,7 +61,7 @@ export const BALANCE_LABELS: Record<string, string> = {
 };
 /** Добавляет блок в конец промпта один раз: если маркер уже есть, промпт не меняется. */
 export const appendBlock = (prompt: string, block: string, marker: string) =>
-  !block || prompt.includes(marker) ? prompt : prompt.trimEnd() + '\n\n' + block;
+  !block || prompt.includes(marker) ? prompt : prompt.trim() ? prompt.trimEnd() + '\n\n' + block : block;
 export type ShotPoint = {
   id: string;
   label: string;
