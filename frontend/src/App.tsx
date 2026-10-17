@@ -36,6 +36,7 @@ import ConnectionsPanel from './ConnectionsPanel';
 import GenerationReview, {type GenerationRequest} from './GenerationReview';
 import AssetLibrary from './AssetLibrary';
 import CreateScreen from './CreateScreen';
+import VideoScreen from './VideoScreen';
 import HomeScreen from './HomeScreen';
 import ReelsScreen, {type ReelUse} from './ReelsScreen';
 import GenerationWatcher from './GenerationWatcher';
@@ -1378,23 +1379,25 @@ function App() {
         ) : (
           <main
             className={
-              mode === 'video' || mode === 'audio'
+              mode === 'audio'
                 ? 'media-main'
-                : mode === 'storyboard'
-                  ? 'storyboard-main'
-                  : mode === 'create'
-                    ? 'create-main'
-                    : mode === 'home'
-                      ? 'home-main'
-                      : mode === 'graph'
-                        ? 'workflow-main'
-                        : mode === 'reels'
-                          ? 'reels-main'
-                          : mode === 'styles'
-                            ? 'world-main'
-                            : mode === 'studio'
-                              ? 'idea-main'
-                              : 'solo-main'
+                : mode === 'video'
+                  ? 'create-main video-main'
+                  : mode === 'storyboard'
+                    ? 'storyboard-main'
+                    : mode === 'create'
+                      ? 'create-main'
+                      : mode === 'home'
+                        ? 'home-main'
+                        : mode === 'graph'
+                          ? 'workflow-main'
+                          : mode === 'reels'
+                            ? 'reels-main'
+                            : mode === 'styles'
+                              ? 'world-main'
+                              : mode === 'studio'
+                                ? 'idea-main'
+                                : 'solo-main'
             }
           >
             <aside className="sidebar">
@@ -1905,20 +1908,17 @@ function App() {
                     .join('. ')}
                 />
               ) : mode === 'video' ? (
-                <>
-                  {modelPanel('video')}
-                  <AssetLibrary
-                    {...replacementControls}
-                    onRefine={refineAsset}
-                    onScene={addToScene}
-                    projectId={projectId}
-                    revision={libraryRevision}
-                    onUse={(link, id) => {
-                      change({videoReference: link, videoAssetId: id});
-                      setNotice('Фото выбрано для видео. Опиши движение и проверь стоимость перед запуском.');
-                    }}
-                  />
-                </>
+                <VideoScreen
+                  projectId={projectId}
+                  world={[
+                    state.style?.look,
+                    state.style?.palette,
+                    state.style?.lighting,
+                    state.style?.environment,
+                  ]
+                    .filter(Boolean)
+                    .join('. ')}
+                />
               ) : mode === 'audio' ? (
                 <>{audioPanel()}</>
               ) : mode === 'archive' ? (

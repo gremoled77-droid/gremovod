@@ -16,15 +16,21 @@ export default function CameraFramePanel({
   onPrompt,
   extra,
   categories = ['size', 'angle', 'comp', 'light'],
+  defaultOpen = false,
+  hint = 'план, ракурс, композиция, свет',
+  title = 'Камера и кадр',
 }: {
   prompt: string;
   onPrompt: (update: (current: string) => string) => void;
   extra?: React.ReactNode;
   /** Движение камеры подключается в разделе «Видео», в «Кадрах» его нет. */
   categories?: FrameCat[];
+  defaultOpen?: boolean;
+  hint?: string;
+  title?: string;
 }) {
-  const [open, setOpen] = useState(false);
-  const [cat, setCat] = useState<FrameCat>('size');
+  const [open, setOpen] = useState(defaultOpen);
+  const [cat, setCat] = useState<FrameCat>(categories[0] ?? 'size');
   const cats = FRAME_CATS.filter(c => categories.includes(c.id));
   const chosen = selectedFrameItems(prompt).filter(i => categories.includes(i.cat));
   const chosenIds = new Set(chosen.map(i => i.id));
@@ -39,7 +45,7 @@ export default function CameraFramePanel({
           aria-expanded={open}
           onClick={() => setOpen(v => !v)}
         >
-          Камера и кадр <span aria-hidden="true">{open ? '▴' : '▾'}</span>
+          {title} <span aria-hidden="true">{open ? '▴' : '▾'}</span>
         </button>
         <div className="cf-chips" aria-label="Выбрано">
           {chosen.map(i => (
@@ -55,7 +61,7 @@ export default function CameraFramePanel({
               </button>
             </span>
           ))}
-          {!chosen.length && <span className="cf-hint">план, ракурс, композиция, свет</span>}
+          {!chosen.length && <span className="cf-hint">{hint}</span>}
         </div>
         {extra}
       </div>
@@ -95,7 +101,8 @@ export default function CameraFramePanel({
             ))}
           </div>
           <small className="muted">
-            Фраза уходит в строки FRAME, DOMINANT и LIGHT промпта; в каждой группе выбирается один вариант.
+            Фраза уходит в строки {[...new Set(cats.map(c => c.line))].join(', ')} промпта; в каждой группе
+            выбирается один вариант.
           </small>
         </div>
       )}

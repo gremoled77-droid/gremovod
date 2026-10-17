@@ -52,7 +52,15 @@ function useProductionEntries(projectId: string, kind: 'character' | 'location')
   return {entries, error};
 }
 
-function Modal({title, onClose, children}: {title: string; onClose: () => void; children: React.ReactNode}) {
+export function Modal({
+  title,
+  onClose,
+  children,
+}: {
+  title: string;
+  onClose: () => void;
+  children: React.ReactNode;
+}) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
     window.addEventListener('keydown', onKey);
@@ -302,6 +310,43 @@ export function LocationModal({
             </button>
           </div>
         </>
+      )}
+    </Modal>
+  );
+}
+
+/** Окно выбора готового кадра из библиотеки проекта (кадр-основа для видео). */
+export function LibraryPickModal({
+  title,
+  assets,
+  onPick,
+  onClose,
+}: {
+  title: string;
+  assets: {id: string; thumbnail_url: string | null; url: string}[];
+  onPick: (assetId: string) => void;
+  onClose: () => void;
+}) {
+  return (
+    <Modal title={title} onClose={onClose}>
+      {assets.length ? (
+        <div className="fs-thumbs fs-library">
+          {assets.map(a => (
+            <button
+              key={a.id}
+              type="button"
+              title="Выбрать этот кадр"
+              onClick={() => {
+                onPick(a.id);
+                onClose();
+              }}
+            >
+              <img src={a.thumbnail_url || a.url} alt="" loading="lazy" />
+            </button>
+          ))}
+        </div>
+      ) : (
+        <p className="muted">В библиотеке проекта пока нет кадров. Сгенерируй их на экране «Кадры».</p>
       )}
     </Modal>
   );

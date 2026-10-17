@@ -1,0 +1,134 @@
+/* Экран «Видео»: форма слева, ролики справа. Каркас main берёт у create-main (create.css). */
+.video-main .vs {
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(320px, 440px) minmax(0, 1fr);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  overflow: hidden;
+  background: var(--bg);
+}
+.vs-form {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  overflow-y: auto;
+  min-width: 0;
+  border-right: 1px solid var(--border);
+}
+.vs-block {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.vs-block > b,
+.vs-model > b {
+  font-size: 13px;
+}
+.vs-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+.vs-row button,
+.vs-opts select {
+  padding: 5px 10px;
+  font-size: 12px;
+  border-radius: 10px;
+}
+.vs-ref {
+  position: relative;
+  width: 64px;
+  height: 64px;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+.vs-ref img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.vs-ref button {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+}
+.vs-add {
+  min-width: 64px;
+  height: 64px;
+  font-size: 18px;
+}
+.vs-count {
+  margin-left: auto;
+  font-size: 12px;
+}
+.vs-form textarea {
+  width: 100%;
+  resize: vertical;
+  box-sizing: border-box;
+}
+.vs-model {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.vs-opts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: flex-end;
+}
+.vs-opts label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.vs-length {
+  flex: 1 1 100%;
+}
+.vs-run {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.vs-price {
+  font-size: 18px;
+  font-weight: 600;
+}
+.vs-results {
+  padding: 16px;
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+}
+.vs-empty {
+  grid-column: 1 / -1;
+}
+@media (max-width: 760px) {
+  .video-main .vs {
+    display: flex;
+    flex-direction: column;
+    overflow: visible;
+  }
+  .vs-form {
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+    overflow: visible;
+  }
+}
