@@ -12,15 +12,8 @@ import {
   buildReplaceInVideoPrompt,
   replacementRefs,
 } from './replaceCharacterPrompt';
-import {
-  DIRECTOR_GROUPS,
-  DIRECTOR_PRESETS,
-  DIRECTOR_TEMPLATE,
-  appendDirectorBlock,
-  findDirectorPreset,
-  type DirectorGroup,
-} from './directorPresets';
 import {appendBlock} from './visualPlan';
+import CameraFramePanel from './CameraFramePanel';
 import PriceTable, {cents, useModelRange, useOptionPrices} from './PriceTable';
 
 type OptionSpec = {
@@ -176,14 +169,6 @@ function CreateScreenBody({projectId, heroes}: {projectId: string; heroes: Hero[
   const [specs, setSpecs] = useState<Record<string, Spec>>({});
   const [library, setLibrary] = useState<LibAsset[]>([]);
   const [prompt, setPrompt] = useState(restored.prompt);
-  /** «Режиссёрский каркас» и заготовки: блок добавляется в конец промпта, строки читает prompt_rules.py. */
-  function addDirectorBlock(text: string, what: string) {
-    setError('');
-    setPrompt(current => appendDirectorBlock(current, text));
-    setNotice(
-      `${what} добавлен в промпт. Заполни пустые строки; для прямой генерации сведи их в один промпт.`
-    );
-  }
   async function addVisualRules() {
     setError('');
     try {
@@ -1038,54 +1023,35 @@ function CreateScreenBody({projectId, heroes}: {projectId: string; heroes: Hero[
             placeholder="Опиши кадр: кто, где, свет, ракурс…"
             onChange={e => setPrompt(e.target.value)}
           />
+          <CameraFramePanel
+            prompt={prompt}
+            onPrompt={setPrompt}
+            extra={
+              <div className="cf-extra">
+                <button
+                  disabled={!projectId}
+                  title="Добавить в промпт визуальные правила серии, локации и героев этого кадра"
+                  onClick={() => void addVisualRules()}
+                >
+                  ＋ Правила серии
+                </button>
+                <button
+                  disabled={!projectId}
+                  title="Добавить в промпт блок композиции: доминанта, баланс или напряжение, противовес из плана кадра"
+                  onClick={() => void addComposition()}
+                >
+                  ＋ Композиция кадра
+                </button>
+                <CinemaInfo topic="composition" />
+                <CinemaInfo topic="lens" />
+              </div>
+            }
+          />
           <div className="cs-row">
             <span className="muted">
               {refs.length} реф. · {total} {total === 1 ? 'модель' : 'моделей'}
             </span>
             <span className="cs-spacer" />
-            <button
-              disabled={!projectId}
-              title="Добавить в промпт визуальные правила серии, локации и героев этого кадра"
-              onClick={() => void addVisualRules()}
-            >
-              ＋ Визуальные правила
-            </button>
-            <button
-              type="button"
-              title="Шесть режиссёрских строк: суть кадра, доминанта, символ, сдвиг, камера, свет (пять столпов киноязыка)"
-              onClick={() => addDirectorBlock(DIRECTOR_TEMPLATE, 'Режиссёрский каркас')}
-            >
-              ＋ Режиссёрский каркас
-            </button>
-            <select
-              value=""
-              aria-label="Заготовки с Грэмом и ВАЗ-2106"
-              title="Готовые заготовки кадра, камеры и истории с Грэмом и ВАЗ-2106"
-              onChange={e => {
-                const preset = findDirectorPreset(e.target.value);
-                if (preset) addDirectorBlock(preset.text, `Заготовка «${preset.title}»`);
-              }}
-            >
-              <option value="">Заготовки ▾</option>
-              {(Object.keys(DIRECTOR_GROUPS) as DirectorGroup[]).map(group => (
-                <optgroup key={group} label={DIRECTOR_GROUPS[group]}>
-                  {DIRECTOR_PRESETS.filter(p => p.group === group).map(p => (
-                    <option key={p.id} value={p.id}>
-                      {p.title}
-                    </option>
-                  ))}
-                </optgroup>
-              ))}
-            </select>
-            <button
-              disabled={!projectId}
-              title="Добавить в промпт блок композиции: доминанта, баланс или напряжение, противовес из плана кадра"
-              onClick={() => void addComposition()}
-            >
-              ＋ Композиция
-            </button>
-            <CinemaInfo topic="composition" />
-            <CinemaInfo topic="lens" />
             <button disabled={!projectId} onClick={() => void external()}>
               Скопировать для ChatGPT
             </button>

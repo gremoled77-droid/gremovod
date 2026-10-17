@@ -731,3 +731,158 @@ a.cs-info:hover {
   color: var(--text);
   font-weight: 600;
 }
+
+/* Панель «Камера и кадр» */
+.cf {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+.cf-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.cf-toggle {
+  height: 32px;
+  padding: 0 14px;
+  border-radius: 99px;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.cf-toggle.on {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.cf-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+  flex: 1;
+}
+.cf-hint {
+  color: var(--muted);
+  font-size: 12px;
+}
+.cf-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 4px 0 10px;
+  border: 1px solid color-mix(in srgb, var(--accent) 55%, var(--border));
+  border-radius: 99px;
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface-2));
+  font-size: 12px;
+}
+.cf-chip small {
+  color: var(--muted);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.cf-chip button {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--muted);
+}
+.cf-chip button:hover {
+  color: var(--bad);
+}
+.cf-extra {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.cf-extra button:not(.cinema-info) {
+  height: 28px;
+  padding: 0 12px;
+  border-radius: 99px;
+  font-size: 12px;
+}
+.cf-drawer {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface-2);
+}
+.cf-tabs {
+  display: flex;
+  gap: 6px;
+}
+.cf-tabs button {
+  height: 30px;
+  padding: 0 14px;
+  border-radius: 99px;
+  font-size: 12px;
+}
+.cf-tabs button.on {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface-2));
+}
+.cf-tabs em {
+  margin-left: 6px;
+  font-style: normal;
+  font-size: 8px;
+  color: var(--accent);
+}
+.cf-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+  gap: 8px;
+}
+.cf-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 12px;
+  text-align: center;
+}
+.cf-card:hover {
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+.cf-card.on {
+  border-color: var(--accent);
+  color: var(--text);
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface));
+}
+.cf-prev {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  border-radius: 8px;
+  background: var(--bg);
+  color: #8b8f99;
+  display: block;
+}
+.cf-chips {
+  order: 3;
+  flex: 1 1 100%;
+}
+.cf-extra {
+  order: 2;
+  margin-left: auto;
+}
+.cf-chip,
+.cf-chip small {
+  white-space: nowrap;
+}
