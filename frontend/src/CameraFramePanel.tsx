@@ -15,14 +15,18 @@ export default function CameraFramePanel({
   prompt,
   onPrompt,
   extra,
+  categories = ['angle', 'size', 'light'],
 }: {
   prompt: string;
   onPrompt: (update: (current: string) => string) => void;
   extra?: React.ReactNode;
+  /** Движение камеры подключается в разделе «Видео», в «Кадрах» его нет. */
+  categories?: FrameCat[];
 }) {
   const [open, setOpen] = useState(false);
   const [cat, setCat] = useState<FrameCat>('angle');
-  const chosen = selectedFrameItems(prompt);
+  const cats = FRAME_CATS.filter(c => categories.includes(c.id));
+  const chosen = selectedFrameItems(prompt).filter(i => categories.includes(i.cat));
   const chosenIds = new Set(chosen.map(i => i.id));
   const catLabel = (c: FrameCat) => FRAME_CATS.find(x => x.id === c)!.label;
 
@@ -58,7 +62,7 @@ export default function CameraFramePanel({
       {open && (
         <div className="cf-drawer">
           <div className="cf-tabs" role="tablist">
-            {FRAME_CATS.map(c => {
+            {cats.map(c => {
               const count = chosen.filter(i => i.cat === c.id).length;
               return (
                 <button
@@ -91,8 +95,7 @@ export default function CameraFramePanel({
             ))}
           </div>
           <small className="muted">
-            Фраза уходит в строки FRAME, CAMERA и LIGHT промпта; в каждой группе выбирается один вариант.
-            Движение учитывается для видео и как подсказка для картинки.
+            Фраза уходит в строки FRAME и LIGHT промпта; в каждой группе выбирается один вариант.
           </small>
         </div>
       )}
