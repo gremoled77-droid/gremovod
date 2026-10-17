@@ -9,7 +9,7 @@ export const MODEL_POLL_MS: Record<string, number> = {};
 
 const LABELS: Record<string, string> = {
   'seedream-5-pro': 'Seedream 5 Pro',
-  'seedream-5-lite': 'Seedream 5 Fast',
+  'seedream-5-lite': 'Seedream 5 Lite',
   'gpt-image-2': 'GPT Image 2.0',
   'gpt-image-2.5': 'GPT Image 2.5',
   'nano-banana-2.1': 'Nano Banana 2.1',

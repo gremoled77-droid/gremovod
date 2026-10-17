@@ -6,6 +6,7 @@ import './style.css';
 import './design.css';
 import './mobile.css';
 import './create.css';
+import './video.css';
 import './home.css';
 import './reels.css';
 import './lightbox.css';

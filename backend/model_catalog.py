@@ -138,3 +138,43 @@ for _id, _profile in _REF_PROFILES.items():
                             'max_refs':_limits.get('image') or 1,'docs':'skills/video-'+_id.replace('.', '-')+'/SKILL.md',
                             'prompt_only':True}
     MODEL_SPECS[_id].update(_profile)
+
+
+# --- Seedream 5 Lite: параметры и цена по размеру (раньше шёл по старому пути без схемы параметров).
+# --- Цены по таблице PiAPI (17.10.2026, вставлена владельцем): lite 2K/3K $0.052, pro 1K $0.068, 2K $0.136.
+MODEL_SPECS['seedream-5-lite'].update({
+    'adapter':'unified_image','api_refs':10,'ref_field':'image_urls',
+    'price_by_size':{'2K':0.052,'3K':0.052},
+    'options':{'size':{'values':['2K','3K'],'default':'2K'},
+               'aspect_ratio':{'values':_ASPECT,'default':'1:1'},
+               'output_format':{'values':['png','jpeg','webp'],'default':'png'}}})
+
+# Варианты less-restriction: цены из той же таблицы PiAPI; task_type = имя модели из таблицы. Живой проверки не было,
+# поэтому запуск выключен (только предпросмотр и цена), пока владелец не разрешит пробный вызов.
+for _base, _prices in (('seedream-5-lite', {'2K':0.065,'3K':0.065}), ('seedream-5-pro', {'1K':0.085,'2K':0.17})):
+    _spec = {k: v for k, v in MODEL_SPECS[_base].items() if k not in ('verified_at', 'price_usd')}
+    _spec.update({'launch_enabled':False,'prompt_only':False,'task_type':_base+'-less-restriction',
+                  'price_by_size':_prices,'family':_base})
+    MODEL_SPECS[_base+'-less-restriction'] = _spec
+
+
+# --- Страница модели у провайдера (кнопка «i» в «Кадрах»). Интерфейс берёт ссылку из page_urls[provider],
+# --- поэтому при втором API-сервисе достаточно добавить его ключ и ссылки; код экрана не меняется.
+# --- Ссылки на страницы моделей владелец даст позже: пока берём только адреса docs на домене провайдера.
+PROVIDER_HOSTS = {'piapi': 'piapi.ai'}
+_GPT_PAGE = 'https://piapi.ai/docs/gpt-image/gpt-image-api'
+PAGE_URLS = {  # {model_id: {provider: url}}: явные ссылки имеют приоритет над docs
+    'gpt-image-2': {'piapi': _GPT_PAGE},
+    'gpt-image-2.5': {'piapi': _GPT_PAGE},  # страница API GPT Image (даёт владелец, 17.10.2026)
+    # Страница Qwen Image 2.1 у PiAPI не найдена: общая страница qwen-image (про 2.1 на ней не сказано).
+    'qwen-image-2.1': {'piapi': 'https://piapi.ai/qwen-image'},
+}
+for _id, _spec in MODEL_SPECS.items():
+    _spec.setdefault('provider', 'piapi')
+    _urls = dict(PAGE_URLS.get(_id, {}))
+    _docs = str(_spec.get('docs') or '')
+    for _name, _host in PROVIDER_HOSTS.items():
+        _parts = _docs.split('/')
+        if _name not in _urls and _docs.startswith('https://') and len(_parts) > 2 and _parts[2].endswith(_host):
+            _urls[_name] = _docs
+    _spec['page_urls'] = _urls

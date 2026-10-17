@@ -4,7 +4,8 @@ import {loadCreateDraft, saveCreateDraft} from './createDraft';
 import GenerationReview, {type GenerationRequest} from './GenerationReview';
 import {type ActivityItem} from './useActivity';
 import {useSharedActivity} from './ActivityContext';
-import Lightbox, {type LightboxItem} from './Lightbox';
+import Lightbox from './Lightbox';
+import FrameActions from './FrameActions';
 import CinemaInfo from './CinemaInfo';
 import {DEFAULT_CHAT_URL, copyTextFor, getChatUrl} from './chatLink';
 import {
@@ -12,15 +13,9 @@ import {
   buildReplaceInVideoPrompt,
   replacementRefs,
 } from './replaceCharacterPrompt';
-import {
-  DIRECTOR_GROUPS,
-  DIRECTOR_PRESETS,
-  DIRECTOR_TEMPLATE,
-  appendDirectorBlock,
-  findDirectorPreset,
-  type DirectorGroup,
-} from './directorPresets';
-import {appendBlock} from './visualPlan';
+import {AddReferenceModal, LocationModal} from './FrameSources';
+import CameraFramePanel from './CameraFramePanel';
+import PriceTable, {cents, useModelRange, useOptionPrices} from './PriceTable';
 
 type OptionSpec = {
   values?: (string | number)[];
@@ -35,25 +30,44 @@ type Spec = {
   options?: Record<string, OptionSpec>;
   variants?: Record<string, unknown>;
   api_refs?: number;
+  provider?: string;
+  page_urls?: Record<string, string>;
 };
 type LibAsset = {
   id: string;
   url: string;
   thumbnail_url: string | null;
   provider_reference_url?: string | null;
+  filename?: string;
   metadata: {kind?: string; favorite?: boolean};
 };
 type Hero = {id: string; name: string; assetId?: string};
 
 const LABELS: Record<string, string> = {
   'seedream-5-pro': 'Seedream 5 Pro',
-  'seedream-5-lite': 'Seedream 5 Fast',
+  'seedream-5-lite': 'Seedream 5 Lite',
+  'seedream-5-lite-less-restriction': 'Seedream 5 Lite · less restriction',
+  'seedream-5-pro-less-restriction': 'Seedream 5 Pro · less restriction',
   'gpt-image-2': 'GPT Image 2.0',
   'gpt-image-2.5': 'GPT Image 2.5',
   'nano-banana-2.1': 'Nano Banana 2.1',
   'qwen-image-2.1': 'Qwen Image 2.1',
 };
-const ORDER = Object.keys(LABELS);
+/** Модели, у которых в карточке можно выбрать вариант; остальные id из LABELS показываются отдельными боксами. */
+const FAMILIES: Record<string, string[]> = {
+  'seedream-5-pro': ['seedream-5-pro', 'seedream-5-pro-less-restriction'],
+  'seedream-5-lite': ['seedream-5-lite', 'seedream-5-lite-less-restriction'],
+};
+const MEMBERS = new Set(Object.values(FAMILIES).flat());
+const ORDER = Object.keys(LABELS).filter(id => !MEMBERS.has(id) || id in FAMILIES);
+const VARIANT_NAMES: Record<string, string> = {
+  'seedream-5-pro': 'Pro',
+  'seedream-5-pro-less-restriction': 'Pro · less restriction',
+  'seedream-5-lite': 'Lite',
+  'seedream-5-lite-less-restriction': 'Lite · less restriction',
+};
+/** Названия API-сервисов; новый сервис добавляется сюда и в каталог бэкенда (provider, page_urls). */
+const PROVIDERS: Record<string, string> = {piapi: 'PiAPI'};
 
 async function json(r: Response) {
   const d = await r.json().catch(() => ({}));
@@ -63,25 +77,108 @@ async function json(r: Response) {
 
 type TempItem = {asset_id: string; days_left: number; expired: boolean; protected: string};
 
-export default function CreateScreen(props: {projectId: string; heroes: Hero[]}) {
+/** Серая «i» в кружке: страница модели у её API-сервиса (ссылка берётся из каталога бэкенда). */
+function ModelInfo({spec}: {spec: Spec}) {
+  const provider = spec.provider || 'piapi';
+  const url = spec.page_urls?.[provider];
+  const name = PROVIDERS[provider] || provider;
+  return url ? (
+    <a
+      className="cs-info"
+      href={url}
+      target="_blank"
+      rel="noreferrer"
+      title={`Страница модели на ${name}`}
+      aria-label={`Страница модели на ${name}`}
+      onClick={e => e.stopPropagation()}
+      onKeyDown={e => e.stopPropagation()}
+    >
+      i
+    </a>
+  ) : (
+    <span className="cs-info off" title={`Ссылка на страницу модели у ${name} пока не задана`}>
+      i
+    </span>
+  );
+}
+
+/** Цена или диапазон цен в заголовке бокса: видна, даже когда модель выключена. */
+function ModelRange({id, schema}: {id: string; schema: Record<string, OptionSpec> | undefined}) {
+  const range = useModelRange(id, schema);
+  return range ? <> · {range}</> : null;
+}
+
+function ModelOptions({
+  id,
+  schema,
+  current,
+  onChange,
+}: {
+  id: string;
+  schema: Record<string, OptionSpec>;
+  current: Record<string, string | number>;
+  onChange: (key: string, value: string | number) => void;
+}) {
+  const prices = useOptionPrices(id, schema, current);
+  const priced = ['variant', 'quality', 'size', 'resolution'].some(k => schema[k]?.values);
+  const flat = useModelRange(id, schema);
+  return (
+    <div className="cs-model-opts">
+      {!priced && flat && (
+        <label>
+          <span>цена за картинку</span>
+          <b className="cs-flat-price">{flat}</b>
+        </label>
+      )}
+      {Object.entries(schema).map(([key, sp]) => (
+        <label key={key}>
+          <span>{key}</span>
+          {sp.values ? (
+            <select value={String(current[key])} onChange={e => onChange(key, e.target.value)}>
+              {sp.values.map(v => {
+                const p = prices[key]?.[String(v)];
+                return (
+                  <option key={String(v)} value={String(v)}>
+                    {String(v)}
+                    {p !== undefined && p !== null ? ' · ' + cents(p) : ''}
+                  </option>
+                );
+              })}
+            </select>
+          ) : (
+            <input
+              type="number"
+              min={sp.min}
+              max={sp.max}
+              value={Number(current[key])}
+              onChange={e => onChange(key, Number(e.target.value))}
+            />
+          )}
+        </label>
+      ))}
+    </div>
+  );
+}
+
+export default function CreateScreen(props: {projectId: string; heroes: Hero[]; world?: string}) {
   return <CreateScreenBody key={props.projectId} {...props} />;
 }
 
-function CreateScreenBody({projectId, heroes}: {projectId: string; heroes: Hero[]}) {
+function CreateScreenBody({
+  projectId,
+  heroes,
+  world = '',
+}: {
+  projectId: string;
+  heroes: Hero[];
+  world?: string;
+}) {
   const [restored] = useState(() => loadCreateDraft(projectId));
   const [draftSaved, setDraftSaved] = useState(true);
   const {items, error: feedError, reset} = useSharedActivity();
   const [specs, setSpecs] = useState<Record<string, Spec>>({});
   const [library, setLibrary] = useState<LibAsset[]>([]);
   const [prompt, setPrompt] = useState(restored.prompt);
-  /** «Режиссёрский каркас» и заготовки: блок добавляется в конец промпта, строки читает prompt_rules.py. */
-  function addDirectorBlock(text: string, what: string) {
-    setError('');
-    setPrompt(current => appendDirectorBlock(current, text));
-    setNotice(
-      `${what} добавлен в промпт. Заполни пустые строки; для прямой генерации сведи их в один промпт.`
-    );
-  }
   async function addVisualRules() {
     setError('');
     try {
@@ -97,16 +194,9 @@ function CreateScreenBody({projectId, heroes}: {projectId: string; heroes: Hero[
       setError(e instanceof Error ? e.message : String(e));
     }
   }
-  async function addComposition() {
-    setError('');
-    try {
-      const data = await json(await apiFetch(`/api/projects/${projectId}/composition-brief`));
-      setPrompt(current => appendBlock(current, data.prompt, 'VISUAL COMPOSITION BRIEF'));
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    }
-  }
+  const [source, setSource] = useState<'' | 'hero' | 'location'>('');
   const [selected, setSelected] = useState<string[]>(restored.selected);
+  const [pick, setPick] = useState<Record<string, string>>({});
   const [options, setOptions] = useState<Record<string, Record<string, string | number>>>(restored.options);
   const [refs, setRefs] = useState<string[]>(restored.refs);
   const [queue, setQueue] = useState<GenerationRequest[]>([]);
@@ -117,7 +207,10 @@ function CreateScreenBody({projectId, heroes}: {projectId: string; heroes: Hero[
   const fileInput = useRef<HTMLInputElement>(null);
   const [pasteFor, setPasteFor] = useState('');
   const [animate, setAnimate] = useState('');
-  const [view, setView] = useState<{items: LightboxItem[]; index: number} | null>(null);
+  const [view, setView] = useState<{
+    entries: {id: string; kind?: string; title?: string}[];
+    index: number;
+  } | null>(null);
   const [videoModel, setVideoModel] = useState(restored.videoModel);
   const [motion, setMotion] = useState(restored.motion);
   const [videoOptions, setVideoOptions] = useState<Record<string, string | number>>(restored.videoOptions);
@@ -203,6 +296,35 @@ function CreateScreenBody({projectId, heroes}: {projectId: string; heroes: Hero[
     }
   };
   const toggleRef = (id: string) => setRefs(r => (r.includes(id) ? r.filter(x => x !== id) : [...r, id]));
+  /** «Править в GPT Image»: кадр становится первым референсом, модель — GPT Image 2.5. */
+  const editAsset = (id: string) => {
+    setRefs(r => [id, ...r.filter(x => x !== id)]);
+    setSelected(['gpt-image-2.5']);
+    setPrompt(p => p.trim() || 'Отредактируй изображение: ');
+    setView(null);
+    setNotice('Кадр прикреплён референсом для правки. Опиши, что изменить, и проверь цену.');
+  };
+  /** Действия над кадром одинаковы в плитках, карточках результатов и просмотре. */
+  const actionsFor = (id: string, kind: string = 'image') => {
+    const a = byId[id];
+    return {
+      favorite: !!a?.metadata.favorite,
+      onFavorite: () => void favorite(id, !a?.metadata.favorite),
+      onEdit: kind === 'image' ? () => editAsset(id) : undefined,
+      onRef: kind === 'image' ? () => toggleRef(id) : undefined,
+      refActive: refs.includes(id),
+      onAnimate:
+        kind === 'image'
+          ? () => {
+              setView(null);
+              setAnimate(id);
+            }
+          : undefined,
+      downloadUrl: a?.url,
+      downloadName: a?.filename,
+      onTrash: () => void trashAsset(id),
+    };
+  };
 
   const toggle = (id: string) => setSelected(s => (s.includes(id) ? s.filter(x => x !== id) : [...s, id]));
 
@@ -521,12 +643,10 @@ function CreateScreenBody({projectId, heroes}: {projectId: string; heroes: Hero[
   const results = items.filter(
     i => (i.kind === 'image' || i.kind === 'video') && i.status !== 'waiting_external'
   );
+  // Крутилка только у заданий, которые действительно в работе: отменённые и завершённые без файла её не получают.
   const pending = items.filter(
     i =>
-      i.status !== 'waiting_external' &&
-      i.status !== 'completed' &&
-      i.status !== 'succeeded' &&
-      i.status !== 'failed' &&
+      ['queued', 'running', 'processing', 'saving'].includes(i.status) &&
       (i.kind === 'image' || i.kind === 'video') &&
       !i.asset_ids.length
   );
@@ -537,15 +657,10 @@ function CreateScreenBody({projectId, heroes}: {projectId: string; heroes: Hero[
     const list = results.flatMap(it =>
       it.asset_ids
         .filter(x => byId[x])
-        .map(x => ({
-          id: x,
-          url: byId[x].url,
-          kind: it.kind,
-          title: LABELS[it.model] || it.model,
-        }))
+        .map(x => ({id: x, kind: it.kind, title: LABELS[it.model] || it.model}))
     );
     setView({
-      items: list,
+      entries: list,
       index: Math.max(
         0,
         list.findIndex(x => x.id === aid)
@@ -553,46 +668,67 @@ function CreateScreenBody({projectId, heroes}: {projectId: string; heroes: Hero[
     });
   };
 
-  const modelCard = (id: string) => {
+  const modelCard = (base: string) => {
+    const family = FAMILIES[base];
+    const id = family ? (family.find(m => selected.includes(m)) ?? pick[base] ?? base) : base;
     const on = selected.includes(id);
     const o = specs[id]?.options;
+    const choose = (next: string) => {
+      setPick(p => ({...p, [base]: next}));
+      setSelected(s => s.map(x => (x === id ? next : x)));
+    };
     return (
       <div key={id} className={'cs-model' + (on ? ' on' : '')}>
-        <button type="button" className="cs-model-head" onClick={() => toggle(id)} aria-pressed={on}>
+        <div
+          role="button"
+          tabIndex={0}
+          className="cs-model-head"
+          onClick={() => toggle(id)}
+          onKeyDown={e => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              toggle(id);
+            }
+          }}
+          aria-pressed={on}
+        >
           <span>
-            <b>{LABELS[id]}</b>
-            <small>PiAPI{specs[id].launch_enabled === false ? ' · проверяется' : ''}</small>
+            <b>
+              {LABELS[id]}
+              <ModelInfo spec={specs[id]} />
+            </b>
+            <small>
+              {PROVIDERS[specs[id].provider || 'piapi'] || specs[id].provider}
+              {specs[id].launch_enabled === false ? ' · проверяется' : ''}
+              <ModelRange id={id} schema={specs[id].options} />
+            </small>
           </span>
           <em>{on ? 'вкл' : 'выкл'}</em>
-        </button>
+        </div>
+        {on && family && (
+          <label className="cs-variant">
+            <span>модель</span>
+            <select value={id} onChange={e => choose(e.target.value)}>
+              {family
+                .filter(m => specs[m])
+                .map(m => (
+                  <option key={m} value={m}>
+                    {VARIANT_NAMES[m] || m}
+                    {specs[m].launch_enabled === false ? ' · не проверена' : ''}
+                  </option>
+                ))}
+            </select>
+          </label>
+        )}
         {on && o && (
-          <div className="cs-model-opts">
-            {Object.entries(o).map(([key, sp]) => (
-              <label key={key}>
-                <span>{key}</span>
-                {sp.values ? (
-                  <select
-                    value={String(optionValue(id, key, sp))}
-                    onChange={e => setOptions(p => ({...p, [id]: {...p[id], [key]: e.target.value}}))}
-                  >
-                    {sp.values.map(v => (
-                      <option key={String(v)} value={String(v)}>
-                        {String(v)}
-                      </option>
-                    ))}
-                  </select>
-                ) : (
-                  <input
-                    type="number"
-                    min={sp.min}
-                    max={sp.max}
-                    value={Number(optionValue(id, key, sp))}
-                    onChange={e => setOptions(p => ({...p, [id]: {...p[id], [key]: Number(e.target.value)}}))}
-                  />
-                )}
-              </label>
-            ))}
-          </div>
+          <ModelOptions
+            id={id}
+            schema={o}
+            current={Object.fromEntries(
+              Object.entries(o).map(([key, sp]) => [key, optionValue(id, key, sp)])
+            )}
+            onChange={(key, value) => setOptions(p => ({...p, [id]: {...p[id], [key]: value}}))}
+          />
         )}
       </div>
     );
@@ -656,31 +792,25 @@ function CreateScreenBody({projectId, heroes}: {projectId: string; heroes: Hero[
                 onClick={() => {
                   const list = shownImages.slice(0, 60);
                   setView({
-                    items: list.map(x => ({url: x.url, title: x.id})),
+                    entries: list.map(x => ({id: x.id, title: x.id})),
                     index: list.findIndex(x => x.id === a.id),
                   });
                 }}
               >
                 ⤢
               </button>
-              <button
-                type="button"
-                className={'cs-heart' + (a.metadata.favorite ? ' on' : '')}
-                aria-label="Избранное"
-                title="Избранное"
-                onClick={() => void favorite(a.id, !a.metadata.favorite)}
-              >
-                {a.metadata.favorite ? '♥' : '♡'}
-              </button>
-              <button
-                type="button"
-                className="cs-x cs-trash"
-                aria-label="Убрать в корзину"
-                title="Убрать из библиотеки (в корзину на 30 дней)"
-                onClick={() => void trashAsset(a.id)}
-              >
-                🗑
-              </button>
+              {a.metadata.favorite && (
+                <span className="cs-fav-badge" aria-hidden="true">
+                  ♥
+                </span>
+              )}
+              <FrameActions
+                small
+                className="cs-tile-actions"
+                {...actionsFor(a.id)}
+                onRef={undefined}
+                onAnimate={undefined}
+              />
             </div>
           ))}
           {!shownImages.length && <span className="muted">Пока нет изображений</span>}
@@ -801,22 +931,13 @@ function CreateScreenBody({projectId, heroes}: {projectId: string; heroes: Hero[
                       onClick={() => openResult(aid)}
                     />
                   )}
-                  <button
-                    type="button"
-                    className={'cs-heart cs-heart-big' + (a.metadata.favorite ? ' on' : '')}
-                    aria-label="Избранное"
-                    title="Избранное"
-                    onClick={() => void favorite(aid, !a.metadata.favorite)}
-                  >
-                    {a.metadata.favorite ? '♥' : '♡'}
-                  </button>
+                  <FrameActions className="cs-result-actions" {...actionsFor(aid, item.kind)} />
                   <div className="cs-cap">
                     <div>
                       <b>{LABELS[item.model] || item.model}</b>
                       <small>{item.status}</small>
                     </div>
                     <div className="cs-row">
-                      {item.kind === 'image' && <button onClick={() => setAnimate(aid)}>Оживить</button>}
                       {item.kind === 'video' && (
                         <button
                           disabled={busy}
@@ -828,12 +949,6 @@ function CreateScreenBody({projectId, heroes}: {projectId: string; heroes: Hero[
                       )}
                       <button onClick={() => regenerate(item)} title="Подставить промпт и модель">
                         ↻
-                      </button>
-                      <button onClick={() => favorite(aid, !a.metadata.favorite)} title="Избранное">
-                        {a.metadata.favorite ? '♥' : '♡'}
-                      </button>
-                      <button onClick={() => toggleRef(aid)} title="Использовать как референс">
-                        {refs.includes(aid) ? '✓ реф.' : '+ реф.'}
                       </button>
                       {item.kind === 'image' && (
                         <select
@@ -916,54 +1031,43 @@ function CreateScreenBody({projectId, heroes}: {projectId: string; heroes: Hero[
             placeholder="Опиши кадр: кто, где, свет, ракурс…"
             onChange={e => setPrompt(e.target.value)}
           />
+          <CameraFramePanel
+            prompt={prompt}
+            onPrompt={setPrompt}
+            extra={
+              <div className="cf-extra">
+                <button
+                  disabled={!projectId}
+                  aria-label="Добавить персонажа или референс"
+                  title="Добавить персонажа или загрузить свой референс"
+                  onClick={() => setSource('hero')}
+                >
+                  ＋
+                </button>
+                <button
+                  disabled={!projectId}
+                  title="Выбрать готовую локацию или создать новую по мотивам мира"
+                  onClick={() => setSource('location')}
+                >
+                  Локация
+                </button>
+                <button
+                  disabled={!projectId}
+                  title="Добавить в промпт визуальные правила серии, локации и героев этого кадра"
+                  onClick={() => void addVisualRules()}
+                >
+                  ＋ Правила серии
+                </button>
+                <CinemaInfo topic="composition" />
+                <CinemaInfo topic="lens" />
+              </div>
+            }
+          />
           <div className="cs-row">
             <span className="muted">
               {refs.length} реф. · {total} {total === 1 ? 'модель' : 'моделей'}
             </span>
             <span className="cs-spacer" />
-            <button
-              disabled={!projectId}
-              title="Добавить в промпт визуальные правила серии, локации и героев этого кадра"
-              onClick={() => void addVisualRules()}
-            >
-              ＋ Визуальные правила
-            </button>
-            <button
-              type="button"
-              title="Шесть режиссёрских строк: суть кадра, доминанта, символ, сдвиг, камера, свет (пять столпов киноязыка)"
-              onClick={() => addDirectorBlock(DIRECTOR_TEMPLATE, 'Режиссёрский каркас')}
-            >
-              ＋ Режиссёрский каркас
-            </button>
-            <select
-              value=""
-              aria-label="Заготовки с Грэмом и ВАЗ-2106"
-              title="Готовые заготовки кадра, камеры и истории с Грэмом и ВАЗ-2106"
-              onChange={e => {
-                const preset = findDirectorPreset(e.target.value);
-                if (preset) addDirectorBlock(preset.text, `Заготовка «${preset.title}»`);
-              }}
-            >
-              <option value="">Заготовки ▾</option>
-              {(Object.keys(DIRECTOR_GROUPS) as DirectorGroup[]).map(group => (
-                <optgroup key={group} label={DIRECTOR_GROUPS[group]}>
-                  {DIRECTOR_PRESETS.filter(p => p.group === group).map(p => (
-                    <option key={p.id} value={p.id}>
-                      {p.title}
-                    </option>
-                  ))}
-                </optgroup>
-              ))}
-            </select>
-            <button
-              disabled={!projectId}
-              title="Добавить в промпт блок композиции: доминанта, баланс или напряжение, противовес из плана кадра"
-              onClick={() => void addComposition()}
-            >
-              ＋ Композиция
-            </button>
-            <CinemaInfo topic="composition" />
-            <CinemaInfo topic="lens" />
             <button disabled={!projectId} onClick={() => void external()}>
               Скопировать для ChatGPT
             </button>
@@ -985,15 +1089,48 @@ function CreateScreenBody({projectId, heroes}: {projectId: string; heroes: Hero[
           <b>Модели</b>
         </div>
         {models.map(modelCard)}
+        <PriceTable specs={specs} labels={LABELS} models={Object.keys(LABELS)} />
         <div className="cs-note">
           Перед отправкой покажу точную цену и попрошу подтверждение. Ручная попытка в ChatGPT стоит $0 по
           API.
         </div>
       </aside>
 
+      {source === 'hero' && (
+        <AddReferenceModal
+          projectId={projectId}
+          refs={refs}
+          onAdd={id => setRefs(r => (r.includes(id) ? r : [...r, id]))}
+          onUploaded={id => {
+            setRefs(r => (r.includes(id) ? r : [...r, id]));
+            void loadLibrary();
+          }}
+          onClose={() => setSource('')}
+        />
+      )}
+      {source === 'location' && (
+        <LocationModal
+          projectId={projectId}
+          refs={refs}
+          world={world}
+          onAdd={id => setRefs(r => (r.includes(id) ? r : [...r, id]))}
+          onCreate={brief => {
+            setPrompt(cur => (cur.trim() ? cur.trimEnd() + '\n\n' + brief : brief));
+            setNotice(
+              'Промпт локации добавлен: выбери модель и сгенерируй, результат появится в библиотеке.'
+            );
+          }}
+          onClose={() => setSource('')}
+        />
+      )}
       {view && (
         <Lightbox
-          items={view.items}
+          items={view.entries.map(e => ({
+            url: byId[e.id]?.url || '',
+            kind: e.kind,
+            title: e.title,
+            ...actionsFor(e.id, e.kind),
+          }))}
           index={view.index}
           onIndex={i => setView(v => (v ? {...v, index: i} : v))}
           onClose={() => setView(null)}
