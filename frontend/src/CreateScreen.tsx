@@ -343,7 +343,7 @@ function CreateScreenBody({
 
   const ensureCloudUrl = async (assetId: string) => {
     const a = byId[assetId];
-    if (a?.provider_reference_url) return a.provider_reference_url;
+    if (a?.provider_reference_url?.startsWith('https://')) return a.provider_reference_url;
     const r = await json(
       await apiFetch(`/api/library/${assetId}/upload-reference`, {
         method: 'POST',

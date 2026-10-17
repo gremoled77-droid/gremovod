@@ -319,11 +319,13 @@ export function LocationModal({
 export function LibraryPickModal({
   title,
   assets,
+  video,
   onPick,
   onClose,
 }: {
   title: string;
   assets: {id: string; thumbnail_url: string | null; url: string}[];
+  video?: boolean;
   onPick: (assetId: string) => void;
   onClose: () => void;
 }) {
@@ -335,18 +337,26 @@ export function LibraryPickModal({
             <button
               key={a.id}
               type="button"
-              title="Выбрать этот кадр"
+              title={video ? 'Выбрать этот ролик' : 'Выбрать этот кадр'}
               onClick={() => {
                 onPick(a.id);
                 onClose();
               }}
             >
-              <img src={a.thumbnail_url || a.url} alt="" loading="lazy" />
+              {video ? (
+                <video src={a.url} preload="metadata" muted />
+              ) : (
+                <img src={a.thumbnail_url || a.url} alt="" loading="lazy" />
+              )}
             </button>
           ))}
         </div>
       ) : (
-        <p className="muted">В библиотеке проекта пока нет кадров. Сгенерируй их на экране «Кадры».</p>
+        <p className="muted">
+          {video
+            ? 'В библиотеке проекта пока нет роликов. Сгенерируй первый на этом экране.'
+            : 'В библиотеке проекта пока нет кадров. Сгенерируй их на экране «Кадры».'}
+        </p>
       )}
     </Modal>
   );
