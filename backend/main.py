@@ -808,6 +808,8 @@ from backend import clip_chain
 clip_chain.register(app,sys.modules[__name__])
 from backend import llm_guard
 llm_guard.register(app,sys.modules[__name__])
+from backend import idea_background
+idea_background.register(app,sys.modules[__name__])
 from backend import workflow_import
 workflow_import.register(app,sys.modules[__name__])
 from backend import series_economics
