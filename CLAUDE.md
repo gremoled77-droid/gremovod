@@ -1,5 +1,7 @@
 # AI Workflow Studio (GremoVOD Studio)
 
+Перед изменениями меню раскадровки прочитать [что уже реализовано Codex](docs/CLAUDE_STORYBOARD_WORK_DONE_2026-10-18.md): коммит `0891740`, пути к коду и проверки. Не создавать повторную независимую реализацию настроек съёмки.
+
 ## Git: отдельная рабочая копия Claude Code
 
 Новые задачи выполнять в `C:/AI_Workflow_Studio/.worktrees/claude`, ветка `claude/work`. Codex работает в `.worktrees/codex`, ветка `codex/work`. Корень `C:/AI_Workflow_Studio` — проверенная `main` и рабочие данные пользователя; не редактировать его параллельно из двух инструментов. Сначала прочитать `AGENTS.md` и `docs/GIT_WORKFLOW.md`. Исходники объединять через Git после проверок, базы/медиа между копиями не переносить. Общий GitHub: `https://github.com/gremoled77-droid/gremovod.git` (origin). Перед задачей: `git fetch origin`, затем `git merge origin/main` в своей чистой ветке. После проверок и коммита: `git push -u origin claude/work`. Не выполнять force-push и не переключать ветку чужой рабочей папки.
@@ -57,6 +59,12 @@
 - Не обходить Cloudflare и не подделывать User-Agent.
 
 ## Где что лежит
+
+- [docs/SCREENWRITING_RESEARCH_2026-10-16.md](docs/SCREENWRITING_RESEARCH_2026-10-16.md) — исследование выбранных разделов девяти сценарных файлов, завершённое 17 октября. Новые навыки: `gremovod-series-development`, `gremovod-script-rewrite`, `gremovod-dialogue-subtext`; они дополняют маршруты восьми страниц. Локальная памятка применения: `output/gremovod-screenwriting/WORKFLOW_APPLICATION_v1.md`, не публикуется в Git. Полное чтение всех книг не заявляется.
+
+- [docs/COMEDY_CHARACTER_TOOLS_2026-10-16.md](docs/COMEDY_CHARACTER_TOOLS_2026-10-16.md) — рассмотренные разделы Каплана/Мартина и применение к юмористическому сериалу. Навыки `gremovod-character-comedy` и `gremovod-comedy-staging` подключаются из восьми страниц; [реестр книг](docs/BOOKS_STUDY_REGISTER_2026-10-16.md) отделяет чтение от извлечения текста. Персонажные примеры и предложения к канону остаются локально.
+
+- [docs/STAGE_SKILLS_2026-10-16.md](docs/STAGE_SKILLS_2026-10-16.md) — карта восьми страниц и их навыков `skills/gremovod-stage-*/`. Для творческого задания начинать с нужной страницы, затем читать связанные тематические навыки. Первый этап Макки: `gremovod-world-design`, `gremovod-character-dramaturgy` и дополнения нарратива/сценария; границы изучения в `docs/MCKEE_STORY_FOUNDATION_2026-10-16.md`. Код автоматического подключения к страницам этим пакетом не меняется.
 
 - `TODO.md` — список пожеланий и задач (актуальный). `CHANGES.md` — история версий (сейчас 0.3.0).
 - `docs/` — решения и проверки: `PIAPI_MODELS_2026-10-16.md` (каталог и живые тесты), `CLOUD_DEPLOY.md` (Docker/Caddy, не проверялся на сервере), `TECHNICAL_SPEC.md`, `ARCHITECTURE_PLAN_2026-10-16.md`.

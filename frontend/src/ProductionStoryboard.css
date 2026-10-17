@@ -288,6 +288,26 @@ main.storyboard-main {
   gap: 8px;
   margin: 12px 0;
 }
+.shot-direction {
+  display: grid;
+  gap: 14px;
+}
+.shot-direction label {
+  display: grid;
+  gap: 6px;
+}
+.shot-direction label.shot-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.shot-direction input[type='checkbox'] {
+  width: auto;
+}
+.shot-direction details[open] {
+  display: grid;
+  gap: 12px;
+}
 .app main.storyboard-main {
   display: block;
   padding: 0;
