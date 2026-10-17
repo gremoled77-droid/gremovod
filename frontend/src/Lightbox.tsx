@@ -1,15 +1,13 @@
 import {useEffect} from 'react';
 import {createPortal} from 'react-dom';
-import {Pencil, Trash2} from 'lucide-react';
+import FrameActions, {type FrameActionSet} from './FrameActions';
 
-export type LightboxItem = {
+export type LightboxItem = FrameActionSet & {
   url: string;
   title?: string;
   kind?: string;
   /** Подпись сверху: модель, разрешение, цена. */
   caption?: string;
-  onEdit?: () => void;
-  onTrash?: () => void;
 };
 
 /** Полноэкранный просмотр: стрелки ← → листают, Esc закрывает, клик по фону закрывает. */
@@ -63,23 +61,20 @@ export default function Lightbox({
           ) : (
             <img src={item.url} alt={item.title || ''} />
           )}
-          {(item.caption || item.onEdit || item.onTrash) && (
-            <div className="lb-top">
-              <span>{item.caption}</span>
-              <div>
-                {item.onEdit && (
-                  <button aria-label="Редактировать" title="Редактировать" onClick={item.onEdit}>
-                    <Pencil size={16} />
-                  </button>
-                )}
-                {item.onTrash && (
-                  <button aria-label="В корзину" title="В корзину" onClick={item.onTrash}>
-                    <Trash2 size={16} />
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
+          <div className="lb-top">
+            <span>{item.caption}</span>
+            <FrameActions
+              favorite={item.favorite}
+              onFavorite={item.onFavorite}
+              onEdit={item.onEdit}
+              onRef={item.onRef}
+              refActive={item.refActive}
+              onAnimate={item.onAnimate}
+              downloadUrl={item.downloadUrl ?? item.url}
+              downloadName={item.downloadName}
+              onTrash={item.onTrash}
+            />
+          </div>
         </div>
         <figcaption>
           <span>{item.title}</span>

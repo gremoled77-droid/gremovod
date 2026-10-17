@@ -16,7 +16,8 @@ type Media = {
   id: string;
   url: string;
   thumbnail_url: string | null;
-  metadata?: {kind?: string; original_name?: string; width?: number; height?: number};
+  filename?: string;
+  metadata?: {kind?: string; original_name?: string; width?: number; height?: number; favorite?: boolean};
 };
 type Cost = {actual_usd?: number | null; estimated_usd?: number | null};
 type Reel = 'video' | 'image' | 'audio';
@@ -65,6 +66,7 @@ export default function HomeScreen({
   const [budget, setBudget] = useState<Budget | null>(null);
   const [view, setView] = useState(-1);
   const [images, setImages] = useState<Media[]>([]);
+  const [refIds, setRefIds] = useState<string[]>(() => loadCreateDraft(projectId).refs);
   const [clips, setClips] = useState<Media[]>([]);
   const [sounds, setSounds] = useState<Media[]>([]);
   const [reel, setReel] = useState<Reel>('image');
@@ -123,6 +125,26 @@ export default function HomeScreen({
     });
     setView(-1);
     onMode('create');
+  };
+  const toggleFavorite = async (a: Media) => {
+    const on = !a.metadata?.favorite;
+    const r = await apiFetch(`/api/library/${a.id}/favorite`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({favorite: on}),
+    });
+    if (!r.ok) return window.alert('Не удалось изменить избранное');
+    setImages(list => list.map(x => (x.id === a.id ? {...x, metadata: {...x.metadata, favorite: on}} : x)));
+  };
+  /** «В референсы»: кадр добавляется в черновик «Кадров» (или убирается оттуда). */
+  const toggleRef = (a: Media) => {
+    const draft = loadCreateDraft(projectId);
+    const on = draft.refs.includes(a.id);
+    saveCreateDraft(projectId, {
+      ...draft,
+      refs: on ? draft.refs.filter(id => id !== a.id) : [...draft.refs, a.id],
+    });
+    setRefIds(ids => (on ? ids.filter(id => id !== a.id) : [...ids, a.id]));
   };
   const trashAsset = async (a: Media) => {
     if (!window.confirm('Убрать кадр в корзину? Его можно вернуть в течение 30 дней.')) return;
@@ -370,7 +392,12 @@ export default function HomeScreen({
             url: a.url,
             title: 'Кадр ' + (i + 1),
             caption: captionOf(a),
+            favorite: !!a.metadata?.favorite,
+            onFavorite: () => void toggleFavorite(a),
             onEdit: () => editAsset(a),
+            onRef: () => toggleRef(a),
+            refActive: refIds.includes(a.id),
+            downloadName: a.filename,
             onTrash: () => void trashAsset(a),
           }))}
           index={view}

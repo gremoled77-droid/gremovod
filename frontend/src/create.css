@@ -90,19 +90,6 @@
   background: var(--bad);
   color: #fff;
 }
-.cs-trash {
-  opacity: 0;
-  font-size: 12px;
-}
-.cs-tile:hover .cs-trash,
-.cs-trash:focus-visible {
-  opacity: 1;
-}
-@media (hover: none) {
-  .cs-trash {
-    opacity: 1;
-  }
-}
 .cs-tabs {
   display: flex;
   gap: 4px;
@@ -346,32 +333,6 @@
   }
 }
 
-.cs-heart {
-  position: absolute;
-  top: 4px;
-  left: 4px;
-  width: 26px;
-  height: 26px;
-  padding: 0;
-  border-radius: 50%;
-  border: 0;
-  background: #0e0f12dd;
-  color: var(--text);
-  font-size: 15px;
-  line-height: 1;
-  cursor: pointer;
-  z-index: 2;
-}
-.cs-heart.on {
-  color: var(--accent);
-}
-.cs-heart-big {
-  top: 10px;
-  left: 10px;
-  width: 34px;
-  height: 34px;
-  font-size: 19px;
-}
 
 .cs-zoomable {
   cursor: zoom-in;
@@ -595,5 +556,74 @@
     background: var(--accent);
     color: var(--accent-ink);
     font-weight: 600;
+  }
+}
+
+/* Действия кадра на плитках и карточках результатов. */
+.cs-tile-actions {
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  bottom: 4px;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+.cs-tile:hover .cs-tile-actions,
+.cs-tile:focus-within .cs-tile-actions {
+  opacity: 1;
+}
+/* Плитка всего 50–72 px: четыре кнопки в сетке 2×2 (♡ ✎ ⤓ 🗑); референс — клик по плитке, остальное и сенсорные экраны — в просмотре (⤢). */
+.cs-tile-actions {
+  display: grid;
+  grid-template-columns: repeat(2, 20px);
+  gap: 3px;
+}
+.cs-tile-actions button,
+.cs-tile-actions a.fa-link {
+  width: 20px;
+  height: 20px;
+}
+.cs-tile-actions svg {
+  width: 11px;
+  height: 11px;
+}
+@media (hover: none) {
+  .cs-tile-actions {
+    display: none;
+  }
+}
+.cs-fav-badge {
+  position: absolute;
+  top: 4px;
+  left: 6px;
+  color: var(--accent);
+  font-size: 15px;
+  text-shadow: 0 1px 3px #000;
+  pointer-events: none;
+}
+.cs-zoom {
+  bottom: auto;
+  top: 4px;
+}
+.cs-result {
+  position: relative;
+}
+.cs-result-actions {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  right: 10px;
+  z-index: 2;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+.cs-result:hover .cs-result-actions,
+.cs-result:focus-within .cs-result-actions {
+  opacity: 1;
+}
+@media (hover: none) {
+  .cs-result-actions {
+    opacity: 1;
   }
 }

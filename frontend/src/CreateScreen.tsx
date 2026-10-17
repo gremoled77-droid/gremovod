@@ -4,7 +4,8 @@ import {loadCreateDraft, saveCreateDraft} from './createDraft';
 import GenerationReview, {type GenerationRequest} from './GenerationReview';
 import {type ActivityItem} from './useActivity';
 import {useSharedActivity} from './ActivityContext';
-import Lightbox, {type LightboxItem} from './Lightbox';
+import Lightbox from './Lightbox';
+import FrameActions from './FrameActions';
 import {DEFAULT_CHAT_URL, copyTextFor, getChatUrl} from './chatLink';
 import {appendBlock} from './visualPlan';
 
@@ -27,6 +28,7 @@ type LibAsset = {
   url: string;
   thumbnail_url: string | null;
   provider_reference_url?: string | null;
+  filename?: string;
   metadata: {kind?: string; favorite?: boolean};
 };
 type Hero = {id: string; name: string};
@@ -95,7 +97,10 @@ function CreateScreenBody({projectId, heroes}: {projectId: string; heroes: Hero[
   const fileInput = useRef<HTMLInputElement>(null);
   const [pasteFor, setPasteFor] = useState('');
   const [animate, setAnimate] = useState('');
-  const [view, setView] = useState<{items: LightboxItem[]; index: number} | null>(null);
+  const [view, setView] = useState<{
+    entries: {id: string; kind?: string; title?: string}[];
+    index: number;
+  } | null>(null);
   const [videoModel, setVideoModel] = useState(restored.videoModel);
   const [motion, setMotion] = useState(restored.motion);
   const [videoOptions, setVideoOptions] = useState<Record<string, string | number>>(restored.videoOptions);
@@ -171,6 +176,35 @@ function CreateScreenBody({projectId, heroes}: {projectId: string; heroes: Hero[
     }
   };
   const toggleRef = (id: string) => setRefs(r => (r.includes(id) ? r.filter(x => x !== id) : [...r, id]));
+  /** «Править в GPT Image»: кадр становится первым референсом, модель — GPT Image 2.5. */
+  const editAsset = (id: string) => {
+    setRefs(r => [id, ...r.filter(x => x !== id)]);
+    setSelected(['gpt-image-2.5']);
+    setPrompt(p => p.trim() || 'Отредактируй изображение: ');
+    setView(null);
+    setNotice('Кадр прикреплён референсом для правки. Опиши, что изменить, и проверь цену.');
+  };
+  /** Действия над кадром одинаковы в плитках, карточках результатов и просмотре. */
+  const actionsFor = (id: string, kind: string = 'image') => {
+    const a = byId[id];
+    return {
+      favorite: !!a?.metadata.favorite,
+      onFavorite: () => void favorite(id, !a?.metadata.favorite),
+      onEdit: kind === 'image' ? () => editAsset(id) : undefined,
+      onRef: kind === 'image' ? () => toggleRef(id) : undefined,
+      refActive: refs.includes(id),
+      onAnimate:
+        kind === 'image'
+          ? () => {
+              setView(null);
+              setAnimate(id);
+            }
+          : undefined,
+      downloadUrl: a?.url,
+      downloadName: a?.filename,
+      onTrash: () => void trashAsset(id),
+    };
+  };
 
   const toggle = (id: string) => setSelected(s => (s.includes(id) ? s.filter(x => x !== id) : [...s, id]));
 
@@ -457,15 +491,10 @@ function CreateScreenBody({projectId, heroes}: {projectId: string; heroes: Hero[
     const list = results.flatMap(it =>
       it.asset_ids
         .filter(x => byId[x])
-        .map(x => ({
-          id: x,
-          url: byId[x].url,
-          kind: it.kind,
-          title: LABELS[it.model] || it.model,
-        }))
+        .map(x => ({id: x, kind: it.kind, title: LABELS[it.model] || it.model}))
     );
     setView({
-      items: list,
+      entries: list,
       index: Math.max(
         0,
         list.findIndex(x => x.id === aid)
@@ -576,31 +605,25 @@ function CreateScreenBody({projectId, heroes}: {projectId: string; heroes: Hero[
                 onClick={() => {
                   const list = shownImages.slice(0, 60);
                   setView({
-                    items: list.map(x => ({url: x.url, title: x.id})),
+                    entries: list.map(x => ({id: x.id, title: x.id})),
                     index: list.findIndex(x => x.id === a.id),
                   });
                 }}
               >
                 ⤢
               </button>
-              <button
-                type="button"
-                className={'cs-heart' + (a.metadata.favorite ? ' on' : '')}
-                aria-label="Избранное"
-                title="Избранное"
-                onClick={() => void favorite(a.id, !a.metadata.favorite)}
-              >
-                {a.metadata.favorite ? '♥' : '♡'}
-              </button>
-              <button
-                type="button"
-                className="cs-x cs-trash"
-                aria-label="Убрать в корзину"
-                title="Убрать из библиотеки (в корзину на 30 дней)"
-                onClick={() => void trashAsset(a.id)}
-              >
-                🗑
-              </button>
+              {a.metadata.favorite && (
+                <span className="cs-fav-badge" aria-hidden="true">
+                  ♥
+                </span>
+              )}
+              <FrameActions
+                small
+                className="cs-tile-actions"
+                {...actionsFor(a.id)}
+                onRef={undefined}
+                onAnimate={undefined}
+              />
             </div>
           ))}
           {!shownImages.length && <span className="muted">Пока нет изображений</span>}
@@ -721,22 +744,13 @@ function CreateScreenBody({projectId, heroes}: {projectId: string; heroes: Hero[
                       onClick={() => openResult(aid)}
                     />
                   )}
-                  <button
-                    type="button"
-                    className={'cs-heart cs-heart-big' + (a.metadata.favorite ? ' on' : '')}
-                    aria-label="Избранное"
-                    title="Избранное"
-                    onClick={() => void favorite(aid, !a.metadata.favorite)}
-                  >
-                    {a.metadata.favorite ? '♥' : '♡'}
-                  </button>
+                  <FrameActions className="cs-result-actions" {...actionsFor(aid, item.kind)} />
                   <div className="cs-cap">
                     <div>
                       <b>{LABELS[item.model] || item.model}</b>
                       <small>{item.status}</small>
                     </div>
                     <div className="cs-row">
-                      {item.kind === 'image' && <button onClick={() => setAnimate(aid)}>Оживить</button>}
                       {item.kind === 'video' && (
                         <button
                           disabled={busy}
@@ -748,12 +762,6 @@ function CreateScreenBody({projectId, heroes}: {projectId: string; heroes: Hero[
                       )}
                       <button onClick={() => regenerate(item)} title="Подставить промпт и модель">
                         ↻
-                      </button>
-                      <button onClick={() => favorite(aid, !a.metadata.favorite)} title="Избранное">
-                        {a.metadata.favorite ? '♥' : '♡'}
-                      </button>
-                      <button onClick={() => toggleRef(aid)} title="Использовать как референс">
-                        {refs.includes(aid) ? '✓ реф.' : '+ реф.'}
                       </button>
                       <select value="" onChange={e => e.target.value && toHero(aid, e.target.value)}>
                         <option value="">В героя ▾</option>
@@ -861,7 +869,12 @@ function CreateScreenBody({projectId, heroes}: {projectId: string; heroes: Hero[
 
       {view && (
         <Lightbox
-          items={view.items}
+          items={view.entries.map(e => ({
+            url: byId[e.id]?.url || '',
+            kind: e.kind,
+            title: e.title,
+            ...actionsFor(e.id, e.kind),
+          }))}
           index={view.index}
           onIndex={i => setView(v => (v ? {...v, index: i} : v))}
           onClose={() => setView(null)}
