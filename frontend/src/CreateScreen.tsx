@@ -21,7 +21,7 @@ import {
   type DirectorGroup,
 } from './directorPresets';
 import {appendBlock} from './visualPlan';
-import PriceTable from './PriceTable';
+import PriceTable, {cents, useOptionPrices} from './PriceTable';
 
 type OptionSpec = {
   values?: (string | number)[];
@@ -63,6 +63,50 @@ async function json(r: Response) {
 }
 
 type TempItem = {asset_id: string; days_left: number; expired: boolean; protected: string};
+
+function ModelOptions({
+  id,
+  schema,
+  current,
+  onChange,
+}: {
+  id: string;
+  schema: Record<string, OptionSpec>;
+  current: Record<string, string | number>;
+  onChange: (key: string, value: string | number) => void;
+}) {
+  const prices = useOptionPrices(id, schema, current);
+  return (
+    <div className="cs-model-opts">
+      {Object.entries(schema).map(([key, sp]) => (
+        <label key={key}>
+          <span>{key}</span>
+          {sp.values ? (
+            <select value={String(current[key])} onChange={e => onChange(key, e.target.value)}>
+              {sp.values.map(v => {
+                const p = prices[key]?.[String(v)];
+                return (
+                  <option key={String(v)} value={String(v)}>
+                    {String(v)}
+                    {p !== undefined && p !== null ? ' · ' + cents(p) : ''}
+                  </option>
+                );
+              })}
+            </select>
+          ) : (
+            <input
+              type="number"
+              min={sp.min}
+              max={sp.max}
+              value={Number(current[key])}
+              onChange={e => onChange(key, Number(e.target.value))}
+            />
+          )}
+        </label>
+      ))}
+    </div>
+  );
+}
 
 export default function CreateScreen(props: {projectId: string; heroes: Hero[]}) {
   return <CreateScreenBody key={props.projectId} {...props} />;
@@ -567,33 +611,14 @@ function CreateScreenBody({projectId, heroes}: {projectId: string; heroes: Hero[
           <em>{on ? 'вкл' : 'выкл'}</em>
         </button>
         {on && o && (
-          <div className="cs-model-opts">
-            {Object.entries(o).map(([key, sp]) => (
-              <label key={key}>
-                <span>{key}</span>
-                {sp.values ? (
-                  <select
-                    value={String(optionValue(id, key, sp))}
-                    onChange={e => setOptions(p => ({...p, [id]: {...p[id], [key]: e.target.value}}))}
-                  >
-                    {sp.values.map(v => (
-                      <option key={String(v)} value={String(v)}>
-                        {String(v)}
-                      </option>
-                    ))}
-                  </select>
-                ) : (
-                  <input
-                    type="number"
-                    min={sp.min}
-                    max={sp.max}
-                    value={Number(optionValue(id, key, sp))}
-                    onChange={e => setOptions(p => ({...p, [id]: {...p[id], [key]: Number(e.target.value)}}))}
-                  />
-                )}
-              </label>
-            ))}
-          </div>
+          <ModelOptions
+            id={id}
+            schema={o}
+            current={Object.fromEntries(
+              Object.entries(o).map(([key, sp]) => [key, optionValue(id, key, sp)])
+            )}
+            onChange={(key, value) => setOptions(p => ({...p, [id]: {...p[id], [key]: value}}))}
+          />
         )}
       </div>
     );

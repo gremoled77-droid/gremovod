@@ -660,3 +660,25 @@
 .cs-price-scroll {
   overflow-x: auto;
 }
+
+/* Компактные параметры модели: строки плотнее, цены в центах помещаются в список */
+.cs-model-opts {
+  gap: 3px;
+  padding: 0 12px 8px;
+}
+.cs-model-opts label {
+  min-height: 0;
+  gap: 6px;
+}
+.cs-model-opts select,
+.cs-model-opts input {
+  height: 28px;
+  min-height: 0;
+  padding: 0 8px;
+  font-size: 12px;
+  max-width: 150px;
+  border-radius: 8px;
+}
+.cs-model-opts select {
+  padding-right: 24px;
+}

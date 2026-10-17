@@ -21,23 +21,62 @@ const combos = (dims: [string, (string | number)[]][]): Record<string, string | 
     [{}]
   );
 
-async function price(model: string, options: Record<string, string | number>): Promise<number | null> {
-  try {
-    const r = await apiFetch('/api/model-jobs/preview', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({model_id: model, prompt: 'price', options, reference_urls: []}),
-    });
-    if (!r.ok) return null;
-    const usd = Number((await r.json()).estimated_usd);
-    return Number.isFinite(usd) ? usd : null;
-  } catch {
-    return null;
+const cache = new Map<string, Promise<number | null>>();
+/** Цена одной картинки по сухому прогону на сервере (сеть не трогает); повторы берутся из памяти. */
+export function price(model: string, options: Record<string, string | number>): Promise<number | null> {
+  const key = JSON.stringify([model, options]);
+  let hit = cache.get(key);
+  if (!hit) {
+    hit = (async () => {
+      try {
+        const r = await apiFetch('/api/model-jobs/preview', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({model_id: model, prompt: 'price', options, reference_urls: []}),
+        });
+        if (!r.ok) return null;
+        const usd = Number((await r.json()).estimated_usd);
+        return Number.isFinite(usd) ? usd : null;
+      } catch {
+        return null;
+      }
+    })();
+    cache.set(key, hit);
   }
+  return hit;
 }
 
-const fmt = (usd: number | null) =>
-  usd === null ? '—' : `$${usd.toFixed(3)} · ${String(Math.round(usd * 1000) / 10).replace('.', ',')} ¢`;
+export const cents = (usd: number | null) =>
+  usd === null ? '—' : String(Math.round(usd * 1000) / 10).replace('.', ',') + ' ¢';
+const fmt = cents;
+
+/** Цена каждого значения параметров размера, качества и варианта при текущем выборе остальных. */
+export function useOptionPrices(
+  model: string,
+  schema: Record<string, Rule> | undefined,
+  current: Record<string, string | number>
+) {
+  const [prices, setPrices] = useState<Record<string, Record<string, number | null>>>({});
+  const signature = JSON.stringify([model, current]);
+  useEffect(() => {
+    let live = true;
+    void (async () => {
+      const out: Record<string, Record<string, number | null>> = {};
+      for (const key of PRICE_KEYS) {
+        const values = schema?.[key]?.values;
+        if (!values) continue;
+        out[key] = {};
+        for (const v of values) out[key][String(v)] = await price(model, {...current, [key]: v});
+      }
+      if (live) setPrices(out);
+    })();
+    return () => {
+      live = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [signature]);
+  return prices;
+}
 
 /** Цены за одну картинку по каждой модели, размеру и качеству. Считает сервер по тем же формулам, что и оценка перед запуском; сети не трогает. */
 export default function PriceTable({
