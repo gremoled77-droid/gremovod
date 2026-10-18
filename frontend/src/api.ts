@@ -47,3 +47,10 @@ export async function apiFetch(input: RequestInfo | URL, init?: RequestInit): Pr
     init?.signal?.removeEventListener('abort', parentAbort);
   }
 }
+
+/** JSON ответа сервера; при ошибке — исключение с текстом detail. */
+export async function responseJson(r: Response) {
+  const d = await r.json();
+  if (!r.ok) throw Error(typeof d.detail === 'string' ? d.detail : JSON.stringify(d.detail));
+  return d;
+}

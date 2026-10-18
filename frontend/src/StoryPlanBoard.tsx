@@ -1,6 +1,5 @@
 import {useEffect, useState} from 'react';
-import {apiFetch} from './api';
-import {responseJson} from './ChatGPTPanel';
+import {apiFetch, responseJson} from './api';
 import {clearLocal, readLocal, writeLocal} from './localDrafts';
 import {LLM_MODELS} from './llmPricing';
 import type {WorkspaceLocation} from './WorkspaceTrail';

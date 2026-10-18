@@ -1,7 +1,6 @@
 import {useEffect, useRef, useState} from 'react';
 import {X} from 'lucide-react';
-import {apiFetch} from './api';
-import {responseJson} from './ChatGPTPanel';
+import {apiFetch, responseJson} from './api';
 
 type Node = {id: string; kind: string; title: string};
 type Entry = {node: Node; assets: string[]};

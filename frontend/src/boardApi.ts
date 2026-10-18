@@ -1,5 +1,4 @@
-import {apiFetch} from './api';
-import {responseJson} from './ChatGPTPanel';
+import {apiFetch, responseJson} from './api';
 
 export type EntityPatch = Partial<{
   character_node_ids: string[];

@@ -1,4 +1,4 @@
-import {useEffect, useMemo, useRef, useState} from 'react';
+import {useEffect, useMemo, useState} from 'react';
 import {apiFetch} from './api';
 import {loadCreateDraft, saveCreateDraft} from './createDraft';
 import GenerationReview, {type GenerationRequest} from './GenerationReview';
@@ -7,7 +7,8 @@ import {useSharedActivity} from './ActivityContext';
 import Lightbox from './Lightbox';
 import FrameActions from './FrameActions';
 import CinemaInfo from './CinemaInfo';
-import {DEFAULT_CHAT_URL, copyTextFor, getChatUrl} from './chatLink';
+import GenerateButton, {useEstimate} from './GenerateButton';
+import {copyText, openQueue} from './imageRoutes';
 import {
   buildReplaceInFramePrompt,
   buildReplaceInVideoPrompt,
@@ -201,11 +202,8 @@ function CreateScreenBody({
   const [refs, setRefs] = useState<string[]>(restored.refs);
   const [queue, setQueue] = useState<GenerationRequest[]>([]);
   const [notice, setNotice] = useState('');
-  const [codexJob, setCodexJob] = useState<{id: string; status: string; message: string} | null>(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
-  const fileInput = useRef<HTMLInputElement>(null);
-  const [pasteFor, setPasteFor] = useState('');
   const [animate, setAnimate] = useState('');
   const [view, setView] = useState<{
     entries: {id: string; kind?: string; title?: string}[];
@@ -280,6 +278,13 @@ function CreateScreenBody({
   const models = ORDER.filter(id => specs[id]);
   const optionValue = (model: string, key: string, spec: OptionSpec) =>
     options[model]?.[key] ?? (spec.default as string | number);
+  const optionsFor = (model: string) =>
+    Object.fromEntries(
+      Object.entries(specs[model]?.options || {}).map(([k, s]) => [k, optionValue(model, k, s)])
+    ) as Record<string, string | number>;
+  const estimate = useEstimate(
+    selected.filter(m => specs[m]).map(model => ({model, options: optionsFor(model)}))
+  );
   const byId = useMemo(() => Object.fromEntries(library.map(a => [a.id, a])), [library]);
   const images = library.filter(a => (a.metadata.kind || 'image') === 'image');
 
@@ -447,9 +452,7 @@ function CreateScreenBody({
           project_id: projectId,
           model_id: model,
           prompt,
-          options: Object.fromEntries(
-            Object.entries(specs[model]?.options || {}).map(([k, s]) => [k, optionValue(model, k, s)])
-          ) as Record<string, string | number>,
+          options: optionsFor(model),
           reference_urls: urls,
         }))
       );
@@ -460,145 +463,10 @@ function CreateScreenBody({
     }
   };
 
-  /** На телефоне уходим в приложение ChatGPT; на компьютере чат открывается во вкладке рядом. */
-  const openChatApp = () => {
-    const url = getChatUrl() || DEFAULT_CHAT_URL;
-    if (window.matchMedia('(max-width: 700px)').matches) window.location.href = url;
-    else window.open(url, '_blank', 'noopener');
-  };
-
   const copyPrompt = async (text: string) => {
-    const ok = await navigator.clipboard?.writeText(text).then(
-      () => true,
-      () => false
-    );
+    const ok = await copyText(text);
     setNotice(ok ? 'Промпт скопирован.' : 'Не удалось скопировать — выдели и скопируй промпт вручную.');
   };
-
-  /** Копирует промпт и создаёт ожидающее внешнее задание; с openChat ещё открывает чат ChatGPT. */
-  /** Ставит промпт и референсы в очередь ветки Codex на компьютере: она сама сгенерирует картинку. */
-  const toCodex = async () => {
-    setError('');
-    if (!prompt.trim()) return setError('Напиши промпт');
-    try {
-      const target = selected.find(id => id.startsWith('gpt-image-')) || 'gpt-image-2.5';
-      const job = await json(
-        await apiFetch('/api/chatgpt/jobs', {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({
-            project_id: projectId,
-            target,
-            operation: 'generate',
-            request_id: crypto.randomUUID().replace(/-/g, ''),
-            brief: prompt,
-            reference_asset_ids: refs,
-          }),
-        })
-      );
-      setCodexJob({id: job.id, status: job.status, message: job.message});
-      const chat = await json(await apiFetch('/api/chatgpt/status')).catch(() => null);
-      setNotice(
-        chat?.worker_online
-          ? 'Отправлено в Codex. Картинка появится в библиотеке, когда ветка её сгенерирует.'
-          : 'Поставлено в очередь, но ветка Codex сейчас не слушает очередь. Открой её на компьютере и напиши «Продолжай очередь студии».'
-      );
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    }
-  };
-
-  useEffect(() => {
-    if (!codexJob || ['completed', 'failed', 'cancelled'].includes(codexJob.status)) return;
-    const timer = window.setInterval(() => {
-      void apiFetch('/api/chatgpt/jobs?project_id=' + encodeURIComponent(projectId))
-        .then(r => (r.ok ? r.json() : []))
-        .then((list: {id: string; status: string; message: string}[]) => {
-          const current = list.find(j => j.id === codexJob.id);
-          if (!current) return;
-          setCodexJob({id: current.id, status: current.status, message: current.message});
-          if (current.status === 'completed') {
-            void loadLibrary();
-            setNotice('Codex прислал картинку: она в библиотеке.');
-          }
-        })
-        .catch(() => undefined);
-    }, 6000);
-    return () => window.clearInterval(timer);
-  }, [codexJob, projectId]);
-
-  const external = async (openChat = false) => {
-    setError('');
-    if (!prompt.trim()) return setError('Напиши промпт');
-    const roles = refs.map((_, i) => (i === 0 ? 'главный референс' : 'референс'));
-    // Буфер записываем сразу, пока жив жест нажатия: после запроса к серверу телефон его не даст.
-    const localText = copyTextFor(prompt, roles);
-    const copied = navigator.clipboard
-      ? navigator.clipboard.writeText(localText).then(
-          () => true,
-          () => false
-        )
-      : Promise.resolve(false);
-    try {
-      const target = selected.find(id => specs[id]) || 'gpt-image-2.5';
-      await json(
-        await apiFetch('/api/external-jobs', {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({
-            project_id: projectId,
-            request_id: crypto.randomUUID().replace(/-/g, ''),
-            target,
-            prompt,
-            service: 'chatgpt',
-            references: refs.map((asset_id, i) => ({asset_id, role: roles[i]})),
-          }),
-        })
-      );
-      reset();
-      const ok = await copied;
-      const chat = getChatUrl();
-      const where = openChat
-        ? chat
-          ? 'Открываю твой чат ChatGPT.'
-          : 'Ссылка на чат не задана (Настройки), открываю ChatGPT.'
-        : 'Сгенерируй в ChatGPT';
-      setNotice(
-        ok
-          ? `Промпт скопирован. ${where} Потом верни картинку кнопкой «Вставить результат» или «Файл…».`
-          : `Не удалось скопировать в буфер — скопируй промпт вручную из поля ниже. ${where}`
-      );
-      if (openChat) openChatApp();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    }
-  };
-  const attach = async (jobId: string, file: File) => {
-    try {
-      const form = new FormData();
-      form.append('file', file);
-      await json(
-        await apiFetch(`/api/external-jobs/${jobId}/result`, {
-          method: 'POST',
-          body: form,
-        })
-      );
-      setPasteFor('');
-      reset();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    }
-  };
-
-  useEffect(() => {
-    if (!pasteFor) return;
-    const onPaste = (ev: ClipboardEvent) => {
-      const file = Array.from(ev.clipboardData?.files || []).find(f => f.type.startsWith('image/'));
-      if (file) void attach(pasteFor, file);
-    };
-    window.addEventListener('paste', onPaste);
-    return () => window.removeEventListener('paste', onPaste);
-  }, [pasteFor]);
 
   const favorite = async (id: string, on: boolean) => {
     try {
@@ -864,50 +732,13 @@ function CreateScreenBody({
           </div>
         )}
         <div className="cs-results">
-          {waiting.map(j => (
-            <div key={j.id} className="cs-card cs-wait">
-              <b>Ждём картинку из ChatGPT</b>
-              <small>{j.prompt.slice(0, 80)}…</small>
-              <ol className="cs-steps">
-                <li>
-                  <span>Скопировать промпт</span>
-                  <button onClick={() => void copyPrompt(j.prompt)}>Промпт</button>
-                </li>
-                <li>
-                  <span>Открыть ChatGPT и сгенерировать</span>
-                  <button onClick={openChatApp}>Открыть чат</button>
-                </li>
-                <li>
-                  <span>Вернуть готовую картинку (Ctrl+V, файл или галерея)</span>
-                  <div className="cs-row">
-                    <button className={pasteFor === j.id ? 'primary' : ''} onClick={() => setPasteFor(j.id)}>
-                      {pasteFor === j.id ? 'Жду Ctrl+V…' : 'Вставить'}
-                    </button>
-                    <button
-                      className="primary"
-                      onClick={() => {
-                        setPasteFor(j.id);
-                        fileInput.current?.click();
-                      }}
-                    >
-                      Выбрать из галереи
-                    </button>
-                  </div>
-                </li>
-              </ol>
+          {waiting.length > 0 && (
+            <div className="cs-card cs-wait">
+              <b>Ждём картинку из ChatGPT: {waiting.length}</b>
+              <small>Верни готовую картинку в «Очереди» справа: Ctrl+V или файл.</small>
+              <button onClick={openQueue}>Открыть очередь</button>
             </div>
-          ))}
-          <input
-            ref={fileInput}
-            type="file"
-            accept="image/*"
-            hidden
-            onChange={e => {
-              const f = e.target.files?.[0];
-              if (f && pasteFor) void attach(pasteFor, f);
-              e.target.value = '';
-            }}
-          />
+          )}
           {pending.map(i => (
             <div key={i.id} className="cs-card cs-spin">
               <div className="cs-spinner" />
@@ -994,36 +825,6 @@ function CreateScreenBody({
           )}
         </div>
 
-        {codexJob && (
-          <div className={'cs-codex-status st-' + codexJob.status} role="status">
-            <b>Codex:</b>{' '}
-            {(
-              {
-                queued: 'в очереди',
-                preparing: 'готовит промпт',
-                generating: 'генерирует',
-                completed: 'готово',
-                failed: 'ошибка',
-                cancelled: 'отменено',
-              } as Record<string, string>
-            )[codexJob.status] || codexJob.status}
-            {codexJob.message ? ` · ${codexJob.message}` : ''}
-            {codexJob.status === 'queued' && (
-              <button
-                onClick={() => {
-                  void apiFetch(`/api/chatgpt/jobs/${codexJob.id}/cancel`, {method: 'POST'})
-                    .then(() => setCodexJob(null))
-                    .catch(e => setError(String(e)));
-                }}
-              >
-                Отменить
-              </button>
-            )}
-            {['completed', 'failed', 'cancelled'].includes(codexJob.status) && (
-              <button onClick={() => setCodexJob(null)}>Скрыть</button>
-            )}
-          </div>
-        )}
         <div className="cs-prompt">
           <textarea
             rows={3}
@@ -1068,18 +869,26 @@ function CreateScreenBody({
               {refs.length} реф. · {total} {total === 1 ? 'модель' : 'моделей'}
             </span>
             <span className="cs-spacer" />
-            <button disabled={!projectId} onClick={() => void external()}>
-              Скопировать для ChatGPT
-            </button>
-            <button className="cs-send-codex" disabled={!projectId} onClick={() => void toCodex()}>
-              Отправить в Codex
-            </button>
-            <button className="cs-send-chat" disabled={!projectId} onClick={() => void external(true)}>
-              Отправить в ChatGPT
-            </button>
-            <button className="primary" disabled={busy || !projectId} onClick={start}>
-              {busy ? 'Готовлю…' : 'Сгенерировать'}
-            </button>
+            <GenerateButton
+              projectId={projectId}
+              busy={busy}
+              disabled={!projectId}
+              estimate={estimate}
+              count={selected.length}
+              onApi={start}
+              job={() =>
+                prompt.trim()
+                  ? {
+                      projectId,
+                      prompt,
+                      target: selected.find(id => specs[id]) || 'gpt-image-2.5',
+                      referenceAssetIds: refs,
+                    }
+                  : 'Напиши промпт'
+              }
+              onNotice={setNotice}
+              onError={setError}
+            />
           </div>
         </div>
       </div>

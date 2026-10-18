@@ -1,7 +1,7 @@
 import {useEffect, useMemo, useState, type ReactNode} from 'react';
-import {apiFetch} from './api';
+import {apiFetch, responseJson} from './api';
 import BatchReview, {type BatchItem} from './BatchReview';
-import {responseJson} from './ChatGPTPanel';
+import GenerateButton, {useEstimate} from './GenerateButton';
 import {belongsToSheet, MAX_SHEET, pickShots, readShotLabel, type Shot} from './sheetShots';
 
 type Spec = {
@@ -95,6 +95,19 @@ export default function SheetPanel({
   }, [models, model]);
   const chosen = pickShots(shots, keys);
   const results = library.filter(a => belongsToSheet(promptOf(a), kind, name));
+  const sheetOptions = useMemo(
+    () =>
+      Object.fromEntries(
+        Object.entries(specs[model]?.options || {})
+          .filter(([, s]) => s.default !== undefined)
+          .map(([k, s]) => [
+            k,
+            k === 'aspect_ratio' && s.values?.includes(aspect) ? aspect : (s.default as string | number),
+          ])
+      ) as Record<string, string | number>,
+    [specs, model, aspect]
+  );
+  const estimate = useEstimate(specs[model] ? chosen.map(() => ({model, options: sheetOptions})) : []);
   const start = async () => {
     setError('');
     setNote('');
@@ -119,14 +132,7 @@ export default function SheetPanel({
             ).url,
         ];
       }
-      const options = Object.fromEntries(
-        Object.entries(spec?.options || {})
-          .filter(([, s]) => s.default !== undefined)
-          .map(([k, s]) => [
-            k,
-            k === 'aspect_ratio' && s.values?.includes(aspect) ? aspect : (s.default as string | number),
-          ])
-      );
+      const options = sheetOptions;
       setBatch(
         chosen.map(shot => ({
           label: shot.label,
@@ -178,9 +184,26 @@ export default function SheetPanel({
             ))}
           </select>
         </label>
-        <button className="primary" disabled={busy || !chosen.length} onClick={() => void start()}>
-          {busy ? 'Готовлю…' : `Собрать пакет (${chosen.length}): оценка и подтверждение`}
-        </button>
+        <GenerateButton
+          projectId={projectId}
+          busy={busy}
+          disabled={!chosen.length}
+          estimate={estimate}
+          count={chosen.length}
+          onApi={start}
+          job={async () => {
+            if (!chosen.length) return 'Выбери хотя бы один ракурс';
+            const pid = projectId || (await ensureProject());
+            return chosen.map(shot => ({
+              projectId: pid,
+              prompt: buildPrompt(shot),
+              target: model,
+              referenceAssetIds: referenceAssetId ? [referenceAssetId] : [],
+            }));
+          }}
+          onNotice={setNote}
+          onError={setError}
+        />
       </div>
       {!referenceAssetId && (
         <p className="muted">

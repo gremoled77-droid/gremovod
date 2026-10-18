@@ -1,6 +1,5 @@
 import {useEffect, useState} from 'react';
-import {apiFetch} from './api';
-import {responseJson} from './ChatGPTPanel';
+import {apiFetch, responseJson} from './api';
 import CinemaInfo from './CinemaInfo';
 import {
   HERO_FRAME_FIELDS,

@@ -1,7 +1,6 @@
 import {useEffect, useState} from 'react';
 import {screenOf, type Mode} from './screens';
-import {apiFetch} from './api';
-import {responseJson} from './ChatGPTPanel';
+import {apiFetch, responseJson} from './api';
 export type WorkspaceLocation = {
   production_id: string;
   production_title: string;

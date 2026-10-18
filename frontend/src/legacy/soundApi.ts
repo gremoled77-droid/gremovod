@@ -1,5 +1,4 @@
-import {apiFetch} from './api';
-import {responseJson} from './ChatGPTPanel';
+import {apiFetch, responseJson} from './api';
 import {readLocal} from './localDrafts';
 import {findProduction} from './locations';
 import type {Cue, CueKind, FrameSound} from './soundCues';

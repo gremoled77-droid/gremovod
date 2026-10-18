@@ -1,7 +1,6 @@
 import {useEffect, useRef, useState} from 'react';
 import {Info, Mic, Paperclip, RotateCw, Send, Square, X} from 'lucide-react';
-import {apiFetch} from './api';
-import {responseJson} from './ChatGPTPanel';
+import {apiFetch, responseJson} from './api';
 import {IDEA_LLM_MODELS, LLM_MAX_TOKENS, ideaEstimate} from './llmPricing';
 
 type Asset = {id: string; url: string; thumbnail_url?: string | null; metadata?: {original_name?: string}};

@@ -1,6 +1,5 @@
 import {useState} from 'react';
-import {apiFetch} from './api';
-import {responseJson} from './ChatGPTPanel';
+import {apiFetch, responseJson} from './api';
 
 /** Размеры картинки без обращения к серверу: браузер сам читает их из файла. */
 function imageSize(url: string): Promise<{w: number; h: number}> {

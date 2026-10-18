@@ -16,7 +16,7 @@
 - Фронтенд: React 18 + TypeScript + Vite 6, `@xyflow/react` для узлов. Порт 5173 (`frontend/`).
 - Windows-first. Запуск: `.\.venv\Scripts\python.exe scripts\start_studio.py` (или `START_WINDOWS.bat`). Если пишет «already running» — заняты порты 8000/5173 старым процессом; остановить его и запустить заново.
 - После правок **бэкенда** нужен перезапуск бэкенда — либо запускать `START_DEV.bat` (`start_studio.py --dev`): бэкенд перезапускается сам. Фронтенд в dev-режиме обновляется сам.
-- Отдельный стенд для проверки ветки: бэкенд на другом порту со своим `STUDIO_DATA_DIR`, фронтенд с `STUDIO_API_URL=http://127.0.0.1:<порт>` (см. `frontend/vite.config.ts`).
+- Отдельный стенд для проверки ветки: бэкенд на другом порту со своим `STUDIO_DATA_DIR`, фронтенд с `STUDIO_API_URL=http://127.0.0.1:<порт>` (см. `frontend/vite.config.ts`), бэкенду — `STUDIO_DEV_ORIGINS=http://127.0.0.1:<порт фронта>` (только loopback, `backend/security.py`).
 - Здоровье: http://127.0.0.1:8000/api/health
 
 ## Проверки перед коммитом

@@ -1,7 +1,7 @@
 import {useEffect, useRef, useState, type ReactNode} from 'react';
 import {Plus, MoreHorizontal} from 'lucide-react';
-import {apiFetch} from './api';
-import {responseJson} from './ChatGPTPanel';
+import {apiFetch, responseJson} from './api';
+import {queueCodexJob} from './imageRoutes';
 
 export type CharacterIdentity = {
   species: string;
@@ -110,18 +110,12 @@ export default function CharacterReferences({
   }, [projectId, characterId]);
   const analyze = async (id: string) => {
     pending.current ||= crypto.randomUUID();
-    const result = await responseJson(
-      await apiFetch('/api/chatgpt/jobs', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({
-          project_id: id,
-          character_id: characterId,
-          operation: 'describe_character',
-          request_id: pending.current,
-        }),
-      })
-    );
+    const result = await queueCodexJob({
+      project_id: id,
+      character_id: characterId,
+      operation: 'describe_character',
+      request_id: pending.current,
+    });
     pending.current = null;
     setJob(result);
   };

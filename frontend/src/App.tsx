@@ -17,7 +17,7 @@ import CharacterReferences from './CharacterReferences';
 import AttachmentMenu, {AttachmentStrip} from './AttachmentMenu';
 import CharactersScreen from './CharactersScreen';
 import FrameBuilder from './FrameBuilder';
-import {EMPTY_SCENE, type Scene} from './ScenePanel';
+import {EMPTY_SCENE, type Scene} from './scene';
 import ConnectionsPanel from './ConnectionsPanel';
 import AssetLibrary from './AssetLibrary';
 import CreateScreen from './CreateScreen';
@@ -31,6 +31,7 @@ import WorkspaceTrail, {type WorkspaceLocation} from './WorkspaceTrail';
 import {readWorkspaceRoute, workspaceHash} from './workspaceRoute';
 import {readLocal, writeLocal, clearLocal} from './localDrafts';
 import Dock, {countActive} from './Dock';
+import {OPEN_QUEUE_EVENT} from './imageRoutes';
 import useActivity from './useActivity';
 import IdeaBrief from './IdeaBrief';
 import IdeaRefs from './IdeaRefs';
@@ -159,6 +160,12 @@ const json = async (r: Response) => {
 const url = '/api';
 function App() {
   const [dockOpen, setDockOpen] = useState(false);
+  // Отправка в ChatGPT/Codex открывает «Очередь»: там лоток ожидания картинки.
+  useEffect(() => {
+    const open = () => setDockOpen(true);
+    window.addEventListener(OPEN_QUEUE_EVENT, open);
+    return () => window.removeEventListener(OPEN_QUEUE_EVENT, open);
+  }, []);
   const [mode, setMode] = useState<Mode>(() => readWorkspaceRoute(window.location.hash)?.mode || 'home');
   // Экраны, скрытые до беты, не открываются ни по кнопкам, ни по старым ссылкам.
   useEffect(() => {

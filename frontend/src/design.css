@@ -812,3 +812,85 @@ section.panel {
 .topbar-status.offline {
   color: var(--bad);
 }
+
+/* Единая кнопка генерации: основное действие и выбор способа (API / ChatGPT / Codex) */
+.gen-split {
+  position: relative;
+  display: inline-flex;
+}
+.gen-split .gen-main {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+.gen-split .gen-more {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  border-left: 1px solid rgba(0, 0, 0, 0.25);
+  padding-left: 10px;
+  padding-right: 10px;
+}
+.gen-menu {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 6px);
+  z-index: 40;
+  display: grid;
+  gap: 4px;
+  width: 300px;
+  padding: 6px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+}
+.gen-menu button {
+  display: grid;
+  gap: 2px;
+  text-align: left;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text);
+  padding: 8px 10px;
+}
+.gen-menu button:hover {
+  background: var(--surface-2);
+}
+.gen-menu button.on {
+  border-color: var(--accent);
+}
+.gen-menu small {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+/* Лоток ожидания ChatGPT/Codex в правой панели «Очередь» */
+.waiting-tray {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.waiting-card {
+  display: grid;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}
+.waiting-card small {
+  color: var(--muted);
+}
+.waiting-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.waiting-actions button {
+  padding: 5px 10px;
+  font-size: 13px;
+}
+.waiting-actions .waiting-cancel {
+  margin-left: auto;
+  color: var(--muted);
+}

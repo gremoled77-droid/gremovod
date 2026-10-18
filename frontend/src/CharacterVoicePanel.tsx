@@ -1,6 +1,5 @@
 import {useEffect, useState} from 'react';
-import {apiFetch} from './api';
-import {responseJson} from './ChatGPTPanel';
+import {apiFetch, responseJson} from './api';
 
 type Voice = {
   provider: string;

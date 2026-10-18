@@ -1,10 +1,10 @@
 import {useEffect, useRef, useState} from 'react';
-import {apiFetch} from './api';
-import {responseJson} from './ChatGPTPanel';
+import {apiFetch, responseJson} from './api';
 import ReplaceCharacterButton, {type CharacterVersion} from './ReplaceCharacterButton';
 import CharacterVoicePanel from './CharacterVoicePanel';
 import VisualRulesForm from './VisualRulesForm';
 import {readLocal, writeLocal, clearLocal} from './localDrafts';
+import {queueCodexJob} from './imageRoutes';
 
 type Selection = {
   character_node_ids: string[];
@@ -187,22 +187,16 @@ export default function ProductionEntityEditor({
       pending.current.instruction !== instruction
     )
       pending.current = {id: crypto.randomUUID(), operation, target, revision: editor.revision, instruction};
-    await responseJson(
-      await apiFetch('/api/chatgpt/jobs', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({
-          request_id: pending.current.id,
-          project_id: editor.owner_project_id,
-          operation,
-          target,
-          production_id: pid,
-          production_node_id: nid,
-          entity_revision: editor.revision,
-          entity_instruction: instruction,
-        }),
-      })
-    );
+    await queueCodexJob({
+      request_id: pending.current.id,
+      project_id: editor.owner_project_id,
+      operation,
+      target,
+      production_id: pid,
+      production_node_id: nid,
+      entity_revision: editor.revision,
+      entity_instruction: instruction,
+    });
     pending.current = null;
     await load();
     setNotice('Задание связано с этой карточкой. Результат появится здесь, даже если закрыть окно.');
