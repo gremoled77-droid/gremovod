@@ -27,15 +27,17 @@ const REELS: {id: Reel; label: string}[] = [
   {id: 'audio', label: 'Звук'},
 ];
 
-const STEPS: {mode: Mode; n: string; title: string; text: string}[] = [
-  {mode: 'studio', n: '1', title: 'Идея', text: 'Задание ролика, шутка, сюжет'},
-  {mode: 'styles', n: '2', title: 'Мир', text: 'Стиль, герои, локации'},
-  {mode: 'storyboard', n: '3', title: 'Раскадровка', text: 'Сцены и кадры эпизода'},
-  {mode: 'create', n: '4', title: 'Кадры', text: 'Картинки от нескольких моделей'},
-  {mode: 'video', n: '5', title: 'Видео', text: 'Оживить кадры'},
-  {mode: 'audio', n: '6', title: 'Звук', text: 'Голос и музыка'},
-  {mode: 'files', n: '7', title: 'Монтаж', text: 'Выгрузка в CapCut по порядку кадров'},
-  {mode: 'economics', n: '8', title: 'Выпуск', text: 'Бюджет серии и итоги'},
+/** Цвет этапа = категория: придумать, кадры, видео, звук, выпуск (по таксономии GSAP, пять цветов) */
+type Hue = 'lilac' | 'pink' | 'orange' | 'blue' | 'green';
+const STEPS: {mode: Mode; n: string; title: string; text: string; hue: Hue}[] = [
+  {mode: 'studio', n: '1', title: 'Идея', text: 'Задание ролика, шутка, сюжет', hue: 'lilac'},
+  {mode: 'styles', n: '2', title: 'Мир', text: 'Стиль, герои, локации', hue: 'lilac'},
+  {mode: 'storyboard', n: '3', title: 'Раскадровка', text: 'Сцены и кадры эпизода', hue: 'lilac'},
+  {mode: 'create', n: '4', title: 'Кадры', text: 'Картинки от нескольких моделей', hue: 'pink'},
+  {mode: 'video', n: '5', title: 'Видео', text: 'Оживить кадры', hue: 'orange'},
+  {mode: 'audio', n: '6', title: 'Звук', text: 'Голос и музыка', hue: 'blue'},
+  {mode: 'files', n: '7', title: 'Монтаж', text: 'Выгрузка в CapCut по порядку кадров', hue: 'green'},
+  {mode: 'economics', n: '8', title: 'Выпуск', text: 'Бюджет серии и итоги', hue: 'green'},
 ];
 
 const money = (v: number | undefined) => '$' + (v ?? 0).toFixed(2);
@@ -199,52 +201,42 @@ export default function HomeScreen({
 
   return (
     <section className="home">
-      <div className="home-glow" aria-hidden="true" />
       <header className="home-hero">
-        <div className="home-slate">
-          <div className="home-slate-bar" aria-hidden="true">
-            {Array.from({length: 8}).map((_, i) => (
-              <i key={i} />
-            ))}
-          </div>
-          <div className="home-slate-body">
-            <span className="home-eyebrow">GREMOVOD STUDIO · AI ANIMATION PIPELINE</span>
-            <h1>{projectName || 'Новый проект'}</h1>
-            <div className="home-meta">
-              <span>
-                <small>ЭТАПОВ</small>8
-              </span>
-              <span>
-                <small>КАДРОВ</small>
-                {images.length}+
-              </span>
-              <span>
-                <small>В РАБОТЕ</small>
-                {active.length + waiting.length}
-              </span>
-              <span>
-                <small>СЕГОДНЯ</small>
-                {money(budget?.daily_reserved_usd)}
-              </span>
-            </div>
-            {projects.length > 1 && (
-              <select value={projectId} onChange={e => onOpenProject(e.target.value)} aria-label="Проект">
-                {projects.map(p => (
-                  <option key={p.id} value={p.id}>
-                    {p.title}
-                  </option>
-                ))}
-              </select>
-            )}
-          </div>
-        </div>
-        <button className="home-cta" onClick={() => onMode(next.mode)}>
-          <span className="home-cta-k">NEXT TAKE</span>
-          <span className="home-cta-t">{next.text}</span>
-          <span className="home-cta-a" aria-hidden="true">
-            →
+        <span className="home-eyebrow">GremoVOD Studio</span>
+        <h1>{projectName || 'Новый проект'}</h1>
+        <div className="home-meta">
+          <span>
+            <small>Этапов</small>8
           </span>
-        </button>
+          <span>
+            <small>Кадров</small>
+            {images.length}+
+          </span>
+          <span>
+            <small>В работе</small>
+            {active.length + waiting.length}
+          </span>
+          <span>
+            <small>Сегодня</small>
+            {money(budget?.daily_reserved_usd)}
+          </span>
+        </div>
+        {projects.length > 1 && (
+          <select value={projectId} onChange={e => onOpenProject(e.target.value)} aria-label="Проект">
+            {projects.map(p => (
+              <option key={p.id} value={p.id}>
+                {p.title}
+              </option>
+            ))}
+          </select>
+        )}
+        <div className="home-next">
+          <span className="home-eyebrow">Следующий шаг</span>
+          <p>{next.text}</p>
+          <button className="home-cta" onClick={() => onMode(next.mode)}>
+            Продолжить <span aria-hidden="true">→</span>
+          </button>
+        </div>
       </header>
 
       <div className="home-film" aria-label="Плёнка проекта">
@@ -265,7 +257,6 @@ export default function HomeScreen({
             </button>
           ))}
         </div>
-        <div className="home-perf" aria-hidden="true" />
         {reel === 'image' && (
           <div className="home-frames">
             {images.slice(0, 6).map((a, i) => (
@@ -323,17 +314,14 @@ export default function HomeScreen({
             )}
           </div>
         )}
-        <div className="home-perf" aria-hidden="true" />
       </div>
 
       <div className="home-grid">
         <div className="home-col">
-          <h2>
-            <i /> Конвейер ролика
-          </h2>
+          <h2>Конвейер ролика</h2>
           <ol className="home-track">
             {STEPS.map(s => (
-              <li key={s.n + s.title} className={s.n === nextN ? 'now' : ''}>
+              <li key={s.n + s.title} className={s.n === nextN ? 'now' : ''} data-hue={s.hue}>
                 <button onClick={() => onMode(s.mode)}>
                   <span className="home-n">{s.n}</span>
                   <span className="home-st">
@@ -348,9 +336,7 @@ export default function HomeScreen({
         </div>
 
         <aside className="home-col">
-          <h2>
-            <i /> Очередь рендера
-          </h2>
+          <h2>Очередь рендера</h2>
           <div className="home-card">
             {latest.map(i => {
               const live = ['queued', 'running', 'processing'].includes(i.status);
@@ -370,9 +356,7 @@ export default function HomeScreen({
             {!latest.length && <span className="muted">Заданий пока нет</span>}
           </div>
 
-          <h2>
-            <i /> Бюджет
-          </h2>
+          <h2>Бюджет</h2>
           <div className="home-card home-gauges">
             <Gauge label="Сегодня" used={budget?.daily_reserved_usd} limit={budget?.daily_limit_usd} />
             <Gauge label="Проект" used={budget?.project_reserved_usd} limit={budget?.project_limit_usd} />
