@@ -12,6 +12,7 @@ import {
   type Node,
   type Edge,
   type ReactFlowInstance,
+  type NodeChange,
 } from '@xyflow/react';
 import {apiFetch} from './api';
 import LimitPicker from './LimitPicker';
@@ -35,6 +36,7 @@ import {
 import {useNodePrices} from './workflowPrices';
 import {LLM_MAX_TOKENS, LLM_MODELS, llmEstimate} from './llmPricing';
 import {missingAssetIds} from './workflowLibrary';
+import {snapPosition} from './workflowSnap';
 
 type Graph = {nodes: Node[]; edges: Edge[]};
 type Lib = {
@@ -635,7 +637,7 @@ export default function WorkflowPanel({
       .then(setSpecs)
       .catch(() => undefined);
   }, []);
-  const flow = useRef<{fitView: ReactFlowInstance['fitView']} | null>(null);
+  const flow = useRef<{fitView: ReactFlowInstance['fitView']; getZoom: () => number} | null>(null);
   const graph = useRef({nodes, edges});
   graph.current = {nodes, edges};
   const [running, setRunning] = useState(false);
@@ -1034,6 +1036,28 @@ export default function WorkflowPanel({
     [nodes, edges]
   );
 
+  /** Невидимые магниты: одиночное перетаскивание притягивается к выравниванию с другими узлами. */
+  const magnet = (changes: NodeChange[], current: Node[]): NodeChange[] => {
+    const moves = changes.filter(c => c.type === 'position' && c.position);
+    if (moves.length !== 1) return changes;
+    const move = moves[0] as Extract<NodeChange, {type: 'position'}>;
+    const box = (n: Node) => ({
+      x: n.position.x,
+      y: n.position.y,
+      w: n.measured?.width ?? 270,
+      h: n.measured?.height ?? NODE_H[String(n.data?.kind) as NodeKind] ?? 320,
+    });
+    const self = current.find(n => n.id === move.id);
+    if (!self || !move.position) return changes;
+    const {w, h} = box(self);
+    const snapped = snapPosition(
+      move.position,
+      {w, h},
+      current.filter(n => n.id !== move.id).map(box),
+      10 / (flow.current?.getZoom() || 1)
+    );
+    return changes.map(c => (c === move ? {...move, position: snapped} : c));
+  };
   /** После добавления узла показываем всю схему, чтобы новый узел не оказался за краем полотна. */
   const showAll = () =>
     window.setTimeout(() => void flow.current?.fitView({duration: 300, padding: 0.2, maxZoom: 1}), 80);
@@ -1215,7 +1239,9 @@ export default function WorkflowPanel({
               nodes={nodes}
               edges={shownEdges}
               colorMode="dark"
-              onNodesChange={changes => onChange(g => ({...g, nodes: applyNodeChanges(changes, g.nodes)}))}
+              onNodesChange={changes =>
+                onChange(g => ({...g, nodes: applyNodeChanges(magnet(changes, g.nodes), g.nodes)}))
+              }
               onEdgesChange={changes => onChange(g => ({...g, edges: applyEdgeChanges(changes, g.edges)}))}
               isValidConnection={c =>
                 checkConnection(

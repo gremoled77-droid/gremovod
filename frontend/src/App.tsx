@@ -165,30 +165,8 @@ const INITIAL: Studio = {
   referenceUrls: '',
   videoReference: '',
   characters: [],
-  nodes: [
-    {
-      id: 'brief',
-      type: 'studio',
-      position: {x: 30, y: 100},
-      data: {title: '① Идея и GPT', description: 'Режиссёрское задание'},
-    },
-    {
-      id: 'image',
-      type: 'studio',
-      position: {x: 330, y: 100},
-      data: {title: '② Image Lab', description: 'Референсы и кадры'},
-    },
-    {
-      id: 'video',
-      type: 'studio',
-      position: {x: 630, y: 100},
-      data: {title: '③ Video Lab', description: 'Анимация выбранного кадра'},
-    },
-  ],
-  edges: [
-    {id: 'e1', source: 'brief', target: 'image', animated: true},
-    {id: 'e2', source: 'image', target: 'video', animated: true},
-  ],
+  nodes: [],
+  edges: [],
 };
 const json = async (r: Response) => {
   const d = await r.json().catch(() => ({detail: 'Не-JSON ответ'}));
