@@ -175,8 +175,7 @@ for _base, _prices in (('seedream-5-lite', {'2K':0.065,'3K':0.065}), ('seedream-
 
 # --- KIE (второй провайдер, 18.10.2026). Схемы: model-studio/seedream-schema.json и qwen-schema.json (каталог KIE 15.10.2026).
 # --- Цены со страниц kie.ai/seedream-5-pro и kie.ai/qwen-image-2.1 (18.10.2026): 1 кредит = $0.005.
-# --- Обе модели image-to-image: нужен хотя бы один публичный референс. Живого вызова не было:
-# --- launch_enabled=False (только предпросмотр и цена), пока владелец не разрешит пробный запуск.
+# --- Обе модели image-to-image: нужен хотя бы один публичный референс.
 _KIE_COMMON={'launch_enabled':False,'prompt_only':False,'provider':'kie','kind':'image','adapter':'kie_image',
              'task_type':'image-to-image','submit_path':'/api/v1/jobs/createTask','max_refs':10,'api_refs':10,'ref_field':'image_urls'}
 MODEL_SPECS['kie-seedream-5-pro']={**_KIE_COMMON,'model':'seedream/5-pro-image-to-image',
@@ -193,6 +192,13 @@ MODEL_SPECS['kie-qwen-image-2.1']={**_KIE_COMMON,'model':'qwen2-1/image-to-image
                'aspect_ratio':{'values':['auto','16:9','9:16','1:1','4:3','3:4','3:2','2:3','21:9','9:21'],'default':'auto'},
                'output_format':{'values':['png','webp','jpeg'],'default':'png'}},
     'docs':'https://kie.ai/qwen-image-2.1'}
+# Живая проверка 18.10.2026 (разрешил владелец): по одному запуску с одним референсом, 16:9.
+# Seedream basic: 7 кредитов, 134 с, PNG 1376×768; Qwen 1K: 4 кредита, 29 с, PNG 1376×768. Списание = оценка ($0.055).
+# Режимы high и 2K не запускались: до своей проверки они убраны из параметров, цены оставлены в таблице.
+for _id, _tier in (('kie-seedream-5-pro', 'quality'), ('kie-qwen-image-2.1', 'resolution')):
+    _rule = MODEL_SPECS[_id]['options'][_tier]
+    _rule['values'] = [_rule['default']]
+    MODEL_SPECS[_id].update({'launch_enabled':True,'verified_at':'2026-10-18'})
 
 
 # --- Страница модели у провайдера (кнопка «i» в «Кадрах»). Интерфейс берёт ссылку из page_urls[provider],

@@ -196,15 +196,18 @@ class ProviderShapeTests(unittest.TestCase):
 
 
 class KieTests(unittest.TestCase):
-    def test_kie_models_preview_only_and_priced_from_kie_pages(self):
+    def test_kie_models_live_verified_tiers_and_priced_from_kie_pages(self):
         for model in ('kie-seedream-5-pro', 'kie-qwen-image-2.1'):
             spec = main.MODEL_SPECS[model]
-            self.assertEqual((spec['provider'], spec['launch_enabled']), ('kie', False))
+            self.assertEqual((spec['provider'], spec['launch_enabled'], spec['verified_at']), ('kie', True, '2026-10-18'))
             self.assertEqual(spec['page_urls'], {'kie': spec['docs']})
         payload, cost = preview('kie-seedream-5-pro', reference_urls=[REF] * 3)
         self.assertEqual((payload['input']['quality'], cost), ('basic', 0.04))  # 7 кредитов + 2 × 0.5
-        payload, cost = preview('kie-qwen-image-2.1', reference_urls=[REF] * 3, options={'resolution': '2K'})
-        self.assertEqual(cost, 0.04)
+        payload, cost = preview('kie-qwen-image-2.1', reference_urls=[REF] * 3)
+        self.assertEqual(cost, 0.02)
+        for model, option in (('kie-seedream-5-pro', {'quality': 'high'}), ('kie-qwen-image-2.1', {'resolution': '2K'})):
+            with self.assertRaises(HTTPException):  # 2K не проверен вживую
+                preview(model, reference_urls=[REF], options=option)
         self.assertFalse(payload['input']['enhance_prompt'])
         self.assertEqual(adapters.wire_body(main.MODEL_SPECS['kie-qwen-image-2.1'], payload),
                          {'model': 'qwen2-1/image-to-image', 'input': payload['input']})

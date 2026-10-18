@@ -158,24 +158,24 @@ class StudioSmokeTests(unittest.TestCase):
         pid=self.client.post('/api/projects',json={'title':'KIE','state':{}}).json()['id']
         body={'project_id':pid,'model_id':'kie-seedream-5-pro','prompt':'Ночной Минск','reference_urls':['https://cdn.example.test/a.png','https://cdn.example.test/b.png'],
               'options':{'quality':'high'},'request_id':'kie-request-123456789','approved':True}
-        self.assertEqual(self.client.post('/api/model-jobs/estimate',json=body).status_code,400)  # запуск выключен до живой проверки
-        with patch.dict(main.MODEL_SPECS['kie-seedream-5-pro'],{'launch_enabled':True}):
-            estimate=self.client.post('/api/model-jobs/estimate',json=body).json()
-            self.assertEqual(estimate['estimated_usd'],0.0725)
-            body.update(quote_token=estimate['quote_token'],max_cost_usd=0.0725)
-            missing=self.client.post('/api/model-jobs',json=body)
-            self.assertEqual(missing.status_code,400)
-            self.assertIn('KIE_API_KEY.txt',missing.text)
-            kie.request.assert_not_awaited()
-            (connections.ROOT/'KIE_API_KEY.txt').write_text('test-kie-key',encoding='utf-8')
-            kie.request.side_effect=None
-            kie.request.return_value={'code':200,'msg':'success','data':{'taskId':'kie-task-1'}}
-            created=self.client.post('/api/model-jobs',json={**body,'request_id':'kie-request-987654321'})
-            self.assertEqual(created.status_code,200,created.text)
-            method,path,key,wire=kie.request.await_args.args
-            self.assertEqual((method,path,key),('POST','/api/v1/jobs/createTask','test-kie-key'))
-            self.assertEqual(wire,{'model':'seedream/5-pro-image-to-image','input':{'prompt':'Ночной Минск','image_urls':body['reference_urls'],
-                                   'quality':'high','aspect_ratio':'16:9','output_format':'png','nsfw_checker':True}})
+        self.assertEqual(self.client.post('/api/model-jobs/estimate',json=body).status_code,400)  # high (2K) ещё не проверен вживую
+        body['options']={'quality':'basic'}
+        estimate=self.client.post('/api/model-jobs/estimate',json=body).json()
+        self.assertEqual(estimate['estimated_usd'],0.0375)
+        body.update(quote_token=estimate['quote_token'],max_cost_usd=0.0375)
+        missing=self.client.post('/api/model-jobs',json=body)
+        self.assertEqual(missing.status_code,400)
+        self.assertIn('KIE_API_KEY.txt',missing.text)
+        kie.request.assert_not_awaited()
+        (connections.ROOT/'KIE_API_KEY.txt').write_text('test-kie-key',encoding='utf-8')
+        kie.request.side_effect=None
+        kie.request.return_value={'code':200,'msg':'success','data':{'taskId':'kie-task-1'}}
+        created=self.client.post('/api/model-jobs',json={**body,'request_id':'kie-request-987654321'})
+        self.assertEqual(created.status_code,200,created.text)
+        method,path,key,wire=kie.request.await_args.args
+        self.assertEqual((method,path,key),('POST','/api/v1/jobs/createTask','test-kie-key'))
+        self.assertEqual(wire,{'model':'seedream/5-pro-image-to-image','input':{'prompt':'Ночной Минск','image_urls':body['reference_urls'],
+                               'quality':'basic','aspect_ratio':'16:9','output_format':'png','nsfw_checker':True}})
         kie.request.return_value={'code':200,'msg':'success','data':{'taskId':'kie-task-1','state':'success','creditsConsumed':14.5,
                                   'resultJson':json.dumps({'resultUrls':['https://cdn.example.test/kie.png']})}}
         image=io.BytesIO();Image.new('RGB',(640,360),'teal').save(image,format='PNG')
