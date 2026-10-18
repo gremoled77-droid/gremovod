@@ -1064,3 +1064,34 @@ input[type='checkbox'],
 input[type='radio'] {
   accent-color: var(--accent);
 }
+
+/* «Монтаж»: папки производства под шапкой */
+.production-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 22px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: var(--surface);
+}
+.production-panel h3 {
+  margin: 0;
+}
+.production-panel .pp-tabs {
+  margin: 0;
+}
+.production-panel .folder-entry,
+.production-panel details {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface-2);
+}
+.production-panel details {
+  padding: 12px 14px;
+}
+@media (max-width: 700px) {
+  .production-panel {
+    padding: 16px;
+  }
+}

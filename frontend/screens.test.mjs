@@ -14,13 +14,13 @@ const {MODES} = await module('./src/workspaceRoute.ts');
 test('beta menu: stages in order, hidden screens are out of menu and links', () => {
   assert.deepEqual(
     STAGES.map(s => s.title),
-    ['Идея', 'Мир', 'Раскадровка', 'Кадры', 'Видео', 'Звук']
+    ['Идея', 'Мир', 'Раскадровка', 'Кадры', 'Видео', 'Звук', 'Монтаж']
   );
   assert.deepEqual(
     TOOLS.map(s => s.title),
     ['Узлы', 'Библиотека']
   );
-  for (const mode of ['reels', 'files', 'economics', 'scene', 'refine', 'agents']) {
+  for (const mode of ['reels', 'economics', 'scene', 'refine', 'agents']) {
     assert.ok(isHidden(mode));
     assert.ok(!MODES.includes(mode));
   }

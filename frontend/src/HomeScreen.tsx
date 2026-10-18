@@ -35,6 +35,7 @@ const STEPS: {mode: Mode; n: string; title: string; text: string}[] = [
   {mode: 'create', n: '4', title: 'Кадры', text: 'Картинки от нескольких моделей'},
   {mode: 'video', n: '5', title: 'Видео', text: 'Оживить кадры'},
   {mode: 'audio', n: '6', title: 'Звук', text: 'Голоса и звук кадров'},
+  {mode: 'files', n: '7', title: 'Монтаж', text: 'Выгрузка в CapCut'},
 ];
 
 const money = (v: number | undefined) => '$' + (v ?? 0).toFixed(2);

@@ -22,6 +22,8 @@ import AssetLibrary from './AssetLibrary';
 import CreateScreen from './CreateScreen';
 import VideoScreen from './VideoScreen';
 import SoundScreen from './SoundScreen';
+import ProductionPanel from './ProductionPanel';
+import {MontageSummary} from './MontageSummary';
 import HomeScreen from './HomeScreen';
 import GenerationWatcher from './GenerationWatcher';
 import {ActivityProvider} from './ActivityContext';
@@ -924,6 +926,16 @@ function App() {
                 />
               ) : mode === 'audio' ? (
                 <SoundScreen projectId={projectId} />
+              ) : mode === 'files' ? (
+                <>
+                  <MontageSummary projectId={projectId} onMode={setMode} />
+                  <ProductionPanel
+                    projectId={projectId}
+                    onOpenProject={(id, characterId) =>
+                      void load(id, characterId ? 'characters' : 'create', characterId)
+                    }
+                  />
+                </>
               ) : mode === 'archive' ? (
                 <AssetLibrary {...replacementControls} projectId={projectId} revision={libraryRevision} />
               ) : mode === 'studio' ? (

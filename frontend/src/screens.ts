@@ -12,9 +12,9 @@ export type Mode =
   | 'connections'
   | 'settings'
   | 'audio'
+  | 'files'
   // Скрыты до беты (решение владельца 18.10.2026): код лежит, в меню и маршрутах их нет.
   | 'reels'
-  | 'files'
   | 'economics'
   | 'scene'
   | 'refine'
@@ -61,6 +61,14 @@ export const SCREENS: Screen[] = [
     hint: 'голос и звук кадров',
     lede: 'Голоса героев и звук каждого кадра: реплики, шумы, музыка.',
   },
+  {
+    mode: 'files',
+    title: 'Монтаж',
+    group: 'stage',
+    main: 'solo-main',
+    hint: 'выгрузка в CapCut',
+    lede: 'Клипы и звук по порядку кадров для CapCut, папки серий и эпизодов на диске.',
+  },
   {mode: 'graph', title: 'Узлы', group: 'tool', main: 'workflow-main', icon: '⌁'},
   {
     mode: 'archive',
@@ -92,7 +100,6 @@ export const SCREENS: Screen[] = [
     lede: 'Проект, модель для промптов и ссылка на чат.',
   },
   {mode: 'reels', title: 'Рилсы', group: 'hidden', main: 'reels-main'},
-  {mode: 'files', title: 'Монтаж', group: 'hidden', main: 'solo-main'},
   {mode: 'economics', title: 'Выпуск', group: 'hidden', main: 'solo-main'},
   {mode: 'scene', title: 'Сцена', group: 'hidden', main: 'solo-main'},
   {mode: 'refine', title: 'Допилить', group: 'hidden', main: 'solo-main'},

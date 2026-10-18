@@ -26,7 +26,7 @@ export default function StageFooter({mode, onMode}: {mode: Mode; onMode: (m: Mod
         </button>
       ) : (
         <button className="stage-footer-next" onClick={() => onMode('home')}>
-          <small>Кадры, видео и звук готовы</small>
+          <small>Ролик собран для CapCut</small>
           <b>К обзору проекта</b>
         </button>
       )}
