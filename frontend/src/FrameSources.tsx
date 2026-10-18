@@ -202,7 +202,7 @@ export function AddReferenceModal({
           error={loadError}
           picked={refs}
           onPick={onAdd}
-          empty="В производстве пока нет персонажей. Добавь героя в Character Vault на экране «Мир»."
+          empty="В производстве пока нет персонажей. Добавь героя на экране «Мир → Персонажи»."
         />
       ) : (
         <div className="fs-upload">

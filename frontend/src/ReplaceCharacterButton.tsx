@@ -51,7 +51,7 @@ export default function ReplaceCharacterButton({
         title={
           character
             ? `Сделать рабочим образом персонажа «${character.name}». Предыдущая версия сохранится.`
-            : 'Выбери персонажа в Character Vault'
+            : 'Выбери персонажа в «Мир → Персонажи»'
         }
         onClick={() => void replace()}
       >

@@ -106,10 +106,10 @@ export default function SettingsPanel({
         )}
       </article>
       {children && (
-        <details className="sc-step reserve-tools">
-          <summary>Резервные инструменты · промпты и фото</summary>
-          <div>{children}</div>
-        </details>
+        <article className="sc-step">
+          <h3>Бюджет и лимиты</h3>
+          {children}
+        </article>
       )}
     </section>
   );

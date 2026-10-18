@@ -8,7 +8,6 @@ import './mobile.css';
 import './create.css';
 import './video.css';
 import './home.css';
-import './reels.css';
 import './lightbox.css';
 import './workflow.css';
 import './connections.css';

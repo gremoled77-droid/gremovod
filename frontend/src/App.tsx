@@ -1,87 +1,45 @@
 import ProductionStoryboard from './ProductionStoryboard';
 import StoryPlanBoard from './StoryPlanBoard';
-import CharacterReferences from './CharacterReferences';
 import SettingsPanel from './SettingsPanel';
+import BudgetPanel from './BudgetPanel';
 import StageFooter from './StageFooter';
-import Collapsible from './Collapsible';
-import {MontageSummary, ReleaseSummary} from './StageSummary';
-import CinemaInfo from './CinemaInfo';
 import ProjectHeader from './ProjectHeader';
-import FramePanel, {
-  FrameSelector,
-  frameBasis,
-  frameOutdated,
-  type FrameCatalogue,
-  type FrameSelection,
-} from './FramePanel';
-import CameraPanel, {
-  CameraSelector,
-  EMPTY_CAMERA,
-  cameraBasis,
-  cameraOutdated,
-  type CameraSelection,
-  type CameraPreset,
-} from './CameraPanel';
-import ProductionPanel from './ProductionPanel';
-import RecoverJob from './RecoverJob';
+import {type FrameSelection} from './FramePanel';
+import {type CameraSelection} from './CameraPanel';
 import {mergeProject} from './projectMerge';
-import {apiFetch, PAID_LLM_ENABLED} from './api';
-import NativeGallery from './NativeGallery';
+import {apiFetch} from './api';
 import {type CharacterVersion} from './ReplaceCharacterButton';
-import RefinePanel, {EMPTY_REFINE, type RefineDraft} from './RefinePanel';
-import ChatGPTPanel from './ChatGPTPanel';
+import {type RefineDraft} from './RefinePanel';
 import WorldFromBrief from './WorldFromBrief';
 import {passportText} from './worldBible';
+import WorldStyle from './WorldStyle';
+import CharacterReferences from './CharacterReferences';
 import AttachmentMenu, {AttachmentStrip} from './AttachmentMenu';
 import CharactersScreen from './CharactersScreen';
-import SoundScreen from './SoundScreen';
 import FrameBuilder from './FrameBuilder';
-import ScenePanel, {EMPTY_SCENE, type Scene} from './ScenePanel';
-import EconomicsPanel from './EconomicsPanel';
-import PromptComposer, {type PromptRequest} from './PromptComposer';
+import {EMPTY_SCENE, type Scene} from './ScenePanel';
 import ConnectionsPanel from './ConnectionsPanel';
-import GenerationReview, {type GenerationRequest} from './GenerationReview';
 import AssetLibrary from './AssetLibrary';
 import CreateScreen from './CreateScreen';
 import VideoScreen from './VideoScreen';
 import HomeScreen from './HomeScreen';
-import ReelsScreen, {type ReelUse} from './ReelsScreen';
 import GenerationWatcher from './GenerationWatcher';
 import {ActivityProvider} from './ActivityContext';
-import StageNav, {STAGES, type Mode} from './StageNav';
+import StageNav from './StageNav';
+import {STAGES, isHidden, screenOf, type Mode} from './screens';
 import WorkspaceTrail, {type WorkspaceLocation} from './WorkspaceTrail';
 import {readWorkspaceRoute, workspaceHash} from './workspaceRoute';
 import {readLocal, writeLocal, clearLocal} from './localDrafts';
 import Dock, {countActive} from './Dock';
 import useActivity from './useActivity';
-import AgentPanel from './AgentPanel';
 import IdeaBrief from './IdeaBrief';
 import IdeaRefs from './IdeaRefs';
 import {lazy, Suspense, useCallback, useEffect, useRef, useState} from 'react';
 import type {Node, Edge} from '@xyflow/react';
-import {
-  MessageSquare,
-  Plus,
-  RefreshCw,
-  Download,
-  ShieldCheck,
-  Music,
-  Upload,
-  Palette,
-  Settings,
-} from 'lucide-react';
+import {Plus, Settings} from 'lucide-react';
 
-const StoryboardDemo = lazy(() => import('./StoryboardDemo'));
 const GraphPanel = lazy(() => import('./WorkflowPanel'));
 
-type ModelSpec = {
-  kind: string;
-  model: string;
-  task_type: string;
-  docs: string;
-  max_refs: number;
-  [key: string]: unknown;
-};
 type Character = {
   working_asset_id?: string;
   version_history?: string[];
@@ -200,14 +158,12 @@ const json = async (r: Response) => {
 };
 const url = '/api';
 function App() {
-  const [productionTarget, setProductionTarget] = useState<{
-    productionId: string;
-    nodeId: string;
-  } | null>(null);
-  const [storyboardDemoOpen, setStoryboardDemoOpen] = useState(false);
   const [dockOpen, setDockOpen] = useState(false);
-  const [demoVisited, setDemoVisited] = useState(false);
   const [mode, setMode] = useState<Mode>(() => readWorkspaceRoute(window.location.hash)?.mode || 'home');
+  // Экраны, скрытые до беты, не открываются ни по кнопкам, ни по старым ссылкам.
+  useEffect(() => {
+    if (isHidden(mode)) setMode('home');
+  }, [mode]);
   const [workspaceLocation, setWorkspaceLocation] = useState<WorkspaceLocation | null>(null);
   useEffect(() => {
     const header = document.querySelector<HTMLElement>('header.topbar');
@@ -222,19 +178,8 @@ function App() {
     observer.observe(header);
     return () => observer.disconnect();
   }, []);
-  const [audioFile, setAudioFile] = useState('');
-  const [audioDuration, setAudioDuration] = useState(0);
-  const [audioSegments, setAudioSegments] = useState<{start: number; end: number; duration: number}[]>([]);
-  const [audioStart, setAudioStart] = useState(0);
-  const [audioEnd, setAudioEnd] = useState(10);
-  const [denoise, setDenoise] = useState(true);
-  const [audioConsent, setAudioConsent] = useState(false);
-  const [audioResult, setAudioResult] = useState('');
   const [provider, setProvider] = useState<'openai' | 'piapi'>('piapi');
   const [diagnostics, setDiagnostics] = useState<any>(null);
-  const [assetList, setAssetList] = useState<any[]>([]);
-  const [assetCategory, setAssetCategory] = useState('real_references');
-  const [assetNote, setAssetNote] = useState('');
   const [projectId, setProjectId] = useState('');
   const currentProjectId = useRef(projectId);
   currentProjectId.current = projectId;
@@ -247,58 +192,11 @@ function App() {
   const [startupAttempt, setStartupAttempt] = useState(0);
   type ProjectChange = {type: 'new'} | {type: 'load'; id: string; mode?: Mode; characterId?: string};
   const [pendingProjectChange, setPendingProjectChange] = useState<ProjectChange | null>(null);
-  const [catalogue, setCatalogue] = useState<'frame' | 'camera' | null>(null);
-  const [frameCatalogue, setFrameCatalogue] = useState<FrameCatalogue>({
-      frames: [],
-      lights: [],
-    }),
-    [frameError, setFrameError] = useState('');
-  useEffect(() => {
-    let active = true;
-    void apiFetch('/api/frame-presets')
-      .then(json)
-      .then(d => {
-        if (active) setFrameCatalogue(d);
-      })
-      .catch(e => {
-        if (active) setFrameError(String(e));
-      });
-    return () => {
-      active = false;
-    };
-  }, []);
-  const [cameraPresets, setCameraPresets] = useState<CameraPreset[]>([]),
-    [cameraError, setCameraError] = useState('');
-  useEffect(() => {
-    let active = true;
-    void apiFetch('/api/camera-presets')
-      .then(json)
-      .then(d => {
-        if (active) setCameraPresets(d.presets);
-      })
-      .catch(e => {
-        if (active) setCameraError(String(e));
-      });
-    return () => {
-      active = false;
-    };
-  }, []);
   const [state, setState] = useState<Studio>(INITIAL);
-  const [specs, setSpecs] = useState<Record<string, ModelSpec>>({});
-  const [imageModel, setImageModel] = useState('seedream-5-lite');
-  const [videoModel, setVideoModel] = useState('seedance-2.5');
   const [llm, setLlm] = useState('gpt-5.6-luna');
-  const [chatText, setChatText] = useState('');
-  const [messages, setMessages] = useState<{role: string; content: string}[]>([]);
-  const [jobs, setJobs] = useState<Job[]>([]);
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-  const [selectedJob, setSelectedJob] = useState('');
-  const [profileModel, setProfileModel] = useState('seedream-5-lite');
-  useEffect(() => {
-    setAssetList([]);
-  }, [projectId, state.selectedCharacter]);
   const change = (patch: Partial<Studio>) => setState(s => ({...s, ...patch}));
   const character = state.characters.find(c => c.id === state.selectedCharacter);
   const [apiHealth, setApiHealth] = useState<'checking' | 'online' | 'offline'>('checking');
@@ -323,23 +221,14 @@ function App() {
   const refresh = useCallback(async () => {
     try {
       setProjects(await json(await apiFetch(url + '/projects')));
-      const refreshedJobs = projectId
-        ? await json(await apiFetch(url + '/jobs?project_id=' + encodeURIComponent(projectId)))
-        : [];
-      if (currentProjectId.current === projectId) setJobs(refreshedJobs);
     } catch (e) {
       if (currentProjectId.current === projectId)
-        setError('Не удалось обновить проекты и очередь: ' + (e instanceof Error ? e.message : String(e)));
+        setError('Не удалось обновить список проектов: ' + (e instanceof Error ? e.message : String(e)));
     }
   }, [projectId]);
   useEffect(() => {
-    apiFetch(url + '/model-specs')
-      .then(json)
-      .then(setSpecs)
-      .catch(() => setError('Backend недоступен. Запусти START_WINDOWS.bat.'));
     refresh();
   }, [refresh]);
-  const headers = {'Content-Type': 'application/json'};
   const baseProject = useRef<{
     id: string;
     revision: number;
@@ -446,8 +335,6 @@ function App() {
     URL.revokeObjectURL(link.href);
   };
 
-  const [promptRequest, setPromptRequest] = useState<PromptRequest | null>(null);
-  const [generationRequest, setGenerationRequest] = useState<GenerationRequest | null>(null);
   const [libraryRevision, setLibraryRevision] = useState(0);
   const deliverySignature = useRef('');
   useEffect(() => {
@@ -460,7 +347,6 @@ function App() {
           await apiFetch('/api/jobs?project_id=' + encodeURIComponent(projectId))
         );
         if (!active) return;
-        setJobs(items);
         const signature = JSON.stringify(items.map(j => [j.id, j.delivery?.saved]));
         if (signature !== deliverySignature.current) {
           deliverySignature.current = signature;
@@ -496,7 +382,6 @@ function App() {
           instruction: '',
         },
       }));
-      setAssetList([]);
       setLibraryRevision(x => x + 1);
       setNotice('Рабочий образ персонажа заменён. Предыдущая версия перенесена в архив образов.');
     },
@@ -519,64 +404,6 @@ function App() {
     }
   };
   const ensureProject = persistProject;
-  const refineAsset = (source_asset_id: string) => {
-    setState(s => ({
-      ...s,
-      refinement: {
-        ...(s.refinement || EMPTY_REFINE),
-        source_asset_id,
-        reference_asset_id: '',
-      },
-    }));
-    setMode('refine');
-    setNotice('Оригинал выбран для точечной правки в GPT Image.');
-  };
-  const addToScene = (asset_id: string) => {
-    setState(s => {
-      const scene = s.scene || EMPTY_SCENE;
-      return {
-        ...s,
-        scene: {
-          ...scene,
-          assets: scene.assets.some(a => a.asset_id === asset_id)
-            ? scene.assets
-            : [
-                ...scene.assets,
-                {
-                  asset_id,
-                  role: scene.assets.length ? 'location' : 'character',
-                  note: '',
-                },
-              ],
-        },
-      };
-    });
-    setMode('scene');
-    setNotice('Исходник добавлен в сцену. Уточни его роль и постановку.');
-  };
-  const sceneGenerate = (target: string, prompt: string) =>
-    work('scene-review', async () => {
-      const id = await ensureProject();
-      const context = await json(
-        await apiFetch('/api/compose/preview', {
-          method: 'POST',
-          headers,
-          body: JSON.stringify({project_id: id, target, use_scene: true}),
-        })
-      );
-      const refs = context.context.references.map((r: {url: string}) => r.url);
-      if (refs.some((r: string) => !r.startsWith('https://')))
-        throw Error(
-          'Для передачи локальных исходников видеопровайдеру нужен публичный HTTPS URL. Загрузка исходников к провайдеру пока не подключена. Промпт и сцена сохранены.'
-        );
-      setGenerationRequest({
-        project_id: id,
-        model_id: target,
-        prompt,
-        options: state.parameters[target] || {},
-        reference_urls: refs,
-      });
-    });
   const save = () =>
     work('save', async () => {
       await persistProject();
@@ -617,13 +444,6 @@ function App() {
     setProjectName(restored.title);
     setTitleEditing(false);
     setState(restored.state);
-    setMessages([]);
-    setChatText('');
-    setJobs([]);
-    setSelectedJob('');
-    setAudioFile('');
-    setAudioResult('');
-    setAudioSegments([]);
     setConflict('');
   }, []);
   useEffect(() => {
@@ -667,16 +487,9 @@ function App() {
       setProjectName('Новый клип');
       setTitleEditing(true);
       setState(INITIAL);
-      setMessages([]);
-      setChatText('');
-      setJobs([]);
-      setSelectedJob('');
       setConflict('');
     }
     if (target.type === 'new') setRecovery(null);
-    setCatalogue(null);
-    setPromptRequest(null);
-    setGenerationRequest(null);
     if (target.type === 'load' && target.characterId)
       setState(s => ({...s, selectedCharacter: target.characterId!}));
     setMode(target.type === 'load' ? target.mode || 'studio' : 'studio');
@@ -717,146 +530,6 @@ function App() {
       await applyProjectChange(pendingProjectChange);
       setPendingProjectChange(null);
     });
-  const sendChat = () =>
-    work('chat', async () => {
-      if (!chatText.trim()) return;
-      const next = [...messages, {role: 'user', content: chatText}];
-      setMessages(next);
-      setChatText('');
-      const d = await json(
-        await apiFetch(url + '/llm/chat', {
-          method: 'POST',
-          headers,
-          body: JSON.stringify({
-            provider,
-            model: llm,
-            messages: [
-              {
-                role: 'system',
-                content:
-                  'Ты режиссёр AI-видеостудии. Помогай создавать точные сцены и промпты; сохраняй внешность персонажей.',
-              },
-              ...next,
-            ],
-          }),
-        })
-      );
-      setMessages([
-        ...next,
-        {
-          role: 'assistant',
-          content: d.choices?.[0]?.message?.content || 'Нет ответа',
-        },
-      ]);
-    });
-  const draft = (model: string) =>
-    work('draft', async () => {
-      const d = await json(
-        await apiFetch(url + '/prompt-drafts', {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({
-            target: model,
-            brief: state.brief,
-            character,
-            style: state.style,
-            camera: state.camera,
-            composition: state.composition,
-            motion_brief: state.motionBrief || '',
-          }),
-        })
-      );
-      change({
-        prompts: {...state.prompts, [model]: d.prompt},
-        ...(specs[model]?.kind === 'video'
-          ? {
-              cameraPromptBasis: {
-                ...state.cameraPromptBasis,
-                [model]: cameraBasis(state.camera),
-              },
-            }
-          : {
-              compositionPromptBasis: {
-                ...state.compositionPromptBasis,
-                [model]: frameBasis(state.composition),
-              },
-            }),
-      });
-      setNotice('Локальный черновик подготовлен без платного API. Проверь и отредактируй текст.');
-    });
-  const compose = (model: string) =>
-    work('compose-preview', async () => {
-      const id = await persistProject();
-      void refresh();
-      setPromptRequest({project_id: id, target: model, provider, model: llm});
-    });
-  const submit = (model: string, kind: string) =>
-    work('review', async () => {
-      if (!projectId) throw Error('Сначала сохрани проект');
-      if (
-        kind === 'image' &&
-        frameOutdated(state.composition, state.compositionPromptBasis?.[model], state.prompts[model] || '')
-      )
-        throw Error('Ракурс или свет изменены. Подготовь новый фотопромпт или проверь его вручную.');
-      if (
-        kind === 'video' &&
-        cameraOutdated(state.camera, state.cameraPromptBasis?.[model], state.prompts[model] || '')
-      )
-        throw Error('Камера изменена. Пересобери видеопромпт или проверь его вручную.');
-      const profileRefs = (character?.profiles[model]?.reference_urls || '')
-        .split(/[\n,]/)
-        .map(x => x.trim())
-        .filter(Boolean);
-      const manualRefs = (kind === 'video' ? [state.videoReference] : state.referenceUrls.split(/[\n,]/))
-        .map(x => x.trim())
-        .filter(Boolean);
-      setGenerationRequest({
-        project_id: projectId,
-        model_id: model,
-        prompt: state.prompts[model] || state.brief,
-        options: state.parameters[model] || {},
-        reference_urls: [...new Set([...manualRefs, ...profileRefs])],
-      });
-    });
-  const saveImage = (id: string, index: number) =>
-    work('save-image', async () => {
-      await json(
-        await apiFetch(`/api/jobs/${id}/outputs/${index}/save`, {
-          method: 'POST',
-        })
-      );
-      setLibraryRevision(v => v + 1);
-      setNotice('Оригинал и параметры сохранены в библиотеке проекта');
-    });
-  const poll = (id: string) =>
-    work('poll', async () => {
-      const d = await json(await apiFetch(url + '/jobs/' + id));
-      setJobs(a =>
-        a.map(j =>
-          j.id === id
-            ? {
-                ...j,
-                status: d.upstream?.data?.status || j.status,
-                response: d.upstream,
-              }
-            : j
-        )
-      );
-      setNotice('Статус обновлён');
-    });
-  const extract = (j: Job): string[] => {
-    const o = j.response?.data?.output || {};
-    const vals = [o.image_urls, o.images, o.video_urls, o.image_url, o.video_url, o.url, o.image, o.video]
-      .flat(3)
-      .filter(Boolean);
-    return [
-      ...new Set<string>(
-        vals
-          .map((v: any) => (typeof v === 'string' ? v : v?.url || ''))
-          .filter((v: string) => /^https?:\/\//.test(v))
-      ),
-    ];
-  };
   const updateChar = (patch: Partial<Character>) => {
     if (!character) return;
     change({
@@ -880,417 +553,6 @@ function App() {
     };
     change({characters: [...state.characters, c], selectedCharacter: id});
   };
-  const chooseComposition = (composition: FrameSelection) => {
-    change({composition});
-    setNotice('Ракурс и свет выбраны. Подготовь фотопромпт с этими настройками.');
-  };
-  const useReelRecipe = (u: ReelUse) => {
-    setVideoModel('seedance-2.5');
-    change({
-      prompts: {...state.prompts, 'seedance-2.5': u.prompt},
-      parameters: {
-        ...state.parameters,
-        'seedance-2.5': {
-          ...state.parameters['seedance-2.5'],
-          duration: u.duration,
-          aspect_ratio: u.aspect_ratio,
-          resolution: u.resolution,
-        },
-      },
-    });
-    setMode('video');
-    setNotice(
-      'Рецепт перенесён в «Видео». Добавь референсы по слотам рецепта и проверь стоимость перед запуском.'
-    );
-  };
-  const chooseCamera = (camera: CameraSelection) => {
-    change({camera});
-    setNotice('Камера выбрана. Подготовь новый видеопромпт с этим движением.');
-  };
-  const models = Object.entries(specs);
-  const images = models.filter(([, v]) => v.kind === 'image');
-  const videos = models.filter(([, v]) => v.kind === 'video');
-  const paramFields = (model: string) => {
-    const spec = specs[model];
-    if (!spec) return null;
-    return (
-      <div className="param-grid">
-        {['size', 'resolution', 'aspect_ratio', 'output_format']
-          .filter(k => Array.isArray(spec[k]))
-          .map(k => (
-            <label key={k}>
-              {k}
-              <select
-                value={String(state.parameters[model]?.[k] || '')}
-                onChange={e =>
-                  change({
-                    parameters: {
-                      ...state.parameters,
-                      [model]: {
-                        ...state.parameters[model],
-                        [k]: e.target.value,
-                      },
-                    },
-                  })
-                }
-              >
-                <option value="">По умолчанию</option>
-                {(spec[k] as string[]).map(v => (
-                  <option key={v}>{v}</option>
-                ))}
-              </select>
-            </label>
-          ))}
-        {spec.kind === 'video' && !spec.prompt_only && spec.duration_mode !== 'provider_default' && (
-          <label>
-            Длительность, сек.
-            <input
-              type="number"
-              min={Number(spec.duration_min)}
-              max={Number(spec.duration_max)}
-              value={Number(state.parameters[model]?.duration || 5)}
-              onChange={e =>
-                change({
-                  parameters: {
-                    ...state.parameters,
-                    [model]: {
-                      ...state.parameters[model],
-                      duration: Number(e.target.value),
-                    },
-                  },
-                })
-              }
-            />
-          </label>
-        )}
-      </div>
-    );
-  };
-  const modelPanel = (kind: 'image' | 'video') => {
-    const model = kind === 'image' ? imageModel : videoModel;
-    const options = kind === 'image' ? images : videos;
-    return (
-      <section className="panel">
-        <div className="panel-title">
-          <h2>{kind === 'image' ? '② Image Lab' : '③ Video Lab'}</h2>
-          {kind === 'video' && <CinemaInfo topic="editing" />}
-          <a target="_blank" rel="noreferrer" href={specs[model]?.docs}>
-            Мануал ↗
-          </a>
-        </div>
-        <div className="model-tabs">
-          {options.map(([id]) => (
-            <button
-              key={id}
-              className={model === id ? 'active' : ''}
-              onClick={() => (kind === 'image' ? setImageModel(id) : setVideoModel(id))}
-            >
-              {id}
-            </button>
-          ))}
-        </div>
-        {kind === 'image' && (
-          <FrameSelector
-            catalogue={frameCatalogue}
-            value={state.composition}
-            onChange={chooseComposition}
-            onCatalogue={() => setCatalogue('frame')}
-          />
-        )}
-        {kind === 'video' && (
-          <label>
-            Действие в кадре
-            <textarea
-              rows={3}
-              value={state.motionBrief || ''}
-              onChange={e => change({motionBrief: e.target.value})}
-              placeholder="Опиши действия героя и происходящее за выбранную длительность"
-            />
-          </label>
-        )}
-        {kind === 'video' && (
-          <label>
-            Выбранный референс из Image Lab
-            <input
-              value={state.videoReference}
-              onChange={e => change({videoReference: e.target.value})}
-              placeholder="https://..."
-            />
-          </label>
-        )}
-        {kind === 'video' && (
-          <>
-            <CameraSelector
-              setupEnabled={!!frameCatalogue.capabilities?.prompt_setup}
-              presets={cameraPresets}
-              value={state.camera || EMPTY_CAMERA}
-              onChange={chooseCamera}
-              onCatalogue={() => setCatalogue('camera')}
-              disabled={!!busy}
-            />
-            {cameraError && <p role="alert">{cameraError}</p>}
-          </>
-        )}
-        {kind === 'video' && (
-          <ChatGPTPanel
-            projectId={projectId}
-            target={model}
-            ensureProject={ensureProject}
-            onAsset={() => setLibraryRevision(x => x + 1)}
-            onPrompt={(prompt, target, movement) =>
-              setState(s => ({
-                ...s,
-                prompts: {...s.prompts, [target]: prompt},
-                cameraPromptBasis: {
-                  ...s.cameraPromptBasis,
-                  [target]: cameraBasis(movement),
-                },
-              }))
-            }
-          />
-        )}
-        <div className="capabilities">
-          <b>Входы модели:</b> <span>✍ Текст ✓</span>
-          <span>🖼 Фото {specs[model]?.max_refs ? '✓' : '—'}</span>
-          <span>🎥 Видео {kind === 'video' ? 'пока не подключено' : '—'}</span>
-          <span>🔊 Аудио {kind === 'video' ? 'пока не подключено' : '—'}</span>
-        </div>
-        {kind === 'image' && (
-          <label>
-            URL референсов (по одному на строку)
-            <textarea
-              rows={2}
-              value={state.referenceUrls}
-              onChange={e => change({referenceUrls: e.target.value})}
-              placeholder="https://..."
-            />
-          </label>
-        )}
-        <div className="twocol">
-          <div>
-            <label>
-              Отдельный промпт — {model}
-              <textarea
-                rows={7}
-                value={state.prompts[model] || ''}
-                onChange={e =>
-                  change({
-                    prompts: {...state.prompts, [model]: e.target.value},
-                  })
-                }
-                placeholder="Можно написать вручную либо сгенерировать через GPT"
-              />
-            </label>
-            {kind === 'video' &&
-              cameraOutdated(state.camera, state.cameraPromptBasis?.[model], state.prompts[model] || '') && (
-                <div className="notice" role="status">
-                  <p>Камера изменена: подготовь новый видеопромпт или проверь текущий вручную.</p>
-                  <button
-                    onClick={() =>
-                      change({
-                        cameraPromptBasis: {
-                          ...state.cameraPromptBasis,
-                          [model]: cameraBasis(state.camera),
-                        },
-                      })
-                    }
-                  >
-                    Камера учтена в этом промпте
-                  </button>
-                </div>
-              )}
-            {kind === 'image' &&
-              frameOutdated(
-                state.composition,
-                state.compositionPromptBasis?.[model],
-                state.prompts[model] || ''
-              ) && (
-                <div className="notice" role="status">
-                  <p>Ракурс или свет изменены. Подготовь новый фотопромпт либо проверь его вручную.</p>
-                  <button
-                    onClick={() =>
-                      change({
-                        compositionPromptBasis: {
-                          ...state.compositionPromptBasis,
-                          [model]: frameBasis(state.composition),
-                        },
-                      })
-                    }
-                  >
-                    Ракурс и свет учтены в промпте
-                  </button>
-                </div>
-              )}
-            <button className="secondary" disabled={!!busy} onClick={() => draft(model)}>
-              Локальный черновик
-            </button>
-            <button className="secondary" disabled={!!busy} onClick={() => compose(model)}>
-              ✦ Подготовить промпт через API
-            </button>
-          </div>
-          <div>
-            <h3>Настройки по API-мануалу</h3>
-            {paramFields(model)}
-            <div className="muted">
-              Референсов: до {specs[model]?.max_refs || '—'}. Непроверенные модели отключены до добавления
-              API-схем.
-            </div>
-            <button
-              className="primary"
-              disabled={
-                !!busy ||
-                !specs[model]?.launch_enabled ||
-                (kind === 'image' &&
-                  frameOutdated(
-                    state.composition,
-                    state.compositionPromptBasis?.[model],
-                    state.prompts[model] || ''
-                  )) ||
-                (kind === 'video' &&
-                  cameraOutdated(state.camera, state.cameraPromptBasis?.[model], state.prompts[model] || ''))
-              }
-              onClick={() => submit(model, kind)}
-            >
-              ▶ Проверить и запустить {kind === 'image' ? 'изображение' : 'видео'}
-            </button>
-            {!specs[model]?.launch_enabled && (
-              <p className="muted">Запуск отключён до проверки схемы и стоимости.</p>
-            )}
-          </div>
-        </div>
-      </section>
-    );
-  };
-  const uploadAudio = (f: File) =>
-    work('upload', async () => {
-      const form = new FormData();
-      form.append('file', f);
-      const result = await json(await apiFetch('/api/media/upload', {method: 'POST', body: form}));
-      setAudioFile(result.url);
-      setAudioResult('');
-      setAudioSegments([]);
-      setNotice('Медиа импортировано локально: ' + f.name);
-    });
-  const analyzeAudio = () =>
-    work('analyze', async () => {
-      const result = await json(await apiFetch('/api/audio/analyze/' + audioFile.split('/').pop()));
-      setAudioDuration(result.duration);
-      setAudioEnd(Math.min(result.duration, 10));
-      setAudioSegments(result.suggested_segments);
-      setNotice('Найдены предложения для монтажа по паузам (не оценка качества исполнения)');
-    });
-  const cutAudio = () =>
-    work('cut', async () => {
-      const result = await json(
-        await apiFetch('/api/audio/cut', {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({
-            filename: audioFile.split('/').pop(),
-            start: audioStart,
-            end: audioEnd,
-            denoise,
-            normalize: true,
-            consent_confirmed: audioConsent,
-          }),
-        })
-      );
-      setAudioResult(result.url);
-      setNotice('Фрагмент подготовлен: WAV 44.1 kHz, mono, loudnorm');
-    });
-  const audioPanel = () => (
-    <section className="panel">
-      <div className="panel-title">
-        <h2>④ Audio Lab — референсы голоса</h2>
-        <CinemaInfo topic="sound" />
-        <Music size={19} />
-      </div>
-      <p className="muted">
-        Загрузи собственный или разрешённый медиафайл. Сервис предлагает фрагменты по паузам, затем ты вручную
-        выбираешь лучший дубль. Экспорт WAV подходит для дальнейшей загрузки в разрешённый сервис озвучки.
-      </p>
-      <label className="upload-area">
-        <Upload size={18} /> Импорт MP3 / WAV / MP4 / MOV / WEBM (до 100 МБ)
-        <input
-          type="file"
-          accept="audio/*,video/mp4,video/quicktime,video/webm,.mkv"
-          onChange={e => e.target.files?.[0] && uploadAudio(e.target.files[0])}
-        />
-      </label>
-      {audioFile && (
-        <>
-          <audio src={audioFile} controls />
-          <div className="audio-actions">
-            <button className="secondary" disabled={!!busy} onClick={analyzeAudio}>
-              Найти интервалы по паузам
-            </button>
-            <span className="muted">Длительность: {audioDuration.toFixed(1)} сек.</span>
-          </div>
-          {audioSegments.length > 0 && (
-            <div className="chips">
-              {audioSegments.map((s, i) => (
-                <button
-                  key={i}
-                  className="secondary"
-                  onClick={() => {
-                    setAudioStart(s.start);
-                    setAudioEnd(s.end);
-                  }}
-                >
-                  {s.start}–{s.end} c
-                </button>
-              ))}
-            </div>
-          )}
-          <div className="param-grid">
-            <label>
-              От (сек)
-              <input
-                type="number"
-                min="0"
-                step="0.1"
-                value={audioStart}
-                onChange={e => setAudioStart(Number(e.target.value))}
-              />
-            </label>
-            <label>
-              До (сек)
-              <input
-                type="number"
-                min="0"
-                step="0.1"
-                value={audioEnd}
-                onChange={e => setAudioEnd(Number(e.target.value))}
-              />
-            </label>
-            <label className="inline-checkbox">
-              <input type="checkbox" checked={denoise} onChange={e => setDenoise(e.target.checked)} /> Лёгкая
-              очистка
-            </label>
-          </div>
-          <label className="inline-checkbox">
-            <input type="checkbox" checked={audioConsent} onChange={e => setAudioConsent(e.target.checked)} />{' '}
-            Подтверждаю права на использование голоса и разрешение на создание голосового референса
-          </label>
-          <button className="primary" disabled={!!busy || !audioConsent} onClick={cutAudio}>
-            ✂ Вырезать и подготовить WAV
-          </button>
-          {audioResult && (
-            <div className="audio-result">
-              <audio controls src={audioResult} />
-              <a href={audioResult} download>
-                Скачать подготовленный WAV ↓
-              </a>
-              <p className="muted">
-                Передавать в ElevenLabs/Fish Audio следует только при соблюдении их правил и разрешений.
-                Прямая отправка API ещё не подключена.
-              </p>
-            </div>
-          )}
-        </>
-      )}
-    </section>
-  );
   const apiStatus =
     apiHealth === 'online'
       ? 'Backend подключён'
@@ -1300,19 +562,7 @@ function App() {
   return (
     <ActivityProvider value={activity}>
       <div className="app shell">
-        <StageNav
-          mode={mode}
-          onMode={setMode}
-          onDemo={() => {
-            setDemoVisited(true);
-            setStoryboardDemoOpen(true);
-          }}
-        />
-        <Suspense fallback={<p>Открываем демо…</p>}>
-          {demoVisited && (
-            <StoryboardDemo open={storyboardDemoOpen} onClose={() => setStoryboardDemoOpen(false)} />
-          )}
-        </Suspense>
+        <StageNav mode={mode} onMode={setMode} />
         <header className="topbar">
           <div className="topbar-project">
             <select
@@ -1393,246 +643,7 @@ function App() {
             )}
           </section>
         ) : (
-          <main
-            className={
-              mode === 'audio'
-                ? 'media-main'
-                : mode === 'video'
-                  ? 'create-main video-main'
-                  : mode === 'storyboard'
-                    ? 'storyboard-main'
-                    : mode === 'create'
-                      ? 'create-main'
-                      : mode === 'home'
-                        ? 'home-main'
-                        : mode === 'graph'
-                          ? 'workflow-main'
-                          : mode === 'reels'
-                            ? 'reels-main'
-                            : mode === 'styles' || mode === 'characters'
-                              ? 'world-main'
-                              : mode === 'studio'
-                                ? 'idea-main'
-                                : 'solo-main'
-            }
-          >
-            <aside className="sidebar">
-              <ProjectHeader
-                id={projectId}
-                name={projectName}
-                editing={titleEditing}
-                dirty={projectDirty}
-                busy={!!busy || saving.current}
-                onName={setProjectName}
-                onEdit={() => setTitleEditing(true)}
-                onCancel={() => {
-                  setProjectName(baseProject.current?.title || projectName);
-                  setTitleEditing(false);
-                }}
-                onSave={() => void save()}
-              />
-              <label>
-                Открыть проект
-                <select value={projectId} disabled={!!busy} onChange={e => void load(e.target.value)}>
-                  <option value="" disabled>
-                    {projects.length ? 'Выбери сохранённый проект' : 'Нет сохранённых проектов'}
-                  </option>
-                  {projects.map(p => (
-                    <option key={p.id} value={p.id}>
-                      {p.title}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <hr />
-              <hr />
-              <h3>
-                <ShieldCheck size={16} /> Character Vault
-              </h3>
-              <button className="secondary" onClick={mkChar}>
-                <Plus size={14} /> Новый персонаж
-              </button>
-              <select
-                value={state.selectedCharacter}
-                onChange={e => change({selectedCharacter: e.target.value})}
-              >
-                <option value="">Без персонажа</option>
-                {state.characters.map(c => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
-              {character && (
-                <div className="char-editor">
-                  <CharacterReferences
-                    key={character.id}
-                    projectId={projectId}
-                    characterId={character.id}
-                    name={character.name}
-                    identity={character.identity}
-                    workingImage={
-                      character.working_asset_id
-                        ? '/api/library/' + character.working_asset_id + '/file'
-                        : undefined
-                    }
-                    busy={!!busy}
-                    ensureProject={ensureProject}
-                    onName={name => updateChar({name})}
-                    onIdentity={identity => updateChar({identity})}
-                    onRecognized={result =>
-                      setState(current => ({
-                        ...current,
-                        characters: current.characters.map(item => {
-                          if (item.id !== character.id) return item;
-                          const identity = {...item.identity};
-                          for (const key of Object.keys(result.identity) as (keyof Character['identity'])[]) {
-                            if ((identity[key] || '') === (result.baseline_identity[key] || ''))
-                              identity[key] = result.identity[key];
-                          }
-                          return {...item, identity};
-                        }),
-                      }))
-                    }
-                  >
-                    <h4>Профиль конкретной модели</h4>
-                    <select value={profileModel} onChange={e => setProfileModel(e.target.value)}>
-                      {models.map(([k]) => (
-                        <option key={k} value={k}>
-                          {k}
-                        </option>
-                      ))}
-                    </select>
-                    <label>
-                      Особые инструкции
-                      <textarea
-                        rows={3}
-                        value={character.profiles[profileModel]?.prompt_notes || ''}
-                        onChange={e =>
-                          updateChar({
-                            profiles: {
-                              ...character.profiles,
-                              [profileModel]: {
-                                reference_urls: character.profiles[profileModel]?.reference_urls || '',
-                                prompt_notes: e.target.value,
-                              },
-                            },
-                          })
-                        }
-                      />
-                    </label>
-                    <label>
-                      Референсы только для этой модели
-                      <textarea
-                        rows={2}
-                        value={character.profiles[profileModel]?.reference_urls || ''}
-                        onChange={e =>
-                          updateChar({
-                            profiles: {
-                              ...character.profiles,
-                              [profileModel]: {
-                                prompt_notes: character.profiles[profileModel]?.prompt_notes || '',
-                                reference_urls: e.target.value,
-                              },
-                            },
-                          })
-                        }
-                      />
-                    </label>
-                    <p className="muted">
-                      Выбери любую модель выше. Профили и референсы хранятся отдельно и подставляются при
-                      запуске.
-                    </p>
-                    <h4>Папки и файлы персонажа</h4>
-                    <p className="muted">
-                      Сначала сохрани проект, затем загружай исходники. Категория rejected — негативные
-                      примеры, они не подаются как референсы.
-                    </p>
-                    <select value={assetCategory} onChange={e => setAssetCategory(e.target.value)}>
-                      {[
-                        ['real_references', 'Реальные референсы'],
-                        ['candidate_generations', 'Кандидаты на утверждение'],
-                        ['approved_generations', 'Утверждённые'],
-                        ['archived_generations', 'Архив образов'],
-                        ['rejected_generations', 'Неудачные'],
-                        ['model_references', 'Для конкретной модели'],
-                      ].map(([v, n]) => (
-                        <option key={v} value={v}>
-                          {n}
-                        </option>
-                      ))}
-                    </select>
-                    <input
-                      placeholder="Комментарий или ошибка"
-                      value={assetNote}
-                      onChange={e => setAssetNote(e.target.value)}
-                    />
-                    <input
-                      type="file"
-                      accept="image/png,image/jpeg,image/webp"
-                      onChange={e => {
-                        const f = e.target.files?.[0];
-                        if (!f || !projectId || !character) return;
-                        work('asset', async () => {
-                          const fd = new FormData();
-                          fd.append('file', f);
-                          fd.append('category', assetCategory);
-                          fd.append('model_id', assetCategory === 'model_references' ? profileModel : '');
-                          fd.append('note', assetNote);
-                          await json(
-                            await apiFetch(`/api/characters/${projectId}/${character.id}/assets`, {
-                              method: 'POST',
-                              body: fd,
-                            })
-                          );
-                          setAssetList(
-                            await json(await apiFetch(`/api/characters/${projectId}/${character.id}/assets`))
-                          );
-                          setNotice('Референс сохранён');
-                        });
-                      }}
-                    />
-                    <button
-                      className="secondary"
-                      onClick={() =>
-                        work('assets', async () => {
-                          if (!projectId || !character)
-                            throw Error('Сначала сохрани проект и выбери персонажа');
-                          setAssetList(
-                            await json(await apiFetch(`/api/characters/${projectId}/${character.id}/assets`))
-                          );
-                        })
-                      }
-                    >
-                      Показать файлы персонажа
-                    </button>
-                    <div className="asset-grid">
-                      {assetList.map(a => (
-                        <div key={a.id} className="asset-card">
-                          <img src={a.url} alt={a.original_name} />
-                          <small>
-                            {a.category} · {a.original_name}
-                          </small>
-                          <small>{a.note}</small>
-                          <button
-                            onClick={() =>
-                              work('remove', async () => {
-                                await json(
-                                  await apiFetch('/api/character-assets/' + a.id, {method: 'DELETE'})
-                                );
-                                setAssetList(v => v.filter(x => x.id !== a.id));
-                              })
-                            }
-                          >
-                            Удалить
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  </CharacterReferences>
-                </div>
-              )}
-            </aside>
+          <main className={screenOf(mode).main}>
             <div className="content">
               {mode !== 'studio' && (
                 <WorkspaceTrail
@@ -1725,58 +736,12 @@ function App() {
                     )
                   }
                 >
-                  <>
-                    <section className="panel">
-                      <div className="panel-title">
-                        <h2>① Prompt Director + GPT</h2>
-                        <CinemaInfo topic="narrative" />
-                        <MessageSquare size={20} />
-                      </div>
-                      <label>
-                        Режиссёрское задание
-                        <textarea
-                          rows={4}
-                          value={state.brief}
-                          onChange={e => change({brief: e.target.value})}
-                        />
-                      </label>
-                      <div className="chat-history">
-                        {messages.length ? (
-                          messages.map((m, i) => (
-                            <div key={i} className={'bubble ' + m.role}>
-                              {m.content}
-                            </div>
-                          ))
-                        ) : (
-                          <span className="muted">
-                            Чат сохраняет контекст в текущей сессии. Создай сцену, затем адаптируй её для
-                            выбранных моделей.
-                          </span>
-                        )}
-                      </div>
-                      <div className="chat-controls">
-                        <input
-                          value={chatText}
-                          onChange={e => setChatText(e.target.value)}
-                          onKeyDown={e => e.key === 'Enter' && !e.shiftKey && sendChat()}
-                          placeholder="Спроси GPT о сцене или промпте…"
-                        />
-                        <button className="primary" disabled={!PAID_LLM_ENABLED || !!busy} onClick={sendChat}>
-                          Отправить
-                        </button>
-                      </div>
-                    </section>
-                    {modelPanel('image')}
-                  </>
+                  {projectId && <BudgetPanel projectId={projectId} />}
                 </SettingsPanel>
               ) : mode === 'storyboard' ? (
                 <>
                   <IdeaRefs projectId={projectId} ids={state.ideaRefs || []} />
                   <ProductionStoryboard
-                    onInspect={(productionId, nodeId) => {
-                      setProductionTarget({productionId, nodeId});
-                      setMode('files');
-                    }}
                     location={workspaceLocation}
                     outlineContext={{
                       projectId,
@@ -1789,133 +754,118 @@ function App() {
                     }}
                   />
                 </>
-              ) : mode === 'files' ? (
-                <>
-                  <MontageSummary projectId={projectId} onMode={setMode} />
-                  <ProductionPanel
-                    initialLocation={productionTarget}
-                    projectId={projectId}
-                    onOpenProject={(id, characterId) => {
-                      void load(id, 'studio', characterId);
-                    }}
-                  />
-                </>
               ) : mode === 'connections' ? (
                 <ConnectionsPanel />
-              ) : mode === 'agents' ? (
-                <AgentPanel
-                  projectId={projectId}
-                  brief={state.brief}
-                  character={character}
-                  style={state.style}
-                  onApply={prompt => {
-                    change({brief: prompt});
-                    setMode('studio');
-                  }}
-                />
-              ) : mode === 'refine' ? (
-                <RefinePanel
-                  {...replacementControls}
-                  projectId={projectId}
-                  draft={state.refinement || EMPTY_REFINE}
-                  onChange={refinement => change({refinement})}
-                  ensureProject={ensureProject}
-                  onAsset={() => setLibraryRevision(x => x + 1)}
-                  revision={libraryRevision}
-                />
-              ) : mode === 'scene' ? (
-                <ScenePanel
-                  onFrameCatalogue={() => setCatalogue('frame')}
-                  onCameraCatalogue={() => setCatalogue('camera')}
-                  frameCatalogue={frameCatalogue}
-                  composition={state.composition}
-                  onComposition={chooseComposition}
-                  cameraPresets={cameraPresets}
-                  camera={state.camera}
-                  onCamera={chooseCamera}
-                  scene={state.scene || EMPTY_SCENE}
-                  onChange={scene => change({scene})}
-                  projectId={projectId}
-                  revision={libraryRevision}
-                  models={models.map(([id, v]) => ({
-                    id,
-                    kind: v.kind,
-                    enabled: !!v.launch_enabled,
-                  }))}
-                  ensureProject={ensureProject}
-                  onAsset={() => setLibraryRevision(x => x + 1)}
-                  onGenerate={(target, prompt) => void sceneGenerate(target, prompt)}
-                />
-              ) : mode === 'economics' ? (
+              ) : mode === 'styles' || mode === 'characters' ? (
                 <>
-                  <ReleaseSummary projectId={projectId} />
-                  <EconomicsPanel projectId={projectId} revision={libraryRevision} />
-                </>
-              ) : mode === 'styles' ? (
-                <>
-                  <IdeaRefs projectId={projectId} ids={state.ideaRefs || []} />
-                  <section className="panel world-bible">
-                    <div className="panel-title">
-                      <h2>Библия мира</h2>
-                      <CinemaInfo topic="world" />
-                      <Palette size={22} />
-                    </div>
-                    <p className="muted">
-                      Единый стиль сохраняется вместе с проектом и держит все кадры серии в одном мире.
-                      Заполни коротко и по делу: эти поля подставляются в промпты и проверку результатов.
-                    </p>
-                    <AttachmentStrip items={(state.scene || EMPTY_SCENE).assets} />
-                    <div className="world-fields">
-                      {(
-                        [
-                          ['look', 'Визуальный стиль', 'Техника, жанр, общий образ'],
-                          ['environment', 'Архитектура и среда', 'Где происходит действие, какие здания'],
-                          ['time', 'Время суток и сезон', 'Когда: ночь, рассвет, зима, дождь'],
-                          ['tech', 'Уровень технологий', 'Эпоха, транспорт, устройства'],
-                          ['textures', 'Фактуры и материалы', 'Металл, стекло, ткань, поверхности'],
-                          ['palette', 'Палитра', 'Главные цвета и оттенки'],
-                          ['lighting', 'Освещение', 'Направление, температура, источники света'],
-                          ['camera', 'Камера и оптика', 'Ракурсы, объективы, движение'],
-                          ['mood', 'Настроение', 'Эмоция и атмосфера ролика'],
-                          ['rules', 'Неизменные правила', 'Что одинаково в каждом кадре'],
-                          ['avoid', 'Что запрещено', 'Чего не должно быть в кадре'],
-                        ] as [keyof StyleBible, string, string][]
-                      ).map(([k, label, hint]) => (
-                        <label key={k} className={'world-field world-field-' + k}>
-                          <b>{label}</b>
-                          <small>{hint}</small>
-                          <textarea
-                            rows={2}
-                            value={state.style?.[k] || ''}
-                            onChange={e =>
-                              change({
-                                style: {...state.style, [k]: e.target.value},
-                              })
-                            }
-                          />
-                        </label>
-                      ))}
-                    </div>
-                    <div className="world-actions">
-                      <button className="primary" disabled={!!busy} onClick={save}>
-                        Сохранить стиль проекта
-                      </button>
-                      <button
-                        onClick={() =>
+                  <nav className="world-tabs" aria-label="Разделы мира">
+                    <button className={mode === 'styles' ? 'on' : ''} onClick={() => setMode('styles')}>
+                      Стиль мира
+                    </button>
+                    <button
+                      className={mode === 'characters' ? 'on' : ''}
+                      onClick={() => setMode('characters')}
+                    >
+                      Персонажи{state.characters.length ? ` · ${state.characters.length}` : ''}
+                    </button>
+                  </nav>
+                  {mode === 'styles' ? (
+                    <>
+                      <IdeaRefs projectId={projectId} ids={state.ideaRefs || []} />
+                      <WorldStyle
+                        style={state.style}
+                        busy={!!busy}
+                        attachments={<AttachmentStrip items={(state.scene || EMPTY_SCENE).assets} />}
+                        onChange={style => change({style: {...state.style, ...style}})}
+                        onSave={() => void save()}
+                        onCopy={() =>
                           void navigator.clipboard
                             ?.writeText(passportText(state.style))
                             .then(() => setNotice('Паспорт мира скопирован'))
                         }
-                      >
-                        Копировать паспорт
-                      </button>
-                      <button onClick={() => setMode('characters')}>Дальше: персонажи →</button>
-                    </div>
-                    <p className="muted">
-                      Герои справа: добавь утверждённые референсы в Character Vault. Библия мира не заменяет
-                      проверку изображений человеком.
-                    </p>
-                  </section>
+                        onNext={() => setMode('characters')}
+                      />
+                    </>
+                  ) : (
+                    <>
+                      <CharactersScreen
+                        projectId={projectId}
+                        ensureProject={ensureProject}
+                        heroes={state.characters}
+                        selectedId={state.selectedCharacter}
+                        world={state.style}
+                        onSelect={id => change({selectedCharacter: id})}
+                        onCreate={mkChar}
+                        onToWorld={() => setMode('styles')}
+                        onNext={() => setMode('storyboard')}
+                        revision={libraryRevision}
+                        onLibrary={() => setLibraryRevision(x => x + 1)}
+                        card={
+                          character && (
+                            <section className="panel hero-card" aria-label="Карточка героя">
+                              <CharacterReferences
+                                key={character.id}
+                                projectId={projectId}
+                                characterId={character.id}
+                                name={character.name}
+                                identity={character.identity}
+                                workingImage={
+                                  character.working_asset_id
+                                    ? '/api/library/' + character.working_asset_id + '/file'
+                                    : undefined
+                                }
+                                busy={!!busy}
+                                ensureProject={ensureProject}
+                                onName={name => updateChar({name})}
+                                onIdentity={identity => updateChar({identity})}
+                                onRecognized={result =>
+                                  setState(current => ({
+                                    ...current,
+                                    characters: current.characters.map(item => {
+                                      if (item.id !== character.id) return item;
+                                      const identity = {...item.identity};
+                                      for (const key of Object.keys(
+                                        result.identity
+                                      ) as (keyof Character['identity'])[]) {
+                                        if ((identity[key] || '') === (result.baseline_identity[key] || ''))
+                                          identity[key] = result.identity[key];
+                                      }
+                                      return {...item, identity};
+                                    }),
+                                  }))
+                                }
+                              />
+                            </section>
+                          )
+                        }
+                        builder={
+                          <FrameBuilder
+                            projectId={projectId}
+                            ensureProject={ensureProject}
+                            heroes={state.characters}
+                            world={state.style}
+                            brief={state.brief}
+                            locationAssetIds={(state.scene || EMPTY_SCENE).assets
+                              .filter(a => a.role === 'location')
+                              .map(a => a.asset_id)}
+                            revision={libraryRevision}
+                            onSent={() => setMode('storyboard')}
+                          />
+                        }
+                        results={
+                          <AssetLibrary
+                            {...replacementControls}
+                            projectId={projectId}
+                            revision={libraryRevision}
+                            onUse={(link, id) => {
+                              change({videoReference: link, videoAssetId: id});
+                              setNotice('Изображение выбрано как основа для видео');
+                            }}
+                          />
+                        }
+                      />
+                    </>
+                  )}
                 </>
               ) : mode === 'home' ? (
                 <HomeScreen
@@ -1925,49 +875,6 @@ function App() {
                   onMode={setMode}
                   onOpenProject={id => void load(id, 'home')}
                 />
-              ) : mode === 'characters' ? (
-                <CharactersScreen
-                  projectId={projectId}
-                  ensureProject={ensureProject}
-                  heroes={state.characters}
-                  selectedId={state.selectedCharacter}
-                  world={state.style}
-                  onSelect={id => change({selectedCharacter: id})}
-                  onCreate={mkChar}
-                  onToWorld={() => setMode('styles')}
-                  onNext={() => setMode('storyboard')}
-                  revision={libraryRevision}
-                  onLibrary={() => setLibraryRevision(x => x + 1)}
-                  builder={
-                    <FrameBuilder
-                      projectId={projectId}
-                      ensureProject={ensureProject}
-                      heroes={state.characters}
-                      world={state.style}
-                      brief={state.brief}
-                      locationAssetIds={(state.scene || EMPTY_SCENE).assets
-                        .filter(a => a.role === 'location')
-                        .map(a => a.asset_id)}
-                      revision={libraryRevision}
-                      onSent={() => setMode('storyboard')}
-                    />
-                  }
-                  results={
-                    <AssetLibrary
-                      {...replacementControls}
-                      onRefine={refineAsset}
-                      onScene={addToScene}
-                      projectId={projectId}
-                      revision={libraryRevision}
-                      onUse={(link, id) => {
-                        change({videoReference: link, videoAssetId: id});
-                        setNotice('Изображение из библиотеки выбрано для Video Lab');
-                      }}
-                    />
-                  }
-                />
-              ) : mode === 'reels' ? (
-                <ReelsScreen onUse={useReelRecipe} />
               ) : mode === 'create' ? (
                 <CreateScreen
                   projectId={projectId}
@@ -1997,18 +904,14 @@ function App() {
                     .filter(Boolean)
                     .join('. ')}
                 />
-              ) : mode === 'audio' ? (
-                <SoundScreen projectId={projectId} audioLab={audioPanel()} />
               ) : mode === 'archive' ? (
                 <AssetLibrary
                   {...replacementControls}
-                  onRefine={refineAsset}
-                  onScene={addToScene}
                   projectId={projectId}
                   revision={libraryRevision}
                   onUse={(link, id) => {
                     change({videoReference: link, videoAssetId: id});
-                    setNotice('Изображение из библиотеки выбрано для Video Lab');
+                    setNotice('Изображение выбрано как основа для видео');
                   }}
                 />
               ) : mode === 'studio' ? (
@@ -2028,34 +931,7 @@ function App() {
                         onRefs={ids => change({ideaRefs: ids})}
                         world={[state.style.look, state.style.rules].filter(Boolean).join('. ')}
                         onNext={() => setMode('styles')}
-                        onScene={() => setMode('scene')}
                       />
-                      <section className="panel photo-setup" aria-label="Фото">
-                        <h2>Фото · постановка и промпт</h2>
-                        <FrameSelector
-                          catalogue={frameCatalogue}
-                          value={state.composition}
-                          onChange={chooseComposition}
-                          onCatalogue={() => setCatalogue('frame')}
-                        />
-                        {frameError && <p role="alert">{frameError}</p>}
-                        <ChatGPTPanel
-                          {...replacementControls}
-                          projectId={projectId}
-                          ensureProject={ensureProject}
-                          onPrompt={(prompt, target, _movement, frame) =>
-                            setState(s => ({
-                              ...s,
-                              prompts: {...s.prompts, [target]: prompt},
-                              compositionPromptBasis: {
-                                ...s.compositionPromptBasis,
-                                [target]: frameBasis(frame),
-                              },
-                            }))
-                          }
-                          onAsset={() => setLibraryRevision(x => x + 1)}
-                        />
-                      </section>
                       <section className="panel idea-world" aria-label="Мир по заданию">
                         <AttachmentMenu
                           projectId={projectId}
@@ -2084,11 +960,11 @@ function App() {
                       <h3>Путь ролика</h3>
                       <ol>
                         {STAGES.map(stage => (
-                          <li key={stage.key} className={stage.mode === 'studio' ? 'current' : ''}>
+                          <li key={stage.mode} className={stage.mode === 'studio' ? 'current' : ''}>
                             <button onClick={() => setMode(stage.mode)}>
                               <span className="idea-path-n">{stage.icon}</span>
                               <span>
-                                <b>{stage.label}</b>
+                                <b>{stage.title}</b>
                                 <small>{stage.hint}</small>
                               </span>
                             </button>
@@ -2100,119 +976,6 @@ function App() {
                       </p>
                     </aside>
                   </div>
-
-                  <Collapsible title="Очередь и галерея" hint="задачи проекта и результаты из ChatGPT">
-                    <NativeGallery {...replacementControls} projectId={projectId} onRefine={refineAsset} />
-                    <button className="secondary" onClick={refresh}>
-                      <RefreshCw size={14} /> Обновить список
-                    </button>
-                    <div className="jobs">
-                      {jobs.length === 0 ? (
-                        <p className="muted">Задач через API пока нет.</p>
-                      ) : (
-                        jobs.map(j => (
-                          <div className="job" key={j.id}>
-                            <div className="jobtop">
-                              <b>
-                                {j.kind} · {j.provider}
-                              </b>
-                              <span>{j.status}</span>
-                              <button onClick={() => poll(j.id)} disabled={!!busy}>
-                                Проверить
-                              </button>
-                            </div>
-                            <small>Task ID: {j.task_id || '—'}</small>
-                            {j.delivery && (
-                              <div>
-                                <p>
-                                  {j.delivery.state === 'saved'
-                                    ? `Сохранено в библиотеке: ${j.delivery.saved}/${j.delivery.total}`
-                                    : j.delivery.state === 'retry'
-                                      ? 'Скачивание будет повторено автоматически'
-                                      : 'Требуется проверить скачивание'}
-                                </p>
-                                {j.delivery.error && <p role="alert">{j.delivery.error}</p>}
-                                {j.delivery.state !== 'saved' && (
-                                  <button
-                                    disabled={!!busy}
-                                    onClick={() =>
-                                      work('retry-download', async () => {
-                                        await json(
-                                          await apiFetch(`/api/jobs/${j.id}/retry-download`, {method: 'POST'})
-                                        );
-                                        setLibraryRevision(x => x + 1);
-                                        await refresh();
-                                      })
-                                    }
-                                  >
-                                    Повторить скачивание без генерации
-                                  </button>
-                                )}
-                              </div>
-                            )}
-                            {j.provider === 'piapi' &&
-                              ['submission_unknown', 'submitting'].includes(j.status) &&
-                              !j.task_id && (
-                                <RecoverJob jobId={j.id} onRecovered={() => void refresh()} />
-                              )}{' '}
-                            {j.kind === 'audio' && j.response?.asset_id && (
-                              <div>
-                                <audio src={'/api/library/' + j.response.asset_id + '/file'} controls />
-                                <a href={'/api/library/' + j.response.asset_id + '/file'} download>
-                                  Скачать реплику
-                                </a>
-                              </div>
-                            )}
-                            <div className="results">
-                              {extract(j).map((link, i) => (
-                                <div key={i} className="result">
-                                  {j.kind === 'video' ? (
-                                    <video src={link} controls />
-                                  ) : (
-                                    <img src={link} alt="Результат генерации" />
-                                  )}
-                                  <a href={link} target="_blank" rel="noreferrer">
-                                    <Download size={13} /> Открыть
-                                  </a>
-                                  {j.status === 'completed' && (
-                                    <button disabled={!!busy} onClick={() => saveImage(j.id, i)}>
-                                      Сохранить в библиотеку
-                                    </button>
-                                  )}
-                                  {j.kind === 'image' && (
-                                    <button
-                                      className="primary"
-                                      onClick={() => {
-                                        change({videoReference: link});
-                                        setSelectedJob(j.id);
-                                        setNotice('Кадр передан в Video Lab');
-                                      }}
-                                    >
-                                      Использовать для видео
-                                    </button>
-                                  )}
-                                </div>
-                              ))}
-                            </div>
-                            {selectedJob === j.id && <small>Выбран для видео ✓</small>}
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  </Collapsible>
-                  <Collapsible title="Библиотека проекта" hint="все картинки и видео проекта">
-                    <AssetLibrary
-                      {...replacementControls}
-                      onRefine={refineAsset}
-                      onScene={addToScene}
-                      projectId={projectId}
-                      revision={libraryRevision}
-                      onUse={(link, id) => {
-                        change({videoReference: link, videoAssetId: id});
-                        setNotice('Изображение из библиотеки выбрано для Video Lab');
-                      }}
-                    />
-                  </Collapsible>
                 </>
               ) : (
                 <Suspense fallback={<p>Открываем редактор узлов…</p>}>
@@ -2254,78 +1017,8 @@ function App() {
             </section>
           </div>
         )}
-        {catalogue && (
-          <div
-            className="modal-backdrop"
-            onClick={e => {
-              if (e.target === e.currentTarget) setCatalogue(null);
-            }}
-          >
-            <section
-              className="panel catalogue-dialog"
-              role="dialog"
-              aria-modal="true"
-              aria-label={catalogue === 'frame' ? 'Каталог композиций фото' : 'Каталог движений видео'}
-              onKeyDown={e => {
-                if (e.key === 'Escape') setCatalogue(null);
-              }}
-            >
-              <div className="catalogue-toolbar">
-                <b>
-                  {catalogue === 'frame' ? 'Фото / сцена · ракурс и свет' : 'Видео / сцена · движение камеры'}
-                </b>
-                <button autoFocus onClick={() => setCatalogue(null)}>
-                  Закрыть каталог
-                </button>
-              </div>
-              {catalogue === 'frame' ? (
-                <FramePanel
-                  catalogue={frameCatalogue}
-                  value={state.composition}
-                  onChange={chooseComposition}
-                  onImage={() => setCatalogue(null)}
-                  error={frameError}
-                />
-              ) : (
-                <CameraPanel
-                  setupEnabled={!!frameCatalogue.capabilities?.prompt_setup}
-                  presets={cameraPresets}
-                  value={state.camera}
-                  onChange={chooseCamera}
-                  onVideo={() => setCatalogue(null)}
-                  error={cameraError}
-                />
-              )}
-            </section>
-          </div>
-        )}
-        {promptRequest && (
-          <PromptComposer
-            request={promptRequest}
-            onClose={() => setPromptRequest(null)}
-            onComposed={prompt => {
-              setState(s => ({
-                ...s,
-                prompts: {...s.prompts, [promptRequest.target]: prompt},
-              }));
-              setPromptRequest(null);
-              setNotice('Промпт подготовлен через API и сохранён в истории проекта');
-            }}
-          />
-        )}
         {projectId && (
           <GenerationWatcher key={projectId} projectId={projectId} onOpen={() => setMode('create')} />
-        )}
-        {generationRequest && (
-          <GenerationReview
-            request={generationRequest}
-            onClose={() => setGenerationRequest(null)}
-            onSubmitted={() => {
-              setGenerationRequest(null);
-              setNotice('Заявка сохранена в очереди. Проверяй её статус перед повторным запуском.');
-              void refresh();
-            }}
-          />
         )}
       </div>
     </ActivityProvider>

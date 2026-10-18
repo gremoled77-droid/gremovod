@@ -332,7 +332,7 @@ function CreateScreenBody({
   const replaceHero = (frameId: string, heroId: string) => {
     const hero = heroes.find(h => h.id === heroId);
     if (!hero?.assetId)
-      return setError(`У героя «${hero?.name ?? ''}» нет рабочего образа: добавь его в Character Vault`);
+      return setError(`У героя «${hero?.name ?? ''}» нет рабочего образа: добавь его в «Мир → Персонажи»`);
     setError('');
     setPrompt(buildReplaceInFramePrompt());
     setRefs(replacementRefs(frameId, hero.assetId));

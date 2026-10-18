@@ -181,7 +181,7 @@ export default function StoryPlanBoard({
           Создать серию
         </button>
       </div>
-      {!pid && <p>Сначала создай проект постановки в разделе «Монтаж / Папки проекта».</p>}
+      {!pid && <p>Сначала создай проект раскадровки на экране «Раскадровка».</p>}
       {pid && sid && nodes.some(n => n.id === sid) && (
         <EpisodePlan
           key={pid + '/' + sid}

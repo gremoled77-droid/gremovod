@@ -33,9 +33,6 @@ const STEPS: {mode: Mode; n: string; title: string; text: string}[] = [
   {mode: 'storyboard', n: '3', title: 'Раскадровка', text: 'Сцены и кадры эпизода'},
   {mode: 'create', n: '4', title: 'Кадры', text: 'Картинки от нескольких моделей'},
   {mode: 'video', n: '5', title: 'Видео', text: 'Оживить кадры'},
-  {mode: 'audio', n: '6', title: 'Звук', text: 'Голос и музыка'},
-  {mode: 'files', n: '7', title: 'Монтаж', text: 'Выгрузка в CapCut по порядку кадров'},
-  {mode: 'economics', n: '8', title: 'Выпуск', text: 'Бюджет серии и итоги'},
 ];
 
 const money = (v: number | undefined) => '$' + (v ?? 0).toFixed(2);
@@ -212,7 +209,8 @@ export default function HomeScreen({
             <h1>{projectName || 'Новый проект'}</h1>
             <div className="home-meta">
               <span>
-                <small>ЭТАПОВ</small>8
+                <small>ЭТАПОВ</small>
+                {STEPS.length}
               </span>
               <span>
                 <small>КАДРОВ</small>
@@ -317,9 +315,7 @@ export default function HomeScreen({
               </div>
             ))}
             {!sounds.length && (
-              <div className="home-frames-empty">
-                Звука пока нет. Голос и музыка делаются на экране «Звук».
-              </div>
+              <div className="home-frames-empty">Звука пока нет. Экран «Звук» появится после беты.</div>
             )}
           </div>
         )}
@@ -376,7 +372,7 @@ export default function HomeScreen({
           <div className="home-card home-gauges">
             <Gauge label="Сегодня" used={budget?.daily_reserved_usd} limit={budget?.daily_limit_usd} />
             <Gauge label="Проект" used={budget?.project_reserved_usd} limit={budget?.project_limit_usd} />
-            <button onClick={() => onMode('economics')}>Лимиты</button>
+            <button onClick={() => onMode('settings')}>Лимиты</button>
           </div>
 
           <div className="home-quick">

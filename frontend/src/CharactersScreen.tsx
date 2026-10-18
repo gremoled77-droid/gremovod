@@ -38,6 +38,7 @@ export default function CharactersScreen({
   onLibrary,
   builder,
   results,
+  card,
   revision,
 }: {
   projectId: string;
@@ -52,6 +53,8 @@ export default function CharactersScreen({
   onLibrary: () => void;
   builder: ReactNode;
   results: ReactNode;
+  /** Карточка выбранного героя: имя, внешность, референсы. */
+  card?: ReactNode;
   revision: number;
 }) {
   const hero = heroes.find(h => h.id === selectedId);
@@ -151,9 +154,7 @@ export default function CharactersScreen({
       {tabs}
       <div className="panel">
         <h2>Персонажи</h2>
-        <p className="muted">
-          Герои проекта. Описание, референсы, голос и версии правятся справа, в Character Vault.
-        </p>
+        <p className="muted">Герои проекта. Выбери героя: ниже его имя, внешность и референсы.</p>
         <div className="chars-grid">
           {heroes.map(h => (
             <button
@@ -179,6 +180,7 @@ export default function CharactersScreen({
           </button>
         </div>
       </div>
+      {card}
       <div className="panel">
         <h3>Сгенерировать героя{hero ? ` · ${hero.name}` : ''}</h3>
         {!worldFilled(world) && (

@@ -48,7 +48,6 @@ export default function IdeaBrief({
   onRefs,
   world,
   onNext,
-  onScene,
 }: {
   projectId: string;
   brief: string;
@@ -61,7 +60,6 @@ export default function IdeaBrief({
   onRefs: (ids: string[]) => void;
   world: string;
   onNext: () => void;
-  onScene: () => void;
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -221,7 +219,6 @@ export default function IdeaBrief({
       <button className="primary" onClick={onNext}>
         Дальше: мир и герои →
       </button>
-      <button onClick={onScene}>Собрать сцену из исходников</button>
     </div>
   );
 

@@ -22,16 +22,12 @@ export default function AssetLibrary({
   projectId,
   revision,
   onUse,
-  onScene,
-  onRefine,
   character,
   onReplaced,
 }: {
   projectId: string;
   revision: number;
   onUse: (url: string, id: string) => void;
-  onScene: (id: string) => void;
-  onRefine: (id: string) => void;
 } & ReplacementControls) {
   const [items, setItems] = useState<Asset[]>([]);
   const [error, setError] = useState('');
@@ -132,7 +128,6 @@ export default function AssetLibrary({
               </a>
               {!['video', 'audio'].includes(a.metadata.kind || 'image') && (
                 <>
-                  <button onClick={() => onScene(a.id)}>Отправить в сцену</button>
                   {(a.provider_reference_url || a.source_url) && (
                     <button onClick={() => onUse(a.provider_reference_url || a.source_url, a.id)}>
                       Выбрать для видео
@@ -152,7 +147,6 @@ export default function AssetLibrary({
                     onUse(url, a.id);
                   }}
                 />
-                <button onClick={() => onRefine(a.id)}>Отправить в GPT Image</button>
                 <ReplaceCharacterButton
                   projectId={projectId}
                   assetId={a.id}

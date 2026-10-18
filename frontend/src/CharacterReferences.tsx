@@ -35,7 +35,7 @@ type Props = {
   onName: (name: string) => void;
   onIdentity: (identity: CharacterIdentity) => void;
   onRecognized: (result: NonNullable<DescriptionJob['description_result']>, jobId: string) => void;
-  children: ReactNode;
+  children?: ReactNode;
 };
 const FIELDS: [keyof CharacterIdentity, string][] = [
   ['species', 'Вид / тип'],
