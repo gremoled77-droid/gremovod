@@ -6,9 +6,9 @@ export const ROUTES: {id: ImageRoute; label: string; hint: string}[] = [
   {
     id: 'chatgpt',
     label: 'ChatGPT вручную',
-    hint: '$0: копирую промпт и открываю чат, картинку вернёшь вставкой',
+    hint: 'Подготовить промпт и вернуть картинку вручную. Лимиты и оплата — в ChatGPT',
   },
-  {id: 'codex', label: 'Codex', hint: '$0: задание уходит в очередь ветки Codex на компьютере'},
+  {id: 'codex', label: 'Codex', hint: 'Очередь Codex на компьютере. Лимиты и оплата — во внешнем сервисе'},
 ];
 
 /** Что нужно ChatGPT и Codex: промпт, модель-цель и референсы из библиотеки по порядку. */
@@ -53,3 +53,19 @@ export function codexJobBody(job: ImageJob, id: string) {
 /** Сохранённое значение способа; неизвестное — API. */
 export const parseRoute = (value: unknown): ImageRoute =>
   ROUTES.some(r => r.id === value) ? (value as ImageRoute) : 'api';
+
+/** Validate the entire batch before any write; the native worker accepts one active job per project. */
+export function validateImageJobs(jobs: ImageJob[], route: ImageRoute): void {
+  if (!jobs.length) throw Error('Нечего отправлять');
+  if (route === 'codex' && jobs.length > 1)
+    throw Error('Codex принимает одно задание за раз. Выбери одну картинку и дождись результата.');
+  for (const job of jobs) {
+    if (!job.projectId) throw Error('Сначала сохрани проект');
+    if (!job.prompt.trim()) throw Error('Напиши промпт');
+    if (job.projectId !== jobs[0].projectId) throw Error('Задания должны принадлежать одному проекту');
+    const max = route === 'codex' ? 4000 : 20000;
+    if (job.prompt.length > max) throw Error(`Сократи промпт до ${max} символов для этого способа`);
+    if (job.referenceAssetIds.length > (route === 'codex' ? 8 : 16))
+      throw Error('Слишком много референсов для выбранного способа');
+  }
+}

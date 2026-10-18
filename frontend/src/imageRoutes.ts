@@ -7,6 +7,7 @@ import {
   externalJobBody,
   parseRoute,
   referenceRoles,
+  validateImageJobs,
   type ImageJob,
   type ImageRoute,
 } from './imageJobs';
@@ -56,20 +57,29 @@ export function copyText(text: string): Promise<boolean> {
     : Promise.resolve(false);
 }
 
-/** ChatGPT вручную: копирует первый промпт, создаёт ожидающие задания и открывает чат. */
+/** Save before leaving the studio. Opening the external chat is a separate user gesture in the tray. */
 export async function sendToChatGPT(jobs: ImageJob[]): Promise<string> {
+  validateImageJobs(jobs, 'chatgpt');
   const [job] = jobs;
   const copied = copyText(copyTextFor(job.prompt, referenceRoles(job.referenceAssetIds)));
-  for (const item of jobs) await postJson('/api/external-jobs', externalJobBody(item, requestId()));
+  let saved = 0;
+  try {
+    for (const item of jobs) {
+      await postJson('/api/external-jobs', externalJobBody(item, requestId()));
+      saved++;
+    }
+  } catch (e) {
+    throw Error(
+      `Сохранено заданий: ${saved} из ${jobs.length}. Проверь очередь перед повторной отправкой: ответ последнего запроса мог потеряться. ${e instanceof Error ? e.message : String(e)}`
+    );
+  } finally {
+    openQueue();
+  }
   const ok = await copied;
-  openChatApp();
-  const where = getChatUrl()
-    ? 'Открыл твой чат ChatGPT.'
-    : 'Открыл ChatGPT (свою ссылку на чат задай в Настройках).';
   const more = jobs.length > 1 ? ` Остальные промпты (${jobs.length - 1}) — в «Очереди».` : '';
   return ok
-    ? `Промпт скопирован. ${where} Готовую картинку верни в «Очереди» справа: Ctrl+V или файл.${more}`
-    : `Не удалось скопировать — промпт есть в «Очереди» справа. ${where}`;
+    ? `Промпт скопирован. В очереди открой ChatGPT и приложи референсы. Готовую картинку верни туда же: Ctrl+V или файл.${more}`
+    : `Задание сохранено. Полный промпт, референсы и кнопка открытия ChatGPT — в очереди справа.${more}`;
 }
 
 /** Любое задание очереди Codex (генерация, описание героя, карточка производства). */
@@ -77,6 +87,7 @@ export const queueCodexJob = (body: Record<string, unknown>) => postJson('/api/c
 
 /** Codex: ставит задания в очередь ветки Codex; сообщает, слушает ли ветка очередь. */
 export async function sendToCodex(jobs: ImageJob[]): Promise<string> {
+  validateImageJobs(jobs, 'codex');
   for (const job of jobs) await queueCodexJob(codexJobBody(job, requestId()));
   const status = await apiFetch('/api/chatgpt/status')
     .then(r => (r.ok ? r.json() : null))
@@ -84,6 +95,21 @@ export async function sendToCodex(jobs: ImageJob[]): Promise<string> {
   return status?.worker_online
     ? 'Отправлено в Codex. Картинка появится в библиотеке, когда ветка её сгенерирует.'
     : 'Поставлено в очередь Codex, но ветка сейчас не слушает. Открой её на компьютере и напиши «Продолжай очередь студии».';
+}
+
+export type ExternalJobDetails = {
+  id: string;
+  project_id: string;
+  prompt: string;
+  copy_text: string;
+  references: {index: number; asset_id: string; role: string; file_url: string}[];
+};
+
+/** Activity contains only a 200-character summary; never use it as the actual prompt. */
+export async function loadExternalJob(jobId: string): Promise<ExternalJobDetails> {
+  const r = await apiFetch(`/api/external-jobs/${encodeURIComponent(jobId)}`);
+  if (!r.ok) throw Error('Не удалось загрузить полное задание. Повтори загрузку.');
+  return r.json();
 }
 
 /** Готовая картинка из ChatGPT: файл или вставка из буфера. */
