@@ -14,6 +14,7 @@ export type LlmStep = {
   model: string;
   system: string;
   sources: string[]; // текстовые узлы и другие LLM-узлы, из которых собирается вход
+  self?: boolean; // узел «Текст» с блоком GPT: входом служит его собственный текст
 };
 /** Дополнительные данные для сборки промптов: готовые ответы LLM и узлы, которые запустятся первыми. */
 export type PlanExtras = {llm?: Record<string, string>; pendingLlm?: string[]};
@@ -183,7 +184,12 @@ export function checkConnection(
 /** Текст узла-источника: свой текст, ответ LLM или заглушка, если LLM запустится в этом же запуске. */
 function textOf(n: Node, extras: PlanExtras): string {
   const d = data(n);
-  if (d.kind === 'text') return String(d.text || '').trim();
+  if (d.kind === 'text') {
+    // «Текст» с блоком GPT отдаёт на выход ответ GPT; пока ответа нет, отдаёт свой текст.
+    if (extras.pendingLlm?.includes(n.id) && !extras.llm?.[n.id]) return PENDING_LLM_TEXT;
+    const out = String(extras.llm?.[n.id] ?? d.output ?? '').trim();
+    return out || String(d.text || '').trim();
+  }
   if (d.kind === 'llm') {
     const out = String(extras.llm?.[n.id] ?? d.output ?? '').trim();
     if (out) return out;
@@ -200,12 +206,30 @@ ${text}`
 }
 
 /** Сборка шагов LLM-узлов: сначала те, от которых зависят другие. */
-export function buildLlmSteps(nodes: Node[], edges: Edge[]): {steps: LlmStep[]; problems: string[]} {
+export function buildLlmSteps(
+  nodes: Node[],
+  edges: Edge[],
+  textIds: string[] = []
+): {steps: LlmStep[]; problems: string[]} {
   if (hasCycle(nodes, edges)) return {steps: [], problems: ['В схеме есть цикл. Убери замкнутую связь.']};
   const problems: string[] = [];
-  const llm = nodes.filter(n => data(n).kind === 'llm').sort(byPosition);
+  // Узлы «Текст» уходят в GPT только по явной кнопке узла (textIds), а не при «Запустить всё».
+  const llm = nodes
+    .filter(n => data(n).kind === 'llm' || (data(n).kind === 'text' && textIds.includes(n.id)))
+    .sort(byPosition);
   const steps: LlmStep[] = llm.map(node => {
     const d = data(node);
+    if (d.kind === 'text') {
+      if (!d.model) problems.push(`«${d.title || node.id}»: не выбрана модель GPT`);
+      if (!String(d.text || '').trim()) problems.push(`«${d.title || node.id}»: введи текст для GPT`);
+      return {
+        nodeId: node.id,
+        model: String(d.model || ''),
+        system: String(d.system || DEFAULT_LLM_SYSTEM),
+        sources: [node.id],
+        self: true,
+      };
+    }
     const sources = upstream(node.id, nodes, edges)
       .filter(n => ['text', 'llm', 'file'].includes(data(n).kind))
       .map(n => n.id);
@@ -224,7 +248,9 @@ export function buildLlmSteps(nodes: Node[], edges: Edge[]): {steps: LlmStep[]; 
   const done = new Set<string>();
   const ids = new Set(steps.map(s => s.nodeId));
   while (ordered.length < steps.length) {
-    const ready = steps.find(s => !done.has(s.nodeId) && s.sources.every(id => !ids.has(id) || done.has(id)));
+    const ready = steps.find(
+      s => !done.has(s.nodeId) && s.sources.every(id => id === s.nodeId || !ids.has(id) || done.has(id))
+    );
     if (!ready) break;
     ordered.push(ready);
     done.add(ready.nodeId);
@@ -234,6 +260,7 @@ export function buildLlmSteps(nodes: Node[], edges: Edge[]): {steps: LlmStep[]; 
 
 /** Вход LLM-шага: тексты источников по порядку; ответы предыдущих LLM-узлов берутся из outputs. */
 export function llmInput(step: LlmStep, nodes: Node[], outputs: Record<string, string>): string {
+  if (step.self) return String(data(nodes.find(n => n.id === step.nodeId) || ({} as Node)).text || '').trim();
   return step.sources
     .map(id => nodes.find(n => n.id === id))
     .filter((n): n is Node => !!n)

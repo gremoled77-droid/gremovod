@@ -456,11 +456,11 @@
   color: var(--accent);
   border-color: var(--accent);
 }
-.wf-audio {
+.wf-player {
   width: 100%;
   height: 36px;
 }
-.wf-file {
+.wf-fileinfo {
   display: grid;
   gap: 3px;
   padding: 8px 10px;
@@ -468,7 +468,7 @@
   background: var(--surface);
   border: 1px solid var(--border);
 }
-.wf-file b {
+.wf-fileinfo b {
   overflow-wrap: anywhere;
   font-size: 13px;
 }
@@ -678,4 +678,34 @@
 }
 .wf-node-foot .wf-price + .wf-run {
   margin-left: 0;
+}
+
+/* Узел «Текст»: вход сверху, строка «модель + В GPT» посередине, ответ GPT снизу и выход справа напротив ответа.
+   Высота как у «Изображения»: поля фиксированной высоты, чтобы точка выхода стояла по центру ответа. */
+.wf-node .wf-text-in,
+.wf-node .wf-text-out {
+  height: 96px;
+  resize: none;
+}
+.wf-gpt-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px;
+}
+.wf-gpt-row select {
+  height: 32px;
+}
+.wf-gpt-row .wf-run {
+  white-space: nowrap;
+}
+.wf-gpt-row .wf-run:disabled {
+  opacity: 0.6;
+}
+.wf-node.wf-text .wf-handle.out {
+  top: calc(100% - 58px);
+}
+/* Аудио: компактный узел, без большой пустой рамки */
+.wf-empty.slim {
+  aspect-ratio: auto;
+  padding: 12px;
 }

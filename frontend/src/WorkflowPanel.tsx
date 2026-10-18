@@ -11,6 +11,7 @@ import {
   Position,
   type Node,
   type Edge,
+  type ReactFlowInstance,
 } from '@xyflow/react';
 import {apiFetch} from './api';
 import LimitPicker from './LimitPicker';
@@ -78,20 +79,33 @@ const IMAGE_MODELS: Record<string, string> = {
   'qwen-image-2.1': 'Qwen Image 2.1',
 };
 
-/** Колонка по типу (вход слева, результат справа); новые узлы встают под уже стоящими в колонке. */
+/** Колонка по типу (вход слева, результат справа). Шаг 340 при ширине узла 270 оставляет зазор для связей. */
 const COLUMN_X: Record<NodeKind, number> = {
   text: 40,
   reference: 40,
   file: 40,
-  llm: 340,
-  image: 660,
-  video: 980,
   audio: 40,
+  llm: 380,
+  image: 720,
+  video: 1060,
 };
+const NODE_H: Record<NodeKind, number> = {
+  text: 310,
+  reference: 300,
+  file: 220,
+  audio: 190,
+  llm: 380,
+  image: 330,
+  video: 360,
+};
+/** Новый узел встаёт в свою колонку под последним узлом, считая его реальную (измеренную) высоту. */
 function slot(kind: NodeKind, nodes: Node[]) {
   const x = COLUMN_X[kind];
-  const below = nodes.filter(n => Math.abs(n.position.x - x) < 160).map(n => n.position.y);
-  return {x, y: below.length ? Math.max(...below) + 350 : 40};
+  const column = nodes.filter(n => Math.abs(n.position.x - x) < 170);
+  const bottoms = column.map(
+    n => n.position.y + (n.measured?.height ?? NODE_H[String(n.data?.kind) as NodeKind] ?? 320)
+  );
+  return {x, y: bottoms.length ? Math.max(...bottoms) + 40 : 40};
 }
 async function json(r: Response) {
   const d = await r.json().catch(() => ({}));
@@ -198,7 +212,12 @@ function Block({id, data, selected}: {id: string; data: Record<string, any>; sel
         <i className="wf-dot" />
         <b>{TYPE_LABEL[kind] || data.title}</b>
         <span className="wf-title" title={String(data.title || '')}>
-          {modelName || (kind === 'reference' || kind === 'file' || kind === 'audio' ? data.title : '')}
+          {modelName ||
+            (kind === 'reference' || kind === 'file' || kind === 'audio'
+              ? data.title === TYPE_LABEL[kind]
+                ? ''
+                : data.title
+              : '')}
         </span>
         {hasModel && (
           <button
@@ -249,13 +268,39 @@ function Block({id, data, selected}: {id: string; data: Record<string, any>; sel
         {kind === 'text' && (
           <>
             <textarea
-              className="nodrag"
-              rows={4}
+              className="nodrag wf-text-in"
               placeholder="Опиши кадр: кто, где, что делает, свет, камера…"
               value={data.text || ''}
               onChange={e => ctx.patch(id, {text: e.target.value})}
             />
-            <small>{(data.text || '').length} симв.</small>
+            <div className="wf-gpt-row nodrag">
+              <select
+                aria-label="Модель GPT"
+                value={data.model || ''}
+                onChange={e => ctx.patch(id, {model: e.target.value})}
+              >
+                <option value="">Модель…</option>
+                {Object.entries(LLM_MODELS).map(([k, v]) => (
+                  <option key={k} value={k}>
+                    {v.label}
+                  </option>
+                ))}
+              </select>
+              <button
+                className="wf-run"
+                disabled={state === 'running'}
+                title="Отправить текст в GPT: сначала оценка цены и подтверждение"
+                onClick={() => ctx.run([id])}
+              >
+                {state === 'running' ? 'Думает…' : data.output ? '↻ В GPT' : '▶ В GPT'}
+              </button>
+            </div>
+            <textarea
+              className="nodrag wf-text-out"
+              placeholder="Ответ GPT (промпт) появится здесь; его можно поправить руками"
+              value={data.output || ''}
+              onChange={e => ctx.patch(id, {output: e.target.value})}
+            />
           </>
         )}
         {kind === 'llm' && (
@@ -337,9 +382,9 @@ function Block({id, data, selected}: {id: string; data: Record<string, any>; sel
               ))}
             </select>
             {lib ? (
-              <audio className="nodrag wf-audio" controls preload="none" src={lib.url} />
+              <audio className="nodrag wf-player" controls preload="none" src={lib.url} />
             ) : (
-              <div className="wf-empty">нет аудио</div>
+              <div className="wf-empty slim">нет аудио</div>
             )}
             <button
               className="nodrag wf-up"
@@ -351,12 +396,12 @@ function Block({id, data, selected}: {id: string; data: Record<string, any>; sel
             >
               ＋ Загрузить аудио
             </button>
-            <small>Пока хранится как референс: модели студии звук на вход не принимают.</small>
+            <small>Хранится как референс: модели студии звук на вход не принимают.</small>
           </>
         )}
         {kind === 'file' && (
           <>
-            <div className="wf-file">
+            <div className="wf-fileinfo">
               <b>{data.name || 'файл не выбран'}</b>
               <small>
                 {data.excerpt
@@ -546,8 +591,8 @@ function Block({id, data, selected}: {id: string; data: Record<string, any>; sel
           id={'out-' + outType}
           type="source"
           position={Position.Right}
-          className="wf-handle"
-          title={'Выход: ' + outType}
+          className="wf-handle out"
+          title={kind === 'text' ? 'Выход: ответ GPT (или текст, пока ответа нет)' : 'Выход: ' + outType}
           style={{'--pc': PORT_COLOR[outType]} as CSSProperties}
         />
       )}
@@ -590,6 +635,7 @@ export default function WorkflowPanel({
       .then(setSpecs)
       .catch(() => undefined);
   }, []);
+  const flow = useRef<{fitView: ReactFlowInstance['fitView']} | null>(null);
   const graph = useRef({nodes, edges});
   graph.current = {nodes, edges};
   const [running, setRunning] = useState(false);
@@ -673,8 +719,10 @@ export default function WorkflowPanel({
   const prepare = async (onlyIds?: string[]) => {
     setError('');
     const outputs: Record<string, string> = {};
-    for (const n of nodes) if (n.data.kind === 'llm' && n.data.output) outputs[n.id] = String(n.data.output);
-    const llmPlan = buildLlmSteps(nodes, edges);
+    for (const n of nodes)
+      if ((n.data.kind === 'llm' || n.data.kind === 'text') && n.data.output)
+        outputs[n.id] = String(n.data.output);
+    const llmPlan = buildLlmSteps(nodes, edges, onlyIds);
     const llmSteps = llmPlan.steps.filter(s => !onlyIds || onlyIds.includes(s.nodeId));
     const plan = buildSteps(nodes, edges, results, {llm: outputs, pendingLlm: llmSteps.map(s => s.nodeId)});
     const steps = plan.steps.filter(s => !onlyIds || onlyIds.includes(s.nodeId));
@@ -728,7 +776,8 @@ export default function WorkflowPanel({
     try {
       const outs: Record<string, string> = {};
       for (const n of graph.current.nodes)
-        if (n.data.kind === 'llm' && n.data.output) outs[n.id] = String(n.data.output);
+        if ((n.data.kind === 'llm' || n.data.kind === 'text') && n.data.output)
+          outs[n.id] = String(n.data.output);
       for (const step of review.llmSteps) {
         const estimated = review.estimates[step.nodeId] || 0;
         if (spent + estimated > budget) throw Error('Лимит запуска исчерпан, остальные шаги не отправлены');
@@ -922,6 +971,7 @@ export default function WorkflowPanel({
         {id: crypto.randomUUID(), type: 'studio', position: slot(node.kind as NodeKind, g.nodes), data: node},
       ],
     }));
+    window.setTimeout(() => void flow.current?.fitView({duration: 300, padding: 0.2, maxZoom: 1}), 80);
   };
   const onFiles = async (files: File[]) => {
     setError('');
@@ -984,7 +1034,11 @@ export default function WorkflowPanel({
     [nodes, edges]
   );
 
-  const add = (kind: NodeKind, label: string) =>
+  /** После добавления узла показываем всю схему, чтобы новый узел не оказался за краем полотна. */
+  const showAll = () =>
+    window.setTimeout(() => void flow.current?.fitView({duration: 300, padding: 0.2, maxZoom: 1}), 80);
+  const add = (kind: NodeKind, label: string) => {
+    showAll();
     onChange(g => ({
       ...g,
       nodes: [
@@ -994,7 +1048,7 @@ export default function WorkflowPanel({
           type: 'studio',
           position: slot(kind, g.nodes),
           data:
-            kind === 'llm'
+            kind === 'llm' || kind === 'text'
               ? {kind, title: label, model: 'gpt-5.6-luna'}
               : kind === 'video'
                 ? {kind, title: label, model: 'minimax-h3'}
@@ -1002,13 +1056,13 @@ export default function WorkflowPanel({
         },
       ],
     }));
+  };
 
   return (
     <WfCtx.Provider value={ctxValue}>
       <section className="wf">
         <aside className="wf-console">
           <div className="wf-console-head">
-            <h2>Воркфлоу</h2>
             <p>Собери цепочку: текст и картинки подаются в узлы «Изображение» и «Видео».</p>
           </div>
           <input
@@ -1197,6 +1251,7 @@ export default function WorkflowPanel({
                 }
               }}
               nodeTypes={types}
+              onInit={instance => (flow.current = instance)}
               fitView
               proOptions={{hideAttribution: true}}
             >

@@ -85,3 +85,25 @@ test('цены узлов: оцениваются узлы с моделью и 
   const llm = llmPrices(nodes, edges);
   assert.ok(llm.l > 0 && llm.l < 0.01);
 });
+
+test('«Текст» с блоком GPT: уходит в GPT только по кнопке, на выход идёт ответ', async () => {
+  const {buildLlmSteps, llmInput} = await import('./src/workflowPlan.ts');
+  const t = n('t', 0, {kind: 'text', text: 'Грэм у такси', model: 'gpt-5.6-luna', title: 'Текст'});
+  const i = n('i', 100, {kind: 'image', model: 'seedream-5-lite', title: 'Кадр'});
+  const nodes = [t, i];
+  const edges = [e('t', 'i')];
+  // «Запустить всё» не отправляет текстовые узлы в GPT
+  assert.equal(buildLlmSteps(nodes, edges).steps.length, 0);
+  // кнопка узла: шаг с собственным текстом на входе
+  const plan = buildLlmSteps(nodes, edges, ['t']);
+  assert.deepEqual(plan.problems, []);
+  assert.equal(plan.steps.length, 1);
+  assert.equal(llmInput(plan.steps[0], nodes, {t: 'старый ответ'}), 'Грэм у такси');
+  // до ответа в промпт идёт сам текст, после ответа — ответ GPT
+  assert.equal(buildSteps(nodes, edges, {}).steps[0].prompt, 'Грэм у такси');
+  const withOut = [{...t, data: {...t.data, output: 'Подробный промпт'}}, i];
+  assert.equal(buildSteps(withOut, edges, {}).steps[0].prompt, 'Подробный промпт');
+  // без модели и текста — понятные проблемы
+  const bad = n('b', 0, {kind: 'text', text: '', title: 'Пусто'});
+  assert.equal(buildLlmSteps([bad], [], ['b']).problems.length, 2);
+});
