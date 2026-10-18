@@ -12,7 +12,7 @@
 | 4. Кадры (`create`) | [gremovod-stage-frames](../skills/gremovod-stage-frames/SKILL.md) | Композиция, читаемость деталей, свет, поза, роли референсов | Фото-промпт и выбранный вариант изображения |
 | 5. Видео (`video`) | [gremovod-stage-video](../skills/gremovod-stage-video/SKILL.md) | Игра, паузы, контакты, движение героя и камеры | Видео-промпт и пригодный интервал клипа |
 | 6. Звук (`audio`) | [gremovod-stage-sound](../skills/gremovod-stage-sound/SKILL.md) | Исполнение реплик, акценты, атмосфера, звуковые связи | Лист реплик, отдельные дорожки, звуковая карта |
-| 7. Монтаж (`files`) | [gremovod-stage-editing](../skills/gremovod-stage-editing/SKILL.md) | Порядок, длительности, выбор реакций, склейки, связность | Монтажный лист и пакет для CapCut |
+| 7. Монтаж (`files`) | [gremovod-stage-editing](../skills/gremovod-stage-editing/SKILL.md), сборка и проверки — [gremovod-montage-agent](../skills/gremovod-montage-agent/SKILL.md) | Порядок, длительности, выбор реакций, склейки, связность | Монтажный лист и пакет для CapCut |
 | 8. Выпуск (`economics`) | [gremovod-stage-release](../skills/gremovod-stage-release/SKILL.md) | Проверка целого, версий 16:9/9:16 и комплекта | Проверенные финальные файлы, архив версии и расходы |
 
 У каждого скилла есть вход, процедура принятия решений, выход, проверка готовности и адрес возврата при проблеме. Результаты в таблице — требования к работе по скиллу, а не обещание уже существующих кнопок или автоматических экспортов.
