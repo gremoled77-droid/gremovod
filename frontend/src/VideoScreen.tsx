@@ -142,6 +142,13 @@ function VideoScreenBody({projectId, world = ''}: {projectId: string; world?: st
   const byId = useMemo(() => Object.fromEntries(library.map(a => [a.id, a])), [library]);
   const frames = library.filter(a => (a.metadata.kind || 'image') === 'image');
   const models = ORDER.filter(id => specs[id]?.launch_enabled && specs[id]?.kind === 'video');
+  // Модель из черновика или рецепта может быть выключена: берём первую доступную, её параметры чужие.
+  useEffect(() => {
+    if (models.length && !models.includes(model)) {
+      setModel(models[0]);
+      setValues({});
+    }
+  }, [models.join(','), model]);
   const spec = specs[model];
   const schema = optionsOf(spec);
   const value = (key: string) => values[key] ?? schema[key]?.default;
