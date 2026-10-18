@@ -1,5 +1,6 @@
 """Офлайн-тесты адаптера Seedance 2.5: видео и аудио референсы, edit/extend, draft, цена. Сетевых вызовов нет."""
 import unittest
+from unittest.mock import patch
 
 from fastapi import HTTPException
 
@@ -23,7 +24,7 @@ def preview(prompt='Slow dolly in', draft=None, **extra):
 
 class SeedanceAdapterTests(unittest.TestCase):
     def test_launch_flag_and_adapter(self):
-        self.assertTrue(SPEC['launch_enabled'])
+        self.assertFalse(SPEC['launch_enabled'])  # живого вызова не было
         self.assertEqual(SPEC['adapter'], 'seedance_25')
 
     def test_text_only_and_image_reference_unchanged(self):
@@ -142,6 +143,7 @@ class SeedanceAdapterTests(unittest.TestCase):
             with self.assertRaises(HTTPException):
                 main.image_payload(body, enforce_launch=False)
 
+    @patch.dict(SPEC, {'launch_enabled': True})
     def test_main_pipeline_estimate_matches_adapter(self):
         body = req('Extend @video1 forward: drifting', video_urls=[VID],
                    options={'task': 'extend', 'duration': 8, 'video_seconds': 5})
