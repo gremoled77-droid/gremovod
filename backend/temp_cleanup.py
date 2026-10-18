@@ -120,10 +120,10 @@ def move_to_trash(studio, asset_id, now, automatic=False):
             if source.is_file():
                 source.rename(target)
                 moved = True
-            db.execute('INSERT INTO cleanup_journal(asset_id,project_id,trash_name,row_json,trashed_at) VALUES(?,?,?,?,?)',
-                       (row['id'], row['project_id'], name, json.dumps(dict(row), ensure_ascii=False), now.isoformat()))
+            entry = db.execute('INSERT INTO cleanup_journal(asset_id,project_id,trash_name,row_json,trashed_at) VALUES(?,?,?,?,?)',
+                               (row['id'], row['project_id'], name, json.dumps(dict(row), ensure_ascii=False), now.isoformat())).lastrowid
             db.execute('DELETE FROM library_assets WHERE id=?', (asset_id,))
-        return True
+        return entry  # номер записи журнала: по нему «Отменить» возвращает файл
     except Exception:
         if moved and target is not None and source is not None:
             # Never overwrite an independently recreated original.
@@ -178,8 +178,8 @@ def register(app, studio):
     @app.post('/api/library/{asset_id}/trash')
     def trash_one(asset_id: str):
         """Ручное «удалить»: мягко, в корзину на 30 дней; используемые ассеты не трогаем."""
-        move_to_trash(studio, asset_id, datetime.now(timezone.utc))
-        return {'asset_id': asset_id, 'trashed': True, 'restore_days': 30}
+        entry = move_to_trash(studio, asset_id, datetime.now(timezone.utc))
+        return {'asset_id': asset_id, 'trashed': True, 'restore_days': 30, 'restore_id': entry}
 
     @app.get('/api/library/temp')
     def temp_list(project_id: str):

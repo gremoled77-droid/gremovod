@@ -1,4 +1,4 @@
-/* Экран «Идея» по макету Main: задание слева, путь ролика справа */
+/* Экран «Идея»: задание и мир слева, «Что дальше» справа */
 .app main.idea-main {
   display: block;
   width: 100%;
@@ -16,7 +16,7 @@
   padding-left: 0;
   padding-right: 0;
 }
-.idea-layout {
+.idea-screen {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 300px;
   gap: 16px;
@@ -45,82 +45,108 @@
   gap: 8px;
   margin-top: 12px;
 }
-.idea-path {
+.idea-card {
+  padding: 18px 20px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface);
+}
+.idea-story > summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+  cursor: pointer;
+  list-style: none;
+}
+.idea-story > summary::-webkit-details-marker {
+  display: none;
+}
+.idea-story > summary::before {
+  content: '▸';
+  color: var(--muted);
+}
+.idea-story[open] > summary::before {
+  content: '▾';
+}
+.idea-story > summary small {
+  color: var(--muted);
+}
+.idea-story[open] > summary {
+  margin-bottom: 12px;
+}
+.idea-story > .panel {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+.idea-next {
   position: sticky;
   top: 16px;
+  display: grid;
+  gap: 12px;
   padding: 18px;
   border: 1px solid var(--border);
   border-radius: 16px;
   background: var(--surface);
 }
-.idea-path h3 {
-  margin: 0 0 12px;
+.idea-next h3 {
+  margin: 0;
   font-size: 15px;
 }
-.idea-path ol {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin: 0 0 12px;
+.idea-next ol {
+  display: grid;
+  gap: 10px;
+  margin: 0;
   padding: 0;
   list-style: none;
 }
-.idea-path li button {
+.idea-next li {
   display: flex;
-  align-items: center;
-  justify-content: flex-start;
   gap: 10px;
-  width: 100%;
-  padding: 8px 10px;
-  border-color: transparent;
-  border-radius: 12px;
-  background: transparent;
-  text-align: left;
+  align-items: flex-start;
 }
-.idea-path li button:hover {
-  background: var(--surface-2);
-}
-.idea-path li.current button {
-  border-color: var(--accent);
-  background: var(--surface-2);
-}
-.idea-path li b {
+.idea-next li b {
   display: block;
   font-size: 14px;
 }
-.idea-path li small {
+.idea-next li small {
   color: var(--muted);
   font-size: 12px;
 }
-.idea-path-n {
+.idea-next-mark {
   flex: none;
   display: grid;
   place-items: center;
-  width: 26px;
-  height: 26px;
-  border-radius: 8px;
-  background: var(--surface-2);
-  color: var(--muted);
+  width: 22px;
+  height: 22px;
+  border: 1px solid var(--border-strong);
+  border-radius: 50%;
   font-size: 12px;
 }
-.idea-path li.current .idea-path-n {
-  background: var(--accent);
+.idea-next li.done .idea-next-mark {
+  border-color: var(--ok);
+  background: var(--ok);
   color: var(--accent-ink);
 }
+.idea-next li.now .idea-next-mark {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(242, 177, 52, 0.18);
+}
+.idea-next li.now b {
+  color: var(--accent);
+}
 @media (max-width: 960px) {
-  .idea-layout {
+  .idea-screen {
     grid-template-columns: minmax(0, 1fr);
   }
-  .idea-path {
+  .idea-next {
     position: static;
     order: -1;
   }
-  .idea-path ol {
-    flex-direction: row;
-    flex-wrap: wrap;
-  }
-  .idea-path li small {
-    display: none;
+  .idea-next ol {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 @media (max-width: 700px) {
@@ -430,4 +456,21 @@
   margin: 8px 0 0;
   font-size: 12px;
   line-height: 1.5;
+}
+/* Внутри свёрнутого блока заголовок и пояснение доски уже есть в summary */
+.idea-story > .story-plan > h2,
+.idea-story > .story-plan > h2 + p {
+  display: none;
+}
+@media (max-width: 700px) {
+  .idea-send select {
+    flex: 1 1 100%;
+    order: -1;
+  }
+  .idea-next {
+    order: 1;
+  }
+  .idea-next > small {
+    display: none;
+  }
 }

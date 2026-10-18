@@ -1,6 +1,5 @@
 import {useState} from 'react';
-import {apiFetch} from './api';
-import {responseJson} from './ChatGPTPanel';
+import {apiFetch, responseJson} from './api';
 
 export type CharacterVersion = {
   id: string;
@@ -51,7 +50,7 @@ export default function ReplaceCharacterButton({
         title={
           character
             ? `Сделать рабочим образом персонажа «${character.name}». Предыдущая версия сохранится.`
-            : 'Выбери персонажа в Character Vault'
+            : 'Выбери персонажа в «Мир → Персонажи»'
         }
         onClick={() => void replace()}
       >

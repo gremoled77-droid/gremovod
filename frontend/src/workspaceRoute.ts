@@ -1,4 +1,5 @@
-import type {Mode} from './StageNav';
+import type {Mode} from './screens';
+/** Открываемые по ссылке экраны; скрытые до беты (Рилсы, Сцена, Допилить, Агенты) — нет. */
 export const MODES: Mode[] = [
   'home',
   'studio',
@@ -8,16 +9,12 @@ export const MODES: Mode[] = [
   'create',
   'video',
   'audio',
-  'reels',
   'files',
   'economics',
   'graph',
-  'scene',
-  'refine',
-  'agents',
+  'archive',
   'connections',
   'settings',
-  'archive',
 ];
 export function readWorkspaceRoute(hash: string): {projectId: string; mode: Mode} | null {
   const match = hash.match(/^#\/project\/([a-zA-Z0-9_-]{1,100})\/([a-z]+)$/);

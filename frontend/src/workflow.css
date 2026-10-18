@@ -679,3 +679,55 @@
 .wf-node-foot .wf-price + .wf-run {
   margin-left: 0;
 }
+
+/* Телефон: сверху полоса «добавить узел» с прокруткой вбок, холст — на весь оставшийся экран */
+@media (max-width: 700px) {
+  .wf {
+    display: flex;
+    flex-direction: column;
+    height: auto;
+  }
+  .wf-console {
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 6px;
+    max-height: none;
+    padding: 8px 10px;
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+  .wf-console-head,
+  .wf-console-title,
+  .wf-search,
+  .wf-help,
+  .wf-stat {
+    display: none;
+  }
+  .wf-console .wf-add {
+    flex: none;
+    width: auto;
+    padding: 7px 12px;
+  }
+  .wf-console .wf-add small,
+  .wf-console .wf-add em {
+    display: none;
+  }
+  .wf-bar {
+    flex-wrap: nowrap;
+    gap: 8px;
+    padding: 8px 10px;
+  }
+  .wf-legend,
+  .wf .wf-console input.wf-search,
+  .wf-canvas .react-flow__minimap {
+    display: none;
+  }
+  .wf-bar > :first-child {
+    margin-left: 0;
+  }
+  .wf-canvas,
+  .wf-stage {
+    min-height: calc(100dvh - 300px);
+  }
+}

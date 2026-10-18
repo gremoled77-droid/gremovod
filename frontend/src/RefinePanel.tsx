@@ -1,7 +1,6 @@
 import ReplaceCharacterButton, {type ReplacementControls} from './ReplaceCharacterButton';
 import {useEffect, useRef, useState} from 'react';
-import {apiFetch} from './api';
-import {responseJson} from './ChatGPTPanel';
+import {apiFetch, responseJson} from './api';
 
 export type RefineDraft = {source_asset_id: string; reference_asset_id: string; instruction: string};
 export const EMPTY_REFINE: RefineDraft = {source_asset_id: '', reference_asset_id: '', instruction: ''};

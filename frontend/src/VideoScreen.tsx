@@ -6,8 +6,10 @@ import FrameActions from './FrameActions';
 import CameraFramePanel from './CameraFramePanel';
 import GenerationReview, {type GenerationRequest} from './GenerationReview';
 import {AddReferenceModal, LibraryPickModal, LocationModal} from './FrameSources';
-import {cents, price} from './PriceTable';
+import {price} from './PriceTable';
+import GenerateButton from './GenerateButton';
 import {modePrompt, seedanceCost, usesSource, VIDEO_MODES, type VideoMode} from './videoMode';
+import {onLibraryChanged, trashAsset as trashToBin} from './studioEvents';
 
 type OptionSpec = {values?: (string | number)[]; default?: string | number; min?: number; max?: number};
 type Spec = {
@@ -131,9 +133,11 @@ function VideoScreenBody({projectId, world = ''}: {projectId: string; world?: st
       }
     })();
   }, []);
+  const [libraryTick, setLibraryTick] = useState(0);
+  useEffect(() => onLibraryChanged(() => setLibraryTick(t => t + 1)), []);
   useEffect(() => {
     void loadLibrary().catch(e => setError(String(e)));
-  }, [projectId, items]);
+  }, [projectId, items, libraryTick]);
 
   const byId = useMemo(() => Object.fromEntries(library.map(a => [a.id, a])), [library]);
   const frames = library.filter(a => (a.metadata.kind || 'image') === 'image');
@@ -191,7 +195,11 @@ function VideoScreenBody({projectId, world = ''}: {projectId: string; world?: st
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [signature, spec]);
 
-  const results = items.filter(i => i.kind === 'video' && i.status !== 'waiting_external');
+  // Лента общая: ролики других проектов и удалённые в библиотеке проекта не найдутся.
+  const results = items
+    .filter(i => i.kind === 'video' && i.status !== 'waiting_external')
+    .map(i => ({...i, asset_ids: i.asset_ids.filter(aid => byId[aid])}))
+    .filter(i => i.asset_ids.length);
   const pending = items.filter(
     i =>
       ['queued', 'running', 'processing', 'saving'].includes(i.status) &&
@@ -201,17 +209,7 @@ function VideoScreenBody({projectId, world = ''}: {projectId: string; world?: st
 
   const addRef = (id: string) =>
     setRefs(r => (r.includes(id) || id === base || id === finish || r.length >= maxRefs ? r : [...r, id]));
-  const trash = async (id: string) => {
-    if (!window.confirm('Убрать ролик из библиотеки? Он хранится в корзине 30 дней и восстанавливается.'))
-      return;
-    try {
-      await json(await apiFetch(`/api/library/${id}/trash`, {method: 'POST'}));
-      setNotice('Ролик убран в корзину на 30 дней.');
-      await loadLibrary();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    }
-  };
+  const trash = (id: string) => trashToBin(id);
   /** Цепочка клипов: последний кадр ролика становится кадром-основой следующего. */
   const continueFrom = async (videoId: string) => {
     setError('');
@@ -462,6 +460,7 @@ function VideoScreenBody({projectId, world = ''}: {projectId: string; world?: st
         <label className="vs-block">
           <b>Промпт</b>
           <textarea
+            data-prompt
             rows={6}
             value={prompt}
             placeholder="Что происходит в ролике: действие, настроение, звук. Движение камеры выбирается ниже."
@@ -473,7 +472,6 @@ function VideoScreenBody({projectId, world = ''}: {projectId: string; world?: st
           prompt={prompt}
           onPrompt={update => setPrompt(update)}
           categories={MOVE_ONLY}
-          defaultOpen
           title="Движение камеры"
           hint="одно движение на ролик"
         />
@@ -544,22 +542,30 @@ function VideoScreenBody({projectId, world = ''}: {projectId: string; world?: st
 
         <div className="vs-run">
           <span className="vs-price">
-            {cost === null ? '…' : '≈ ' + cents(cost)}
-            {rate !== null && (
+            {rate !== null ? (
               <small className="muted">
-                {' '}
                 {String(rate).replace('.', ',')} ¢/с × {outSec} с
                 {fromClip && clipSec
                   ? ` + ${String(rate / 2).replace('.', ',')} ¢/с × ${clipSec} с входа`
                   : ''}
               </small>
+            ) : (
+              <small className="muted">{cost === null ? 'Считаю цену…' : 'Цена на кнопке'}</small>
             )}
           </span>
-          <button className="primary" disabled={busy || !projectId} onClick={() => void start()}>
-            {busy ? 'Готовлю…' : 'Оценить и запустить'}
-          </button>
+          <GenerateButton
+            projectId={projectId}
+            busy={busy}
+            disabled={!projectId}
+            estimate={cost}
+            label="Сгенерировать видео"
+            routes={['api']}
+            onApi={start}
+            job={() => 'Видео запускается только через API'}
+            onNotice={setNotice}
+            onError={setError}
+          />
         </div>
-        <small className="muted">Перед отправкой покажу точную цену и попрошу подтверждение.</small>
       </div>
 
       <div className="vs-results cs-results">
@@ -572,7 +578,6 @@ function VideoScreenBody({projectId, world = ''}: {projectId: string; world?: st
         {results.flatMap(item =>
           item.asset_ids.map(aid => {
             const a = byId[aid];
-            if (!a) return null;
             return (
               <div key={item.id + aid} className="cs-card cs-result vs-result">
                 <video src={a.url} controls />

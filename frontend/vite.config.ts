@@ -5,14 +5,16 @@ const remoteHosts = (process.env.STUDIO_REMOTE_HOSTS || '')
   .split(',')
   .map(h => h.trim())
   .filter(Boolean);
+// Отдельный стенд разработки: STUDIO_API_URL=http://127.0.0.1:8100 (рабочая студия остаётся на 8000).
+const api = process.env.STUDIO_API_URL || 'http://127.0.0.1:8000';
 export default defineConfig({
   server: {
     port: 5173,
     allowedHosts: remoteHosts,
     // changeOrigin: false — бэкенду нужен настоящий Host запроса: по нему он отличает телефон от локального браузера.
     proxy: {
-      '/api': {target: 'http://127.0.0.1:8000', changeOrigin: false},
-      '/login': {target: 'http://127.0.0.1:8000', changeOrigin: false},
+      '/api': {target: api, changeOrigin: false},
+      '/login': {target: api, changeOrigin: false},
     },
   },
 });

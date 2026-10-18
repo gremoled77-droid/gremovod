@@ -1,7 +1,6 @@
 import {useEffect, useState} from 'react';
-import type {Mode} from './StageNav';
-import {apiFetch} from './api';
-import {responseJson} from './ChatGPTPanel';
+import {screenOf, type Mode} from './screens';
+import {apiFetch, responseJson} from './api';
 export type WorkspaceLocation = {
   production_id: string;
   production_title: string;
@@ -47,38 +46,7 @@ export default function WorkspaceTrail({
     };
   }, [projectId, onLocation]);
   const location = context?.project === projectId ? context.location : null;
-  const title: Record<Mode, string> = {
-    home: 'Старт',
-    studio: 'Идея',
-    styles: 'Мир',
-    characters: 'Персонажи',
-    storyboard: 'Раскадровка',
-    create: 'Кадры',
-    video: 'Видео',
-    audio: 'Звук',
-    reels: 'Рилсы',
-    files: 'Файлы и монтаж',
-    economics: 'Экономика',
-    graph: 'Воркфлоу',
-    scene: 'Сцена',
-    refine: 'Допилить',
-    agents: 'Агенты',
-    connections: 'Подключения',
-    settings: 'Настройки',
-    archive: 'Архив',
-  };
-  const lede: Partial<Record<Mode, string>> = {
-    studio: 'Задание ролика и стартовая постановка кадра.',
-    styles: 'Стиль мира и герои: общие для всех кадров серии.',
-    files: 'Папки проекта и подготовка материалов к монтажу.',
-    economics: 'Бюджет, лимиты и расходы на генерации.',
-    scene: 'Собери кадр из героя, локации и предметов.',
-    refine: 'Точечная правка готового кадра через ChatGPT.',
-    agents: 'Команда ИИ-агентов: план, проверка и промпты.',
-    connections: 'Ключи и доступ к сервисам: PiAPI, OpenAI, голос.',
-    settings: 'Проект, модель для промптов и ссылка на чат.',
-    archive: 'Все картинки и видео проекта.',
-  };
+  const screen = screenOf(mode);
   return (
     <div className="workspace-trail">
       <div>
@@ -94,8 +62,8 @@ export default function WorkspaceTrail({
                 .join(' / ')
             : 'Рабочее пространство проекта'}
         </small>
-        <h1>{title[mode]}</h1>
-        {lede[mode] && <p className="trail-lede">{lede[mode]}</p>}
+        <h1>{screen.title}</h1>
+        {screen.lede && <p className="trail-lede">{screen.lede}</p>}
         {error && <small role="alert">Не удалось загрузить связь с доской. {error}</small>}
       </div>
       {location && location.source_project_id !== projectId && (

@@ -1,6 +1,5 @@
 import {useEffect, useState} from 'react';
-import {apiFetch} from './api';
-import {responseJson} from './ChatGPTPanel';
+import {apiFetch, responseJson} from './api';
 import ReplaceCharacterButton, {type CharacterVersion} from './ReplaceCharacterButton';
 import CharacterVoicePanel from './CharacterVoicePanel';
 import MotionPanel from './MotionPanel';
@@ -218,21 +217,21 @@ export default function ProductionPanel({
       setNotice('Файл сохранён в папке проекта.');
     });
   return (
-    <section className="panel production-panel">
-      <h2>Папки проекта</h2>
+    <section className="production-panel">
+      <h3>Папки производства</h3>
       <p className="muted">
         Общий проект → серия с гостем → эпизод / сцена → кадры. Персонажи и локации общие для всех серий.
         Раскадровка — визуальный план сцены; скринкаст — запись экрана.
       </p>
       {error && (
-        <p className="alert" role="alert">
+        <div className="alert" role="alert">
           {error}
-        </p>
+        </div>
       )}
       {notice && (
-        <p className="notice" role="status">
+        <div className="notice" role="status">
           {notice}
-        </p>
+        </div>
       )}
       <label>
         Общий проект
@@ -268,10 +267,12 @@ export default function ProductionPanel({
       {tree && (
         <>
           <p className="folder-path">{tree.absolute_path}</p>
-          <div className="chips">
+          <div className="world-tabs pp-tabs" role="tablist" aria-label="Разделы папок">
             {(['character', 'location', 'series'] as const).map(k => (
               <button
-                className={!selected && group === k ? 'active' : ''}
+                role="tab"
+                aria-selected={!selected && group === k}
+                className={!selected && group === k ? 'on' : ''}
                 key={k}
                 onClick={() => {
                   setGroup(k);
@@ -282,6 +283,8 @@ export default function ProductionPanel({
                 {TITLES[k]}
               </button>
             ))}
+          </div>
+          <div className="chips">
             <button
               disabled={busy}
               onClick={() =>
@@ -307,7 +310,6 @@ export default function ProductionPanel({
           <div className="folder-list">
             {children.map(n => (
               <button className="folder-entry" key={n.id} onClick={() => choose(n.id)}>
-                📁{' '}
                 {n.kind === 'series' || n.kind === 'episode' || n.kind === 'frame'
                   ? String(n.number).padStart(3, '0') + ' · '
                   : ''}
@@ -485,7 +487,7 @@ export default function ProductionPanel({
               </button>
               {details.groups.map(g => (
                 <div key={g}>
-                  <h4>📁 {g.replace(/_/g, ' ')}</h4>
+                  <h4>{g.replace(/_/g, ' ')}</h4>
                   <div className="production-files">
                     {details.files
                       .filter(f => f.relative_path.split(/[\\/]/).includes(g))

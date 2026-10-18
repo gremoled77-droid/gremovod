@@ -1,6 +1,5 @@
 import {useState} from 'react';
-import {apiFetch} from './api';
-import {responseJson} from './ChatGPTPanel';
+import {apiFetch, responseJson} from './api';
 import {LLM_MAX_TOKENS, LLM_MODELS} from './llmPricing';
 import {mergeWorld, parseWorld, WORLD_FIELDS, WORLD_SYSTEM, type World} from './worldBible';
 

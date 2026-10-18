@@ -2,6 +2,7 @@
 import hashlib
 import hmac
 import json
+import os
 import secrets
 import time
 from datetime import datetime, timezone, timedelta
@@ -13,7 +14,25 @@ from urllib.parse import urlsplit
 
 LAUNCH_TOKEN = secrets.token_urlsafe(32)
 SIGNING_KEY = secrets.token_bytes(32)
-ORIGINS = {'http://127.0.0.1:5173', 'http://localhost:5173', 'http://127.0.0.1:8000', 'http://localhost:8000'}
+
+
+def dev_origins(value):
+    """Адреса отдельного стенда разработки (STUDIO_DEV_ORIGINS=http://127.0.0.1:5273,...).
+    Принимаются только http://127.0.0.1:<порт> и http://localhost:<порт>; всё прочее отбрасывается."""
+    result = set()
+    for item in (value or '').split(','):
+        item = item.strip()
+        try:
+            parts = urlsplit(item)
+            port = parts.port
+        except ValueError:
+            continue
+        if parts.scheme == 'http' and parts.hostname in {'127.0.0.1', 'localhost'} and port and item == f'http://{parts.hostname}:{port}':
+            result.add(item)
+    return result
+
+
+ORIGINS = {'http://127.0.0.1:5173', 'http://localhost:5173', 'http://127.0.0.1:8000', 'http://localhost:8000'} | dev_origins(os.environ.get('STUDIO_DEV_ORIGINS'))
 MOSCOW = timezone(timedelta(hours=3))
 
 

@@ -1,64 +1,18 @@
-import {useEffect, useState, type ReactNode} from 'react';
+import {useEffect, useState} from 'react';
+import {STAGES, TOOLS, navMode, type Mode, type Screen} from './screens';
 
-export type Mode =
-  | 'studio'
-  | 'graph'
-  | 'agents'
-  | 'styles'
-  | 'characters'
-  | 'connections'
-  | 'scene'
-  | 'economics'
-  | 'refine'
-  | 'files'
-  | 'settings'
-  | 'storyboard'
-  | 'create'
-  | 'home'
-  | 'video'
-  | 'audio'
-  | 'reels'
-  | 'archive';
+export type {Mode} from './screens';
 
-type Item = {key: string; mode: Mode; label: string; hint?: string; icon: ReactNode};
-
-export const STAGES: Item[] = [
-  {key: 'idea', mode: 'studio', label: 'Идея', hint: 'задание ролика', icon: '1'},
-  {key: 'world', mode: 'styles', label: 'Мир', hint: 'стиль и герои', icon: '2'},
-  {key: 'chars', mode: 'characters', label: 'Персонажи', hint: 'герои и образы', icon: '3'},
-  {key: 'board', mode: 'storyboard', label: 'Раскадровка', hint: 'кадры эпизода', icon: '4'},
-  {key: 'frames', mode: 'create', label: 'Кадры', hint: 'картинки', icon: '5'},
-  {key: 'video', mode: 'video', label: 'Видео', hint: 'оживление кадров', icon: '6'},
-  {key: 'sound', mode: 'audio', label: 'Звук', hint: 'голос и обработка', icon: '7'},
-  {key: 'edit', mode: 'files', label: 'Монтаж', hint: 'выгрузка в CapCut', icon: '8'},
-  {key: 'release', mode: 'economics', label: 'Выпуск', hint: 'бюджет серии', icon: '9'},
-];
-/** Нижние вкладки на телефоне (макет Mobile): пять частых действий и «Ещё». */
+/** Нижние вкладки на телефоне: пять частых разделов и «Ещё». */
 const TABS: {mode: Mode; label: string; icon: string}[] = [
-  {mode: 'create', label: 'Создать', icon: '✦'},
+  {mode: 'create', label: 'Кадры', icon: '✦'},
   {mode: 'storyboard', label: 'Сцены', icon: '▦'},
-  {mode: 'characters', label: 'Герои', icon: '☺'},
+  {mode: 'styles', label: 'Мир', icon: '☺'},
+  {mode: 'video', label: 'Видео', icon: '▶'},
   {mode: 'archive', label: 'Архив', icon: '▤'},
-  {mode: 'economics', label: 'Бюджет', icon: '$'},
-];
-const TOOLS: Item[] = [
-  {key: 'reels', mode: 'reels', label: 'Рилсы', hint: 'рецепты сценариев', icon: '▶'},
-  {key: 'graph', mode: 'graph', label: 'Узлы', icon: '⌁'},
-  {key: 'scene', mode: 'scene', label: 'Сцена', icon: '▣'},
-  {key: 'refine', mode: 'refine', label: 'Допилить', icon: '✎'},
-  {key: 'agents', mode: 'agents', label: 'Агенты', icon: '☁'},
-  {key: 'connections', mode: 'connections', label: 'Подключения', icon: '⚷'},
 ];
 
-export default function StageNav({
-  mode,
-  onMode,
-  onDemo,
-}: {
-  mode: Mode;
-  onMode: (m: Mode) => void;
-  onDemo: () => void;
-}) {
+export default function StageNav({mode, onMode}: {mode: Mode; onMode: (m: Mode) => void}) {
   const [hidden, setHidden] = useState(false);
   const [more, setMore] = useState(false);
   // На телефоне нижняя панель уезжает вниз при прокрутке вниз и возвращается при прокрутке вверх.
@@ -75,19 +29,19 @@ export default function StageNav({
     window.addEventListener('scroll', onScroll, {passive: true});
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
-  const activeStage = STAGES.find(s => s.mode === mode)?.key;
-  const render = (item: Item, active: boolean) => (
+  const current = navMode(mode);
+  const render = (item: Screen) => (
     <button
-      key={item.key}
-      className={'nav-item' + (active ? ' nav-active' : '')}
-      aria-current={active ? 'page' : undefined}
+      key={item.mode}
+      className={'nav-item' + (item.mode === current ? ' nav-active' : '')}
+      aria-current={item.mode === current ? 'page' : undefined}
       onClick={() => onMode(item.mode)}
     >
       <span className="nav-icon" aria-hidden="true">
         {item.icon}
       </span>
       <span className="nav-text">
-        <b>{item.label}</b>
+        <b>{item.title}</b>
         {item.hint && <small>{item.hint}</small>}
       </span>
     </button>
@@ -124,24 +78,16 @@ export default function StageNav({
           </span>
         </button>
         <div className="nav-group-title">Эпизод</div>
-        {STAGES.map(s => render(s, s.key === activeStage))}
+        {STAGES.map(render)}
         <div className="nav-group-title">Инструменты</div>
-        {TOOLS.map(t => render(t, t.mode === mode))}
-        <button className="nav-item nav-demo" onClick={onDemo}>
-          <span className="nav-icon" aria-hidden="true">
-            ▷
-          </span>
-          <span className="nav-text">
-            <b>Раскадровка · демо</b>
-          </span>
-        </button>
+        {TOOLS.map(render)}
       </nav>
       <nav className={'mobile-tabs' + (hidden ? ' nav-hidden' : '')} aria-label="Быстрые разделы">
         {TABS.map(t => (
           <button
             key={t.mode}
-            className={'mobile-tab' + (mode === t.mode ? ' on' : '')}
-            aria-current={mode === t.mode ? 'page' : undefined}
+            className={'mobile-tab' + (current === t.mode ? ' on' : '')}
+            aria-current={current === t.mode ? 'page' : undefined}
             onClick={() => go(t.mode)}
           >
             <span aria-hidden="true">{t.icon}</span>
@@ -171,16 +117,16 @@ export default function StageNav({
                 ⌂ Старт
               </button>
               {STAGES.map(s => (
-                <button key={s.key} className={mode === s.mode ? 'on' : ''} onClick={() => go(s.mode)}>
-                  {s.icon}. {s.label}
+                <button key={s.mode} className={current === s.mode ? 'on' : ''} onClick={() => go(s.mode)}>
+                  {s.icon}. {s.title}
                 </button>
               ))}
             </div>
             <b>Инструменты</b>
             <div className="mobile-sheet-grid">
               {TOOLS.map(t => (
-                <button key={t.key} className={mode === t.mode ? 'on' : ''} onClick={() => go(t.mode)}>
-                  {t.icon} {t.label}
+                <button key={t.mode} className={mode === t.mode ? 'on' : ''} onClick={() => go(t.mode)}>
+                  {t.icon} {t.title}
                 </button>
               ))}
               <button className={mode === 'settings' ? 'on' : ''} onClick={() => go('settings')}>

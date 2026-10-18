@@ -1,6 +1,5 @@
 import {useState} from 'react';
-import {apiFetch} from './api';
-import {responseJson} from './ChatGPTPanel';
+import {apiFetch, responseJson} from './api';
 import './visualPlan.css';
 
 type Cut = {score: number; label: string} | null;

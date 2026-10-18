@@ -10,7 +10,7 @@ export type LightboxItem = FrameActionSet & {
   caption?: string;
 };
 
-/** Полноэкранный просмотр: стрелки ← → листают, Esc закрывает, клик по фону закрывает. */
+/** Полноэкранный просмотр: ← → листают, F — в избранное, Delete — в корзину, Esc и клик по фону закрывают. */
 export default function Lightbox({
   items,
   index,
@@ -29,6 +29,9 @@ export default function Lightbox({
       if (e.key === 'Escape') onClose();
       else if (e.key === 'ArrowLeft') go(-1);
       else if (e.key === 'ArrowRight') go(1);
+      else if (e.code === 'KeyF' && !e.ctrlKey && !e.metaKey && !e.altKey && item?.onFavorite)
+        item.onFavorite();
+      else if (e.key === 'Delete' && item?.onTrash) item.onTrash();
       else return;
       e.preventDefault();
     };

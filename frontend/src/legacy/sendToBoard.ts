@@ -1,5 +1,4 @@
-import {apiFetch} from './api';
-import {responseJson} from './ChatGPTPanel';
+import {apiFetch, responseJson} from './api';
 import {readLocal, writeLocal} from './localDrafts';
 
 export type BoardScene = {id: string; title: string; number: number; frames: {id: string; title: string}[]};

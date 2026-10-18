@@ -1,9 +1,11 @@
 import {useEffect, useState} from 'react';
 import {apiFetch} from './api';
 import {useSharedActivity} from './ActivityContext';
-import type {Mode} from './StageNav';
+import {screenOf, type Mode} from './screens';
+import {lastStage} from './lastStage';
 import Lightbox from './Lightbox';
 import {loadCreateDraft, saveCreateDraft} from './createDraft';
+import {onLibraryChanged, trashAsset as trashToBin} from './studioEvents';
 
 type Budget = {
   project_limit_usd: number;
@@ -20,11 +22,10 @@ type Media = {
   metadata?: {kind?: string; original_name?: string; width?: number; height?: number; favorite?: boolean};
 };
 type Cost = {actual_usd?: number | null; estimated_usd?: number | null};
-type Reel = 'video' | 'image' | 'audio';
+type Reel = 'video' | 'image';
 const REELS: {id: Reel; label: string}[] = [
   {id: 'video', label: 'Видео'},
   {id: 'image', label: 'Кадры'},
-  {id: 'audio', label: 'Звук'},
 ];
 
 const STEPS: {mode: Mode; n: string; title: string; text: string}[] = [
@@ -33,9 +34,9 @@ const STEPS: {mode: Mode; n: string; title: string; text: string}[] = [
   {mode: 'storyboard', n: '3', title: 'Раскадровка', text: 'Сцены и кадры эпизода'},
   {mode: 'create', n: '4', title: 'Кадры', text: 'Картинки от нескольких моделей'},
   {mode: 'video', n: '5', title: 'Видео', text: 'Оживить кадры'},
-  {mode: 'audio', n: '6', title: 'Звук', text: 'Голос и музыка'},
-  {mode: 'files', n: '7', title: 'Монтаж', text: 'Выгрузка в CapCut по порядку кадров'},
-  {mode: 'economics', n: '8', title: 'Выпуск', text: 'Бюджет серии и итоги'},
+  {mode: 'audio', n: '6', title: 'Звук', text: 'Голоса и звук кадров'},
+  {mode: 'files', n: '7', title: 'Монтаж', text: 'Выгрузка в CapCut'},
+  {mode: 'economics', n: '8', title: 'Выпуск', text: 'Бюджет и итоги серии'},
 ];
 
 const money = (v: number | undefined) => '$' + (v ?? 0).toFixed(2);
@@ -55,20 +56,24 @@ export default function HomeScreen({
   projects,
   onMode,
   onOpenProject,
+  onNewProject,
 }: {
   projectId: string;
   projectName: string;
   projects: Project[];
   onMode: (m: Mode) => void;
-  onOpenProject: (id: string) => void;
+  /** Открыть другой проект на его последнем этапе. */
+  onOpenProject: (id: string, mode: Mode) => void;
+  /** Создать проект с названием и открыть его «Идею». */
+  onNewProject: (title: string) => void;
 }) {
+  const [newTitle, setNewTitle] = useState('');
   const {items} = useSharedActivity();
   const [budget, setBudget] = useState<Budget | null>(null);
   const [view, setView] = useState(-1);
   const [images, setImages] = useState<Media[]>([]);
   const [refIds, setRefIds] = useState<string[]>(() => loadCreateDraft(projectId).refs);
   const [clips, setClips] = useState<Media[]>([]);
-  const [sounds, setSounds] = useState<Media[]>([]);
   const [reel, setReel] = useState<Reel>('image');
   const [playing, setPlaying] = useState('');
   const [costs, setCosts] = useState<Record<string, Cost>>({});
@@ -80,6 +85,8 @@ export default function HomeScreen({
       .then(setBudget)
       .catch(() => undefined);
   }, [projectId, items]);
+  const [libraryTick, setLibraryTick] = useState(0);
+  useEffect(() => onLibraryChanged(() => setLibraryTick(t => t + 1)), []);
   useEffect(() => {
     if (!projectId) return;
     void apiFetch('/api/library?project_id=' + encodeURIComponent(projectId))
@@ -88,10 +95,9 @@ export default function HomeScreen({
         const of = (kind: string) => list.filter(a => (a.metadata?.kind || 'image') === kind);
         setImages(of('image').slice(0, 8));
         setClips(of('video').slice(0, 12));
-        setSounds(of('audio').slice(0, 12));
       })
       .catch(() => undefined);
-  }, [projectId, items]);
+  }, [projectId, items, libraryTick]);
 
   useEffect(() => {
     if (!projectId) return;
@@ -147,9 +153,7 @@ export default function HomeScreen({
     setRefIds(ids => (on ? ids.filter(id => id !== a.id) : [...ids, a.id]));
   };
   const trashAsset = async (a: Media) => {
-    if (!window.confirm('Убрать кадр в корзину? Его можно вернуть в течение 30 дней.')) return;
-    const r = await apiFetch(`/api/library/${a.id}/trash`, {method: 'POST'});
-    if (!r.ok) return window.alert('Не удалось убрать: кадр используется в проекте или недоступен');
+    if (!(await trashToBin(a.id))) return;
     setView(-1);
     setImages(list => list.filter(x => x.id !== a.id));
   };
@@ -162,9 +166,11 @@ export default function HomeScreen({
     : active.length
       ? {mode: 'create' as Mode, text: `Дождаться заданий: ${active.length} в работе`}
       : images.length
-        ? {mode: 'create' as Mode, text: 'Продолжить: выбрать главный дубль и оживить кадр'}
+        ? {mode: 'create' as Mode, text: 'Дальше: выбрать главный дубль и оживить кадр'}
         : {mode: 'studio' as Mode, text: 'Начать с идеи ролика'};
 
+  const resume = projectId ? lastStage(projectId) : 'studio';
+  const others = projects.filter(p => p.id !== projectId).slice(0, 6);
   const videos = items.filter(i => i.kind === 'video' && i.asset_ids.length).length;
   const stageMeta: Record<string, string> = {
     '4': images.length ? `${images.length}+ картинок` : '',
@@ -212,7 +218,8 @@ export default function HomeScreen({
             <h1>{projectName || 'Новый проект'}</h1>
             <div className="home-meta">
               <span>
-                <small>ЭТАПОВ</small>8
+                <small>ЭТАПОВ</small>
+                {STEPS.length}
               </span>
               <span>
                 <small>КАДРОВ</small>
@@ -227,24 +234,56 @@ export default function HomeScreen({
                 {money(budget?.daily_reserved_usd)}
               </span>
             </div>
-            {projects.length > 1 && (
-              <select value={projectId} onChange={e => onOpenProject(e.target.value)} aria-label="Проект">
-                {projects.map(p => (
-                  <option key={p.id} value={p.id}>
-                    {p.title}
-                  </option>
-                ))}
-              </select>
-            )}
+            <div className="home-continue">
+              <button className="primary home-go" onClick={() => onMode(resume)}>
+                {projectId ? `Продолжить: ${screenOf(resume).title}` : 'Начать с идеи'} →
+              </button>
+              {projectId && (
+                <button className="home-hint" onClick={() => onMode(next.mode)}>
+                  {next.text}
+                </button>
+              )}
+            </div>
           </div>
         </div>
-        <button className="home-cta" onClick={() => onMode(next.mode)}>
-          <span className="home-cta-k">NEXT TAKE</span>
-          <span className="home-cta-t">{next.text}</span>
-          <span className="home-cta-a" aria-hidden="true">
-            →
-          </span>
-        </button>
+        <aside className="home-projects" aria-label="Проекты">
+          <form
+            className="home-new"
+            onSubmit={e => {
+              e.preventDefault();
+              if (newTitle.trim()) onNewProject(newTitle.trim());
+            }}
+          >
+            <input
+              id="home-new-title"
+              value={newTitle}
+              placeholder="Название нового проекта"
+              aria-label="Название нового проекта"
+              onChange={e => setNewTitle(e.target.value)}
+            />
+            <button className="primary" disabled={!newTitle.trim()}>
+              ＋ Новый проект
+            </button>
+          </form>
+          {others.length > 0 && (
+            <>
+              <span className="home-eyebrow">ДРУГИЕ ПРОЕКТЫ</span>
+              <ul>
+                {others.map(p => {
+                  const stage = lastStage(p.id);
+                  return (
+                    <li key={p.id}>
+                      <button onClick={() => onOpenProject(p.id, stage)}>
+                        <b>{p.title}</b>
+                        <small>{screenOf(stage).title} →</small>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </>
+          )}
+        </aside>
       </header>
 
       <div className="home-film" aria-label="Плёнка проекта">
@@ -261,7 +300,7 @@ export default function HomeScreen({
               }}
             >
               {r.label}
-              <em>{r.id === 'video' ? clips.length : r.id === 'audio' ? sounds.length : images.length}</em>
+              <em>{r.id === 'video' ? clips.length : images.length}</em>
             </button>
           ))}
         </div>
@@ -304,22 +343,6 @@ export default function HomeScreen({
             ))}
             {!clips.length && (
               <div className="home-frames-empty">Клипов пока нет. Оживи кадр на экране «Видео».</div>
-            )}
-          </div>
-        )}
-        {reel === 'audio' && (
-          <div className="home-sounds">
-            {sounds.map((a, i) => (
-              <div key={a.id} className="home-sound">
-                <span className="home-sound-n">{String(i + 1).padStart(2, '0')}</span>
-                <b>{a.metadata?.original_name || 'Дорожка ' + (i + 1)}</b>
-                <audio src={a.url} controls preload="none" />
-              </div>
-            ))}
-            {!sounds.length && (
-              <div className="home-frames-empty">
-                Звука пока нет. Голос и музыка делаются на экране «Звук».
-              </div>
             )}
           </div>
         )}
@@ -376,13 +399,7 @@ export default function HomeScreen({
           <div className="home-card home-gauges">
             <Gauge label="Сегодня" used={budget?.daily_reserved_usd} limit={budget?.daily_limit_usd} />
             <Gauge label="Проект" used={budget?.project_reserved_usd} limit={budget?.project_limit_usd} />
-            <button onClick={() => onMode('economics')}>Лимиты</button>
-          </div>
-
-          <div className="home-quick">
-            <button onClick={() => onMode('create')}>Сгенерировать кадр</button>
-            <button onClick={() => onMode('graph')}>Узлы</button>
-            <button onClick={() => onMode('connections')}>API</button>
+            <button onClick={() => onMode('settings')}>Лимиты</button>
           </div>
         </aside>
       </div>

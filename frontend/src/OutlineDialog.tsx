@@ -1,6 +1,5 @@
 import {useRef, useState} from 'react';
-import {apiFetch} from './api';
-import {responseJson} from './ChatGPTPanel';
+import {apiFetch, responseJson} from './api';
 import {moveItem} from './boardOrder';
 import {estimateLlm, runLlm, type LlmQuote, type Msg} from './llmAsk';
 import {LLM_MODELS} from './llmPricing';

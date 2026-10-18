@@ -1,7 +1,6 @@
 import {useEffect, useRef, useState} from 'react';
 import {Info, Mic, Paperclip, RotateCw, Send, Square, X} from 'lucide-react';
-import {apiFetch} from './api';
-import {responseJson} from './ChatGPTPanel';
+import {apiFetch, responseJson} from './api';
 import {IDEA_LLM_MODELS, LLM_MAX_TOKENS, ideaEstimate} from './llmPricing';
 
 type Asset = {id: string; url: string; thumbnail_url?: string | null; metadata?: {original_name?: string}};
@@ -48,7 +47,6 @@ export default function IdeaBrief({
   onRefs,
   world,
   onNext,
-  onScene,
 }: {
   projectId: string;
   brief: string;
@@ -61,7 +59,6 @@ export default function IdeaBrief({
   onRefs: (ids: string[]) => void;
   world: string;
   onNext: () => void;
-  onScene: () => void;
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -221,7 +218,6 @@ export default function IdeaBrief({
       <button className="primary" onClick={onNext}>
         Дальше: мир и герои →
       </button>
-      <button onClick={onScene}>Собрать сцену из исходников</button>
     </div>
   );
 
@@ -235,6 +231,7 @@ export default function IdeaBrief({
         </div>
       </div>
       <textarea
+        data-prompt
         ref={area}
         rows={3}
         value={brief}

@@ -1,8 +1,8 @@
 import {useEffect, useMemo, useRef, useState} from 'react';
-import {apiFetch} from './api';
-import {responseJson} from './ChatGPTPanel';
+import {apiFetch, responseJson} from './api';
 import type {Identity, WorldFields} from './characterPrompt';
 import BatchReview, {type BatchItem} from './BatchReview';
+import GenerateButton, {useEstimate} from './GenerateButton';
 import {defaultFrameTitles} from './framePrompt';
 import OperatorLayers from './OperatorLayers';
 import {buildOperatorPrompt, EMPTY_LAYERS, type Layers} from './operatorPrompt';
@@ -126,6 +126,21 @@ export default function FrameBuilder({
     );
     return r.url as string;
   };
+  /** Параметры по умолчанию; основной формат серии 16:9. */
+  const optionsOf = (model: string) =>
+    Object.fromEntries(
+      Object.entries(specs[model]?.options || {})
+        .filter(([, s]) => s.default !== undefined)
+        .map(([k, s]) => [
+          k,
+          k === 'aspect_ratio' && s.values?.includes('16:9') ? '16:9' : (s.default as string | number),
+        ])
+    ) as Record<string, string | number>;
+  const estimate = useEstimate(
+    pickedModels
+      .filter(m => specs[m])
+      .flatMap(model => Array.from({length: count}, () => ({model, options: optionsOf(model)})))
+  );
   const start = async () => {
     setError('');
     setNote('');
@@ -141,14 +156,7 @@ export default function FrameBuilder({
           limit = spec?.api_refs ?? 0;
         const urls: string[] = [];
         for (const id of refAssets.slice(0, limit)) urls.push((urlCache[id] ||= await cloudUrl(id)));
-        const options = Object.fromEntries(
-          Object.entries(spec?.options || {})
-            .filter(([, s]) => s.default !== undefined)
-            .map(([k, s]) => [
-              k,
-              k === 'aspect_ratio' && s.values?.includes('16:9') ? '16:9' : (s.default as string | number),
-            ])
-        );
+        const options = optionsOf(model);
         for (let i = 1; i <= count; i++)
           items.push({
             label: `${model} · вариант ${i}`,
@@ -244,9 +252,27 @@ export default function FrameBuilder({
             ))}
           </select>
         </label>
-        <button className="primary" disabled={busy || !pickedModels.length} onClick={() => void start()}>
-          {busy ? 'Готовлю…' : `Сгенерировать (${pickedModels.length * count}): оценка и подтверждение`}
-        </button>
+        <GenerateButton
+          projectId={projectId}
+          busy={busy}
+          disabled={!pickedModels.length}
+          estimate={estimate}
+          count={pickedModels.length * count}
+          onApi={start}
+          job={async () => {
+            if (!prompt.trim()) return 'Опиши, что происходит в кадре';
+            if (!chosen.length && !locationId) return 'Выбери хотя бы героя или локацию';
+            const pid = projectId || (await ensureProject());
+            return {
+              projectId: pid,
+              prompt,
+              target: pickedModels[0] || DEFAULT_MODEL,
+              referenceAssetIds: refAssets,
+            };
+          }}
+          onNotice={setNote}
+          onError={setError}
+        />
         <button
           disabled={!edited}
           onClick={() => {

@@ -290,7 +290,12 @@ main.storyboard-main {
 }
 .app main.storyboard-main {
   display: block;
-  padding: 0;
+  padding: 0 22px;
+}
+@media (max-width: 700px) {
+  .app main.storyboard-main {
+    padding: 0 12px;
+  }
 }
 .app main.storyboard-main > .content {
   padding: 0;
@@ -545,7 +550,8 @@ main.storyboard-main {
 .snd-frame {
   padding: 10px;
   border-radius: 10px;
-  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border);
+  background: var(--surface);
   display: grid;
   gap: 6px;
 }
@@ -560,7 +566,7 @@ main.storyboard-main {
 .snd-add {
   display: grid;
   gap: 6px;
-  border: 1px dashed rgba(255, 255, 255, 0.2);
+  border: 1px dashed var(--border);
   border-radius: 10px;
 }
 .snd-frame ul {
@@ -576,8 +582,8 @@ main.storyboard-main {
   gap: 6px;
   align-items: end;
   padding: 8px;
-  border-left: 3px solid rgba(242, 177, 52, 0.6);
-  background: rgba(255, 255, 255, 0.03);
+  border-left: 3px solid var(--accent);
+  background: var(--surface-2);
 }
 .snd-cue > b,
 .snd-cue > textarea,

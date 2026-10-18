@@ -1,6 +1,7 @@
 import {useEffect, useState} from 'react';
 import {apiFetch} from './api';
 import {useSharedActivity} from './ActivityContext';
+import WaitingTray from './WaitingTray';
 
 type Budget = {
   project_limit_usd: number;
@@ -68,6 +69,7 @@ export default function Dock({projectId, onClose}: {projectId: string; onClose: 
           </div>
         </div>
       )}
+      <WaitingTray />
       <div className="dock-list">
         {items.slice(0, 30).map(i => (
           <div key={i.id} className={'dock-item st-' + i.status}>

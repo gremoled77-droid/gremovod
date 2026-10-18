@@ -3,8 +3,7 @@ import SeriesEconomics from './SeriesEconomics';
 import ProductionEntityEditor from './ProductionEntityEditor';
 import {readLocal, writeLocal} from './localDrafts';
 import {useEffect, useRef, useState} from 'react';
-import {apiFetch} from './api';
-import {responseJson} from './ChatGPTPanel';
+import {apiFetch, responseJson} from './api';
 import Lightbox, {type LightboxItem} from './Lightbox';
 import CinemaInfo from './CinemaInfo';
 import {analyzeAsset, shotPoints, TensionGraph, useVisualPlans, VisualPlanForm} from './VisualPlanPanel';
@@ -78,7 +77,8 @@ export default function ProductionStoryboard({
 }: {
   location?: WorkspaceLocation | null;
   outlineContext?: OutlineContext;
-  onInspect: (productionId: string, nodeId: string) => void;
+  /** Папки серии (экран «Монтаж»); без него серия открывается в редакторе доски. */
+  onInspect?: (productionId: string, nodeId: string) => void;
   onOpenProject: (id: string) => void;
 }) {
   const [productions, setProductions] = useState<Production[]>([]),
@@ -111,6 +111,7 @@ export default function ProductionStoryboard({
   const [editorStack, setEditorStack] = useState<string[]>([]),
     [storageOK, setStorageOK] = useState(true);
   const [view, setView] = useState<{items: LightboxItem[]; index: number} | null>(null);
+  const [newProduction, setNewProduction] = useState('');
   const [busy, setBusy] = useState(false),
     [error, setError] = useState(''),
     [notice, setNotice] = useState(''),
@@ -259,7 +260,7 @@ export default function ProductionStoryboard({
     return () => window.removeEventListener('scroll', remember);
   }, [board, key, location?.frame]);
   const inspect = (id: string) => {
-    if (nodes.find(n => n.id === id)?.kind === 'series') {
+    if (onInspect && nodes.find(n => n.id === id)?.kind === 'series') {
       onInspect(pid, id);
       return;
     }
@@ -438,7 +439,34 @@ export default function ProductionStoryboard({
           </select>
         </label>
       </div>
-      {!productions.length && <p>Создай общий проект в разделе «Папки проекта».</p>}
+      <details open={!productions.length}>
+        <summary>＋ Новый проект раскадровки</summary>
+        <label>
+          Название проекта
+          <input disabled={busy} value={newProduction} onChange={e => setNewProduction(e.target.value)} />
+        </label>
+        <button
+          disabled={busy || !newProduction.trim()}
+          onClick={e => {
+            const box = e.currentTarget.closest('details');
+            void perform(async () => {
+              const created: Production = await request('/api/productions', {
+                title: newProduction.trim(),
+                source_project_id: outlineContext?.projectId || undefined,
+              });
+              setProductions(items => [...items, created]);
+              setPid(created.id);
+              setSid('');
+              setPlan(null);
+              setNewProduction('');
+              setTick(t => t + 1);
+              if (box) box.open = false;
+            });
+          }}
+        >
+          Создать проект
+        </button>
+      </details>
       {pid && (
         <details>
           <summary>＋ Новая серия</summary>
@@ -448,7 +476,8 @@ export default function ProductionStoryboard({
           </label>
           <button
             disabled={busy || !name.trim()}
-            onClick={() =>
+            onClick={e => {
+              const box = e.currentTarget.closest('details');
               void perform(async () => {
                 const n = await request(`/api/productions/${pid}/nodes`, {
                   kind: 'series',
@@ -457,8 +486,9 @@ export default function ProductionStoryboard({
                 setSid(n.id);
                 setName('');
                 setTick(t => t + 1);
-              })
-            }
+                if (box) box.open = false;
+              });
+            }}
           >
             Создать серию
           </button>

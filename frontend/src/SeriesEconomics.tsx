@@ -1,6 +1,5 @@
 import {useEffect, useState} from 'react';
-import {apiFetch} from './api';
-import {responseJson} from './ChatGPTPanel';
+import {apiFetch, responseJson} from './api';
 import {smallUsd} from './usdFormat';
 type Summary = {
   actual_usd_known: number;

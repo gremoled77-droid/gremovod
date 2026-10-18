@@ -1,7 +1,6 @@
 import {useEffect, useRef, useState} from 'react';
 import {X} from 'lucide-react';
-import {apiFetch} from './api';
-import {responseJson} from './ChatGPTPanel';
+import {apiFetch, responseJson} from './api';
 
 type Node = {id: string; kind: string; title: string};
 type Entry = {node: Node; assets: string[]};
@@ -202,7 +201,7 @@ export function AddReferenceModal({
           error={loadError}
           picked={refs}
           onPick={onAdd}
-          empty="В производстве пока нет персонажей. Добавь героя в Character Vault на экране «Мир»."
+          empty="В производстве пока нет персонажей. Добавь героя на экране «Мир → Персонажи»."
         />
       ) : (
         <div className="fs-upload">

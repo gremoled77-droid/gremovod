@@ -1,7 +1,6 @@
 import {useEffect, useMemo, useState} from 'react';
-import {apiFetch} from './api';
+import {apiFetch, responseJson} from './api';
 import BatchReview, {type BatchItem} from './BatchReview';
-import {responseJson} from './ChatGPTPanel';
 import {
   ACTIONS,
   AMPLITUDES,

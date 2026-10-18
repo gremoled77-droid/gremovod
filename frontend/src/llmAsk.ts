@@ -1,5 +1,4 @@
-import {apiFetch} from './api';
-import {responseJson} from './ChatGPTPanel';
+import {apiFetch, responseJson} from './api';
 import {LLM_MAX_TOKENS} from './llmPricing';
 
 export type Msg = {role: 'system' | 'user'; content: string};

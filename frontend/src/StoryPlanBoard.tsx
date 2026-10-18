@@ -1,6 +1,5 @@
 import {useEffect, useState} from 'react';
-import {apiFetch} from './api';
-import {responseJson} from './ChatGPTPanel';
+import {apiFetch, responseJson} from './api';
 import {clearLocal, readLocal, writeLocal} from './localDrafts';
 import {LLM_MODELS} from './llmPricing';
 import type {WorkspaceLocation} from './WorkspaceTrail';
@@ -181,7 +180,7 @@ export default function StoryPlanBoard({
           Создать серию
         </button>
       </div>
-      {!pid && <p>Сначала создай проект постановки в разделе «Монтаж / Папки проекта».</p>}
+      {!pid && <p>Сначала создай проект раскадровки на экране «Раскадровка».</p>}
       {pid && sid && nodes.some(n => n.id === sid) && (
         <EpisodePlan
           key={pid + '/' + sid}
