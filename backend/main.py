@@ -14,7 +14,7 @@ from backend.image_assets import download_image, inspect_image, output_urls, dow
 from backend.prompt_rules import RULES_VERSION, system_rules, PROFILES, reference_label, validate_prompt
 from backend.llm_response import chat_text, upstream_error
 from backend.model_catalog import MODEL_SPECS, ALLOWED_CHAT, IMAGE_TASKS, VIDEO_MODELS
-from backend import adapters
+from backend import adapters, kie
 from backend import camera_movements
 from backend import frame_composition
 
@@ -182,7 +182,8 @@ async def job_status(job_id:str,x_api_key:str|None=Header(default=None)):
     with connect() as db: job=db.execute('SELECT * FROM jobs WHERE id=?',(job_id,)).fetchone()
     if not job: raise HTTPException(404,'Задание не найдено')
     if job['status'] in {'completed','failed','submission_unknown'} or not job['task_id']: return {'job_id':job_id,'upstream':json.loads(job['response'])}
-    result=await request_piapi('GET','/api/v1/task/'+job['task_id'],get_key(x_api_key))
+    if job['provider']=='kie': result=await kie.fetch(provider_key('kie'),job['task_id'])
+    else: result=await request_piapi('GET','/api/v1/task/'+job['task_id'],get_key(x_api_key))
     status=(result.get('data') or {}).get('status','unknown')
     with connect() as db: db.execute('UPDATE jobs SET status=?,response=? WHERE id=?',(status,json.dumps(result,ensure_ascii=False),job_id))
     return {'job_id':job_id,'upstream':result}
@@ -455,23 +456,24 @@ async def model_job(body:ModelJobRequest,x_api_key:str|None=Header(default=None)
     cost=generation_cost(body,payload)
     if not body.approved or body.max_cost_usd<cost: raise HTTPException(400,f'Подтверди платный запуск и лимит не меньше ${cost:.3f}')
     security.verify_quote(body.quote_token,body.project_id,payload,cost)
-    key=get_key(x_api_key)
+    spec=MODEL_SPECS[body.model_id]
+    key=provider_key('kie') if spec['provider']=='kie' else get_key(x_api_key)
     jid=body.request_id
     # Reserve before upstream I/O. Never retry a submission with an uncertain result.
     with connect() as db:
         db.execute('BEGIN IMMEDIATE')
         security.check_budget(db,body.project_id,cost)
         try:
-            db.execute('INSERT INTO jobs VALUES(?,?,?,?,?,?,?,?,?)',(jid,body.project_id,MODEL_SPECS[body.model_id]['kind'],'piapi',None,'submitting',request_data,'{}',now()))
+            db.execute('INSERT INTO jobs VALUES(?,?,?,?,?,?,?,?,?)',(jid,body.project_id,spec['kind'],spec['provider'],None,'submitting',request_data,'{}',now()))
             db.execute('INSERT INTO generation_approvals VALUES(?,?,?,?,?)',(jid,cost,body.max_cost_usd,now(),'documentation_estimate'))
         except sqlite3.IntegrityError: raise HTTPException(409,'Заявка уже отправляется; обнови очередь')
     try:
-        spec=MODEL_SPECS[body.model_id]
-        result=await request_piapi('POST',adapters.submit_path(spec),key,adapters.wire_body(spec,payload))
+        if spec['provider']=='kie': result=await kie.submit(key,adapters.wire_body(spec,payload))
+        else: result=await request_piapi('POST',adapters.submit_path(spec),key,adapters.wire_body(spec,payload))
         if isinstance(result,dict) and not result.get('data') and result.get('task_id'): result={'code':200,'data':result,'message':'success'}  # async GPT-эндпоинт отвечает без обёртки data
         task=result.get('data') or {}
         if not isinstance(task,dict) or not task.get('task_id'):
-            raise HTTPException(502,'Провайдер не вернул task_id. Не повторяй оплату; проверь историю PiAPI.')
+            raise HTTPException(502,'Провайдер не вернул task_id. Не повторяй оплату; проверь историю задач у провайдера.')
         status=str(task.get('status','submitted'))
         with connect() as db:
             db.execute('UPDATE jobs SET task_id=?,status=?,response=? WHERE id=?',(task['task_id'],status,json.dumps(result,ensure_ascii=False),jid))
