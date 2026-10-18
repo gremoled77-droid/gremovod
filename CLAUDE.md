@@ -62,6 +62,7 @@
 - `docs/` — решения и проверки: `PIAPI_MODELS_2026-10-16.md` (каталог и живые тесты), `CLOUD_DEPLOY.md` (Docker/Caddy, не проверялся на сервере), `TECHNICAL_SPEC.md`, `ARCHITECTURE_PLAN_2026-10-16.md`.
 - `skills/gremovod-screenplay/` — формат сценария для ChatGPT.
 - `skills/cinema-*/` — пять навыков по киноязыку (нарратив и жанр, мизансцена, камера, монтаж, звук) по Lewis «Essential Cinema». Контекст и статус значков «I» в интерфейсе: `docs/CINEMA_KNOWLEDGE_2026-10-16.md`.
+- Моушн и монтаж кодом (HyperFrames, Remotion, GSAP, OpenMontage, video-use): скиллы в `~/.claude/skills`, исходники в `~/motion-tools`, что где и что не проверено — `docs/MOTION_TOOLS_2026-10-18.md`; промпт «студии моушна» — `docs/MOTION_STUDIO_PROMPT.md`.
 - Живой скрипт проверки PiAPI: `scripts/live_piapi_test.py` (платный!).
 
 ## Открытые задачи (кратко, полный список в TODO.md)
