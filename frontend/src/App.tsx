@@ -32,6 +32,7 @@ import {readWorkspaceRoute, workspaceHash} from './workspaceRoute';
 import {readLocal, writeLocal, clearLocal} from './localDrafts';
 import Dock, {countActive} from './Dock';
 import Hotkeys from './Hotkeys';
+import {rememberStage} from './lastStage';
 import {OPEN_QUEUE_EVENT} from './imageRoutes';
 import useActivity from './useActivity';
 import IdeaBrief from './IdeaBrief';
@@ -198,7 +199,8 @@ function App() {
   const [titleEditing, setTitleEditing] = useState(true);
   const [startup, setStartup] = useState<'loading' | 'ready' | 'error'>('loading');
   const [startupAttempt, setStartupAttempt] = useState(0);
-  type ProjectChange = {type: 'new'} | {type: 'load'; id: string; mode?: Mode; characterId?: string};
+  type ProjectChange =
+    {type: 'new'; title?: string} | {type: 'load'; id: string; mode?: Mode; characterId?: string};
   const [pendingProjectChange, setPendingProjectChange] = useState<ProjectChange | null>(null);
   const [state, setState] = useState<Studio>(INITIAL);
   const [llm, setLlm] = useState('gpt-5.6-luna');
@@ -488,7 +490,18 @@ function App() {
   }, [openProject, startupAttempt]);
   const applyProjectChange = async (target: ProjectChange) => {
     if (target.type === 'load') await openProject(target.id);
-    else {
+    else if (target.title?.trim()) {
+      // «＋ Новый проект» со «Старта»: сразу сохраняем с названием и открываем на «Идее».
+      const created = await json(
+        await apiFetch('/api/projects', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({title: target.title.trim(), state: INITIAL}),
+        })
+      );
+      await openProject(created.id);
+      void refresh();
+    } else {
       loadingEpoch.current++;
       baseProject.current = null;
       setProjectId('');
@@ -521,6 +534,9 @@ function App() {
   };
   const load = (id: string, destination?: Mode, characterId?: string) =>
     requestProjectChange({type: 'load', id, mode: destination, characterId});
+  useEffect(() => {
+    if (startup === 'ready' && projectId) rememberStage(projectId, mode);
+  }, [projectId, mode, startup]);
   useEffect(() => {
     if (startup === 'ready' && projectId) {
       const hash = workspaceHash(projectId, mode);
@@ -623,7 +639,11 @@ function App() {
               <button
                 className="topbar-new"
                 disabled={startup !== 'ready' || !!busy}
-                onClick={() => void requestProjectChange({type: 'new'})}
+                onClick={() => {
+                  // Новый проект создаётся на «Старте»: название и сразу «Идея».
+                  setMode('home');
+                  window.setTimeout(() => document.getElementById('home-new-title')?.focus(), 50);
+                }}
               >
                 <Plus size={16} /> Новый проект
               </button>
@@ -881,7 +901,8 @@ function App() {
                   projectName={projectName}
                   projects={projects}
                   onMode={setMode}
-                  onOpenProject={id => void load(id, 'home')}
+                  onOpenProject={(id, stage) => void load(id, stage)}
+                  onNewProject={title => void requestProjectChange({type: 'new', title})}
                 />
               ) : mode === 'create' ? (
                 <CreateScreen
