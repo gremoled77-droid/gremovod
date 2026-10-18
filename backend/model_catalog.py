@@ -11,7 +11,7 @@ MODEL_SPECS = {
  'seedream-5-pro': {'launch_enabled':False,'kind':'image','model':'seedream','task_type':'seedream-5-pro','size':['1K','2K'],'aspect_ratio':['16:9','9:16','1:1','4:3','3:4','3:2','2:3','4:5','5:4','21:9'],'output_format':['png','jpeg','webp'],'max_refs':10,'ref_field':'image_urls','docs':'https://app.piapi.ai/docs/seedream-api/seedream-5'},
  'seedream-5-lite': {'launch_enabled':True,'verified_at':'2026-10-15','price_usd':0.052,'kind':'image','model':'seedream','task_type':'seedream-5-lite','size':['2K','3K'],'aspect_ratio':['16:9','9:16','1:1','4:3','3:4','3:2','2:3','4:5','5:4','21:9'],'output_format':['png','jpeg','webp'],'max_refs':10,'ref_field':'image_urls','docs':'https://app.piapi.ai/docs/seedream-api/seedream-5'},
  'nano-banana-2.1': {'launch_enabled':False,'kind':'image','model':'gemini','task_type':'nano-banana-2.1','resolution':['1K','2K','4K'],'aspect_ratio':['16:9','9:16','1:1','4:3','3:4'],'output_format':['png','jpg','webp'],'max_refs':10,'ref_field':'image_urls','docs':'https://piapi.ai/docs/gemini-api/nano-banana-2'},
- 'seedance-2.5': {'launch_enabled':True,'verified_at':'2026-10-15','price_per_second_usd':{'480p':0.15,'720p':0.35,'1080p':0.8},'kind':'video','model':'seedance','task_type':'seedance-2.5','resolution':['480p','720p','1080p'],'aspect_ratio':['16:9','9:16','4:3','3:4','21:9','1:1','adaptive'],'duration_min':4,'duration_max':30,'max_refs':30,'ref_field':'image_urls','docs':'https://piapi.ai/docs/seedance-api/seedance-25'}
+ 'seedance-2.5': {'launch_enabled':False,'price_per_second_usd':{'480p':0.15,'720p':0.35,'1080p':0.8},'kind':'video','model':'seedance','task_type':'seedance-2.5','resolution':['480p','720p','1080p'],'aspect_ratio':['16:9','9:16','4:3','3:4','21:9','1:1','adaptive'],'duration_min':4,'duration_max':30,'max_refs':30,'ref_field':'image_urls','docs':'https://piapi.ai/docs/seedance-api/seedance-25'}
 }
 
 # Prompt-only profiles do not enable or invent a paid provider schema.
@@ -71,6 +71,7 @@ MODEL_SPECS['minimax-h3']={
                'seed':{'min':0,'max':2147483647,'optional':True}}}
 
 
+# Seedance 2.5: живого вызова не было (docs/SEEDANCE_25_480P_5S_PROMPT.md), запуск выключен до проверки.
 # Seedance 2.5: адаптер сам валидирует картинки, видео, аудио, edit/extend и draft (backend/adapters.py).
 MODEL_SPECS['seedance-2.5']['adapter']='seedance_25'
 
