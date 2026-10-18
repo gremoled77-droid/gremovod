@@ -447,7 +447,8 @@ export default function ProductionStoryboard({
         </label>
         <button
           disabled={busy || !newProduction.trim()}
-          onClick={() =>
+          onClick={e => {
+            const box = e.currentTarget.closest('details');
             void perform(async () => {
               const created: Production = await request('/api/productions', {
                 title: newProduction.trim(),
@@ -459,8 +460,9 @@ export default function ProductionStoryboard({
               setPlan(null);
               setNewProduction('');
               setTick(t => t + 1);
-            })
-          }
+              if (box) box.open = false;
+            });
+          }}
         >
           Создать проект
         </button>
@@ -474,7 +476,8 @@ export default function ProductionStoryboard({
           </label>
           <button
             disabled={busy || !name.trim()}
-            onClick={() =>
+            onClick={e => {
+              const box = e.currentTarget.closest('details');
               void perform(async () => {
                 const n = await request(`/api/productions/${pid}/nodes`, {
                   kind: 'series',
@@ -483,8 +486,9 @@ export default function ProductionStoryboard({
                 setSid(n.id);
                 setName('');
                 setTick(t => t + 1);
-              })
-            }
+                if (box) box.open = false;
+              });
+            }}
           >
             Создать серию
           </button>

@@ -28,6 +28,7 @@ test('combos use physical keys, so the Russian layout works', () => {
   assert.equal(comboOf({key: 'а'}), 'f');
   assert.equal(comboOf({key: 'k', ctrlKey: true}), 'mod+k');
   assert.equal(comboOf({key: '4', altKey: true}), 'alt+4');
+  assert.equal(comboOf({key: 'ы', code: 'KeyS', ctrlKey: true}), 'mod+s');
   assert.equal(comboOf({key: 'а', code: 'KeyF', ctrlKey: true}), null);
 });
 
@@ -38,7 +39,7 @@ test('single keys never fire while typing; Ctrl+Enter, Esc and Ctrl+K do', () =>
   assert.ok(!isTyping({tagName: 'INPUT', type: 'checkbox'}));
   assert.ok(!isTyping({tagName: 'BUTTON'}));
   assert.ok(!isTyping(null));
-  for (const c of ['mod+enter', 'escape', 'mod+k']) assert.ok(allowedWhileTyping(c));
+  for (const c of ['mod+enter', 'escape', 'mod+k', 'mod+s']) assert.ok(allowedWhileTyping(c));
   for (const c of ['/', '?', 'f', 'delete', 'mod+z', 'alt+1']) assert.ok(!allowedWhileTyping(c));
 });
 

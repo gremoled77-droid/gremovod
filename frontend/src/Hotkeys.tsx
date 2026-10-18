@@ -72,6 +72,7 @@ export default function Hotkeys({
   onHero,
   dockOpen,
   onCloseDock,
+  onSave,
 }: {
   mode: Mode;
   onMode: (m: Mode) => void;
@@ -81,14 +82,15 @@ export default function Hotkeys({
   onHero: (id: string) => void;
   dockOpen: boolean;
   onCloseDock: () => void;
+  onSave: () => void;
 }) {
   const [help, setHelp] = useState(false);
   const [palette, setPalette] = useState(false);
   const [toasts, setToasts] = useState<(Toast & {id: number})[]>([]);
   const {items, reset} = useSharedActivity();
   const waiting = items.filter(i => i.source === 'external' && i.status === 'waiting_external');
-  const live = useRef({mode, waiting, dockOpen, help, palette, onMode, onCloseDock});
-  live.current = {mode, waiting, dockOpen, help, palette, onMode, onCloseDock};
+  const live = useRef({mode, waiting, dockOpen, help, palette, onMode, onCloseDock, onSave});
+  live.current = {mode, waiting, dockOpen, help, palette, onMode, onCloseDock, onSave};
 
   useEffect(
     () =>
@@ -114,6 +116,8 @@ export default function Hotkeys({
           if (!closeTopModal()) return;
         } else if (s.dockOpen) s.onCloseDock();
         else return;
+      } else if (combo === 'mod+s') {
+        s.onSave(); // и не даём браузеру «Сохранить страницу»
       } else if (modalOpen() || s.help || s.palette) {
         return; // окна (просмотр, подтверждение цены) обрабатывают свои клавиши сами
       } else if (combo === 'mod+k') setPalette(true);

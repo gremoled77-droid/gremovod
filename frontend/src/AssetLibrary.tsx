@@ -21,13 +21,11 @@ type Asset = {
 export default function AssetLibrary({
   projectId,
   revision,
-  onUse,
   character,
   onReplaced,
 }: {
   projectId: string;
   revision: number;
-  onUse: (url: string, id: string) => void;
 } & ReplacementControls) {
   const [items, setItems] = useState<Asset[]>([]);
   const [error, setError] = useState('');
@@ -126,15 +124,6 @@ export default function AssetLibrary({
               <a href={a.url} download>
                 Скачать оригинал
               </a>
-              {!['video', 'audio'].includes(a.metadata.kind || 'image') && (
-                <>
-                  {(a.provider_reference_url || a.source_url) && (
-                    <button onClick={() => onUse(a.provider_reference_url || a.source_url, a.id)}>
-                      Выбрать для видео
-                    </button>
-                  )}
-                </>
-              )}
             </div>
             {!['video', 'audio'].includes(a.metadata.kind || 'image') && (
               <>
@@ -144,7 +133,6 @@ export default function AssetLibrary({
                     setItems(items =>
                       items.map(item => (item.id === a.id ? {...item, provider_reference_url: url} : item))
                     );
-                    onUse(url, a.id);
                   }}
                 />
                 <ReplaceCharacterButton

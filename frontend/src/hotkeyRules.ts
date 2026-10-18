@@ -17,6 +17,8 @@ const BY_KEY: Record<string, string> = {
   л: 'KeyK',
   z: 'KeyZ',
   я: 'KeyZ',
+  s: 'KeyS',
+  ы: 'KeyS',
   f: 'KeyF',
   а: 'KeyF',
   '/': 'Slash',
@@ -36,6 +38,7 @@ export function comboOf(e: KeyLike): string | null {
   if (e.altKey && !mod && /^Digit[0-9]$/.test(code)) return 'alt+' + code.slice(5);
   if (mod && !e.altKey && code === 'KeyK') return 'mod+k';
   if (mod && !e.altKey && !e.shiftKey && code === 'KeyZ') return 'mod+z';
+  if (mod && !e.altKey && !e.shiftKey && code === 'KeyS') return 'mod+s';
   if (mod || e.altKey) return null;
   if (code === 'Slash') return e.shiftKey ? '?' : '/';
   if (e.key === '?') return '?';
@@ -59,7 +62,7 @@ export function isTyping(target: TargetLike): boolean {
 }
 
 /** Эти сочетания работают и во время набора текста (Ctrl+V обрабатывается отдельно, событием вставки). */
-const WHILE_TYPING = new Set(['mod+enter', 'escape', 'mod+k']);
+const WHILE_TYPING = new Set(['mod+enter', 'escape', 'mod+k', 'mod+s']);
 export const allowedWhileTyping = (combo: string) => WHILE_TYPING.has(combo);
 
 /** Alt+цифра → экран: 0 Старт, 1–5 этапы ролика, 6 Узлы, 7 Библиотека. */
@@ -78,6 +81,7 @@ export const ALT_DIGIT_MODES = [
 export const HOTKEY_HELP: {keys: string; text: string}[] = [
   {keys: 'Ctrl + Enter', text: 'Сгенерировать (для API сначала окно цены)'},
   {keys: 'Ctrl + K', text: 'Быстрый переход: экран, проект, герой'},
+  {keys: 'Ctrl + S', text: 'Сохранить проект'},
   {keys: 'Alt + 0…7', text: 'Старт, Идея, Мир, Раскадровка, Кадры, Видео, Узлы, Библиотека'},
   {keys: '/', text: 'Курсор в строку промпта'},
   {keys: 'Ctrl + V', text: 'Картинка: ответ ChatGPT, а в «Кадрах» — новый референс'},

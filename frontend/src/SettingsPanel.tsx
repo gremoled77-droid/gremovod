@@ -105,12 +105,7 @@ export default function SettingsPanel({
           <pre className="settings-diagnostics">{JSON.stringify(diagnostics, null, 2)}</pre>
         )}
       </article>
-      {children && (
-        <article className="sc-step">
-          <h3>Бюджет и лимиты</h3>
-          {children}
-        </article>
-      )}
+      {children && <article className="sc-step">{children}</article>}
     </section>
   );
 }

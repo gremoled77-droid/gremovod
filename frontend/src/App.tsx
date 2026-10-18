@@ -118,8 +118,7 @@ const INITIAL: Studio = {
     rules: 'Грэм и автомобиль соответствуют утвержденным референсам',
     avoid: 'Случайные изменения внешности, формы машины, цвета и стилистики',
   },
-  brief:
-    'Кинематографичный кадр ночного Минска. Герой стоит спиной у окна и поёт. Камера медленно поднимается.',
+  brief: '',
   prompts: {},
   parameters: {},
   selectedCharacter: '',
@@ -157,6 +156,10 @@ function App() {
     return () => window.removeEventListener(OPEN_QUEUE_EVENT, open);
   }, []);
   const [mode, setMode] = useState<Mode>(() => readWorkspaceRoute(window.location.hash)?.mode || 'home');
+  // На телефоне «Очередь» закрывает полэкрана: при переходе на другой экран убираем её.
+  useEffect(() => {
+    if (window.matchMedia('(max-width: 700px)').matches) setDockOpen(false);
+  }, [mode]);
   // Экраны, скрытые до беты, не открываются ни по кнопкам, ни по старым ссылкам.
   useEffect(() => {
     if (isHidden(mode)) setMode('home');
@@ -604,13 +607,11 @@ function App() {
             </span>
           </div>
           <div className="top-actions">
-            {projectId &&
-              projectDirty &&
-              ['home', 'create', 'video', 'audio', 'storyboard', 'graph'].includes(mode) && (
-                <button disabled={!!busy} onClick={() => void save()}>
-                  Сохранить проект
-                </button>
-              )}
+            {projectId && projectDirty && (
+              <button disabled={!!busy} onClick={() => void save()} title="Ctrl + S">
+                Сохранить проект
+              </button>
+            )}
             <button
               className={'dock-toggle' + (dockOpen ? ' active' : '')}
               onClick={() => setDockOpen(v => !v)}
@@ -876,10 +877,6 @@ function App() {
                             {...replacementControls}
                             projectId={projectId}
                             revision={libraryRevision}
-                            onUse={(link, id) => {
-                              change({videoReference: link, videoAssetId: id});
-                              setNotice('Изображение выбрано как основа для видео');
-                            }}
                           />
                         }
                       />
@@ -925,15 +922,7 @@ function App() {
                     .join('. ')}
                 />
               ) : mode === 'archive' ? (
-                <AssetLibrary
-                  {...replacementControls}
-                  projectId={projectId}
-                  revision={libraryRevision}
-                  onUse={(link, id) => {
-                    change({videoReference: link, videoAssetId: id});
-                    setNotice('Изображение выбрано как основа для видео');
-                  }}
-                />
+                <AssetLibrary {...replacementControls} projectId={projectId} revision={libraryRevision} />
               ) : mode === 'studio' ? (
                 <IdeaScreen
                   briefText={state.brief}
@@ -1039,6 +1028,9 @@ function App() {
           }}
           dockOpen={dockOpen}
           onCloseDock={() => setDockOpen(false)}
+          onSave={() => {
+            if (projectId && projectDirty && !busy) void save();
+          }}
         />
       </div>
     </ActivityProvider>

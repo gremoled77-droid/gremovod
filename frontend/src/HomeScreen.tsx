@@ -235,9 +235,11 @@ export default function HomeScreen({
               <button className="primary home-go" onClick={() => onMode(resume)}>
                 {projectId ? `Продолжить: ${screenOf(resume).title}` : 'Начать с идеи'} →
               </button>
-              <button className="home-hint" onClick={() => onMode(next.mode)}>
-                {next.text}
-              </button>
+              {projectId && (
+                <button className="home-hint" onClick={() => onMode(next.mode)}>
+                  {next.text}
+                </button>
+              )}
             </div>
           </div>
         </div>
