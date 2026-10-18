@@ -1,4 +1,3 @@
-import {Palette} from 'lucide-react';
 import type {ReactNode} from 'react';
 import CinemaInfo from './CinemaInfo';
 import {WORLD_FIELDS, type World, type WorldKey} from './worldBible';
@@ -17,9 +16,19 @@ const HINTS: Record<WorldKey, string> = {
   avoid: 'Чего не должно быть в кадре',
 };
 
-/** «Библия мира»: поля стиля, которые подставляются в промпты всех кадров серии. */
+/** Поля мира по смыслу: сначала образ, затем место и время, в конце камера и правила. */
+const GROUPS: {title: string; keys: WorldKey[]}[] = [
+  {title: 'Образ', keys: ['look', 'mood', 'palette', 'lighting']},
+  {title: 'Место и время', keys: ['environment', 'time', 'tech', 'textures']},
+  {title: 'Камера и правила', keys: ['camera', 'rules', 'avoid']},
+];
+
+const LABELS = Object.fromEntries(WORLD_FIELDS) as Record<WorldKey, string>;
+
+/** «Стиль мира»: поля библии мира слева, справа паспорт — то, что уходит в промпты всех кадров серии. */
 export default function WorldStyle({
   style,
+  passport,
   busy,
   attachments,
   onChange,
@@ -28,6 +37,8 @@ export default function WorldStyle({
   onNext,
 }: {
   style: Partial<World>;
+  /** Текст паспорта мира (как он подставляется в промпты). */
+  passport: string;
   busy: boolean;
   attachments?: ReactNode;
   onChange: (style: Partial<World>) => void;
@@ -35,38 +46,55 @@ export default function WorldStyle({
   onCopy: () => void;
   onNext: () => void;
 }) {
+  const filled = WORLD_FIELDS.filter(([k]) => (style[k] || '').trim()).length;
   return (
-    <section className="panel world-bible">
-      <div className="panel-title">
-        <h2>Библия мира</h2>
-        <CinemaInfo topic="world" />
-        <Palette size={22} />
-      </div>
-      <p className="muted">
-        Единый стиль сохраняется вместе с проектом и держит все кадры серии в одном мире. Заполни коротко и по
-        делу: эти поля подставляются в промпты и проверку результатов.
-      </p>
-      {attachments}
-      <div className="world-fields">
-        {WORLD_FIELDS.map(([k, label]) => (
-          <label key={k} className={'world-field world-field-' + k}>
-            <b>{label}</b>
-            <small>{HINTS[k]}</small>
-            <textarea
-              rows={2}
-              value={style[k] || ''}
-              onChange={e => onChange({...style, [k]: e.target.value})}
-            />
-          </label>
+    <div className="ws">
+      <section className="ws-main" aria-label="Библия мира">
+        <div className="ws-head">
+          <div>
+            <h2>
+              Библия мира <CinemaInfo topic="world" />
+            </h2>
+            <small>Коротко и по делу: эти поля держат все кадры серии в одном мире.</small>
+          </div>
+          <span className={'ws-count' + (filled === WORLD_FIELDS.length ? ' full' : '')}>
+            {filled} из {WORLD_FIELDS.length}
+          </span>
+        </div>
+        {attachments}
+        {GROUPS.map(g => (
+          <fieldset key={g.title} className="ws-group">
+            <legend>{g.title}</legend>
+            <div className="world-fields">
+              {g.keys.map(k => (
+                <label key={k} className={'world-field world-field-' + k}>
+                  <b>{LABELS[k]}</b>
+                  <small>{HINTS[k]}</small>
+                  <textarea
+                    rows={2}
+                    value={style[k] || ''}
+                    onChange={e => onChange({...style, [k]: e.target.value})}
+                  />
+                </label>
+              ))}
+            </div>
+          </fieldset>
         ))}
-      </div>
-      <div className="world-actions">
+      </section>
+      <aside className="ws-side" aria-label="Паспорт мира">
+        <h3>Паспорт мира</h3>
+        <small className="muted">Так стиль подставляется в промпты кадров и героев.</small>
+        <pre className="ws-passport">{passport.trim() || 'Заполни поля слева — здесь появится паспорт.'}</pre>
         <button className="primary" disabled={busy} onClick={onSave}>
-          Сохранить стиль проекта
+          Сохранить стиль
         </button>
-        <button onClick={onCopy}>Копировать паспорт</button>
-        <button onClick={onNext}>Дальше: персонажи →</button>
-      </div>
-    </section>
+        <div className="ws-side-row">
+          <button onClick={onCopy} disabled={!passport.trim()}>
+            Копировать
+          </button>
+          <button onClick={onNext}>Персонажи →</button>
+        </div>
+      </aside>
+    </div>
   );
 }

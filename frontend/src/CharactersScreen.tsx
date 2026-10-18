@@ -36,9 +36,9 @@ export default function CharactersScreen({
   onToWorld,
   onNext,
   onLibrary,
-  builder,
   results,
   card,
+  view,
   revision,
 }: {
   projectId: string;
@@ -51,8 +51,9 @@ export default function CharactersScreen({
   onToWorld: () => void;
   onNext: () => void;
   onLibrary: () => void;
-  builder: ReactNode;
   results: ReactNode;
+  /** Вкладка задаётся снаружи (вкладки «Мира»); без неё — свои вкладки «Герои / Локации». */
+  view?: 'heroes' | 'locations';
   /** Карточка выбранного героя: имя, внешность, референсы. */
   card?: ReactNode;
   revision: number;
@@ -66,7 +67,8 @@ export default function CharactersScreen({
     [error, setError] = useState(''),
     [note, setNote] = useState(''),
     [busy, setBusy] = useState(false),
-    [tab, setTab] = useState<'heroes' | 'locations'>('heroes');
+    [ownTab, setTab] = useState<'heroes' | 'locations'>('heroes');
+  const tab = view || ownTab;
   useEffect(() => {
     let active = true;
     void apiFetch('/api/model-specs')
@@ -143,7 +145,7 @@ export default function CharactersScreen({
   if (tab === 'locations')
     return (
       <section className="chars">
-        {tabs}
+        {!view && tabs}
         <LocationsTab
           projectId={projectId}
           ensureProject={ensureProject}
@@ -156,7 +158,7 @@ export default function CharactersScreen({
     );
   return (
     <section className="chars">
-      {tabs}
+      {!view && tabs}
       <div className="panel">
         <h2>Персонажи</h2>
         <p className="muted">Герои проекта. Выбери героя: ниже его имя, внешность и референсы.</p>
@@ -185,71 +187,73 @@ export default function CharactersScreen({
           </button>
         </div>
       </div>
-      {card}
-      <div className="panel">
-        <h3>Сгенерировать героя{hero ? ` · ${hero.name}` : ''}</h3>
-        {!worldFilled(world) && (
-          <p role="status" className="muted">
-            «Мир» пока пуст. <button onClick={onToWorld}>Заполнить мир</button>
+      <div className="chars-work">
+        {card}
+        <div className="panel chars-gen">
+          <h3>Сгенерировать героя{hero ? ` · ${hero.name}` : ''}</h3>
+          {!worldFilled(world) && (
+            <p role="status" className="muted">
+              «Мир» пока пуст. <button onClick={onToWorld}>Заполнить мир</button>
+            </p>
+          )}
+          <label>
+            Модель
+            <select value={model} onChange={e => setModel(e.target.value)}>
+              {(models.length ? models.map(([id]) => id) : [DEFAULT_MODEL]).map(id => (
+                <option key={id} value={id}>
+                  {id}
+                  {id === DEFAULT_MODEL ? ' (по умолчанию)' : ''}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Промпт героя
+            <textarea
+              data-prompt
+              rows={8}
+              value={prompt}
+              onChange={e => {
+                setPrompt(e.target.value);
+                setEdited(true);
+              }}
+            />
+          </label>
+          <div className="chars-actions">
+            <GenerateButton
+              projectId={projectId}
+              busy={busy}
+              disabled={!hero}
+              estimate={estimate}
+              onApi={start}
+              job={async () => {
+                if (!hero) return 'Выбери героя или создай нового';
+                if (!worldFilled(world)) return 'Сначала заполни «Мир»: стиль нужен для промпта героя';
+                if (!prompt.trim()) return 'Промпт пустой';
+                const pid = projectId || (await ensureProject());
+                return {projectId: pid, prompt, target: model, referenceAssetIds: []};
+              }}
+              onNotice={setNote}
+              onError={setError}
+            />
+            <button
+              disabled={!edited}
+              onClick={() => {
+                setEdited(false);
+                setPrompt(auto);
+              }}
+            >
+              Собрать промпт заново
+            </button>
+            <button onClick={onNext}>Дальше: раскадровка →</button>
+          </div>
+          {error && <p role="alert">{error}</p>}
+          {note && <p className="muted">{note}</p>}
+          <p className="muted">
+            Платный запуск через API — только после оценки цены и подтверждения; ChatGPT и Codex — $0. Готовые
+            картинки появятся ниже в библиотеке: выбери лучшую и нажми «Заменить персонажа».
           </p>
-        )}
-        <label>
-          Модель
-          <select value={model} onChange={e => setModel(e.target.value)}>
-            {(models.length ? models.map(([id]) => id) : [DEFAULT_MODEL]).map(id => (
-              <option key={id} value={id}>
-                {id}
-                {id === DEFAULT_MODEL ? ' (по умолчанию)' : ''}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Промпт героя
-          <textarea
-            data-prompt
-            rows={8}
-            value={prompt}
-            onChange={e => {
-              setPrompt(e.target.value);
-              setEdited(true);
-            }}
-          />
-        </label>
-        <div className="chars-actions">
-          <GenerateButton
-            projectId={projectId}
-            busy={busy}
-            disabled={!hero}
-            estimate={estimate}
-            onApi={start}
-            job={async () => {
-              if (!hero) return 'Выбери героя или создай нового';
-              if (!worldFilled(world)) return 'Сначала заполни «Мир»: стиль нужен для промпта героя';
-              if (!prompt.trim()) return 'Промпт пустой';
-              const pid = projectId || (await ensureProject());
-              return {projectId: pid, prompt, target: model, referenceAssetIds: []};
-            }}
-            onNotice={setNote}
-            onError={setError}
-          />
-          <button
-            disabled={!edited}
-            onClick={() => {
-              setEdited(false);
-              setPrompt(auto);
-            }}
-          >
-            Собрать промпт заново
-          </button>
-          <button onClick={onNext}>Дальше: раскадровка →</button>
         </div>
-        {error && <p role="alert">{error}</p>}
-        {note && <p className="muted">{note}</p>}
-        <p className="muted">
-          Платный запуск через API — только после оценки цены и подтверждения; ChatGPT и Codex — $0. Готовые
-          картинки появятся ниже в библиотеке: выбери лучшую и нажми «Заменить персонажа».
-        </p>
       </div>
       {hero && (
         <SheetPanel
@@ -303,7 +307,6 @@ export default function CharactersScreen({
           )}
         />
       )}
-      {builder}
       {results}
       {request && (
         <GenerationReview

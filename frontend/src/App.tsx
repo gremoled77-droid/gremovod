@@ -16,7 +16,6 @@ import WorldStyle from './WorldStyle';
 import CharacterReferences from './CharacterReferences';
 import AttachmentMenu, {AttachmentStrip} from './AttachmentMenu';
 import CharactersScreen from './CharactersScreen';
-import FrameBuilder from './FrameBuilder';
 import {EMPTY_SCENE, type Scene} from './scene';
 import ConnectionsPanel from './ConnectionsPanel';
 import AssetLibrary from './AssetLibrary';
@@ -163,6 +162,7 @@ const json = async (r: Response) => {
 const url = '/api';
 function App() {
   const [dockOpen, setDockOpen] = useState(false);
+  const [worldTab, setWorldTab] = useState<'heroes' | 'locations'>('heroes');
   // Отправка в ChatGPT/Codex открывает «Очередь»: там лоток ожидания картинки.
   useEffect(() => {
     const open = () => setDockOpen(true);
@@ -790,16 +790,29 @@ function App() {
                       Стиль мира
                     </button>
                     <button
-                      className={mode === 'characters' ? 'on' : ''}
-                      onClick={() => setMode('characters')}
+                      className={mode === 'characters' && worldTab === 'heroes' ? 'on' : ''}
+                      onClick={() => {
+                        setWorldTab('heroes');
+                        setMode('characters');
+                      }}
                     >
                       Персонажи{state.characters.length ? ` · ${state.characters.length}` : ''}
+                    </button>
+                    <button
+                      className={mode === 'characters' && worldTab === 'locations' ? 'on' : ''}
+                      onClick={() => {
+                        setWorldTab('locations');
+                        setMode('characters');
+                      }}
+                    >
+                      Локации
                     </button>
                   </nav>
                   {mode === 'styles' ? (
                     <>
                       <IdeaRefs projectId={projectId} ids={state.ideaRefs || []} />
                       <WorldStyle
+                        passport={passportText(state.style)}
                         style={state.style}
                         busy={!!busy}
                         attachments={<AttachmentStrip items={(state.scene || EMPTY_SCENE).assets} />}
@@ -830,6 +843,7 @@ function App() {
                         card={
                           character && (
                             <section className="panel hero-card" aria-label="Карточка героя">
+                              <h3>Карточка героя · {character.name}</h3>
                               <CharacterReferences
                                 key={character.id}
                                 projectId={projectId}
@@ -865,20 +879,7 @@ function App() {
                             </section>
                           )
                         }
-                        builder={
-                          <FrameBuilder
-                            projectId={projectId}
-                            ensureProject={ensureProject}
-                            heroes={state.characters}
-                            world={state.style}
-                            brief={state.brief}
-                            locationAssetIds={(state.scene || EMPTY_SCENE).assets
-                              .filter(a => a.role === 'location')
-                              .map(a => a.asset_id)}
-                            revision={libraryRevision}
-                            onSent={() => setMode('storyboard')}
-                          />
-                        }
+                        view={worldTab}
                         results={
                           <AssetLibrary
                             {...replacementControls}
@@ -1042,6 +1043,7 @@ function App() {
           heroes={state.characters}
           onHero={id => {
             change({selectedCharacter: id});
+            setWorldTab('heroes');
             setMode('characters');
           }}
           dockOpen={dockOpen}
