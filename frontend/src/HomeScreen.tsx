@@ -34,6 +34,7 @@ const STEPS: {mode: Mode; n: string; title: string; text: string}[] = [
   {mode: 'storyboard', n: '3', title: 'Раскадровка', text: 'Сцены и кадры эпизода'},
   {mode: 'create', n: '4', title: 'Кадры', text: 'Картинки от нескольких моделей'},
   {mode: 'video', n: '5', title: 'Видео', text: 'Оживить кадры'},
+  {mode: 'audio', n: '6', title: 'Звук', text: 'Голоса и звук кадров'},
 ];
 
 const money = (v: number | undefined) => '$' + (v ?? 0).toFixed(2);

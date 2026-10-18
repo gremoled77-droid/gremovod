@@ -1,5 +1,5 @@
 import type {Mode} from './screens';
-/** Открываемые по ссылке экраны; скрытые до беты (Звук, Монтаж, Выпуск, Рилсы, Сцена, Допилить, Агенты) — нет. */
+/** Открываемые по ссылке экраны; скрытые до беты (Монтаж, Выпуск, Рилсы, Сцена, Допилить, Агенты) — нет. */
 export const MODES: Mode[] = [
   'home',
   'studio',
@@ -8,6 +8,7 @@ export const MODES: Mode[] = [
   'storyboard',
   'create',
   'video',
+  'audio',
   'graph',
   'archive',
   'connections',

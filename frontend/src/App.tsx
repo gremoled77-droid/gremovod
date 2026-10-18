@@ -21,6 +21,7 @@ import ConnectionsPanel from './ConnectionsPanel';
 import AssetLibrary from './AssetLibrary';
 import CreateScreen from './CreateScreen';
 import VideoScreen from './VideoScreen';
+import SoundScreen from './SoundScreen';
 import HomeScreen from './HomeScreen';
 import GenerationWatcher from './GenerationWatcher';
 import {ActivityProvider} from './ActivityContext';
@@ -921,6 +922,8 @@ function App() {
                     .filter(Boolean)
                     .join('. ')}
                 />
+              ) : mode === 'audio' ? (
+                <SoundScreen projectId={projectId} />
               ) : mode === 'archive' ? (
                 <AssetLibrary {...replacementControls} projectId={projectId} revision={libraryRevision} />
               ) : mode === 'studio' ? (

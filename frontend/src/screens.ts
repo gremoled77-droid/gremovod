@@ -11,8 +11,8 @@ export type Mode =
   | 'archive'
   | 'connections'
   | 'settings'
-  // Скрыты до беты (решение владельца 18.10.2026): код лежит, в меню и маршрутах их нет.
   | 'audio'
+  // Скрыты до беты (решение владельца 18.10.2026): код лежит, в меню и маршрутах их нет.
   | 'reels'
   | 'files'
   | 'economics'
@@ -53,6 +53,14 @@ export const SCREENS: Screen[] = [
   {mode: 'storyboard', title: 'Раскадровка', group: 'stage', main: 'storyboard-main', hint: 'кадры эпизода'},
   {mode: 'create', title: 'Кадры', group: 'stage', main: 'create-main', hint: 'картинки'},
   {mode: 'video', title: 'Видео', group: 'stage', main: 'create-main video-main', hint: 'оживление кадров'},
+  {
+    mode: 'audio',
+    title: 'Звук',
+    group: 'stage',
+    main: 'solo-main',
+    hint: 'голос и звук кадров',
+    lede: 'Голоса героев и звук каждого кадра: реплики, шумы, музыка.',
+  },
   {mode: 'graph', title: 'Узлы', group: 'tool', main: 'workflow-main', icon: '⌁'},
   {
     mode: 'archive',
@@ -83,7 +91,6 @@ export const SCREENS: Screen[] = [
     main: 'solo-main',
     lede: 'Проект, модель для промптов и ссылка на чат.',
   },
-  {mode: 'audio', title: 'Звук', group: 'hidden', main: 'media-main'},
   {mode: 'reels', title: 'Рилсы', group: 'hidden', main: 'reels-main'},
   {mode: 'files', title: 'Монтаж', group: 'hidden', main: 'solo-main'},
   {mode: 'economics', title: 'Выпуск', group: 'hidden', main: 'solo-main'},

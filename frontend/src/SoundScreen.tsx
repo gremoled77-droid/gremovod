@@ -1,4 +1,4 @@
-import {useCallback, useEffect, useState, type ReactNode} from 'react';
+import {useCallback, useEffect, useState} from 'react';
 import FrameSoundTab from './FrameSoundTab';
 import {loadSound, type SoundContext} from './soundApi';
 import VoicesTab from './VoicesTab';
@@ -6,12 +6,11 @@ import VoicesTab from './VoicesTab';
 const TABS = [
   {id: 'voices', label: 'Голоса'},
   {id: 'frames', label: 'Звук по кадрам'},
-  {id: 'refs', label: 'Референсы голоса'},
 ] as const;
 type Tab = (typeof TABS)[number]['id'];
 
-/** Экран «Звук»: библиотека голосов, звуковые заметки кадров и прежний Audio Lab. */
-export default function SoundScreen({projectId, audioLab}: {projectId: string; audioLab: ReactNode}) {
+/** Экран «Звук»: библиотека голосов и звуковые заметки кадров. */
+export default function SoundScreen({projectId}: {projectId: string}) {
   const [tab, setTab] = useState<Tab>('voices'),
     [ctx, setCtx] = useState<SoundContext | null>(null),
     [loaded, setLoaded] = useState(false),
@@ -38,28 +37,27 @@ export default function SoundScreen({projectId, audioLab}: {projectId: string; a
       .finally(() => setBusy(false));
   };
   return (
-    <section className="panel snd">
-      <div className="panel-title">
-        <h2>Звук</h2>
-      </div>
-      <div className="chips" role="tablist" aria-label="Разделы звука">
+    <section className="snd">
+      <div className="world-tabs" role="tablist" aria-label="Разделы звука">
         {TABS.map(t => (
           <button
             key={t.id}
             role="tab"
             aria-selected={tab === t.id}
-            className={tab === t.id ? 'primary' : ''}
+            className={tab === t.id ? 'on' : ''}
             onClick={() => setTab(t.id)}
           >
             {t.label}
           </button>
         ))}
       </div>
-      {error && <p role="alert">{error}</p>}
+      {error && (
+        <div className="alert" role="alert">
+          {error}
+        </div>
+      )}
       {busy && <p className="muted">Сохраняю…</p>}
-      {tab === 'refs' ? (
-        audioLab
-      ) : !loaded ? (
+      {!loaded ? (
         <p className="muted">Загружаю…</p>
       ) : !ctx ? (
         <p className="muted">

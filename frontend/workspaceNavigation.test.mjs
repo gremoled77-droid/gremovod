@@ -7,7 +7,7 @@ const {readWorkspaceRoute,workspaceHash}=await module('./src/workspaceRoute.ts')
 const {startActivityFeed}=await module('./src/activityFeed.ts');
 test('workspace route keeps the chosen project and separate media pages',()=>{
  for(const mode of ['create','video','styles','storyboard'])assert.deepEqual(readWorkspaceRoute(workspaceHash('frame_project-1',mode)),{projectId:'frame_project-1',mode});
- for(const hash of ['#/project/a/audio','#/project/a/refine','#/project/a/unknown','#/project/../../x/create','#https://evil.test','#/project/a/create?pay=true'])assert.equal(readWorkspaceRoute(hash),null);
+ for(const hash of ['#/project/a/refine','#/project/a/unknown','#/project/../../x/create','#https://evil.test','#/project/a/create?pay=true'])assert.equal(readWorkspaceRoute(hash),null);
 });
 test('a late response cannot deliver results after leaving the project',async()=>{
  let resolve;const received=[];
