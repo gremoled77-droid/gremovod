@@ -20,18 +20,20 @@ export type Mode =
   | 'reels'
   | 'archive';
 
-type Item = {key: string; mode: Mode; label: string; hint?: string; icon: ReactNode};
+/** Пять категорий этапов (цвет = категория, как у GSAP): придумать, кадры, видео, звук, выпуск. */
+export type Hue = 'lilac' | 'pink' | 'orange' | 'blue' | 'green';
+type Item = {key: string; mode: Mode; label: string; hint?: string; icon: ReactNode; hue?: Hue};
 
 export const STAGES: Item[] = [
-  {key: 'idea', mode: 'studio', label: 'Идея', hint: 'задание ролика', icon: '1'},
-  {key: 'world', mode: 'styles', label: 'Мир', hint: 'стиль и герои', icon: '2'},
-  {key: 'chars', mode: 'characters', label: 'Персонажи', hint: 'герои и образы', icon: '3'},
-  {key: 'board', mode: 'storyboard', label: 'Раскадровка', hint: 'кадры эпизода', icon: '4'},
-  {key: 'frames', mode: 'create', label: 'Кадры', hint: 'картинки', icon: '5'},
-  {key: 'video', mode: 'video', label: 'Видео', hint: 'оживление кадров', icon: '6'},
-  {key: 'sound', mode: 'audio', label: 'Звук', hint: 'голос и обработка', icon: '7'},
-  {key: 'edit', mode: 'files', label: 'Монтаж', hint: 'выгрузка в CapCut', icon: '8'},
-  {key: 'release', mode: 'economics', label: 'Выпуск', hint: 'бюджет серии', icon: '9'},
+  {key: 'idea', mode: 'studio', label: 'Идея', hint: 'задание ролика', icon: '1', hue: 'lilac'},
+  {key: 'world', mode: 'styles', label: 'Мир', hint: 'стиль и герои', icon: '2', hue: 'lilac'},
+  {key: 'chars', mode: 'characters', label: 'Персонажи', hint: 'герои и образы', icon: '3', hue: 'lilac'},
+  {key: 'board', mode: 'storyboard', label: 'Раскадровка', hint: 'кадры эпизода', icon: '4', hue: 'lilac'},
+  {key: 'frames', mode: 'create', label: 'Кадры', hint: 'картинки', icon: '5', hue: 'pink'},
+  {key: 'video', mode: 'video', label: 'Видео', hint: 'оживление кадров', icon: '6', hue: 'orange'},
+  {key: 'sound', mode: 'audio', label: 'Звук', hint: 'голос и обработка', icon: '7', hue: 'blue'},
+  {key: 'edit', mode: 'files', label: 'Монтаж', hint: 'выгрузка в CapCut', icon: '8', hue: 'green'},
+  {key: 'release', mode: 'economics', label: 'Выпуск', hint: 'бюджет серии', icon: '9', hue: 'green'},
 ];
 /** Нижние вкладки на телефоне (макет Mobile): пять частых действий и «Ещё». */
 const TABS: {mode: Mode; label: string; icon: string}[] = [
@@ -80,6 +82,7 @@ export default function StageNav({
     <button
       key={item.key}
       className={'nav-item' + (active ? ' nav-active' : '')}
+      data-hue={item.hue}
       aria-current={active ? 'page' : undefined}
       onClick={() => onMode(item.mode)}
     >

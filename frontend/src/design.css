@@ -812,3 +812,158 @@ section.panel {
 .topbar-status.offline {
   color: var(--bad);
 }
+
+/* GSAP-эстетика для навигации и верхней панели: кремовый текст на зеленовато-чёрном, тонкие линии,
+   пустые «таблетки» вместо залитых кнопок, цвет названия этапа = его категория. Главное действие: градиентная рамка. */
+.stage-nav,
+.topbar {
+  --g-bg: #0e100f;
+  --g-cream: #fffce1;
+  --g-muted: #7c7c6f;
+  --g-line: #42433d;
+}
+.stage-nav {
+  background: var(--g-bg);
+  border-right: 1px solid var(--g-line);
+  gap: 2px;
+}
+.stage-nav .nav-logo {
+  color: #0ae448;
+}
+.stage-nav .nav-brand b {
+  color: var(--g-cream);
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+.stage-nav .nav-brand small {
+  color: var(--g-muted);
+  font-size: 12px;
+}
+.stage-nav .nav-group-title {
+  margin: 20px 8px 6px;
+  font-size: 14px;
+  letter-spacing: -0.01em;
+  text-transform: none;
+  color: var(--g-muted);
+}
+.stage-nav .nav-group-title::before {
+  content: '{ ';
+}
+.stage-nav .nav-group-title::after {
+  content: ' }';
+}
+.stage-nav .nav-item {
+  min-height: 46px;
+  border-radius: 100px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--g-cream);
+}
+.stage-nav .nav-item:hover {
+  background: transparent;
+  border-color: var(--g-line);
+}
+.stage-nav .nav-icon {
+  width: 22px;
+  height: auto;
+  border-radius: 0;
+  background: transparent;
+  color: var(--g-muted);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+.stage-nav .nav-text b {
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--g-cream);
+}
+.stage-nav .nav-text small {
+  font-size: 12px;
+  color: var(--g-muted);
+}
+.stage-nav .nav-item[data-hue='lilac'] .nav-text b {
+  color: #9d95ff;
+}
+.stage-nav .nav-item[data-hue='pink'] .nav-text b {
+  color: #fec5fb;
+}
+.stage-nav .nav-item[data-hue='orange'] .nav-text b {
+  color: #ff8709;
+}
+.stage-nav .nav-item[data-hue='blue'] .nav-text b {
+  color: #00bae2;
+}
+.stage-nav .nav-item[data-hue='green'] .nav-text b {
+  color: #0ae448;
+}
+.stage-nav .nav-item.nav-active {
+  background: transparent;
+  border-color: var(--g-cream);
+}
+.stage-nav .nav-item.nav-active .nav-icon {
+  background: transparent;
+  color: var(--g-cream);
+}
+.stage-nav .nav-demo {
+  color: var(--g-muted);
+}
+
+.topbar {
+  background: var(--g-bg);
+  backdrop-filter: none;
+  border-bottom: 1px solid var(--g-line);
+}
+.topbar .topbar-project-picker {
+  background-color: transparent;
+  border: 1px solid var(--g-line);
+  color: var(--g-cream);
+}
+.topbar .topbar-status {
+  background: transparent;
+  border-color: var(--g-line);
+  color: var(--g-muted);
+  font-size: 13px;
+}
+.topbar .topbar-status i {
+  box-shadow: none;
+}
+.topbar .topbar-status.online {
+  color: #0ae448;
+}
+.topbar .top-actions button {
+  background: transparent;
+  border: 1px solid var(--g-cream);
+  color: var(--g-cream);
+  font-size: 14px;
+  font-weight: 600;
+}
+.topbar .top-actions button:hover:not(:disabled) {
+  background: transparent;
+  border-color: var(--g-cream);
+  opacity: 0.8;
+}
+.topbar .top-actions .topbar-ghost {
+  border-color: transparent;
+  color: var(--g-muted);
+  font-weight: 400;
+}
+.topbar .top-actions .topbar-ghost:hover:not(:disabled) {
+  color: var(--g-cream);
+  opacity: 1;
+}
+.topbar .top-actions .topbar-new {
+  border: 1.5px solid transparent;
+  color: var(--g-cream);
+  background:
+    linear-gradient(var(--g-bg), var(--g-bg)) padding-box,
+    linear-gradient(114deg, #0ae448 20%, #abff84 65%) border-box;
+  filter: none;
+}
+.topbar .top-actions .topbar-new:hover:not(:disabled) {
+  background:
+    linear-gradient(var(--g-bg), var(--g-bg)) padding-box,
+    linear-gradient(114deg, #0ae448 20%, #abff84 65%) border-box;
+  border-color: transparent;
+}
