@@ -50,37 +50,39 @@ export default function SettingsPanel({
         </article>
       )}
       <article className="sc-step">
-        {card('✎', 'Модель для промптов', 'Резервный API: провайдер и модель')}
+        {card('✎', 'Текстовые модели и API', 'Модели сценарных запросов выбираются на странице «Идея»')}
         {!PAID_LLM_ENABLED && (
           <p className="notice">
-            Платный LLM-резерв временно отключён до настройки оценки стоимости. Основной чат доступен в
-            студии.
+            На «Идее» и в «Мире» доступны отдельные запросы с оценкой цены и подтверждением. Общий резервный
+            чат пока отключён.
           </p>
         )}
-        <div className="param-grid">
-          <label>
-            LLM-провайдер
-            <select
-              value={provider}
-              disabled={busy}
-              onChange={e => onProvider(e.target.value as 'openai' | 'piapi')}
-            >
-              <option value="openai">OpenAI напрямую</option>
-              <option value="piapi">PiAPI</option>
-            </select>
-          </label>
-          <label>
-            LLM
-            <select value={model} disabled={busy} onChange={e => onModel(e.target.value)}>
-              {(provider === 'openai'
-                ? ['gpt-4.1-mini', 'gpt-4.1', 'gpt-5-mini']
-                : ['gpt-5.6-luna', 'gpt-5.6-terra', 'gpt-5.6-sol', 'gpt-6-astra']
-              ).map(item => (
-                <option key={item}>{item}</option>
-              ))}
-            </select>
-          </label>
-        </div>
+        {PAID_LLM_ENABLED && (
+          <div className="param-grid">
+            <label>
+              LLM-провайдер
+              <select
+                value={provider}
+                disabled={busy}
+                onChange={e => onProvider(e.target.value as 'openai' | 'piapi')}
+              >
+                <option value="openai">OpenAI напрямую</option>
+                <option value="piapi">PiAPI</option>
+              </select>
+            </label>
+            <label>
+              LLM
+              <select value={model} disabled={busy} onChange={e => onModel(e.target.value)}>
+                {(provider === 'openai'
+                  ? ['gpt-4.1-mini', 'gpt-4.1', 'gpt-5-mini']
+                  : ['gpt-5.6-luna', 'gpt-5.6-terra', 'gpt-5.6-sol', 'gpt-6-astra']
+                ).map(item => (
+                  <option key={item}>{item}</option>
+                ))}
+              </select>
+            </label>
+          </div>
+        )}
         <div className="rf-actions">
           <button onClick={onConnections}>Открыть подключения</button>
           <small className="muted">Ключи настраиваются на сервере.</small>

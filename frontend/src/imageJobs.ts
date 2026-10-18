@@ -2,7 +2,7 @@
 export type ImageRoute = 'api' | 'chatgpt' | 'codex';
 
 export const ROUTES: {id: ImageRoute; label: string; hint: string}[] = [
-  {id: 'api', label: 'API · PiAPI', hint: 'Платно: сначала оценка цены и подтверждение'},
+  {id: 'api', label: 'API · выбранные модели', hint: 'Платно: сначала оценка цены и подтверждение'},
   {
     id: 'chatgpt',
     label: 'ChatGPT вручную',

@@ -324,9 +324,9 @@ def register(app,studio):
         except Exception:
             # Only paths created by this attempt, checked under PRODUCTIONS_ROOT; no recursive removal.
             for path in reversed(created_files):
-                folders.checked_path(studio,path.relative_to(studio.PRODUCTIONS_ROOT.resolve())).unlink(missing_ok=True)
+                folders.checked_path(studio,path.relative_to(folders.checked_path(studio,'.'))).unlink(missing_ok=True)
             for path in reversed(created_dirs):
-                folders.checked_path(studio,path.relative_to(studio.PRODUCTIONS_ROOT.resolve())).rmdir()
+                folders.checked_path(studio,path.relative_to(folders.checked_path(studio,'.'))).rmdir()
             raise
         warning=None
         try:

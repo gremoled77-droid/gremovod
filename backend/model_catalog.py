@@ -178,7 +178,7 @@ for _base, _prices in (('seedream-5-lite', {'2K':0.065,'3K':0.065}), ('seedream-
 # --- Цены со страниц kie.ai/seedream-5-pro и kie.ai/qwen-image-2.1 (18.10.2026): 1 кредит = $0.005.
 # --- Обе модели image-to-image: нужен хотя бы один публичный референс.
 _KIE_COMMON={'launch_enabled':False,'prompt_only':False,'provider':'kie','kind':'image','adapter':'kie_image',
-             'task_type':'image-to-image','submit_path':'/api/v1/jobs/createTask','max_refs':10,'api_refs':10,'ref_field':'image_urls'}
+             'task_type':'image-to-image','submit_path':'/api/v1/jobs/createTask','max_refs':10,'api_refs':10,'min_refs':1,'ref_field':'image_urls'}
 MODEL_SPECS['kie-seedream-5-pro']={**_KIE_COMMON,'model':'seedream/5-pro-image-to-image',
     'tier_field':'quality','price_by_tier':{'basic':0.035,'high':0.07},'extra_ref_usd':0.0025,
     'fixed_input':{'nsfw_checker':True},

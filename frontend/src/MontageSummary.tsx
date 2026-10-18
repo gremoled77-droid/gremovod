@@ -6,6 +6,7 @@ import type {Mode} from './screens';
 export function useCounts(projectId: string) {
   const [counts, setCounts] = useState({images: 0, videos: 0, audio: 0});
   useEffect(() => {
+    setCounts({images: 0, videos: 0, audio: 0});
     if (!projectId) return;
     let live = true;
     void apiFetch('/api/library?project_id=' + encodeURIComponent(projectId))
@@ -23,12 +24,11 @@ export function useCounts(projectId: string) {
 }
 
 /** Шапка «Монтажа»: что готово к выгрузке в CapCut по этапам. */
-export function MontageSummary({projectId, onMode}: {projectId: string; onMode: (m: Mode) => void}) {
-  const {images, videos, audio} = useCounts(projectId);
-  const cards: {mode: Mode; title: string; count: number; unit: string; hint: string}[] = [
-    {mode: 'create', title: 'Кадры', count: images, unit: 'картинок', hint: 'основа клипов'},
-    {mode: 'video', title: 'Видео', count: videos, unit: 'клипов', hint: 'оживлённые кадры'},
-    {mode: 'audio', title: 'Звук', count: audio, unit: 'дорожек', hint: 'голос и музыка'},
+export function MontageSummary({onMode}: {onMode: (m: Mode) => void}) {
+  const cards: {mode: Mode; title: string; hint: string}[] = [
+    {mode: 'create', title: 'Кадры', hint: 'основа клипов'},
+    {mode: 'video', title: 'Видео', hint: 'оживлённые кадры'},
+    {mode: 'audio', title: 'Звук', hint: 'голос и музыка'},
   ];
   return (
     <section className="ss">
@@ -42,16 +42,14 @@ export function MontageSummary({projectId, onMode}: {projectId: string; onMode: 
       <div className="ss-cards">
         {cards.map(c => (
           <button key={c.mode} className="ss-card" onClick={() => onMode(c.mode)}>
-            <small>{c.title}</small>
-            <b>{c.count}</b>
-            <span>
-              {c.unit} · {c.hint}
-            </span>
+            <small>Открыть этап</small>
+            <b>{c.title}</b>
+            <span>{c.hint}</span>
           </button>
         ))}
       </div>
       <p className="ss-note">
-        Кнопка «Выгрузить в CapCut» появится, когда будем настраивать выгрузку на компьютере.
+        Выбери серию ниже: скачай ZIP с клипами, звуком и монтажным списком для импорта в CapCut.
       </p>
     </section>
   );

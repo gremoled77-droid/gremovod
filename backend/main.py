@@ -372,6 +372,7 @@ def image_payload(body:ModelJobRequest,enforce_launch:bool=True):
     if len(body.reference_urls)>spec['max_refs']: raise HTTPException(400,'Превышено число референсов')
     from urllib.parse import urlsplit
     for ref in [*body.reference_urls,*body.video_urls,*body.audio_urls]:
+        reference_upload.validate_local(sys.modules[__name__], ref)
         parsed=urlsplit(ref)
         if parsed.scheme!='https' or not parsed.hostname or parsed.username or parsed.password or parsed.hostname in {'localhost','127.0.0.1','::1'}:
             raise HTTPException(400,'Нужен публичный HTTPS URL референса; локальный файл нельзя передать провайдеру напрямую')
@@ -434,6 +435,8 @@ def preview_model_job(body:ModelJobRequest):
     """Сухой прогон: параметры, тело запроса и цена без сетевых вызовов. Работает и для непроверенных моделей."""
     spec=MODEL_SPECS.get(body.model_id)
     if not spec: raise HTTPException(400,'Модель отсутствует в каталоге')
+    if spec.get('min_refs') and not body.reference_urls:  # цена в «Кадрах» до выбора картинки; первый референс бесплатный
+        body=body.model_copy(update={'reference_urls':['https://example.com/reference.png']*spec['min_refs']})
     payload=image_payload(body,enforce_launch=False)
     cost=generation_cost(body,payload)
     return {'model_id':body.model_id,'kind':spec['kind'],'launch_enabled':bool(spec.get('launch_enabled')),
@@ -467,9 +470,12 @@ async def model_job(body:ModelJobRequest,x_api_key:str|None=Header(default=None)
             db.execute('INSERT INTO jobs VALUES(?,?,?,?,?,?,?,?,?)',(jid,body.project_id,spec['kind'],spec['provider'],None,'submitting',request_data,'{}',now()))
             db.execute('INSERT INTO generation_approvals VALUES(?,?,?,?,?)',(jid,cost,body.max_cost_usd,now(),'documentation_estimate'))
         except sqlite3.IntegrityError: raise HTTPException(409,'Заявка уже отправляется; обнови очередь')
+    upstream_started=False
     try:
-        if spec['provider']=='kie': result=await kie.submit(key,adapters.wire_body(spec,payload))
-        else: result=await request_piapi('POST',adapters.submit_path(spec),key,adapters.wire_body(spec,payload))
+        wire_payload=await reference_upload.resolve_payload(sys.modules[__name__],payload)
+        upstream_started=True
+        if spec['provider']=='kie': result=await kie.submit(key,adapters.wire_body(spec,wire_payload))
+        else: result=await request_piapi('POST',adapters.submit_path(spec),key,adapters.wire_body(spec,wire_payload))
         if isinstance(result,dict) and not result.get('data') and result.get('task_id'): result={'code':200,'data':result,'message':'success'}  # async GPT-эндпоинт отвечает без обёртки data
         task=result.get('data') or {}
         if not isinstance(task,dict) or not task.get('task_id'):
@@ -478,7 +484,7 @@ async def model_job(body:ModelJobRequest,x_api_key:str|None=Header(default=None)
         with connect() as db:
             db.execute('UPDATE jobs SET task_id=?,status=?,response=? WHERE id=?',(task['task_id'],status,json.dumps(result,ensure_ascii=False),jid))
     except HTTPException as exc:
-        status='submission_unknown' if exc.status_code>=500 else 'failed'
+        status='submission_unknown' if upstream_started and exc.status_code>=500 else 'failed'
         with connect() as db: db.execute('UPDATE jobs SET status=?,response=? WHERE id=?',(status,json.dumps({'detail':exc.detail},ensure_ascii=False),jid))
         raise HTTPException(exc.status_code,{'job_id':jid,'status':status,'message':exc.detail})
     return {'job_id':jid,'upstream':result,'status':status}
@@ -806,6 +812,8 @@ from backend import frame_analysis
 frame_analysis.register(app,sys.modules[__name__])
 from backend import edit_list
 edit_list.register(app,sys.modules[__name__])
+from backend import series_export
+series_export.register(app,sys.modules[__name__])
 from backend import motion
 motion.register(app,sys.modules[__name__])
 from backend import clip_chain

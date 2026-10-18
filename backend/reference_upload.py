@@ -76,24 +76,74 @@ def register(app,studio):
                 db.execute("ALTER TABLE public_references ADD COLUMN provider TEXT NOT NULL DEFAULT 'piapi'")
 
     @app.post('/api/library/{asset_id}/upload-reference')
-    async def publish(asset_id:str,body:Approval,x_api_key:str|None=Header(default=None)):
-        if not body.approved:raise HTTPException(400,'Подтверди передачу оригинала в выбранное временное хранилище')
-        async with LOCKS.setdefault(asset_id,asyncio.Lock()):
-            with studio.connect() as db:
-                asset=db.execute('SELECT * FROM library_assets WHERE id=?',(asset_id,)).fetchone()
-                cached=db.execute('SELECT * FROM public_references WHERE asset_id=?',(asset_id,)).fetchone()
-            if not asset:raise HTTPException(404,'Изображение не найдено')
-            if cached and cached['provider']==body.provider and cached['expires_at']>time.time():return {'url':cached['url'],'expires_at':cached['expires_at'],'provider':body.provider,'cached':True}
-            path=(studio.LIBRARY_ROOT/asset['filename']).resolve()
-            if not path.is_relative_to(studio.LIBRARY_ROOT.resolve()) or not path.is_file():raise HTTPException(404,'Оригинал отсутствует')
-            content=path.read_bytes()
-            if len(content)>20*1024*1024:raise HTTPException(413,'Для загрузки референса нужен оригинал до 20 МБ')
-            if body.provider=='piapi' and len(content)>7_500_000:raise HTTPException(413,'Для загрузки PiAPI нужен оригинал до 7,5 МБ (до 10 МБ в Base64). Уменьши отдельную копию изображения.')
-            studio.inspect_image(content)
-            if body.provider=='tempfile':
-                result=await upload_free(path.name,content);url=result['url'];expires=result['expires_at']
-            else:
-                url=await upload(studio.get_key(x_api_key),path.name,content);expires=time.time()+23*3600
-            with studio.connect() as db:
-                db.execute('INSERT INTO public_references(asset_id,url,expires_at,provider) VALUES(?,?,?,?) ON CONFLICT(asset_id) DO UPDATE SET url=excluded.url,expires_at=excluded.expires_at,provider=excluded.provider',(asset_id,url,expires,body.provider))
-            return {'url':url,'expires_at':expires,'provider':body.provider,'cached':False}
+    async def publish_reference(asset_id:str,body:Approval,x_api_key:str|None=Header(default=None)):
+        return await publish(studio, asset_id, body, x_api_key)
+
+async def publish(studio, asset_id:str, body:Approval, x_api_key=None):
+    if not body.approved:raise HTTPException(400,'Подтверди передачу оригинала в выбранное временное хранилище')
+    async with LOCKS.setdefault(asset_id,asyncio.Lock()):
+        with studio.connect() as db:
+            asset=db.execute('SELECT * FROM library_assets WHERE id=?',(asset_id,)).fetchone()
+            cached=db.execute('SELECT * FROM public_references WHERE asset_id=?',(asset_id,)).fetchone()
+        if not asset:raise HTTPException(404,'Изображение не найдено')
+        if cached and cached['provider']==body.provider and cached['expires_at']>time.time():return {'url':cached['url'],'expires_at':cached['expires_at'],'provider':body.provider,'cached':True}
+        path=(studio.LIBRARY_ROOT/asset['filename']).resolve()
+        if not path.is_relative_to(studio.LIBRARY_ROOT.resolve()) or not path.is_file():raise HTTPException(404,'Оригинал отсутствует')
+        content=path.read_bytes()
+        if len(content)>20*1024*1024:raise HTTPException(413,'Для загрузки референса нужен оригинал до 20 МБ')
+        if body.provider=='piapi' and len(content)>7_500_000:raise HTTPException(413,'Для загрузки PiAPI нужен оригинал до 7,5 МБ (до 10 МБ в Base64). Уменьши отдельную копию изображения.')
+        studio.inspect_image(content)
+        if body.provider=='tempfile':
+            result=await upload_free(path.name,content);url=result['url'];expires=result['expires_at']
+        else:
+            url=await upload(studio.get_key(x_api_key),path.name,content);expires=time.time()+23*3600
+        with studio.connect() as db:
+            db.execute('INSERT INTO public_references(asset_id,url,expires_at,provider) VALUES(?,?,?,?) ON CONFLICT(asset_id) DO UPDATE SET url=excluded.url,expires_at=excluded.expires_at,provider=excluded.provider',(asset_id,url,expires,body.provider))
+        return {'url':url,'expires_at':expires,'provider':body.provider,'cached':False}
+
+LOCAL_PREFIX = 'https://studio-local.invalid/'
+
+
+def local_asset_id(url):
+    if not isinstance(url, str) or not url.startswith(LOCAL_PREFIX):
+        return None
+    asset_id = url[len(LOCAL_PREFIX):]
+    if not re.fullmatch(r'[A-Za-z0-9_-]{1,100}', asset_id):
+        raise HTTPException(400, 'Неверный локальный референс')
+    return asset_id
+
+
+def validate_local(studio, url):
+    asset_id = local_asset_id(url)
+    if asset_id is None:
+        return
+    with studio.connect() as db:
+        asset = db.execute('SELECT * FROM library_assets WHERE id=?', (asset_id,)).fetchone()
+    if not asset:
+        raise HTTPException(404, 'Локальный референс не найден')
+    path = (studio.LIBRARY_ROOT / asset['filename']).resolve()
+    if not path.is_relative_to(studio.LIBRARY_ROOT.resolve()) or not path.is_file():
+        raise HTTPException(404, 'Оригинал референса отсутствует')
+
+
+async def resolve_payload(studio, payload):
+    """Только после проверки согласия, цены и резерва; оценка никогда не публикует файл."""
+    resolved = {}
+    async def visit(value):
+        if isinstance(value, list):
+            return [await visit(item) for item in value]
+        if isinstance(value, dict):
+            return {key: await visit(item) for key, item in value.items()}
+        asset_id = local_asset_id(value)
+        if asset_id:
+            if asset_id not in resolved:
+                result = await publish(studio, asset_id, Approval(approved=True, provider='tempfile'))
+                resolved[asset_id] = result['url']
+            return resolved[asset_id]
+        return value
+    result = dict(payload)
+    result['input'] = dict(payload.get('input') or {})
+    for field in ('image', 'images', 'image_urls', 'video_urls', 'audio_urls'):
+        if field in result['input']:
+            result['input'][field] = await visit(result['input'][field])
+    return result

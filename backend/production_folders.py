@@ -2,6 +2,7 @@
 import json
 import re
 import shutil
+import sys
 import uuid
 from pathlib import Path
 
@@ -32,6 +33,12 @@ def checked_path(studio,relative):
     root=studio.PRODUCTIONS_ROOT.resolve()
     path=(root/relative).resolve()
     if not path.is_relative_to(root):raise HTTPException(400,'Путь выходит за папку проектов')
+    # Keep stored relative paths and existing folders intact. Win32's extended
+    # syntax allows long scene/frame paths without a machine-wide registry edit.
+    if sys.platform=='win32':
+        value=str(path)
+        if not value.startswith('\\\\?\\'):
+            path=Path('\\\\?\\UNC\\'+value[2:] if value.startswith('\\\\') else '\\\\?\\'+value)
     return path
 
 
@@ -384,20 +391,20 @@ def register(app,studio):
         path=checked_path(studio,relative);path.write_bytes(content)
         with studio.connect() as db:
             asset_id=None
-            if image_info:
+            if kind in {'image','video','audio'}:
                 common=production(studio,pid)
                 bound=db.execute('SELECT project_id FROM production_links WHERE node_id=?',(nid,)).fetchone()
                 owner=bound['project_id'] if bound else common['source_project_id']
                 asset_id=fid;canonical=fid+extension
                 studio.LIBRARY_ROOT.mkdir(parents=True,exist_ok=True);(studio.LIBRARY_ROOT/canonical).write_bytes(content)
-                metadata={**image_info,'kind':'image','provider':'local_import','original_name':name,'request':{'payload':{'task_type':'local-reference','input':{'prompt':''}}}}
-                if target['kind']=='character':metadata.update(character_id=target['character_id'],character_status='reference')
+                metadata={**(image_info or {}),'kind':kind,'provider':'local_import','original_name':name,'request':{'payload':{'task_type':'local-reference','input':{'prompt':''}}}}
+                if target['kind']=='character' and kind=='image':metadata.update(character_id=target['character_id'],character_status='reference')
                 db.execute('INSERT INTO library_assets VALUES(?,?,?,?,?,?,?,?)',(fid,'import-'+fid,owner,0,canonical,'',json.dumps(metadata,ensure_ascii=False),studio.now()))
-                if target['kind']=='character':
+                if target['kind']=='character' and kind=='image':
                     directory=studio.char_directory(common['source_project_id'],target['character_id'],'real_references');directory.mkdir(parents=True,exist_ok=True);(directory/canonical).write_bytes(content)
                     db.execute('INSERT INTO character_assets VALUES(?,?,?,?,?,?,?,?,?,?)',(fid,common['source_project_id'],target['character_id'],'real_references','',canonical,name,'','Загружено в общую папку персонажа',studio.now()))
             db.execute('INSERT INTO production_files VALUES(?,?,?,?,?,?,?,?)',(fid,pid,nid,asset_id,name,relative,kind,studio.now()))
-        if target['kind']=='character':
+        if target['kind']=='character' and kind=='image':
             from backend import character_voice
             character_voice.document(studio,target)
         return {'id':fid,'url':'/api/production-files/'+fid}

@@ -79,7 +79,15 @@ export default function EditListPanel({pid, sid}: {pid: string; sid: string}) {
         }
       >
         Скачать CSV
-      </button>
+      </button>{' '}
+      <a
+        className="vp-download"
+        href={`/api/productions/${pid}/series/${sid}/export.zip`}
+        download="capcut-media.zip"
+      >
+        Скачать исходники для CapCut (ZIP)
+      </a>
+      <p className="muted">Клипы, кадры, звук и списки по порядку. Импорт и сборка в CapCut вручную.</p>
       {error && (
         <p role="alert" className="vp-err">
           {error}

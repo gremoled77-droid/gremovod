@@ -5,6 +5,20 @@
   padding: 14px 16px;
   margin: 0 0 18px;
 }
+.vp-download {
+  display: inline-block;
+  padding: 9px 14px;
+  margin: 4px 0;
+  color: var(--text);
+  background: var(--surface, #1e2128);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  text-decoration: none;
+  max-width: 100%;
+}
+.vp-download:hover {
+  border-color: var(--accent);
+}
 .vp-head {
   display: flex;
   align-items: center;

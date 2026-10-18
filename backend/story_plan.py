@@ -209,9 +209,9 @@ def register(app, studio):
                 db.execute('UPDATE story_plans SET revision=?,data=? WHERE series_id=?', (revision, json.dumps(plan, ensure_ascii=False), sid))
         except Exception:
             for path in reversed(created_files):
-                folders.checked_path(studio, path.relative_to(studio.PRODUCTIONS_ROOT.resolve())).unlink(missing_ok=True)
+                folders.checked_path(studio, path.relative_to(folders.checked_path(studio, '.'))).unlink(missing_ok=True)
             for path in reversed(created_dirs):
-                folders.checked_path(studio, path.relative_to(studio.PRODUCTIONS_ROOT.resolve())).rmdir()
+                folders.checked_path(studio, path.relative_to(folders.checked_path(studio, '.'))).rmdir()
             raise
         return {**plan, 'revision': revision}
 

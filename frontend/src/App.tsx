@@ -26,6 +26,7 @@ import ProductionPanel from './ProductionPanel';
 import {MontageSummary} from './MontageSummary';
 import EconomicsPanel from './EconomicsPanel';
 import {ReleaseSummary} from './ReleaseSummary';
+import SeriesDelivery from './SeriesDelivery';
 import HomeScreen from './HomeScreen';
 import GenerationWatcher from './GenerationWatcher';
 import {ActivityProvider} from './ActivityContext';
@@ -930,17 +931,22 @@ function App() {
                 <SoundScreen projectId={projectId} />
               ) : mode === 'files' ? (
                 <>
-                  <MontageSummary projectId={projectId} onMode={setMode} />
-                  <ProductionPanel
-                    projectId={projectId}
-                    onOpenProject={(id, characterId) =>
-                      void load(id, characterId ? 'characters' : 'create', characterId)
-                    }
-                  />
+                  <MontageSummary onMode={setMode} />
+                  <SeriesDelivery projectId={projectId} onMode={setMode} />
+                  <details className="panel">
+                    <summary>Папки производства и моушн</summary>
+                    <ProductionPanel
+                      projectId={projectId}
+                      onOpenProject={(id, characterId) =>
+                        void load(id, characterId ? 'characters' : 'create', characterId)
+                      }
+                    />
+                  </details>
                 </>
               ) : mode === 'economics' ? (
                 <>
                   <ReleaseSummary projectId={projectId} />
+                  <SeriesDelivery projectId={projectId} onMode={setMode} />
                   <EconomicsPanel projectId={projectId} revision={libraryRevision} />
                 </>
               ) : mode === 'archive' ? (

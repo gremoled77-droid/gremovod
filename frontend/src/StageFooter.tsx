@@ -26,7 +26,7 @@ export default function StageFooter({mode, onMode}: {mode: Mode; onMode: (m: Mod
         </button>
       ) : (
         <button className="stage-footer-next" onClick={() => onMode('home')}>
-          <small>Серия выпущена</small>
+          <small>Вернуться к проекту</small>
           <b>К обзору проекта</b>
         </button>
       )}

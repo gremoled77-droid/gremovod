@@ -1,3 +1,4 @@
+import {localReference} from './localReference';
 import {useEffect, useMemo, useState} from 'react';
 import {apiFetch} from './api';
 import {loadCreateDraft, saveCreateDraft} from './createDraft';
@@ -54,6 +55,8 @@ const LABELS: Record<string, string> = {
   'gpt-image-2.5': 'GPT Image 2.5',
   'nano-banana-2.1': 'Nano Banana 2.1',
   'qwen-image-2.1': 'Qwen Image 2.1',
+  'kie-seedream-5-pro': 'Seedream 5 Pro (KIE)',
+  'kie-qwen-image-2.1': 'Qwen Image 2.1 (KIE)',
 };
 /** Модели, у которых в карточке можно выбрать вариант; остальные id из LABELS показываются отдельными боксами. */
 const FAMILIES: Record<string, string[]> = {
@@ -69,7 +72,7 @@ const VARIANT_NAMES: Record<string, string> = {
   'seedream-5-lite-less-restriction': 'Lite · less restriction',
 };
 /** Названия API-сервисов; новый сервис добавляется сюда и в каталог бэкенда (provider, page_urls). */
-const PROVIDERS: Record<string, string> = {piapi: 'PiAPI'};
+const PROVIDERS: Record<string, string> = {piapi: 'PiAPI', kie: 'KIE'};
 
 async function json(r: Response) {
   const d = await r.json().catch(() => ({}));
@@ -363,18 +366,8 @@ function CreateScreenBody({
     );
   };
 
-  const ensureCloudUrl = async (assetId: string) => {
-    const a = byId[assetId];
-    if (a?.provider_reference_url?.startsWith('https://')) return a.provider_reference_url;
-    const r = await json(
-      await apiFetch(`/api/library/${assetId}/upload-reference`, {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({approved: true, provider: 'tempfile'}),
-      })
-    );
-    return r.url as string;
-  };
+  const ensureCloudUrl = async (assetId: string) =>
+    byId[assetId]?.provider_reference_url || localReference(assetId);
 
   /** Параметры видеомодели: из spec.options или из плоских полей старых спецификаций. */
   const videoSpec = (id: string): Record<string, OptionSpec> => {
@@ -665,6 +658,7 @@ function CreateScreenBody({
                 type="button"
                 className="cs-pick"
                 onClick={() => toggleRef(a.id)}
+                aria-pressed={refs.includes(a.id)}
                 title="Добавить/убрать референс"
               >
                 <img src={a.thumbnail_url || a.url} alt="" />
@@ -695,6 +689,9 @@ function CreateScreenBody({
                 {...actionsFor(a.id)}
                 onRef={undefined}
                 onAnimate={undefined}
+                onEdit={undefined}
+                onTrash={undefined}
+                downloadUrl={undefined}
               />
             </div>
           ))}
@@ -782,8 +779,17 @@ function CreateScreenBody({
                   <FrameActions className="cs-result-actions" {...actionsFor(aid, item.kind)} />
                   <div className="cs-cap">
                     <div>
-                      <b>{LABELS[item.model] || item.model}</b>
-                      <small>{item.status}</small>
+                      <b>
+                        {item.source === 'external'
+                          ? 'ChatGPT · ручной результат'
+                          : item.source === 'native'
+                            ? 'Codex · возвращённый результат'
+                            : LABELS[item.model] || item.model}
+                      </b>
+                      <small>
+                        {item.source !== 'api' ? `Промпт для ${LABELS[item.model] || item.model} · ` : ''}
+                        {item.status === 'done' ? 'готово' : item.status}
+                      </small>
                     </div>
                     <div className="cs-row">
                       {item.kind === 'video' && (
@@ -918,8 +924,8 @@ function CreateScreenBody({
         {models.map(modelCard)}
         <PriceTable specs={specs} labels={LABELS} models={Object.keys(LABELS)} />
         <div className="cs-note">
-          Перед отправкой покажу точную цену и попрошу подтверждение. Ручная попытка в ChatGPT стоит $0 по
-          API.
+          Перед отправкой покажу оценку цены и попрошу подтверждение. Лимиты и оплата ручной генерации
+          определяются ChatGPT.
         </div>
       </aside>
 

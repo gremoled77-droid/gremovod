@@ -41,6 +41,7 @@ export function ReleaseSummary({projectId}: {projectId: string}) {
   const {images, videos, audio} = useCounts(projectId);
   const [budget, setBudget] = useState<Budget | null>(null);
   useEffect(() => {
+    setBudget(null);
     if (!projectId) return;
     let live = true;
     void apiFetch('/api/budgets/' + encodeURIComponent(projectId))
@@ -55,8 +56,12 @@ export function ReleaseSummary({projectId}: {projectId: string}) {
     <section className="ss">
       <div className="ss-head">
         <span className="ss-eyebrow">Выпуск · итоги серии</span>
-        <h2>Сколько потрачено и что получено</h2>
+        <h2>Бюджет и библиотека проекта</h2>
       </div>
+      <p className="muted">
+        Расходы показаны по резервам API, материалы — по библиотеке проекта. Готовность выбранной серии
+        проверяется ниже.
+      </p>
       <div className="ss-release">
         <div className="ss-gauges">
           <Gauge label="Проект" used={budget?.project_reserved_usd} limit={budget?.project_limit_usd} />

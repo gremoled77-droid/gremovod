@@ -207,6 +207,14 @@
   .ps-board {
     padding: 16px 14px 48px;
   }
+  .ps-scene-head {
+    flex-wrap: wrap;
+  }
+  .ps-scene,
+  .ps-frames {
+    min-width: 0;
+    max-width: 100%;
+  }
   .ps-pick {
     grid-template-columns: 1fr;
   }

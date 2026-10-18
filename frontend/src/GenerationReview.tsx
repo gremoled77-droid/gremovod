@@ -2,6 +2,7 @@ import {useEffect, useRef, useState} from 'react';
 import {apiFetch} from './api';
 import LimitPicker from './LimitPicker';
 import {initialLimit, limitAllowed} from './spendLimit';
+import {hasLocalReferences} from './localReference';
 
 export type GenerationRequest = {
   project_id: string;
@@ -32,6 +33,7 @@ function jobLabel(request: GenerationRequest) {
     return request.options.draft ? `черновик 480p, ${label}` : label;
   }
   if (request.model_id === 'hunyuan-i2v') return 'одно видео, длительность и размер по умолчанию провайдера';
+  if (request.model_id === 'minimax-h3') return `${request.options.duration || 5} секунд видео`;
   return 'одно изображение';
 }
 export default function GenerationReview({
@@ -51,6 +53,7 @@ export default function GenerationReview({
   const [highOk, setHighOk] = useState(false);
   const [attempted, setAttempted] = useState(false);
   const requestId = useRef(crypto.randomUUID());
+  const provider = request.model_id.startsWith('kie-') ? 'KIE' : 'PiAPI';
   useEffect(() => {
     let active = true;
     void (async () => {
@@ -113,14 +116,20 @@ export default function GenerationReview({
       >
         <h2 id="generation-title">Подтверждение генерации</h2>
         <p>
-          PiAPI · {request.model_id} · {jobLabel(request)}
+          {provider} · {request.model_id} · {jobLabel(request)}
         </p>
         <p className="muted">
           Референсов: картинок {request.reference_urls.length}
           {request.video_urls?.length ? `, видео ${request.video_urls.length}` : ''}
           {request.audio_urls?.length ? `, аудио ${request.audio_urls.length}` : ''}. Задание и ссылки будут
-          переданы PiAPI.
+          переданы {provider}.
         </p>
+        {hasLocalReferences(request) && (
+          <p className="muted">
+            После подтверждения локальные референсы будут загружены на TempFile.org (до 24 часов), затем
+            переданы провайдеру. При закрытии окна файлы остаются на компьютере.
+          </p>
+        )}
         <details>
           <summary>Проверить промпт и настройки</summary>
           <pre>{request.prompt}</pre>

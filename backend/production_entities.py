@@ -117,7 +117,7 @@ def video_anchor(studio,project_id,references):
     if not anchor:raise HTTPException(400,'Перед видео выбери основное фото в карточке кадра на доске раскадровки')
     from backend import reference_upload
     url=reference_upload.reference_url(studio,anchor)
-    if not references or not url or references[0]!=url:raise HTTPException(400,'Первым референсом видео должно быть выбранное основное фото этого кадра. Подготовь для него публичную ссылку.')
+    if not references or references[0] not in {url, reference_upload.LOCAL_PREFIX+anchor['id']}:raise HTTPException(400,'Первым референсом видео должно быть выбранное основное фото этого кадра. Подготовь для него публичную ссылку.')
 
 
 def register(app,studio):

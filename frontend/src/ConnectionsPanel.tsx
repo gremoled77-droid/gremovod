@@ -28,6 +28,7 @@ const ROLES: Record<string, string> = {
   openai: 'Резервный API для текстов',
   elevenlabs: 'Голос персонажей',
   fish: 'Голос персонажей, второй движок',
+  kie: 'Картинки от референса (Seedream, Qwen)',
 };
 /** Цвет статуса: зелёный, янтарный, серый или красный. */
 const tone = (status: string) =>

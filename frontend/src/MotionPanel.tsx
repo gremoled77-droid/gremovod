@@ -1,6 +1,5 @@
 import {useState} from 'react';
-import {apiFetch} from './api';
-import {responseJson} from './ChatGPTPanel';
+import {apiFetch, responseJson} from './api';
 
 type Template = 'intro' | 'lower-third';
 const FIELDS: Record<Template, {id: string; label: string; placeholder: string}[]> = {

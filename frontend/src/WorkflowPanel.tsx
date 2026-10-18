@@ -1,3 +1,4 @@
+import {localReference} from './localReference';
 import {createContext, useContext, useEffect, useMemo, useRef, useState, type CSSProperties} from 'react';
 import {
   ReactFlow,
@@ -660,18 +661,8 @@ export default function WorkflowPanel({
   const patch = (id: string, p: Record<string, unknown>) =>
     onChange(g => ({...g, nodes: g.nodes.map(n => (n.id === id ? {...n, data: {...n.data, ...p}} : n))}));
 
-  const cloudUrl = async (assetId: string) => {
-    const known = library.find(a => a.id === assetId)?.provider_reference_url;
-    if (known) return known;
-    const r = await json(
-      await apiFetch(`/api/library/${assetId}/upload-reference`, {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({approved: true, provider: 'tempfile'}),
-      })
-    );
-    return r.url as string;
-  };
+  const cloudUrl = async (assetId: string) =>
+    library.find(a => a.id === assetId)?.provider_reference_url || localReference(assetId);
 
   const estimate = async (step: Step, urls: string[]) =>
     json(
@@ -1292,7 +1283,8 @@ export default function WorkflowPanel({
               />
               <label className="inline-checkbox">
                 <input type="checkbox" checked={approved} onChange={e => setApproved(e.target.checked)} />{' '}
-                Подтверждаю платный запуск в пределах лимита
+                Подтверждаю платный запуск в пределах лимита и передачу локальных референсов через
+                TempFile.org провайдеру
               </label>
               <div className="chips">
                 <button

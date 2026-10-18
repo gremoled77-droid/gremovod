@@ -1,5 +1,4 @@
 import {apiFetch, responseJson} from './api';
-import {readLocal} from './localDrafts';
 
 export type LocationNode = {id: string; title: string; notes: string};
 export type LocationFile = {id: string; asset_id: string | null; kind: string; filename: string};
@@ -11,15 +10,13 @@ const json = (method: string, body: unknown) => ({
   body: JSON.stringify(body),
 });
 
-/** Общий проект, к которому относится проект: из рабочего места, сохранённой доски или единственный. */
+/** Общий проект только по явной связи: чужая открытая доска не меняет владельца данных. */
 export async function findProduction(projectId: string): Promise<string> {
   const where = await responseJson(
     await apiFetch(`/api/projects/${encodeURIComponent(projectId)}/workspace-location`)
   );
   if (where?.production_id) return where.production_id;
-  const stored = readLocal<{pid: string}>('studio:board-location', {pid: ''});
-  const all = await responseJson(await apiFetch('/api/productions'));
-  return all.find((p: {id: string}) => p.id === stored.pid)?.id || (all.length === 1 ? all[0].id : '');
+  return '';
 }
 
 /** Локации общего проекта вместе с файлами-картинками. */

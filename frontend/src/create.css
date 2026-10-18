@@ -486,7 +486,7 @@
 .cs-tile:focus-within .cs-tile-actions {
   opacity: 1;
 }
-/* Плитка всего 50–72 px: четыре кнопки в сетке 2×2 (♡ ✎ ⤓ 🗑); референс — клик по плитке, остальное и сенсорные экраны — в просмотре (⤢). */
+/* На маленькой плитке оставляем избранное; полные действия доступны в просмотре (⤢). */
 .cs-tile-actions {
   display: grid;
   grid-template-columns: repeat(2, 20px);
@@ -500,6 +500,14 @@
 .cs-tile-actions svg {
   width: 11px;
   height: 11px;
+}
+.cs-tile .cs-tile-actions {
+  display: flex;
+  justify-content: flex-end;
+  pointer-events: none;
+}
+.cs-tile .cs-tile-actions button {
+  pointer-events: auto;
 }
 @media (hover: none) {
   .cs-tile-actions {

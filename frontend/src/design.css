@@ -536,6 +536,10 @@ section.panel {
   font-size: 11px;
   opacity: 0.75;
 }
+.stage-footer button.primary small {
+  color: #1a150e;
+  opacity: 1;
+}
 .stage-footer-prev {
   justify-self: start;
 }

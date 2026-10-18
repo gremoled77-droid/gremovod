@@ -4,6 +4,7 @@ import type {GenerationRequest} from './GenerationReview';
 import LimitPicker from './LimitPicker';
 import {initialLimit, limitAllowed} from './spendLimit';
 import {batchTotal} from './sheetShots';
+import {hasLocalReferences} from './localReference';
 
 export type BatchItem = {label: string; request: GenerationRequest};
 type Quote = {quote_token: string; estimated_usd: number};
@@ -93,11 +94,17 @@ export default function BatchReview({
         aria-modal="true"
         aria-label="Пакетный запуск"
       >
-        <h2>Пакетный запуск · {items.length} картинок</h2>
+        <h2>Пакетный запуск · {items.length} заданий</h2>
         <p className="muted">
-          PiAPI · {[...new Set(items.map(i => i.request.model_id))].join(', ')}. Задание и ссылки будут
-          переданы PiAPI.
+          {[...new Set(items.map(i => i.request.model_id))].join(', ')}. Задания и ссылки будут переданы
+          указанным провайдерам.
         </p>
+        {items.some(item => hasLocalReferences(item.request)) && (
+          <p className="muted">
+            После подтверждения локальные референсы будут загружены на TempFile.org (до 24 часов). Закрытие
+            окна ничего не отправляет.
+          </p>
+        )}
         <ul className="batch-list">
           {items.map((item, i) => (
             <li key={i}>

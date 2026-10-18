@@ -1,3 +1,4 @@
+import {localReference} from './localReference';
 import {useEffect, useMemo, useState} from 'react';
 import {apiFetch, responseJson} from './api';
 import BatchReview, {type BatchItem} from './BatchReview';
@@ -128,15 +129,7 @@ export default function AnimateDialog({
             })
           )
         ).project_id as string;
-      const url = (
-        await responseJson(
-          await apiFetch(`/api/library/${mainFile.asset_id}/upload-reference`, {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({approved: true, provider: 'tempfile'}),
-          })
-        )
-      ).url as string;
+      const url = localReference(mainFile.asset_id);
       const options: Record<string, string | number> = {duration};
       if (p.resolutions.length) options.resolution = resolution;
       if (p.aspects.length) options.aspect_ratio = aspect;

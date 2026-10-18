@@ -1,3 +1,4 @@
+import {localReference} from './localReference';
 import {useEffect, useMemo, useState} from 'react';
 import {X} from 'lucide-react';
 import {apiFetch} from './api';
@@ -36,6 +37,7 @@ type LibAsset = {
 };
 
 const LABELS: Record<string, string> = {
+  local_import: 'Локальный клип',
   'seedance-2.5': 'Seedance 2.5',
   'minimax-h3': 'MiniMax H3',
   'hunyuan-i2v': 'Hunyuan I2V',
@@ -203,10 +205,23 @@ function VideoScreenBody({projectId, world = ''}: {projectId: string; world?: st
   }, [signature, spec]);
 
   // Лента общая: ролики других проектов и удалённые в библиотеке проекта не найдутся.
-  const results = items
+  const generatedResults = items
     .filter(i => i.kind === 'video' && i.status !== 'waiting_external')
     .map(i => ({...i, asset_ids: i.asset_ids.filter(aid => byId[aid])}))
     .filter(i => i.asset_ids.length);
+  const generatedIds = new Set(generatedResults.flatMap(item => item.asset_ids));
+  const results = [
+    ...generatedResults,
+    ...library
+      .filter(a => a.metadata.kind === 'video' && !generatedIds.has(a.id))
+      .map(a => ({
+        id: a.id,
+        model: 'local_import',
+        status: 'Загружено с компьютера',
+        prompt: '',
+        asset_ids: [a.id],
+      })),
+  ];
   const pending = items.filter(
     i =>
       ['queued', 'running', 'processing', 'saving'].includes(i.status) &&
@@ -246,18 +261,8 @@ function VideoScreenBody({projectId, world = ''}: {projectId: string; world?: st
       setError(e instanceof Error ? e.message : String(e));
     }
   };
-  const cloudUrl = async (assetId: string) => {
-    const a = byId[assetId];
-    if (a?.provider_reference_url?.startsWith('https://')) return a.provider_reference_url;
-    const r = await json(
-      await apiFetch(`/api/library/${assetId}/upload-reference`, {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({approved: true, provider: 'tempfile'}),
-      })
-    );
-    return r.url as string;
-  };
+  const cloudUrl = async (assetId: string) =>
+    byId[assetId]?.provider_reference_url || localReference(assetId);
 
   const start = async () => {
     setError('');

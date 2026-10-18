@@ -1,3 +1,4 @@
+import {localReference} from './localReference';
 import {useEffect, useMemo, useState, type ReactNode} from 'react';
 import {apiFetch, responseJson} from './api';
 import BatchReview, {type BatchItem} from './BatchReview';
@@ -118,18 +119,9 @@ export default function SheetPanel({
       const spec = specs[model];
       let urls: string[] = [];
       if (referenceAssetId && (spec?.api_refs ?? 0) > 0) {
-        const known = library.find(a => a.id === referenceAssetId)?.provider_reference_url;
         urls = [
-          known ||
-            (
-              await responseJson(
-                await apiFetch(`/api/library/${referenceAssetId}/upload-reference`, {
-                  method: 'POST',
-                  headers: {'Content-Type': 'application/json'},
-                  body: JSON.stringify({approved: true, provider: 'tempfile'}),
-                })
-              )
-            ).url,
+          library.find(a => a.id === referenceAssetId)?.provider_reference_url ||
+            localReference(referenceAssetId),
         ];
       }
       const options = sheetOptions;

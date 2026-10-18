@@ -212,6 +212,11 @@ class KieTests(unittest.TestCase):
         self.assertEqual(adapters.wire_body(main.MODEL_SPECS['kie-qwen-image-2.1'], payload),
                          {'model': 'qwen2-1/image-to-image', 'input': payload['input']})
 
+    def test_kie_preview_prices_without_reference_but_estimate_requires_one(self):
+        self.assertEqual(main.preview_model_job(job('kie-qwen-image-2.1'))['estimated_usd'], 0.02)
+        with self.assertRaises(HTTPException):  # оценка перед запуском без референса не проходит
+            main.image_payload(job('kie-qwen-image-2.1'))
+
     def test_kie_rejects_text_only_unknown_options_and_long_prompt(self):
         for extra in ({}, {'reference_urls': [REF], 'options': {'size': '2K'}},
                       {'reference_urls': [REF], 'prompt': 'x' * 5001}):

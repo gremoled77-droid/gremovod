@@ -171,7 +171,7 @@ export default function PriceTable({
 
   return (
     <details className="cs-prices" open={open} onToggle={e => setOpen((e.target as HTMLDetailsElement).open)}>
-      <summary>Цены PiAPI по моделям</summary>
+      <summary>Цены API по моделям</summary>
       {open && !tables && <small className="muted">Считаю…</small>}
       {tables?.map(t => (
         <div key={t.id} className="cs-price-model">
@@ -209,7 +209,7 @@ export default function PriceTable({
       {tables && (
         <small className="muted">
           Цена за одну картинку, из каталога студии. Перед запуском оценка пересчитывается и требует
-          подтверждения; фактическое списание определяет PiAPI.
+          подтверждения; фактическое списание определяет провайдер.
         </small>
       )}
     </details>
