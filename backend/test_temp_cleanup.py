@@ -111,6 +111,16 @@ class TempCleanupTests(unittest.TestCase):
         self.assertEqual(self.client.post(f'/api/library/cleanup/restore/{journal[0]["id"]}').status_code, 200)
         self.assertEqual(self.client.get(f'/api/library/{aid}/file').content, png())
 
+    def test_manual_trash_returns_restore_id_for_undo(self):
+        pid, aid = self.make()
+        r = self.client.post(f'/api/library/{aid}/trash')
+        self.assertEqual(r.status_code, 200)
+        restore_id = r.json()['restore_id']
+        self.assertIsInstance(restore_id, int)
+        self.assertNotIn(aid, [a['id'] for a in self.client.get('/api/library', params={'project_id': pid}).json()])
+        self.assertEqual(self.client.post(f'/api/library/cleanup/restore/{restore_id}').status_code, 200)
+        self.assertIn(aid, [a['id'] for a in self.client.get('/api/library', params={'project_id': pid}).json()])
+
     def test_protection_check_holds_writer_lock(self):
         pid, aid = self.make(); studio = self.age(aid, 1)
         original = temp_cleanup.used_reason

@@ -4,6 +4,7 @@ import {useSharedActivity} from './ActivityContext';
 import type {Mode} from './StageNav';
 import Lightbox from './Lightbox';
 import {loadCreateDraft, saveCreateDraft} from './createDraft';
+import {onLibraryChanged, trashAsset as trashToBin} from './studioEvents';
 
 type Budget = {
   project_limit_usd: number;
@@ -77,6 +78,8 @@ export default function HomeScreen({
       .then(setBudget)
       .catch(() => undefined);
   }, [projectId, items]);
+  const [libraryTick, setLibraryTick] = useState(0);
+  useEffect(() => onLibraryChanged(() => setLibraryTick(t => t + 1)), []);
   useEffect(() => {
     if (!projectId) return;
     void apiFetch('/api/library?project_id=' + encodeURIComponent(projectId))
@@ -88,7 +91,7 @@ export default function HomeScreen({
         setSounds(of('audio').slice(0, 12));
       })
       .catch(() => undefined);
-  }, [projectId, items]);
+  }, [projectId, items, libraryTick]);
 
   useEffect(() => {
     if (!projectId) return;
@@ -144,9 +147,7 @@ export default function HomeScreen({
     setRefIds(ids => (on ? ids.filter(id => id !== a.id) : [...ids, a.id]));
   };
   const trashAsset = async (a: Media) => {
-    if (!window.confirm('Убрать кадр в корзину? Его можно вернуть в течение 30 дней.')) return;
-    const r = await apiFetch(`/api/library/${a.id}/trash`, {method: 'POST'});
-    if (!r.ok) return window.alert('Не удалось убрать: кадр используется в проекте или недоступен');
+    if (!(await trashToBin(a.id))) return;
     setView(-1);
     setImages(list => list.filter(x => x.id !== a.id));
   };

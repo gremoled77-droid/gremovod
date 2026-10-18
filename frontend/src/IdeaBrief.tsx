@@ -231,6 +231,7 @@ export default function IdeaBrief({
         </div>
       </div>
       <textarea
+        data-prompt
         ref={area}
         rows={3}
         value={brief}

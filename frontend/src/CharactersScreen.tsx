@@ -207,6 +207,7 @@ export default function CharactersScreen({
         <label>
           Промпт героя
           <textarea
+            data-prompt
             rows={8}
             value={prompt}
             onChange={e => {

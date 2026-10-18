@@ -17,6 +17,7 @@ import {
 import {AddReferenceModal, LocationModal} from './FrameSources';
 import CameraFramePanel from './CameraFramePanel';
 import PriceTable, {cents, useModelRange, useOptionPrices} from './PriceTable';
+import {onLibraryChanged, PASTE_REFERENCE, trashAsset as trashToBin} from './studioEvents';
 
 type OptionSpec = {
   values?: (string | number)[];
@@ -245,9 +246,31 @@ function CreateScreenBody({
       }
     })();
   }, []);
+  const [libraryTick, setLibraryTick] = useState(0);
+  useEffect(() => onLibraryChanged(() => setLibraryTick(t => t + 1)), []);
   useEffect(() => {
     void loadLibrary().catch(e => setError(String(e)));
-  }, [projectId, items]);
+  }, [projectId, items, libraryTick]);
+  // Ctrl+V с картинкой вне полей ввода: картинка становится новым референсом кадра.
+  useEffect(() => {
+    const onPaste = (e: Event) => {
+      const file = (e as CustomEvent<File>).detail;
+      if (!projectId) return setError('Сначала сохрани проект');
+      const form = new FormData();
+      form.append('project_id', projectId);
+      form.append('file', file);
+      void apiFetch('/api/library/import-reference', {method: 'POST', body: form})
+        .then(json)
+        .then(asset => {
+          setRefs(r => (r.includes(asset.id) ? r : [...r, asset.id]));
+          setNotice('Картинка из буфера добавлена референсом.');
+          return loadLibrary();
+        })
+        .catch(err => setError(err instanceof Error ? err.message : String(err)));
+    };
+    window.addEventListener(PASTE_REFERENCE, onPaste);
+    return () => window.removeEventListener(PASTE_REFERENCE, onPaste);
+  }, [projectId]);
 
   useEffect(() => {
     if (tab !== 'temp' || !projectId) return;
@@ -288,17 +311,11 @@ function CreateScreenBody({
   const byId = useMemo(() => Object.fromEntries(library.map(a => [a.id, a])), [library]);
   const images = library.filter(a => (a.metadata.kind || 'image') === 'image');
 
+  /** В корзину без вопроса: внизу появится «Отменить» на 10 секунд (и Ctrl+Z). */
   const trashAsset = async (id: string) => {
-    if (!window.confirm('Убрать файл из библиотеки? Он хранится в корзине 30 дней и восстанавливается.'))
-      return;
-    try {
-      await json(await apiFetch(`/api/library/${id}/trash`, {method: 'POST'}));
-      setRefs(r => r.filter(x => x !== id));
-      setNotice('Файл убран в корзину на 30 дней.');
-      await loadLibrary();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    }
+    if (!(await trashToBin(id))) return;
+    setRefs(r => r.filter(x => x !== id));
+    setView(null);
   };
   const toggleRef = (id: string) => setRefs(r => (r.includes(id) ? r.filter(x => x !== id) : [...r, id]));
   /** «Править в GPT Image»: кадр становится первым референсом, модель — GPT Image 2.5. */
@@ -827,6 +844,7 @@ function CreateScreenBody({
 
         <div className="cs-prompt">
           <textarea
+            data-prompt
             rows={3}
             value={prompt}
             placeholder="Опиши кадр: кто, где, свет, ракурс…"

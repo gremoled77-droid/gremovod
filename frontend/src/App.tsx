@@ -31,6 +31,7 @@ import WorkspaceTrail, {type WorkspaceLocation} from './WorkspaceTrail';
 import {readWorkspaceRoute, workspaceHash} from './workspaceRoute';
 import {readLocal, writeLocal, clearLocal} from './localDrafts';
 import Dock, {countActive} from './Dock';
+import Hotkeys from './Hotkeys';
 import {OPEN_QUEUE_EVENT} from './imageRoutes';
 import useActivity from './useActivity';
 import IdeaBrief from './IdeaBrief';
@@ -1027,6 +1028,19 @@ function App() {
         {projectId && (
           <GenerationWatcher key={projectId} projectId={projectId} onOpen={() => setMode('create')} />
         )}
+        <Hotkeys
+          mode={mode}
+          onMode={setMode}
+          projects={projects}
+          onOpenProject={id => void load(id)}
+          heroes={state.characters}
+          onHero={id => {
+            change({selectedCharacter: id});
+            setMode('characters');
+          }}
+          dockOpen={dockOpen}
+          onCloseDock={() => setDockOpen(false)}
+        />
       </div>
     </ActivityProvider>
   );

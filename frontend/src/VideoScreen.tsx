@@ -8,6 +8,7 @@ import GenerationReview, {type GenerationRequest} from './GenerationReview';
 import {AddReferenceModal, LibraryPickModal, LocationModal} from './FrameSources';
 import {cents, price} from './PriceTable';
 import {modePrompt, seedanceCost, usesSource, VIDEO_MODES, type VideoMode} from './videoMode';
+import {onLibraryChanged, trashAsset as trashToBin} from './studioEvents';
 
 type OptionSpec = {values?: (string | number)[]; default?: string | number; min?: number; max?: number};
 type Spec = {
@@ -131,9 +132,11 @@ function VideoScreenBody({projectId, world = ''}: {projectId: string; world?: st
       }
     })();
   }, []);
+  const [libraryTick, setLibraryTick] = useState(0);
+  useEffect(() => onLibraryChanged(() => setLibraryTick(t => t + 1)), []);
   useEffect(() => {
     void loadLibrary().catch(e => setError(String(e)));
-  }, [projectId, items]);
+  }, [projectId, items, libraryTick]);
 
   const byId = useMemo(() => Object.fromEntries(library.map(a => [a.id, a])), [library]);
   const frames = library.filter(a => (a.metadata.kind || 'image') === 'image');
@@ -201,17 +204,7 @@ function VideoScreenBody({projectId, world = ''}: {projectId: string; world?: st
 
   const addRef = (id: string) =>
     setRefs(r => (r.includes(id) || id === base || id === finish || r.length >= maxRefs ? r : [...r, id]));
-  const trash = async (id: string) => {
-    if (!window.confirm('Убрать ролик из библиотеки? Он хранится в корзине 30 дней и восстанавливается.'))
-      return;
-    try {
-      await json(await apiFetch(`/api/library/${id}/trash`, {method: 'POST'}));
-      setNotice('Ролик убран в корзину на 30 дней.');
-      await loadLibrary();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    }
-  };
+  const trash = (id: string) => trashToBin(id);
   /** Цепочка клипов: последний кадр ролика становится кадром-основой следующего. */
   const continueFrom = async (videoId: string) => {
     setError('');
@@ -462,6 +455,7 @@ function VideoScreenBody({projectId, world = ''}: {projectId: string; world?: st
         <label className="vs-block">
           <b>Промпт</b>
           <textarea
+            data-prompt
             rows={6}
             value={prompt}
             placeholder="Что происходит в ролике: действие, настроение, звук. Движение камеры выбирается ниже."
