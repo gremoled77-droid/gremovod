@@ -51,6 +51,7 @@ export default function GenerateButton({
   onNotice,
   onError,
   routes,
+  label: title = 'Сгенерировать',
 }: {
   projectId: string;
   busy?: boolean;
@@ -65,8 +66,10 @@ export default function GenerateButton({
   job: () => Job | string | Promise<Job | string>;
   onNotice: (text: string) => void;
   onError: (text: string) => void;
-  /** Допустимые способы (по умолчанию все три). */
+  /** Допустимые способы (по умолчанию все три); при одном способе стрелки ▾ нет. */
   routes?: ImageRoute[];
+  /** Подпись основного действия для API (например «Сгенерировать видео»). */
+  label?: string;
 }) {
   const allowed = ROUTES.filter(r => !routes || routes.includes(r.id));
   const pick = (saved: ImageRoute) => (allowed.some(r => r.id === saved) ? saved : 'api');
@@ -117,7 +120,7 @@ export default function GenerateButton({
   const label = working
     ? 'Готовлю…'
     : route === 'api'
-      ? `Сгенерировать${count > 1 ? ` (${count})` : ''}${estimate !== null ? ' · ' + usd(estimate) : ''}`
+      ? `${title}${count > 1 ? ` (${count})` : ''}${estimate !== null ? ' · ' + usd(estimate) : ''}`
       : route === 'chatgpt'
         ? 'Сгенерировать в ChatGPT · $0'
         : 'Отправить в Codex · $0';
@@ -132,17 +135,19 @@ export default function GenerateButton({
       >
         {label}
       </button>
-      <button
-        className="primary gen-more"
-        aria-label={'Способ генерации: ' + current.label}
-        aria-haspopup="menu"
-        aria-expanded={open}
-        disabled={working}
-        onClick={() => setOpen(v => !v)}
-      >
-        ▾
-      </button>
-      {open && (
+      {allowed.length > 1 && (
+        <button
+          className="primary gen-more"
+          aria-label={'Способ генерации: ' + current.label}
+          aria-haspopup="menu"
+          aria-expanded={open}
+          disabled={working}
+          onClick={() => setOpen(v => !v)}
+        >
+          ▾
+        </button>
+      )}
+      {open && allowed.length > 1 && (
         <div className="gen-menu" role="menu" aria-label="Способ генерации">
           {allowed.map(r => (
             <button

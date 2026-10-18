@@ -1055,3 +1055,12 @@ kbd {
   scrollbar-color: var(--border-strong) transparent;
   scrollbar-width: thin;
 }
+/* Один способ — обычная кнопка без стрелки */
+.gen-split .gen-main:only-child {
+  border-radius: var(--radius);
+}
+input[type='range'],
+input[type='checkbox'],
+input[type='radio'] {
+  accent-color: var(--accent);
+}

@@ -6,7 +6,8 @@ import FrameActions from './FrameActions';
 import CameraFramePanel from './CameraFramePanel';
 import GenerationReview, {type GenerationRequest} from './GenerationReview';
 import {AddReferenceModal, LibraryPickModal, LocationModal} from './FrameSources';
-import {cents, price} from './PriceTable';
+import {price} from './PriceTable';
+import GenerateButton from './GenerateButton';
 import {modePrompt, seedanceCost, usesSource, VIDEO_MODES, type VideoMode} from './videoMode';
 import {onLibraryChanged, trashAsset as trashToBin} from './studioEvents';
 
@@ -467,7 +468,6 @@ function VideoScreenBody({projectId, world = ''}: {projectId: string; world?: st
           prompt={prompt}
           onPrompt={update => setPrompt(update)}
           categories={MOVE_ONLY}
-          defaultOpen
           title="Движение камеры"
           hint="одно движение на ролик"
         />
@@ -538,22 +538,30 @@ function VideoScreenBody({projectId, world = ''}: {projectId: string; world?: st
 
         <div className="vs-run">
           <span className="vs-price">
-            {cost === null ? '…' : '≈ ' + cents(cost)}
-            {rate !== null && (
+            {rate !== null ? (
               <small className="muted">
-                {' '}
                 {String(rate).replace('.', ',')} ¢/с × {outSec} с
                 {fromClip && clipSec
                   ? ` + ${String(rate / 2).replace('.', ',')} ¢/с × ${clipSec} с входа`
                   : ''}
               </small>
+            ) : (
+              <small className="muted">{cost === null ? 'Считаю цену…' : 'Цена на кнопке'}</small>
             )}
           </span>
-          <button className="primary" disabled={busy || !projectId} onClick={() => void start()}>
-            {busy ? 'Готовлю…' : 'Оценить и запустить'}
-          </button>
+          <GenerateButton
+            projectId={projectId}
+            busy={busy}
+            disabled={!projectId}
+            estimate={cost}
+            label="Сгенерировать видео"
+            routes={['api']}
+            onApi={start}
+            job={() => 'Видео запускается только через API'}
+            onNotice={setNotice}
+            onError={setError}
+          />
         </div>
-        <small className="muted">Перед отправкой покажу точную цену и попрошу подтверждение.</small>
       </div>
 
       <div className="vs-results cs-results">
