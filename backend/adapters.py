@@ -281,7 +281,26 @@ def cost_image_upscale(spec, payload):
     return max(spec['min_price_usd'], round(mpx * spec['price_per_mpx_usd'], 4))
 
 
+# ---------- KIE image-to-image (Seedream 5 Pro, Qwen Image 2.1): схемы model-studio/*-schema.json ----------
+def build_kie_image(spec, body):
+    if not body.reference_urls:
+        _bad('Эта модель KIE работает от картинки: добавь хотя бы один референс')
+    check_refs(body.reference_urls, spec['api_refs'])
+    if len(body.prompt) > 5000:
+        _bad('Промпт KIE не длиннее 5000 символов')
+    inp = {'prompt': body.prompt, 'image_urls': list(body.reference_urls), **pick_options(spec, body.options),
+           **spec.get('fixed_input', {})}
+    return {'model': spec['model'], 'task_type': spec['task_type'], 'input': inp}
+
+
+def cost_kie_image(spec, payload):
+    inp = payload['input']
+    extra = max(0, len(inp['image_urls']) - 1)  # первый референс бесплатный
+    return round(spec['price_by_tier'][inp[spec['tier_field']]] + extra * spec.get('extra_ref_usd', 0), 4)
+
+
 REGISTRY = {
+    'kie_image': (build_kie_image, cost_kie_image),
     'image_upscale': (build_image_upscale, cost_image_upscale),
     'unified_image': (build_unified_image, cost_unified_image),
     'gpt_image': (build_gpt_image, cost_gpt_image),
@@ -319,6 +338,8 @@ def wire_body(spec, payload):
     Служебное поле billing (для оценки цены) провайдеру не уходит."""
     if spec.get('adapter') == 'gpt_image':
         return {'model': payload['model'], **payload['input']}
+    if spec.get('provider') == 'kie':  # createTask: {model, input}, task_type только для студии
+        return {'model': payload['model'], 'input': payload['input']}
     if spec.get('adapter') == 'image_upscale':  # dims нужны только для оценки цены
         return {k: payload[k] for k in ('model', 'task_type', 'input')}
     return {key: value for key, value in payload.items() if key != 'billing'}

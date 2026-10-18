@@ -173,10 +173,32 @@ for _base, _prices in (('seedream-5-lite', {'2K':0.065,'3K':0.065}), ('seedream-
     MODEL_SPECS[_base+'-less-restriction'] = _spec
 
 
+# --- KIE (второй провайдер, 18.10.2026). Схемы: model-studio/seedream-schema.json и qwen-schema.json (каталог KIE 15.10.2026).
+# --- Цены со страниц kie.ai/seedream-5-pro и kie.ai/qwen-image-2.1 (18.10.2026): 1 кредит = $0.005.
+# --- Обе модели image-to-image: нужен хотя бы один публичный референс. Живого вызова не было:
+# --- launch_enabled=False (только предпросмотр и цена), пока владелец не разрешит пробный запуск.
+_KIE_COMMON={'launch_enabled':False,'prompt_only':False,'provider':'kie','kind':'image','adapter':'kie_image',
+             'task_type':'image-to-image','submit_path':'/api/v1/jobs/createTask','max_refs':10,'api_refs':10,'ref_field':'image_urls'}
+MODEL_SPECS['kie-seedream-5-pro']={**_KIE_COMMON,'model':'seedream/5-pro-image-to-image',
+    'tier_field':'quality','price_by_tier':{'basic':0.035,'high':0.07},'extra_ref_usd':0.0025,
+    'fixed_input':{'nsfw_checker':True},
+    'options':{'quality':{'values':['basic','high'],'default':'basic'},  # basic = 1K, high = 2K
+               'aspect_ratio':{'values':['16:9','9:16','1:1','4:3','3:4','3:2','2:3','21:9'],'default':'16:9'},
+               'output_format':{'values':['png','jpeg'],'default':'png'}},
+    'docs':'https://kie.ai/seedream-5-pro'}
+MODEL_SPECS['kie-qwen-image-2.1']={**_KIE_COMMON,'model':'qwen2-1/image-to-image',
+    'tier_field':'resolution','price_by_tier':{'1K':0.02,'2K':0.04},
+    'fixed_input':{'nsfw_checker':True,'enhance_prompt':False},  # промпт пишет студия, без переписывания у провайдера
+    'options':{'resolution':{'values':['1K','2K'],'default':'1K'},
+               'aspect_ratio':{'values':['auto','16:9','9:16','1:1','4:3','3:4','3:2','2:3','21:9','9:21'],'default':'auto'},
+               'output_format':{'values':['png','webp','jpeg'],'default':'png'}},
+    'docs':'https://kie.ai/qwen-image-2.1'}
+
+
 # --- Страница модели у провайдера (кнопка «i» в «Кадрах»). Интерфейс берёт ссылку из page_urls[provider],
 # --- поэтому при втором API-сервисе достаточно добавить его ключ и ссылки; код экрана не меняется.
 # --- Ссылки на страницы моделей владелец даст позже: пока берём только адреса docs на домене провайдера.
-PROVIDER_HOSTS = {'piapi': 'piapi.ai'}
+PROVIDER_HOSTS = {'piapi': 'piapi.ai', 'kie': 'kie.ai'}
 _GPT_PAGE = 'https://piapi.ai/docs/gpt-image/gpt-image-api'
 PAGE_URLS = {  # {model_id: {provider: url}}: явные ссылки имеют приоритет над docs
     'gpt-image-2': {'piapi': _GPT_PAGE},
