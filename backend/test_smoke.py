@@ -780,6 +780,7 @@ class StudioSmokeTests(unittest.TestCase):
             self.assertEqual(asyncio.run(image_assets.download_image('https://cdn.example.test/start')),b'image bytes')
         self.assertEqual([c.args[0] for c in guard.call_args_list],['https://cdn.example.test/start','https://other.example.test/image'])
 
+    @patch.dict(main.MODEL_SPECS['seedance-2.5'], {'launch_enabled': True})  # конвейер, не проверка модели
     def test_seedance_schema_estimate_approval_and_submission(self):
         body=self.image_request(model_id='seedance-2.5',prompt='Slow forward dolly in @image1',
                                 reference_urls=['https://cdn.example.test/frame.png'],
@@ -805,6 +806,7 @@ class StudioSmokeTests(unittest.TestCase):
         self.assertEqual(self.client.post('/api/model-jobs',json=body).json()['duplicate'],True)
         main.request_piapi.assert_awaited_once()
 
+    @patch.dict(main.MODEL_SPECS['seedance-2.5'], {'launch_enabled': True})  # конвейер, не проверка модели
     def test_seedance_draft_then_final_uses_project_queue(self):
         draft_body=self.image_request(model_id='seedance-2.5',prompt='Slow forward dolly',options={'draft':True,'duration':4},
                                       max_cost_usd=0.6,request_id='draft-request-1234567')
@@ -850,6 +852,7 @@ class StudioSmokeTests(unittest.TestCase):
         main.request_piapi.assert_not_awaited()
 
     @unittest.skipUnless(shutil.which('ffmpeg') and shutil.which('ffprobe'),'FFmpeg unavailable')
+    @patch.dict(main.MODEL_SPECS['seedance-2.5'], {'launch_enabled': True})  # конвейер, не проверка модели
     def test_video_download_validate_library_and_reopen(self):
         body=self.image_request(model_id='seedance-2.5',options={'resolution':'480p','duration':5},max_cost_usd=0.75)
         main.request_piapi.side_effect=None
