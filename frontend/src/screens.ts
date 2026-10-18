@@ -13,9 +13,9 @@ export type Mode =
   | 'settings'
   | 'audio'
   | 'files'
+  | 'economics'
   // Скрыты до беты (решение владельца 18.10.2026): код лежит, в меню и маршрутах их нет.
   | 'reels'
-  | 'economics'
   | 'scene'
   | 'refine'
   | 'agents';
@@ -69,6 +69,14 @@ export const SCREENS: Screen[] = [
     hint: 'выгрузка в CapCut',
     lede: 'Клипы и звук по порядку кадров для CapCut, папки серий и эпизодов на диске.',
   },
+  {
+    mode: 'economics',
+    title: 'Выпуск',
+    group: 'stage',
+    main: 'solo-main',
+    hint: 'бюджет серии',
+    lede: 'Итоги серии: бюджет, расходы на попытки и что вошло в ролик.',
+  },
   {mode: 'graph', title: 'Узлы', group: 'tool', main: 'workflow-main', icon: '⌁'},
   {
     mode: 'archive',
@@ -100,7 +108,6 @@ export const SCREENS: Screen[] = [
     lede: 'Проект, модель для промптов и ссылка на чат.',
   },
   {mode: 'reels', title: 'Рилсы', group: 'hidden', main: 'reels-main'},
-  {mode: 'economics', title: 'Выпуск', group: 'hidden', main: 'solo-main'},
   {mode: 'scene', title: 'Сцена', group: 'hidden', main: 'solo-main'},
   {mode: 'refine', title: 'Допилить', group: 'hidden', main: 'solo-main'},
   {mode: 'agents', title: 'Агенты', group: 'hidden', main: 'solo-main'},

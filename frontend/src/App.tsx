@@ -24,6 +24,8 @@ import VideoScreen from './VideoScreen';
 import SoundScreen from './SoundScreen';
 import ProductionPanel from './ProductionPanel';
 import {MontageSummary} from './MontageSummary';
+import EconomicsPanel from './EconomicsPanel';
+import {ReleaseSummary} from './ReleaseSummary';
 import HomeScreen from './HomeScreen';
 import GenerationWatcher from './GenerationWatcher';
 import {ActivityProvider} from './ActivityContext';
@@ -935,6 +937,11 @@ function App() {
                       void load(id, characterId ? 'characters' : 'create', characterId)
                     }
                   />
+                </>
+              ) : mode === 'economics' ? (
+                <>
+                  <ReleaseSummary projectId={projectId} />
+                  <EconomicsPanel projectId={projectId} revision={libraryRevision} />
                 </>
               ) : mode === 'archive' ? (
                 <AssetLibrary {...replacementControls} projectId={projectId} revision={libraryRevision} />

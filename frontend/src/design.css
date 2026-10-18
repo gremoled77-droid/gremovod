@@ -1065,7 +1065,7 @@ input[type='radio'] {
   accent-color: var(--accent);
 }
 
-/* «Монтаж»: папки производства под шапкой */
+/* «Монтаж» и «Выпуск»: карточка под шапкой */
 .production-panel {
   display: flex;
   flex-direction: column;
@@ -1094,4 +1094,20 @@ input[type='radio'] {
   .production-panel {
     padding: 16px;
   }
+}
+
+.econ {
+  margin-top: 16px;
+}
+.econ-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.econ h4 {
+  margin: 8px 0 0;
+}
+.econ .cost-stats article {
+  background: var(--surface-2);
 }

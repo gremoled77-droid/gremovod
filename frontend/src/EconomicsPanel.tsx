@@ -1,7 +1,6 @@
 import BudgetPanel from './BudgetPanel';
 import {useEffect, useState} from 'react';
-import {apiFetch} from './api';
-import {responseJson} from './ChatGPTPanel';
+import {apiFetch, responseJson} from './api';
 import {smallUsd} from './usdFormat';
 type Entry = {
   id: string;
@@ -154,9 +153,9 @@ export default function EconomicsPanel({projectId, revision}: {projectId: string
   }, [projectId, revision, tick]);
   const money = (n: number | null) => (n === null ? '—' : '$' + n.toFixed(3));
   return (
-    <section className="panel">
-      <div className="panel-title">
-        <h2>Экономика ролика</h2>
+    <section className="production-panel econ">
+      <div className="econ-head">
+        <h3>Экономика ролика</h3>
         <button onClick={() => setTick(x => x + 1)}>Обновить</button>
       </div>
       <p className="muted">
@@ -165,7 +164,11 @@ export default function EconomicsPanel({projectId, revision}: {projectId: string
       </p>
       {projectId && <BudgetPanel projectId={projectId} />}
       {!projectId && <p>Выбери или сохрани проект ролика.</p>}
-      {error && <div className="alert">{error}</div>}
+      {error && (
+        <div className="alert" role="alert">
+          {error}
+        </div>
+      )}
       {data && (
         <>
           <div className="cost-stats">
@@ -243,7 +246,7 @@ export default function EconomicsPanel({projectId, revision}: {projectId: string
             </a>{' '}
             · тариф проверен 15.10.2026.
           </p>
-          <h3>Все попытки и расходы</h3>
+          <h4>Все попытки и расходы</h4>
           <div className="table-scroll">
             <table className="cost-table">
               <thead>
@@ -261,7 +264,7 @@ export default function EconomicsPanel({projectId, revision}: {projectId: string
               </tbody>
             </table>
           </div>
-          <h3>Прогресс по моделям и месяцам</h3>
+          <h4>Прогресс по моделям и месяцам</h4>
           <div className="table-scroll">
             <table className="cost-table">
               <thead>
