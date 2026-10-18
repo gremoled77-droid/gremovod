@@ -50,6 +50,7 @@ export default function GenerateButton({
   job,
   onNotice,
   onError,
+  routes,
 }: {
   projectId: string;
   busy?: boolean;
@@ -64,12 +65,16 @@ export default function GenerateButton({
   job: () => Job | string | Promise<Job | string>;
   onNotice: (text: string) => void;
   onError: (text: string) => void;
+  /** Допустимые способы (по умолчанию все три). */
+  routes?: ImageRoute[];
 }) {
-  const [route, setRoute] = useState<ImageRoute>(() => readRoute(projectId));
+  const allowed = ROUTES.filter(r => !routes || routes.includes(r.id));
+  const pick = (saved: ImageRoute) => (allowed.some(r => r.id === saved) ? saved : 'api');
+  const [route, setRoute] = useState<ImageRoute>(() => pick(readRoute(projectId)));
   const [open, setOpen] = useState(false);
   const [sending, setSending] = useState(false);
   const box = useRef<HTMLDivElement>(null);
-  useEffect(() => setRoute(readRoute(projectId)), [projectId]);
+  useEffect(() => setRoute(pick(readRoute(projectId))), [projectId]);
   useEffect(() => {
     if (!open) return;
     const close = (e: MouseEvent | KeyboardEvent) => {
@@ -139,7 +144,7 @@ export default function GenerateButton({
       </button>
       {open && (
         <div className="gen-menu" role="menu" aria-label="Способ генерации">
-          {ROUTES.map(r => (
+          {allowed.map(r => (
             <button
               key={r.id}
               role="menuitemradio"

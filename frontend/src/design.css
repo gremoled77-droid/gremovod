@@ -1034,3 +1034,24 @@ kbd {
     bottom: 76px;
   }
 }
+
+/* Средняя ширина: в верхней полосе только проект и главные действия, без наезда */
+.topbar-project {
+  flex: 1 1 auto;
+  overflow: hidden;
+}
+.top-actions {
+  flex: 0 0 auto;
+}
+@media (max-width: 1180px) {
+  .topbar-ghost,
+  .topbar-status.online {
+    display: none;
+  }
+}
+
+/* Полосы прокрутки в тёмной теме (иначе в Windows они белые) */
+* {
+  scrollbar-color: var(--border-strong) transparent;
+  scrollbar-width: thin;
+}

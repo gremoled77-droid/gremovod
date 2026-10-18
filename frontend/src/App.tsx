@@ -126,31 +126,18 @@ const INITIAL: Studio = {
   referenceUrls: '',
   videoReference: '',
   characters: [],
-  nodes: [
-    {
-      id: 'brief',
-      type: 'studio',
-      position: {x: 30, y: 100},
-      data: {title: '① Идея и GPT', description: 'Режиссёрское задание'},
-    },
-    {
-      id: 'image',
-      type: 'studio',
-      position: {x: 330, y: 100},
-      data: {title: '② Image Lab', description: 'Референсы и кадры'},
-    },
-    {
-      id: 'video',
-      type: 'studio',
-      position: {x: 630, y: 100},
-      data: {title: '③ Video Lab', description: 'Анимация выбранного кадра'},
-    },
-  ],
-  edges: [
-    {id: 'e1', source: 'brief', target: 'image', animated: true},
-    {id: 'e2', source: 'image', target: 'video', animated: true},
-  ],
+  nodes: [],
+  edges: [],
 };
+/** Старые демо-узлы «① Идея и GPT / ② Image Lab / ③ Video Lab» без вида узла: в открытых проектах убираем. */
+const DEMO_NODES = new Set(['brief', 'image', 'video']);
+function withoutDemoNodes(state: Studio): Studio {
+  const demo = (n: Node) => DEMO_NODES.has(n.id) && n.type === 'studio' && !(n.data as {kind?: string})?.kind;
+  if (!state.nodes?.some(demo)) return state;
+  const nodes = state.nodes.filter(n => !demo(n));
+  const ids = new Set(nodes.map(n => n.id));
+  return {...state, nodes, edges: (state.edges || []).filter(e => ids.has(e.source) && ids.has(e.target))};
+}
 const json = async (r: Response) => {
   const d = await r.json().catch(() => ({detail: 'Не-JSON ответ'}));
   if (!r.ok) {
@@ -426,7 +413,7 @@ function App() {
     const p = await json(await apiFetch(url + '/projects/' + encodeURIComponent(id)));
     if (!isActive() || epoch !== loadingEpoch.current) return;
     setApiHealth('online');
-    const loaded = {...INITIAL, ...p.state};
+    const loaded = withoutDemoNodes({...INITIAL, ...p.state});
     baseProject.current = {
       id: p.id,
       revision: p.revision,
@@ -448,7 +435,11 @@ function App() {
       Array.isArray(draft.local.state.characters) &&
       typeof draft.local.title === 'string'
     ) {
-      const merge = mergeProject(draft.base, draft.local, restored);
+      const merge = mergeProject(
+        {...draft.base, state: withoutDemoNodes(draft.base.state)},
+        {...draft.local, state: withoutDemoNodes(draft.local.state)},
+        restored
+      );
       if (merge.conflicts.length) setRecovery({projectId: p.id, ...merge.value, conflicts: merge.conflicts});
       else restored = merge.value;
     }

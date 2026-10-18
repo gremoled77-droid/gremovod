@@ -13,6 +13,9 @@ import {
   type Edge,
 } from '@xyflow/react';
 import {apiFetch} from './api';
+import GenerateButton from './GenerateButton';
+import type {ImageJob} from './imageRoutes';
+import {toast} from './studioEvents';
 import LimitPicker from './LimitPicker';
 import {initialLimit, limitAllowed} from './spendLimit';
 import {useSharedActivity} from './ActivityContext';
@@ -107,6 +110,9 @@ type Ctx = {
   library: Lib[];
   prices: Record<string, number | null>;
   run: (ids: string[]) => void;
+  /** Задание для ChatGPT/Codex по узлу «Изображение»; строка — что мешает отправке. */
+  imageJob: (id: string) => ImageJob | string;
+  projectId: string;
   upload: (accept: string, done: (asset: Lib) => void) => void;
   specs: Record<string, ModelSpecLite>;
   duplicate: (id: string) => void;
@@ -534,10 +540,24 @@ function Block({id, data, selected}: {id: string; data: Record<string, any>; sel
               {kind === 'llm' ? 'до ' : ''}${formatPrice(ctx.prices[id] as number)}
             </span>
           )}
-          {(kind === 'llm' || !out) && (
-            <button className="nodrag wf-run" onClick={() => ctx.run([id])}>
-              {kind === 'llm' ? (data.output ? '↻ Ещё раз' : '▶ Сгенерировать') : '▶ Запустить'}
-            </button>
+          {kind === 'image' && !out ? (
+            <span className="nodrag wf-gen">
+              <GenerateButton
+                projectId={ctx.projectId}
+                estimate={ctx.prices[id] ?? null}
+                onApi={() => ctx.run([id])}
+                job={() => ctx.imageJob(id)}
+                onNotice={text => toast({text})}
+                onError={text => text && toast({text})}
+                routes={['api', 'chatgpt']}
+              />
+            </span>
+          ) : (
+            (kind === 'llm' || !out) && (
+              <button className="nodrag wf-run" onClick={() => ctx.run([id])}>
+                {kind === 'llm' ? (data.output ? '↻ Ещё раз' : '▶ Сгенерировать') : '▶ Запустить'}
+              </button>
+            )
           )}
         </footer>
       )}
@@ -668,6 +688,24 @@ export default function WorkflowPanel({
         }),
       })
     );
+
+  /** ChatGPT/Codex: промпт и референсы узла из той же схемы, что и для API; результат вернётся в узел. */
+  const imageJob = (id: string): ImageJob | string => {
+    const outputs: Record<string, string> = {};
+    for (const n of nodes) if (n.data.kind === 'llm' && n.data.output) outputs[n.id] = String(n.data.output);
+    const plan = buildSteps(nodes, edges, results, {llm: outputs});
+    const step = plan.steps.find(s => s.nodeId === id);
+    if (!step) return plan.problems.join(' · ') || 'Подключи к узлу текст с промптом';
+    if (step.waitFor.length) return 'Сначала получи картинки во входящих узлах: они нужны как референсы';
+    if (!step.prompt.trim()) return 'Промпт пустой: подключи узел «Текст»';
+    return {
+      projectId,
+      prompt: step.prompt,
+      target: step.model,
+      referenceAssetIds: step.refAssetIds,
+      nodeId: id,
+    };
+  };
 
   /** Подготовка запуска: оценка по каждому шагу, показ итога и подтверждение. */
   const prepare = async (onlyIds?: string[]) => {
@@ -962,6 +1000,8 @@ export default function WorkflowPanel({
     library,
     prices,
     run: ids => void prepare(ids),
+    imageJob,
+    projectId,
     upload,
     specs,
     duplicate,
