@@ -1,0 +1,118 @@
+<!doctype html>
+<html
+  lang="ru"
+  data-composition-variables='[
+    {"id":"name","type":"string","label":"Имя","default":"Грэм"},
+    {"id":"role","type":"string","label":"Кто это","default":"таксист, ВАЗ-2106"}
+  ]'
+>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <script src="assets/gsap.min.js"></script>
+    <style>
+      @font-face {
+        font-family: 'Onest';
+        src: url('assets/Onest.ttf') format('truetype');
+        font-weight: 100 900;
+      }
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: transparent;
+      }
+      #root {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        font-family: 'Onest', sans-serif;
+      }
+      /* the plate: checker strip + name block, lower-left safe area */
+      #plate {
+        position: absolute;
+        left: 6%;
+        bottom: 12%;
+        display: flex;
+        align-items: stretch;
+        gap: 1.6vmin;
+      }
+      #checker {
+        display: grid;
+        grid-template-columns: repeat(2, 1.8vmin);
+        grid-auto-rows: 1.8vmin;
+        align-content: start;
+      }
+      #checker i {
+        display: block;
+      }
+      #checker i.on {
+        background: #f2b134;
+      }
+      #card {
+        background: rgba(7, 10, 18, 0.82);
+        border-left: 0.6vmin solid #f2b134;
+        padding: 1.6vmin 3.2vmin 1.8vmin 2.4vmin;
+        overflow: hidden;
+      }
+      #name {
+        color: #f2b134;
+        font-size: 6.4vmin;
+        font-weight: 800;
+        line-height: 1;
+        white-space: nowrap;
+      }
+      #role {
+        margin-top: 0.8vmin;
+        color: #e9e4d8;
+        font-size: 3vmin;
+        font-weight: 500;
+        white-space: nowrap;
+      }
+      @media (orientation: portrait) {
+        /* keep the bottom 20% free for the platform interface */
+        #plate {
+          left: 7%;
+          bottom: 24%;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="4" data-width="1920" data-height="1080">
+      <div id="plate" class="clip" data-start="0" data-duration="4" data-track-index="0">
+        <div id="checker"></div>
+        <div id="card">
+          <div id="name" data-var-text="name">Грэм</div>
+          <div id="role" data-var-text="role">таксист, ВАЗ-2106</div>
+        </div>
+      </div>
+    </div>
+    <script>
+      const checker = document.getElementById('checker');
+      for (let i = 0; i < 8; i++) {
+        const cell = document.createElement('i');
+        if ((Math.floor(i / 2) + i) % 2 === 0) cell.className = 'on';
+        checker.appendChild(cell);
+      }
+
+      const tl = gsap.timeline({paused: true});
+      tl.from('#checker i', {scaleY: 0, duration: 0.2, stagger: 0.03, ease: 'back.out(2)'}, 0);
+      tl.from('#card', {clipPath: 'inset(0 100% 0 0)', duration: 0.5, ease: 'power3.out'}, 0.15);
+      tl.from('#name', {x: '-4vmin', opacity: 0, duration: 0.5, ease: 'power3.out'}, 0.3);
+      tl.from('#role', {x: '-4vmin', opacity: 0, duration: 0.5, ease: 'power3.out'}, 0.42);
+      // exit: card wipes out, strip collapses
+      tl.to('#card', {clipPath: 'inset(0 100% 0 0)', duration: 0.4, ease: 'power3.in'}, 3.4);
+      tl.to('#checker i', {scaleY: 0, duration: 0.15, stagger: 0.02, ease: 'power2.in'}, 3.6);
+
+      window.__timelines['main'] = tl;
+      tl.seek(0);
+    </script>
+  </body>
+</html>

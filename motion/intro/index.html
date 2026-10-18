@@ -1,0 +1,338 @@
+<!doctype html>
+<html
+  lang="ru"
+  data-composition-variables='[
+    {"id":"series","type":"string","label":"Название сериала","default":"ГРЭМ"},
+    {"id":"episode","type":"string","label":"Серия","default":"Серия 1 · Ночная смена"},
+    {"id":"caption","type":"string","label":"Подпись","default":"ВАЗ-2106 · Минск"}
+  ]'
+>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <script src="assets/gsap.min.js"></script>
+    <style>
+      @font-face {
+        font-family: 'Onest';
+        src: url('assets/Onest.ttf') format('truetype');
+        font-weight: 100 900;
+      }
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: #05070c;
+      }
+      #root {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        font-family: 'Onest', sans-serif;
+        background: linear-gradient(180deg, #070a14 0%, #0d1424 55%, #141a26 72%, #07090e 100%);
+      }
+      .layer {
+        position: absolute;
+        inset: 0;
+      }
+      /* sodium haze over the city */
+      #haze {
+        background: radial-gradient(ellipse 70% 30% at 50% 68%, rgba(242, 140, 50, 0.22), transparent 70%);
+      }
+      #city svg {
+        position: absolute;
+        left: 0;
+        bottom: 30%;
+        width: 100%;
+        height: 30%;
+      }
+      #road {
+        top: auto;
+        height: 30%;
+        background: linear-gradient(180deg, #0b0e15 0%, #05070b 100%);
+        border-top: 0.25vmin solid rgba(242, 177, 49, 0.18);
+      }
+      /* wet asphalt: vertical reflections of the lamps */
+      #reflect {
+        top: auto;
+        height: 30%;
+        background: repeating-linear-gradient(
+          90deg,
+          transparent 0 7.5%,
+          rgba(242, 160, 60, 0.12) 7.5% 8.3%,
+          transparent 8.3% 15%
+        );
+        -webkit-mask-image: linear-gradient(180deg, #000, transparent 85%);
+        mask-image: linear-gradient(180deg, #000, transparent 85%);
+      }
+      /* the passing car: headlight cones + body glow, travels left → right */
+      #car {
+        position: absolute;
+        left: 0;
+        bottom: 17%;
+        width: 0;
+        height: 0;
+      }
+      .cone {
+        position: absolute;
+        left: 0;
+        width: 75vmax;
+        height: 34vmin;
+        transform-origin: 0 50%;
+        background: radial-gradient(
+          ellipse 100% 50% at 0% 50%,
+          rgba(255, 244, 214, 0.75),
+          rgba(255, 226, 160, 0.18) 45%,
+          transparent 72%
+        );
+        clip-path: polygon(0 47%, 100% 0, 100% 100%, 0 53%);
+        mix-blend-mode: screen;
+        filter: blur(0.6vmin);
+      }
+      #cone1 {
+        top: -17vmin;
+        transform: rotate(-3deg);
+      }
+      #cone2 {
+        top: -14vmin;
+        transform: rotate(2deg);
+      }
+      .lamp {
+        position: absolute;
+        width: 3.2vmin;
+        height: 3.2vmin;
+        margin: -1.6vmin 0 0 -1.6vmin;
+        border-radius: 50%;
+        background: radial-gradient(circle, #fff 0 22%, rgba(255, 236, 190, 0.7) 40%, transparent 70%);
+        mix-blend-mode: screen;
+      }
+      #lamp1 {
+        top: -1vmin;
+      }
+      #lamp2 {
+        top: 2vmin;
+      }
+      .tail {
+        position: absolute;
+        width: 2.4vmin;
+        height: 1.4vmin;
+        border-radius: 40%;
+        background: radial-gradient(circle, #ff5a3c 0 30%, rgba(255, 40, 30, 0.5) 50%, transparent 75%);
+        mix-blend-mode: screen;
+        filter: blur(0.2vmin);
+      }
+      #tail1 {
+        left: -26vmin;
+        top: -1vmin;
+      }
+      #tail2 {
+        left: -26vmin;
+        top: 2vmin;
+      }
+      /* big soft spill that lights up the scene as the car passes */
+      #spill {
+        position: absolute;
+        left: -40vmax;
+        top: -50vmax;
+        width: 100vmax;
+        height: 100vmax;
+        background: radial-gradient(circle, rgba(255, 220, 160, 0.16), transparent 60%);
+        mix-blend-mode: screen;
+      }
+      #titles {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 2.4vmin;
+        padding-bottom: 14%;
+        text-align: center;
+      }
+      #seriesWrap {
+        position: relative;
+        line-height: 0.9;
+      }
+      .series {
+        font-size: 30vmin;
+        font-weight: 800;
+        letter-spacing: 0.04em;
+        padding-left: 0.04em;
+        white-space: nowrap;
+      }
+      #seriesDim {
+        color: #161c2a;
+        -webkit-text-stroke: 0.25vmin rgba(255, 255, 255, 0.06);
+      }
+      #seriesLit {
+        position: absolute;
+        inset: 0;
+        color: #f2b134;
+        text-shadow:
+          0 0 2vmin rgba(242, 177, 52, 0.55),
+          0 0 7vmin rgba(242, 120, 30, 0.35);
+        clip-path: inset(-30% 100% -30% -30%);
+      }
+      #checker {
+        display: grid;
+        grid-template-columns: repeat(14, 2.6vmin);
+        grid-template-rows: repeat(2, 2.6vmin);
+      }
+      #checker i {
+        display: block;
+        transform-origin: 50% 50%;
+      }
+      #checker i.on {
+        background: #f2b134;
+      }
+      #episode {
+        color: #e9e4d8;
+        font-size: 5.2vmin;
+        font-weight: 500;
+        letter-spacing: 0.02em;
+        max-width: 90vw;
+        padding: 0.6vmin 2.4vmin;
+        background: radial-gradient(ellipse at center, rgba(5, 7, 12, 0.85) 40%, transparent 75%);
+        text-shadow: 0 0 1.2vmin #05070c;
+      }
+      #caption {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 9%;
+        text-align: center;
+        color: rgba(233, 228, 216, 0.75);
+        font-size: 3.4vmin;
+        font-weight: 600;
+        letter-spacing: 0.42em;
+        padding-left: 0.42em;
+        text-transform: uppercase;
+      }
+      #grain {
+        background: radial-gradient(ellipse at center, transparent 55%, rgba(0, 0, 0, 0.65) 100%);
+      }
+      #fade {
+        background: #000;
+        opacity: 1;
+      }
+      @media (orientation: portrait) {
+        .series {
+          font-size: 24vmin;
+        }
+        #episode {
+          font-size: 6vmin;
+        }
+        #caption {
+          font-size: 4.2vmin;
+          bottom: 14%;
+        }
+        #titles {
+          padding-bottom: 22%;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6.5" data-width="1920" data-height="1080">
+      <div id="haze" class="layer clip" data-start="0" data-duration="6.5" data-track-index="0"></div>
+      <div id="city" class="layer clip" data-start="0" data-duration="6.5" data-track-index="1"></div>
+      <div id="road" class="layer clip" data-start="0" data-duration="6.5" data-track-index="2"></div>
+      <div id="reflect" class="layer clip" data-start="0" data-duration="6.5" data-track-index="3"></div>
+      <div id="titles" class="layer clip" data-start="0" data-duration="6.5" data-track-index="4">
+        <div id="seriesWrap">
+          <div id="seriesDim" class="series" data-var-text="series">ГРЭМ</div>
+          <div id="seriesLit" class="series" data-var-text="series">ГРЭМ</div>
+        </div>
+        <div id="checker"></div>
+        <div id="episode" data-var-text="episode">Серия 1 · Ночная смена</div>
+      </div>
+      <div id="caption" class="clip" data-start="0" data-duration="6.5" data-track-index="5" data-var-text="caption">
+        ВАЗ-2106 · Минск
+      </div>
+      <div id="carLayer" class="layer clip" data-start="0" data-duration="6.5" data-track-index="6">
+        <div id="car">
+          <div id="spill"></div>
+          <div id="cone1" class="cone"></div>
+          <div id="cone2" class="cone"></div>
+          <div id="lamp1" class="lamp"></div>
+          <div id="lamp2" class="lamp"></div>
+          <div id="tail1" class="tail"></div>
+          <div id="tail2" class="tail"></div>
+        </div>
+      </div>
+      <div id="grain" class="layer clip" data-start="0" data-duration="6.5" data-track-index="7"></div>
+      <div id="fade" class="layer clip" data-start="0" data-duration="6.5" data-track-index="8"></div>
+    </div>
+    <script>
+      const root = document.getElementById('root');
+      const W = +root.dataset.width;
+      const H = +root.dataset.height;
+
+      // seeded PRNG: panel blocks and lit windows must be identical every frame/render
+      let seed = 2106;
+      const rnd = () => ((seed = (seed * 16807) % 2147483647) - 1) / 2147483646;
+
+      // Minsk skyline: panel high-rises with a few lit windows, plus the TV tower silhouette
+      const SH = H * 0.3;
+      let svg = `<svg viewBox="0 0 ${W} ${SH}" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">`;
+      const windows = [];
+      for (let x = -20; x < W; ) {
+        const bw = (0.05 + rnd() * 0.06) * Math.max(W, H) * 0.6;
+        const bh = SH * (0.25 + rnd() * 0.6);
+        const shade = 14 + Math.floor(rnd() * 10);
+        svg += `<rect x="${x}" y="${SH - bh}" width="${bw}" height="${bh}" fill="rgb(${shade},${shade + 3},${shade + 12})"/>`;
+        const cols = Math.max(2, Math.floor(bw / 22));
+        const rows = Math.floor(bh / 26);
+        for (let r = 1; r < rows; r++)
+          for (let c = 0; c < cols; c++)
+            if (rnd() < 0.13)
+              windows.push(
+                `<rect class="win" x="${x + 6 + c * ((bw - 12) / cols)}" y="${SH - bh + r * 26}" width="${(bw - 12) / cols - 6}" height="12" fill="${rnd() < 0.7 ? '#f2b65a' : '#cfe0ff'}" opacity="0.8"/>`,
+              );
+        x += bw + rnd() * 18;
+      }
+      const tx = W * 0.78;
+      svg += `<rect x="${tx - 5}" y="${SH * 0.02}" width="10" height="${SH}" fill="#121725"/><rect x="${tx - 22}" y="${SH * 0.3}" width="44" height="34" rx="8" fill="#121725"/><circle class="beacon" cx="${tx}" cy="${SH * 0.02}" r="6" fill="#ff3b30"/>`;
+      svg += windows.join('') + '</svg>';
+      document.getElementById('city').innerHTML = svg;
+
+      // taxi checker strip (two rows, alternating)
+      const checker = document.getElementById('checker');
+      for (let r = 0; r < 2; r++)
+        for (let c = 0; c < 14; c++) {
+          const i = document.createElement('i');
+          if ((r + c) % 2 === 0) i.className = 'on';
+          checker.appendChild(i);
+        }
+
+      const tl = gsap.timeline({paused: true});
+      // open from black, windows switch on in a scattered order
+      tl.to('#fade', {opacity: 0, duration: 0.8, ease: 'power2.out'}, 0);
+      tl.from('.win', {opacity: 0, duration: 0.15, stagger: {each: 0.006, from: 'random'}}, 0.2);
+      tl.fromTo('.beacon', {opacity: 0.2}, {opacity: 1, duration: 0.4, repeat: 7, yoyo: true, ease: 'none'}, 0);
+
+      // the car crosses the frame; cones lead, tail lights trail
+      tl.fromTo('#car', {x: -0.35 * W}, {x: 1.45 * W, duration: 2.6, ease: 'power1.inOut'}, 0.5);
+      // title lights up as the beam front sweeps across it
+      tl.to('#seriesLit', {clipPath: 'inset(-30% -30% -30% -30%)', duration: 1.05, ease: 'power1.inOut'}, 0.95);
+      tl.fromTo('#seriesWrap', {scale: 0.97}, {scale: 1, duration: 1.6, ease: 'power2.out'}, 0.95);
+
+      // checker strip snaps in, then the episode line and caption
+      tl.from('#checker i', {scaleY: 0, duration: 0.25, stagger: {each: 0.02, from: 'start'}, ease: 'back.out(2)'}, 2.0);
+      tl.from('#episode', {opacity: 0, y: '2vmin', duration: 0.6, ease: 'power3.out'}, 2.35);
+      tl.from('#caption', {opacity: 0, scale: 1.12, duration: 0.9, ease: 'power3.out'}, 2.7);
+
+      // slow hold, then fade to black for the episode cold open
+      tl.to('#titles', {scale: 1.03, duration: 3.5, ease: 'none'}, 2.6);
+      tl.to('#fade', {opacity: 1, duration: 0.5, ease: 'power2.in'}, 6.0);
+
+      window.__timelines['main'] = tl;
+      tl.seek(0);
+    </script>
+  </body>
+</html>
