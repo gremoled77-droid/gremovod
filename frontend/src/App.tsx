@@ -26,7 +26,7 @@ import HomeScreen from './HomeScreen';
 import GenerationWatcher from './GenerationWatcher';
 import {ActivityProvider} from './ActivityContext';
 import StageNav from './StageNav';
-import {STAGES, isHidden, screenOf, type Mode} from './screens';
+import {isHidden, screenOf, type Mode} from './screens';
 import WorkspaceTrail, {type WorkspaceLocation} from './WorkspaceTrail';
 import {readWorkspaceRoute, workspaceHash} from './workspaceRoute';
 import {readLocal, writeLocal, clearLocal} from './localDrafts';
@@ -36,6 +36,7 @@ import {rememberStage} from './lastStage';
 import {OPEN_QUEUE_EVENT} from './imageRoutes';
 import useActivity from './useActivity';
 import IdeaBrief from './IdeaBrief';
+import IdeaScreen from './IdeaScreen';
 import IdeaRefs from './IdeaRefs';
 import {lazy, Suspense, useCallback, useEffect, useRef, useState} from 'react';
 import type {Node, Edge} from '@xyflow/react';
@@ -673,15 +674,13 @@ function App() {
         ) : (
           <main className={screenOf(mode).main}>
             <div className="content">
-              {mode !== 'studio' && (
-                <WorkspaceTrail
-                  projectId={projectId}
-                  mode={mode}
-                  onMode={setMode}
-                  onLocation={setWorkspaceLocation}
-                  onOpenProject={id => void load(id, 'home')}
-                />
-              )}
+              <WorkspaceTrail
+                projectId={projectId}
+                mode={mode}
+                onMode={setMode}
+                onLocation={setWorkspaceLocation}
+                onOpenProject={id => void load(id, 'home')}
+              />
               {!projectDraftSaved && (
                 <p className="alert" role="alert">
                   Черновик проекта не сохранён браузером. Сохрани проект перед перезагрузкой.
@@ -944,68 +943,54 @@ function App() {
                   }}
                 />
               ) : mode === 'studio' ? (
-                <>
-                  <StoryPlanBoard location={workspaceLocation} brief={state.brief} />
-                  <div className="idea-layout">
-                    <div className="idea-col">
-                      <IdeaBrief
+                <IdeaScreen
+                  briefText={state.brief}
+                  worldFilled={Object.values(state.style || {}).filter(v => String(v || '').trim()).length}
+                  worldTotal={11}
+                  heroes={state.characters.length}
+                  onMode={setMode}
+                  storyBoard={<StoryPlanBoard location={workspaceLocation} brief={state.brief} />}
+                  brief={
+                    <IdeaBrief
+                      projectId={projectId}
+                      brief={state.brief}
+                      onBrief={v => change({brief: v})}
+                      result={state.ideaResult || ''}
+                      onResult={v => change({ideaResult: v})}
+                      model={state.ideaModel || 'gpt-5.6-luna'}
+                      onModel={v => change({ideaModel: v})}
+                      refs={state.ideaRefs || []}
+                      onRefs={ids => change({ideaRefs: ids})}
+                      world={[state.style.look, state.style.rules].filter(Boolean).join('. ')}
+                      onNext={() => setMode('styles')}
+                    />
+                  }
+                  world={
+                    <>
+                      <AttachmentMenu
+                        projectId={projectId}
+                        ensureProject={ensureProject}
+                        heroes={state.characters}
+                        items={(state.scene || EMPTY_SCENE).assets}
+                        revision={libraryRevision}
+                        onChange={assets =>
+                          setState(s => ({...s, scene: {...(s.scene || EMPTY_SCENE), assets}}))
+                        }
+                        onAsset={() => setLibraryRevision(x => x + 1)}
+                      />
+                      <WorldFromBrief
                         projectId={projectId}
                         brief={state.brief}
-                        onBrief={v => change({brief: v})}
-                        result={state.ideaResult || ''}
-                        onResult={v => change({ideaResult: v})}
-                        model={state.ideaModel || 'gpt-5.6-luna'}
-                        onModel={v => change({ideaModel: v})}
-                        refs={state.ideaRefs || []}
-                        onRefs={ids => change({ideaRefs: ids})}
-                        world={[state.style.look, state.style.rules].filter(Boolean).join('. ')}
-                        onNext={() => setMode('styles')}
+                        style={state.style}
+                        conflicts={state.worldDraft || {}}
+                        onConflicts={worldDraft => setState(s => ({...s, worldDraft}))}
+                        ensureProject={ensureProject}
+                        onApply={fields => setState(s => ({...s, style: {...s.style, ...fields}}))}
+                        onDone={() => setMode('styles')}
                       />
-                      <section className="panel idea-world" aria-label="Мир по заданию">
-                        <AttachmentMenu
-                          projectId={projectId}
-                          ensureProject={ensureProject}
-                          heroes={state.characters}
-                          items={(state.scene || EMPTY_SCENE).assets}
-                          revision={libraryRevision}
-                          onChange={assets =>
-                            setState(s => ({...s, scene: {...(s.scene || EMPTY_SCENE), assets}}))
-                          }
-                          onAsset={() => setLibraryRevision(x => x + 1)}
-                        />
-                        <WorldFromBrief
-                          projectId={projectId}
-                          brief={state.brief}
-                          style={state.style}
-                          conflicts={state.worldDraft || {}}
-                          onConflicts={worldDraft => setState(s => ({...s, worldDraft}))}
-                          ensureProject={ensureProject}
-                          onApply={fields => setState(s => ({...s, style: {...s.style, ...fields}}))}
-                          onDone={() => setMode('styles')}
-                        />
-                      </section>
-                    </div>
-                    <aside className="idea-path" aria-label="Путь ролика">
-                      <h3>Путь ролика</h3>
-                      <ol>
-                        {STAGES.map(stage => (
-                          <li key={stage.mode} className={stage.mode === 'studio' ? 'current' : ''}>
-                            <button onClick={() => setMode(stage.mode)}>
-                              <span className="idea-path-n">{stage.icon}</span>
-                              <span>
-                                <b>{stage.title}</b>
-                                <small>{stage.hint}</small>
-                              </span>
-                            </button>
-                          </li>
-                        ))}
-                      </ol>
-                      <p className="muted">
-                        Начни с задания, затем иди вниз по списку: каждый этап готовит следующий.
-                      </p>
-                    </aside>
-                  </div>
-                </>
+                    </>
+                  }
+                />
               ) : (
                 <Suspense fallback={<p>Открываем редактор узлов…</p>}>
                   <GraphPanel
