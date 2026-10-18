@@ -195,7 +195,11 @@ function VideoScreenBody({projectId, world = ''}: {projectId: string; world?: st
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [signature, spec]);
 
-  const results = items.filter(i => i.kind === 'video' && i.status !== 'waiting_external');
+  // Лента общая: ролики других проектов и удалённые в библиотеке проекта не найдутся.
+  const results = items
+    .filter(i => i.kind === 'video' && i.status !== 'waiting_external')
+    .map(i => ({...i, asset_ids: i.asset_ids.filter(aid => byId[aid])}))
+    .filter(i => i.asset_ids.length);
   const pending = items.filter(
     i =>
       ['queued', 'running', 'processing', 'saving'].includes(i.status) &&
@@ -574,7 +578,6 @@ function VideoScreenBody({projectId, world = ''}: {projectId: string; world?: st
         {results.flatMap(item =>
           item.asset_ids.map(aid => {
             const a = byId[aid];
-            if (!a) return null;
             return (
               <div key={item.id + aid} className="cs-card cs-result vs-result">
                 <video src={a.url} controls />
