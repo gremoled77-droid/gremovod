@@ -198,3 +198,16 @@ Service token ограничен одним source project и не может с
 Следующий срез: echo flow в sandbox n8n только после разрешения на запись workflow,
 UI/лента, затем привязка серверных денежных approvals и LLM-резервов. Пока нет
 автовыдачи зависших running, media URLs, SSE, применения канона и live n8n smoke.
+
+### Подготовка Skill Sync в том же PR
+
+API-коммит: `d07013d`. `scripts/n8n_skill_sync.py` строит только offline JSON-план
+из pinned Git commit: SKILL.md, Markdown references и локальные ссылки skills/docs,
+SHA256 пакета, source commit, existing agent_id + skill_id, baseSkillHash/baseConfigHash.
+Действия bind_existing/noop/update_draft/blocked; create и publish отсутствуют.
+Ограничение: консервативный однострочный frontmatter, не общий YAML parser.
+
+Для inventory a06ab54: 12 назначений этого repo, 1 требует привязки existing skill ID,
+11 заблокированы source-code/отсутствующими/приватными ссылками. Нужна адаптация
+источников, затем read-only получение настоящих skill IDs/hashes из n8n. Ничего
+в n8n не записано, навыки не синхронизированы. Подробности: integrations/n8n/SKILL_SYNC.md.
