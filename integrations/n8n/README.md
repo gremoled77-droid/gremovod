@@ -72,3 +72,7 @@ React/Vite GremoVOD Web
 ## Следующий обязательный контракт: границы доказательств QA
 
 [QA_EVIDENCE_POLICY.md](QA_EVIDENCE_POLICY.md) определяет запрет `TEXT PASS ⇒ IMAGE/VIDEO PASS`, форматы доказательств и статусы по каждой области; [машинная JSON Schema](contracts/qa-reviewer-output-v1.schema.json) описывает *недоверенный* результат модели. Реальный медиапросмотр, проверка подтверждённого канона, server-side budget approval и запись QA в FastAPI ещё не реализованы. `QA Orchestrator` обновлён и протестирован на четырёх дополнительных офлайн-наборах без вызовов моделей. В GitHub Skills и сохранённых n8n Skills у A0/A6/A7/A8 новая редакция совпадает; *автоматического* Skill Sync пока нет.
+
+## Двухступенчатая приёмка
+
+[QA_TEXT_PREFLIGHT.md](QA_TEXT_PREFLIGHT.md) — обязательный контракт **TEXT_PRECHECK: A6+A7** и **FINAL_MEDIA: A6+A7+A8** с версионированием и запретом текстового PASS как медиадоказательства. В неактивном QA Orchestrator реализовано предварительное разделение этапов и блокировка неправильного входа, **но живой вызов saved Agents через workflow, серверный evidence receipt и Media Inspector отсутствуют**. Примеры тестов 13–17 в документе. Codex должен реализовать FastAPI-политику независимо от n8n.
