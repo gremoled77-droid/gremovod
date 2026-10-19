@@ -1,0 +1,32 @@
+name: QA text sandbox (no AI calls)
+on:
+  push:
+    branches:
+      - feature/qa-text-precheck-sandbox-20261019
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  tests:
+    name: FastAPI + temporary SQLite integration
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - name: Install dependencies
+        run: python -m pip install -r backend/requirements.txt
+      - name: Run QA sandbox and FastAPI integration tests
+        env:
+          STUDIO_QA_SANDBOX_TOKEN: ''
+          STUDIO_QA_SANDBOX_PROJECT_ID: ''
+          PIAPI_API_KEY: ''
+          KIE_API_KEY: ''
+          ELEVENLABS_API_KEY: ''
+        run: python -m unittest backend.test_qa_text_precheck backend.test_qa_text_app_integration -v
