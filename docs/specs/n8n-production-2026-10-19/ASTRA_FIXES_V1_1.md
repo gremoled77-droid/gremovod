@@ -80,3 +80,12 @@
 ## Доказательства и границы текущего этапа
 
 Эта версия исправляет **схему**, а не подтверждает provider/audio/video. JSON-спецификация должна ссылаться на эти правила, но лишь статус `SPECIFIED`/ `SIMULATED` допустим без live runtime. Owner approval, бюджет и carrier state должны быть проверены в backend, а не в LLM или n8n Code.
+
+
+## Вызов ролевых агентов в n8n: не смешивать продукты
+
+Официальная документация описывает **Message an Agent v3.1**, но у конкретного MCP-инстанса были retired/несогласованные метаданные. Нельзя объявлять этот node глобально удалённым и нельзя считать доступность доказанной. Для пилота остаётся выбранный в спецификации **Execute Sub-workflow** с независимыми ролевыми workflow и одним закреплённым источником инструкций; это НЕ исполнение saved Agent IDs. Начать с mock child workflow без LLM и проверить передачу/ожидание результата. До cloud-проверки sub-workflow endpoint: статус `NOT_TESTED`. Для Message an Agent отдельная безопасная проверка версии и состояния публикации; не активировать saved Agents для обхода.
+
+## Доверенная граница SQLite reference-кода
+
+`integrations/n8n/pilot_state_sqlite.py` — импортируемый **офлайн reference module**, но не FastAPI router, не session validator и не provider adapter. Его `owner_authenticated`, `trusted_backend_verifier`, `owner_session_verified` сейчас передаются вызывающим тестовым кодом. В production их **никогда не передавать из HTTP body, n8n JSON или LLM**: они должны вычисляться внутри защищённого FastAPI из существующей сессии человека и серверного evidence-verifier, после проверки project ownership. В целях безопасности `owner_ready` дополнительно требует persisted final round, а незаполненные media states всегда BLOCKED. Реальный S09 нельзя считать выполненным до такого интеграционного испытания.
