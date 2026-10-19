@@ -56,6 +56,11 @@ def connect(filename: str | Path) -> sqlite3.Connection:
       operation_id TEXT NOT NULL, event_id TEXT NOT NULL, payload_sha TEXT NOT NULL,
       PRIMARY KEY(operation_id,event_id), FOREIGN KEY(operation_id) REFERENCES operations(operation_id)
     );
+    CREATE TABLE IF NOT EXISTS validated_final_rounds (
+      run_id TEXT NOT NULL, snapshot_sha TEXT NOT NULL, master_checksum TEXT NOT NULL,
+      status TEXT NOT NULL, provenance TEXT NOT NULL,
+      PRIMARY KEY(run_id,snapshot_sha), FOREIGN KEY(run_id) REFERENCES runs(run_id)
+    );
     CREATE TABLE IF NOT EXISTS release_decisions (
       decision_id TEXT PRIMARY KEY, run_id TEXT NOT NULL, snapshot_sha TEXT NOT NULL,
       owner_id TEXT NOT NULL, kind TEXT NOT NULL,
@@ -233,12 +238,41 @@ def final_gate(*, frozen_snapshot, active_snapshot, master_checksum, reviewers,
     return "AWAITING_OWNER_APPROVAL"
 
 
+def record_trusted_final_round(db, *, run_id, frozen_snapshot, active_snapshot, master_checksum,
+                               reviewers, required_evidence, media_capabilities_verified,
+                               expected_slots, delivered_slots, trusted_backend_verifier):
+    # trusted_backend_verifier MUST be established by authenticated backend code;
+    # never map an n8n/LLM input field directly to this argument.
+    if trusted_backend_verifier is not True:
+        raise Blocked("backend evidence verifier required")
+    status = final_gate(frozen_snapshot=frozen_snapshot,active_snapshot=active_snapshot,
+                        master_checksum=master_checksum,reviewers=reviewers,
+                        required_evidence=required_evidence,
+                        media_capabilities_verified=media_capabilities_verified,
+                        expected_slots=expected_slots,delivered_slots=delivered_slots)
+    if status != "AWAITING_OWNER_APPROVAL":
+        return status
+    def inner():
+        run=db.execute("SELECT current_snapshot FROM runs WHERE run_id=?",(run_id,)).fetchone()
+        if not run or run["current_snapshot"]!=active_snapshot:
+            raise Conflict("snapshot changed before final verdict was recorded")
+        db.execute("""INSERT OR REPLACE INTO validated_final_rounds
+            (run_id,snapshot_sha,master_checksum,status,provenance) VALUES(?,?,?,?,?)""",
+            (run_id,frozen_snapshot,master_checksum,status,"trusted_backend_verified"))
+    _tx(db, inner)
+    return status
+
+
 def owner_ready(db, *, decision_id, owner_id, run_id, snapshot_sha, gate_result, owner_session_verified):
     if owner_session_verified is not True or not owner_id or gate_result!="AWAITING_OWNER_APPROVAL":
         raise Blocked("owner session or QA not approved")
     def inner():
         run=db.execute("SELECT * FROM runs WHERE run_id=?",(run_id,)).fetchone()
         if not run or run["current_snapshot"]!=snapshot_sha: raise Conflict("stale owner decision")
+        trusted=db.execute("SELECT * FROM validated_final_rounds WHERE run_id=? AND snapshot_sha=?",
+                           (run_id,snapshot_sha)).fetchone()
+        if not trusted or trusted["status"]!="AWAITING_OWNER_APPROVAL" or trusted["provenance"]!="trusted_backend_verified":
+            raise Blocked("three trusted media verdicts on current snapshot required")
         old=db.execute("SELECT * FROM release_decisions WHERE decision_id=?",(decision_id,)).fetchone()
         if old:
             if (old["run_id"],old["snapshot_sha"],old["owner_id"]) != (run_id,snapshot_sha,owner_id):
