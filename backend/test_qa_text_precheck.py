@@ -41,19 +41,22 @@ class QAReviewTests(unittest.TestCase):
             db.executescript('''
                 CREATE TABLE projects(id TEXT PRIMARY KEY,state TEXT,revision INTEGER);
                 CREATE TABLE productions(id TEXT PRIMARY KEY,source_project_id TEXT);
-                CREATE TABLE production_nodes(id TEXT PRIMARY KEY,production_id TEXT,kind TEXT,parent_id TEXT,number INTEGER,notes TEXT);
+                CREATE TABLE production_nodes(id TEXT PRIMARY KEY,production_id TEXT,kind TEXT,parent_id TEXT,number INTEGER,title TEXT,notes TEXT);
                 CREATE TABLE storyboard_imports(request_id TEXT PRIMARY KEY,series_id TEXT,script TEXT);
                 CREATE TABLE production_entity_state(node_id TEXT,data TEXT);
                 CREATE TABLE story_plans(series_id TEXT PRIMARY KEY,revision INTEGER,data TEXT);
                 CREATE TABLE character_assets(id TEXT,project_id TEXT,character_id TEXT,category TEXT,model_id TEXT,note TEXT,created_at TEXT);
                 INSERT INTO productions VALUES('prod','project');
-                INSERT INTO production_nodes VALUES('series','prod','series',NULL,1,'A series');
+                INSERT INTO production_nodes VALUES('series','prod','series',NULL,1,'Проверочная серия','Грэм подъезжает к аэропорту.');
                 INSERT INTO storyboard_imports VALUES('imp','series','Грэм подъезжает к аэропорту.');
             ''')
             db.execute('INSERT INTO projects VALUES(?,?,?)', ('project', json.dumps({'characters':[
                 {'id':'grem','name':'Грэм','identity':{'hair':'black','hat':'blue'}}]}), 1))
             db.execute('INSERT INTO story_plans VALUES(?,?,?)', ('series',1,json.dumps({
-                'source':'Грэм должен встретить гостя.', 'cards':[{'title':'Встреча', 'description':'У аэропорта'}]})))
+                'source':'Грэм должен встретить гостя.', 'source_kind':'idea',
+                'cards':[{'id':'card-fixture-1','title':'Встреча','summary':'У аэропорта',
+                          'change':'Ожидание → прибытие','stage':'setup',
+                          'scene_id':None,'character_ids':[],'location_id':None}]})))
         self.app = FastAPI()
         qa.register(self.app, self.studio)
         self.ctx = TestClient(self.app, base_url='http://localhost')
@@ -160,7 +163,7 @@ class QAReviewTests(unittest.TestCase):
         self.assertEqual(self.verdict(task,'REVIEW-REQ',event_id='changed-event-1').status_code,409)
         stale_payload=self.verdict(task,'REVIEW-SYSTEM',dry_run=True)
         with self.studio.connect() as db:
-            db.execute("UPDATE storyboard_imports SET script='Новая редакция' WHERE series_id='series'")
+            db.execute("UPDATE production_nodes SET notes='Новая редакция' WHERE id='series'")
         self.assertEqual(self.ctx.post(self.url+f'/service/jobs/{task}/verdict',json=stale_payload,headers=self.svc).status_code,409)
         with self.studio.connect() as db:
             db.execute('SELECT COUNT(*) FROM qa_text_verdicts').fetchone()
@@ -217,6 +220,50 @@ class QAReviewTests(unittest.TestCase):
         self.assertEqual(self.ctx.post(self.url+'/jobs',headers=self.owners,json={
             'approval_id':self.approve(),'idempotency_key':'idempotent-003',
             'requested_scopes':['TEXT','IMAGE']}).status_code,422)
+
+
+    def test_real_card_fields_are_preserved(self):
+        snap = self.ctx.get(self.url+'/contexts/project/prod/series',headers=self.owners).json()
+        self.assertIn('summary: У аэропорта',snap['requirements'])
+        self.assertIn('change: Ожидание → прибытие',snap['requirements'])
+        self.assertIn('card-fixture-1',snap['requirements'])
+        self.assertIn('Грэм подъезжает',snap['artifact_text'])
+
+    def test_completed_job_reports_stale_source(self):
+        task=self.job();self.claim(task)
+        self.assertEqual(self.verdict(task,'REVIEW-REQ').status_code,200)
+        self.assertEqual(self.verdict(task,'REVIEW-SYSTEM').status_code,200)
+        before=self.ctx.get(self.url+f'/jobs/{task}',headers=self.owners).json()
+        self.assertTrue(before['source_current'])
+        self.assertTrue(before['sandbox_mock_passed'])
+        with self.studio.connect() as db:
+            db.execute("UPDATE production_nodes SET notes='Совсем другая версия' WHERE id='series'")
+        after=self.ctx.get(self.url+f'/jobs/{task}',headers=self.owners).json()
+        self.assertFalse(after['source_current'])
+        self.assertTrue(after['historical_review'])
+        self.assertFalse(after['sandbox_mock_passed'])
+        self.assertEqual(after['approval_id'],before['approval_id'])
+        self.assertEqual(after['source_revisions'],before['source_revisions'])
+        self.assertEqual(len(after['verdicts']),2)
+
+    def test_invalid_bearer_and_callback_limits(self):
+        # Non-ASCII untrusted Authorization must return 401, never 500.
+        self.assertEqual(self.ctx.get(self.url+'/service/queue',
+                         headers={'Authorization':'Bearer ÿ'}).status_code,401)
+        task=self.job();self.claim(task)
+        invalid=self.verdict(task,'REVIEW-REQ',dry_run=True)
+        invalid['verdict']='BLOCKED'
+        invalid['checked_scopes']=[]
+        invalid['scope_results']={'TEXT':'BLOCKED'}
+        invalid['evidence']=[]
+        invalid['missing_inputs']=['x'*300]
+        self.assertEqual(self.ctx.post(self.url+f'/service/jobs/{task}/verdict',
+                         json=invalid,headers=self.svc).status_code,422)
+        invalid['missing_inputs']=['x'*100000]
+        self.assertEqual(self.ctx.post(self.url+f'/service/jobs/{task}/verdict',
+                         json=invalid,headers=self.svc).status_code,413)
+        with self.studio.connect() as db:
+            self.assertEqual(db.execute('SELECT COUNT(*) FROM qa_text_verdicts').fetchone()[0],0)
 
     def test_no_generation_or_canon_write(self):
         self.job();self.job(key='second-job-123')
