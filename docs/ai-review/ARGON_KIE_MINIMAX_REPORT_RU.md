@@ -1,7 +1,7 @@
 # GremoVOD — отчёт о реализации моста MiniMax → KIE Gemini 4 Argon
 
 **Дата:** 2026-10-20 · **Ветка:** `experiment/minimax-kie-argon-bridge-impl-20261020`
-**Коммит кода:** `7d625fb21eff9fb4f808b90f33c789308ed06ba0`
+**Коммиты:** `7d625fb` — реализация · `ae35f6e` — отчёт · `b0b871b` — исправления по независимому ревью
 **Draft PR:** https://github.com/gremoled77-droid/gremovod/pull/34 (draft)
 **База стека:** PR #33 `experiment/minimax-kie-argon-bridge-20261019` = `0ac4e916e274b4c75fde75edc1ddd0d5a3e376c1`
 **Расход:** **0 кредитов. LIVE не запускался. Ключ KIE не использовался.**
@@ -33,6 +33,7 @@
 ## 2. Файлы, коммиты, PR
 
 Коммит кода: `7d625fb21eff9fb4f808b90f33c789308ed06ba0` — «feat: add budget-gated OFFLINE Argon KIE review bridge».
+Отчёт: `ae35f6e`. Исправления по ревью: `b0b871b`.
 
 | Файл | Действие | Назначение |
 |---|---|---|
