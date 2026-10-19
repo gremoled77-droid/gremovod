@@ -1,0 +1,67 @@
+.acting-notes {
+  margin: 12px 0;
+  padding: 12px;
+  border: 1px solid var(--border, #454545);
+  border-radius: 10px;
+}
+.acting-notes summary {
+  cursor: pointer;
+}
+.acting-notes > p {
+  font-size: 13px;
+}
+.acting-notes fieldset {
+  min-width: 0;
+  margin: 10px 0;
+  border: 1px solid var(--border, #454545);
+  border-radius: 8px;
+}
+.acting-notes label {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.acting-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr));
+  gap: 10px;
+  margin: 10px 0;
+}
+.acting-grid label {
+  display: grid;
+  align-content: start;
+  font-size: 13px;
+}
+.acting-grid textarea,
+.acting-grid select {
+  width: 100%;
+  box-sizing: border-box;
+}
+.acting-grid textarea {
+  resize: vertical;
+}
+.acting-beat {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border, #454545);
+}
+.acting-beat h4 {
+  margin: 0 0 8px;
+}
+.acting-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 10px 0;
+}
+.acting-conflict {
+  padding: 12px;
+  border: 1px solid #d69e36;
+  border-radius: 8px;
+  overflow-wrap: anywhere;
+}
+.acting-conflict button {
+  margin: 4px;
+}
+.acting-notes [role='alert'] {
+  color: #ffbf80;
+}
