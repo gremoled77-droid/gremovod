@@ -23,10 +23,53 @@ CATALOG = ROOT / "video_catalog.json"
 DEST = ROOT / "downloaded" / "Training_Videos_ZIP"
 VIDEO_EXTENSIONS = {".mp4", ".mov", ".m4v", ".mkv", ".avi", ".webm", ".mts", ".m2ts", ".wmv"}
 SECTIONS = ("Edit", "Color", "Fairlight", "Fusion")
+PRIORITY_EIGHT = {
+    "Introduction to Editing — Part 1", "Introduction to Editing — Part 2",
+    "Introduction to Sound Design", "Introduction to Mixing", "Recording VO and ADR",
+    "Visual Effects in the Edit Page", "Basic Compositing", "Delivering Content",
+}
 
 
 def is_valid_zip(path: Path) -> bool:
     return path.is_file() and path.stat().st_size > 0 and zipfile.is_zipfile(path)
+
+
+def inspect_local_file(path: Path) -> str:
+    if not path.is_file():
+        return "не существует"
+    size = path.stat().st_size
+    with path.open("rb") as f:
+        prefix = f.read(160)
+    if is_valid_zip(path):
+        return f"ZIP OK, {size:,} байт"
+    if b"<html" in prefix.lower() or b"<!doctype" in prefix.lower():
+        return f"HTML вместо ZIP, {size:,} байт, начало: {prefix[:90]!r}"
+    if prefix.startswith(b"%PDF-"):
+        return f"PDF вместо ZIP, {size:,} байт"
+    if prefix.startswith(b"PK"):
+        return f"начинается как ZIP, но архив неполный или поврежден, {size:,} байт"
+    return f"не ZIP, {size:,} байт, начало файла: {prefix[:90]!r}"
+
+
+def check_existing(entries: list[dict]) -> int:
+    checked, fixed = 0, 0
+    for item in entries:
+        target = DEST / item["section"] / item["filename"]
+        partial = target.with_name(target.name + ".part")
+        print(f"\n[{item['section']}] {item['title']}")
+        for candidate in (target, partial, target.with_name(target.name + ".invalid")):
+            if candidate.exists():
+                checked += 1
+                print(f"  {candidate.name}: {inspect_local_file(candidate)}")
+        if not target.exists() and is_valid_zip(partial):
+            target.parent.mkdir(parents=True, exist_ok=True)
+            partial.replace(target)
+            fixed += 1
+            print("  [ИСПРАВЛЕНО] Корректный ZIP восстановлен из файла .part")
+    if checked == 0:
+        print("Файлы ZIP / .part в папке пока отсутствуют.")
+    print(f"\nПроверено файлов: {checked}; восстановлено ZIP: {fixed}. Сетевые запросы не выполнялись.")
+    return 0
 
 
 def download(url: str, target: Path, force: bool = False) -> str:
@@ -37,6 +80,10 @@ def download(url: str, target: Path, force: bool = False) -> str:
     if target.exists():
         target.unlink()
     partial = target.with_name(target.name + ".part")
+    if not force and is_valid_zip(partial):
+        partial.replace(target)
+        print(f"  Готовый ZIP восстановлен из .part: {target.name}")
+        return "recovered"
     curl = shutil.which("curl.exe") or shutil.which("curl")
     if not curl:
         raise RuntimeError("Не найден curl.exe (поставляется с Windows 10/11).")
@@ -64,7 +111,7 @@ def download(url: str, target: Path, force: bool = False) -> str:
         if response.returncode != 0 and not is_valid_zip(partial):
             raise RuntimeError(f"curl: код {response.returncode}; .part сохранён для следующей попытки")
     if not is_valid_zip(partial):
-        raise RuntimeError("Полученный файл не является целым ZIP-архивом; .part оставлен для диагностики")
+        raise RuntimeError(f"ZIP-проверка не пройдена: {inspect_local_file(partial)}. Файл .part сохранён.")
     os.replace(partial, target)
     return "downloaded"
 
@@ -158,6 +205,9 @@ def main() -> int:
                         help="Скачать только выбранную категорию (можно повторить)")
     parser.add_argument("--list", action="store_true", help="Показать список, ничего не скачивать")
     parser.add_argument("--sizes", action="store_true", help="Проверить вес архивов без загрузки данных (HEAD)")
+    parser.add_argument("--priority-eight", action="store_true", help="Только 8 приоритетных уроков GremoVOD")
+    parser.add_argument("--verify-only", action="store_true", help="Проверить ранее скачанные ZIP/.part без сетевых запросов")
+    parser.add_argument("--stop-on-error", action="store_true", help="Остановиться после первой ошибки вместо скачивания всех архивов")
     parser.add_argument("--match", action="append", metavar="TEXT", help="Скачать лишь видео, где название содержит TEXT; можно повторить")
     parser.add_argument("--extract", action="store_true", help="Дополнительно извлечь видеофайлы из ZIP")
     parser.add_argument("--force", action="store_true", help="Перекачать существующие ZIP")
@@ -165,6 +215,8 @@ def main() -> int:
 
     catalog = json.loads(CATALOG.read_text(encoding="utf-8"))
     entries = [item for item in catalog["videos"] if not args.section or item["section"] in args.section]
+    if args.priority_eight:
+        entries = [item for item in entries if item["title"] in PRIORITY_EIGHT]
     if args.match:
         terms = [term.casefold().strip() for term in args.match if term.strip()]
         entries = [item for item in entries if any(term in item["title"].casefold() for term in terms)]
@@ -179,6 +231,9 @@ def main() -> int:
 
     if args.sizes:
         return show_sizes(entries)
+
+    if args.verify_only:
+        return check_existing(entries)
 
     results = []
     errors = []
@@ -199,6 +254,9 @@ def main() -> int:
             problem = f"{item['title']}: {exc}"
             errors.append(problem)
             print(f"  ОШИБКА: {problem}", file=sys.stderr)
+            if args.stop_on_error:
+                print("  Остальные скачивания остановлены, чтобы не расходовать трафик.")
+                break
 
     DEST.mkdir(parents=True, exist_ok=True)
     report = {"catalog_source": catalog["source"], "success": results, "errors": errors}
