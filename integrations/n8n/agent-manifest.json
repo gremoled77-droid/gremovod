@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "1.2",
+  "schemaVersion": "1.3",
   "snapshotDate": "2026-10-19",
   "purpose": "Read-only inventory of n8n resources and skill assignments; not a deployment mechanism.",
   "security": "No API keys, credential IDs, tokens, or user files committed. Resource IDs are identifiers, not authorization.",
@@ -47,50 +47,51 @@
         "agents": [
           {
             "agentId": "z3v7YE2uNrWxy7CY",
-            "enabled": true,
-            "useWhen": "A1: этапы «Идея», «Сценарий», «Мир»; сценарная структура, диалоги, юмор, мотивы, сцены и проверка канона, без утверждения новых правил."
+            "useWhen": "A1: этапы «Идея», «Сценарий», «Мир»; сценарная структура, диалоги, юмор, мотивы, сцены и проверка канона, без утверждения новых правил.",
+            "enabled": true
           },
           {
             "agentId": "uLxJzQ142zYRfmBl",
-            "enabled": true,
-            "useWhen": "A2: этап «Раскадровка»; функция шотов, расстановка, камера, свет, монтажные реакции; сложные композиционные решения для «Кадров»."
+            "useWhen": "A2: этап «Раскадровка»; функция шотов, расстановка, камера, свет, монтажные реакции; сложные композиционные решения для «Кадров».",
+            "enabled": true
           },
           {
             "agentId": "LtxRZ0cK8LI1vyRL",
-            "enabled": true,
-            "useWhen": "A3: этапы «Кадры» и «Видео»; перевод утверждённого решения в промпт выбранной image/video модели с валидными параметрами и референсами; генерации не запускать."
+            "useWhen": "A3: этапы «Кадры» и «Видео»; перевод утверждённого решения в промпт выбранной image/video модели с валидными параметрами и референсами; генерации не запускать.",
+            "enabled": true
           },
           {
             "agentId": "ylW6J9muCXXELT12",
-            "enabled": true,
-            "useWhen": "A4: изучение доступных текстов/исследований; извлечение фактов, цитат, сравнение источников. Не утверждать, что агент сам прочёл недоступный PDF или использовал отсутствующие инструменты."
+            "useWhen": "A4: изучение доступных текстов/исследований; извлечение фактов, цитат, сравнение источников. Не утверждать, что агент сам прочёл недоступный PDF или использовал отсутствующие инструменты.",
+            "enabled": true
           },
           {
             "agentId": "ubHXs6DSwFrxSh8X",
-            "enabled": true,
-            "useWhen": "A5: этапы «Звук», «Монтаж», «Выпуск»; монтажный и звуковой лист, передача в CapCut, контроль файлов; без генерации, рендера и публикации."
+            "useWhen": "A5: этапы «Звук», «Монтаж», «Выпуск»; монтажный и звуковой лист, передача в CapCut, контроль файлов; без генерации, рендера и публикации.",
+            "enabled": true
           },
           {
             "agentId": "nkmWNxBdJcFEXSMF",
-            "enabled": false,
-            "useWhen": "FINISH REVIEW ONLY, DISABLED UNTIL SECURE WEB API: A6 проверяет ТЗ, полноту результата, обязательные требования. Получает отдельный чистый контекст."
+            "useWhen": "REVIEW-REQ only. Проверить отдельное утверждённое ТЗ и фактический текстовый результат, только по конкретному task_id/artifact_revision. Свежая независимая сессия, без самооценки автора. Если материала не хватает — BLOCKED.",
+            "enabled": true
           },
           {
             "agentId": "NRWXr5AY2MXAFhcH",
-            "enabled": false,
-            "useWhen": "FINISH REVIEW ONLY, DISABLED UNTIL CANON API: A7 проверяет только утверждённый канон/дизайн-систему; отдельный контекст, не знает выводов других."
+            "useWhen": "REVIEW-SYSTEM only. Проверить отдельные фактические данные об утверждённом каноне и реальный текст/артефакт; дать PASS/FAIL/BLOCKED с доказательствами. Не использовать общую историю сборщика и другие вердикты.",
+            "enabled": true
           },
           {
             "agentId": "s7IIGiioapxre90t",
-            "enabled": false,
-            "useWhen": "FINISH REVIEW ONLY, DISABLED UNTIL TRUSTED EXPERT APPROVAL: A8 Opus оценивает только реально отрендеренный артефакт против утвержденного bar.md. НИКОГДА без лимита и approve."
+            "useWhen": "FINISH REVIEW ONLY, DISABLED UNTIL TRUSTED EXPERT APPROVAL: A8 Opus оценивает только реально отрендеренный артефакт против утвержденного bar.md. НИКОГДА без лимита и approve.",
+            "enabled": false
           }
         ],
         "modelsByDifficulty": {
           "low": "anthropic/claude-haiku-5-5",
           "medium": "anthropic/claude-sonnet-5-5"
         }
-      }
+      },
+      "budgetGuardrails": null
     },
     {
       "key": "A1",
@@ -466,7 +467,15 @@
           "sourceBlobSha": "16a5010df0878e77556e4876bfde164973feffb6",
           "references": []
         }
-      ]
+      ],
+      "budgetGuardrails": {
+        "budget": {
+          "enabled": true,
+          "monthlyBudgetUsd": 1.5,
+          "alertThresholdPercent": 80,
+          "sessionCostCapUsd": 0.04
+        }
+      }
     },
     {
       "key": "A7",
@@ -507,7 +516,15 @@
           "sourceBlobSha": "0e72899d884c87f18e6a49a14955ebb739835551",
           "references": []
         }
-      ]
+      ],
+      "budgetGuardrails": {
+        "budget": {
+          "enabled": true,
+          "monthlyBudgetUsd": 4,
+          "alertThresholdPercent": 80,
+          "sessionCostCapUsd": 0.15
+        }
+      }
     },
     {
       "key": "A8",
@@ -560,8 +577,16 @@
           "sourceBlobSha": "d66cda3b6c96c7168bd7d1a87d98f000b5438b35",
           "references": []
         }
-      ]
+      ],
+      "budgetGuardrails": {
+        "budget": {
+          "enabled": true,
+          "monthlyBudgetUsd": 1,
+          "alertThresholdPercent": 80,
+          "sessionCostCapUsd": 0.3
+        }
+      }
     }
   ],
-  "syncStatus": "manual-copy; QA critics draft, disabled in A0, no paid tests"
+  "syncStatus": "manual-copy; A6/A7 enabled as A0 subagents in unpublished drafts; A8 disabled; A6 preview failed; A7 preview PASS/FAIL test succeeded"
 }
