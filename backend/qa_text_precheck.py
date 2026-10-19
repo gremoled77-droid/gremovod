@@ -10,7 +10,7 @@ import json
 import os
 import uuid
 from datetime import datetime, timezone
-from typing import Literal
+from typing import Literal, Annotated
 
 from fastapi import HTTPException, Request
 from pydantic import BaseModel, ConfigDict, Field
@@ -76,17 +76,17 @@ class Evidence(Strict):
 
 class Verdict(Strict):
     role: Literal['REVIEW-REQ', 'REVIEW-SYSTEM']
-    task_id: str = Field(min_length=1)
-    project_id: str = Field(min_length=1)
-    artifact_id: str = Field(min_length=1)
+    task_id: str = Field(min_length=1, max_length=100)
+    project_id: str = Field(min_length=1, max_length=100)
+    artifact_id: str = Field(min_length=1, max_length=100)
     artifact_revision: str = Field(pattern=r'^[0-9a-f]{64}$')
     review_round: Literal[1] = 1
     requested_scopes: tuple[Literal['TEXT']] = ('TEXT',)
-    checked_scopes: list[Literal['TEXT']]
-    scope_results: dict[Literal['TEXT'], Literal['PASS', 'FAIL', 'BLOCKED']]
+    checked_scopes: list[Literal['TEXT']] = Field(max_length=1)
+    scope_results: dict[Literal['TEXT'], Literal['PASS', 'FAIL', 'BLOCKED']] = Field(max_length=1)
     verdict: Literal['PASS', 'FAIL', 'BLOCKED']
     evidence: list[Evidence] = Field(default_factory=list, max_length=20)
-    missing_inputs: list[str] = Field(default_factory=list, max_length=20)
+    missing_inputs: list[Annotated[str, Field(min_length=1, max_length=256)]] = Field(default_factory=list, max_length=20)
     biggest_gap: str | None = Field(default=None, max_length=1500)
     model_used: Literal['mock-a6-v1', 'mock-a7-v1']
     estimated_cost_usd: Literal[0] = 0
@@ -99,7 +99,7 @@ def owner(request):
     from backend import security
     token = request.headers.get('x-studio-session') or request.cookies.get('studio_session', '')
     # Bearer service credentials cannot create approvals, even if browser cookie supplied.
-    if request.headers.get('authorization') or not hmac.compare_digest(token, security.LAUNCH_TOKEN):
+    if request.headers.get('authorization') or not hmac.compare_digest(token.encode('utf-8'), security.LAUNCH_TOKEN.encode('utf-8')):
         raise HTTPException(401, 'Authenticated Studio owner required')
 
 
@@ -109,7 +109,7 @@ def service(request):
     if len(secret) < 32 or not project_id:
         raise HTTPException(503, 'QA sandbox service is not configured')
     supplied = request.headers.get('authorization', '')
-    if not hmac.compare_digest(supplied, 'Bearer ' + secret):
+    if not hmac.compare_digest(supplied.encode('utf-8'), ('Bearer ' + secret).encode('utf-8')):
         raise HTTPException(401, 'Invalid QA sandbox credential')
     # Forbid any remote caller, even if a web deployment changes middleware.
     # Live n8n cannot connect until separate HTTPS service-gate review.
@@ -132,16 +132,56 @@ def context(db, project_id, production_id, series_id):
                       (production_id, project_id)).fetchone()
     if not project or not prod:
         raise HTTPException(404, 'Project or production not found')
-    parent, _, text, artifact_revision = storyboard.snapshot(db, production_id, series_id)
+    # storyboard.snapshot's third value is the historical import, NOT the current edited scenes.
+    parent, nodes, _historical_import, board_revision = storyboard.snapshot(db, production_id, series_id)
+    episodes = sorted((n for n in nodes if n['kind'] == 'episode'),
+                      key=lambda n: (n['number'], n['id']))
+    frames_by_scene = {}
+    for frame in (n for n in nodes if n['kind'] == 'frame'):
+        frames_by_scene.setdefault(frame['parent_id'], []).append(frame)
+    parts = []
+    contains_actual_notes = False
+
+    def append_node(kind, node):
+        nonlocal contains_actual_notes
+        notes = (node.get('notes') or '').strip()
+        contains_actual_notes |= bool(notes)
+        parts.append(f"{kind} [id={node['id']}] {node.get('title', '')}\\n{notes}".strip())
+
+    append_node('Серия', parent)
+    for scene in episodes:
+        append_node('Сцена', scene)
+        for frame in sorted(frames_by_scene.get(scene['id'], []),
+                            key=lambda n: (n['number'], n['id'])):
+            append_node('Кадр', frame)
+    text = '\\n\\n'.join(parts)
+    artifact_revision = sha([board_revision, text])
     plan = db.execute('SELECT revision,data FROM story_plans WHERE series_id=?', (series_id,)).fetchone()
-    if not text or not text.strip() or not plan:
-        raise HTTPException(409, 'BLOCKED_MISSING_APPROVED_SOURCE: screenplay or story plan absent')
+    if not contains_actual_notes or not plan:
+        raise HTTPException(409, 'BLOCKED_MISSING_APPROVED_SOURCE: current scene notes or story plan absent')
     parsed = json.loads(plan['data'])
-    requirements = [str(parsed.get('source', '')).strip()]
-    for card in parsed.get('cards', []):
-        if isinstance(card, dict):
-            requirements.append(' | '.join(str(card.get(k, '')).strip() for k in ('title', 'description', 'situation', 'outcome') if card.get(k)))
-    requirements = [x for x in requirements if x]
+    if not isinstance(parsed, dict):
+        raise HTTPException(409, 'BLOCKED_INVALID_STORY_PLAN')
+    from backend.story_plan import Card
+    from pydantic import ValidationError
+    try:
+        cards = [Card.model_validate(item) for item in parsed.get('cards', [])]
+    except (ValidationError, TypeError):
+        raise HTTPException(409, 'BLOCKED_INVALID_STORY_PLAN')
+    source = str(parsed.get('source') or '').strip()
+    source_kind = str(parsed.get('source_kind') or 'idea')
+    requirements = [f'Исходный замысел ({source_kind}): {source}'] if source else []
+    for i, card in enumerate(cards, 1):
+        requirements.append('\\n'.join([
+            f'Карточка {i} [id={card.id}]: {card.title}',
+            f'summary: {card.summary}',
+            f'change: {card.change}',
+            f'stage: {card.stage}',
+            f'scene_id: {card.scene_id or ""}',
+            f'character_ids: {stable(card.character_ids)}',
+            f'location_id: {card.location_id or ""}',
+        ]))
+    requirements = [item for item in requirements if item.strip()]
     state = json.loads(project['state'])
     canon = []
     for char in state.get('characters', []):
@@ -155,10 +195,10 @@ def context(db, project_id, production_id, series_id):
                 'series_id': series_id, 'artifact_id': series_id,
                 'artifact_revision': artifact_revision, 'artifact_text': text,
                 'requirements': '\n'.join(requirements), 'canon': '\n'.join(canon),
-                'brief_revision': sha([plan['revision'], requirements]),
+                'brief_revision': sha([plan['revision'], parsed, requirements]),
                 'canon_revision': sha([project['revision'], canon, vault]),
                 'text_sha256': hashlib.sha256(text.encode('utf-8')).hexdigest(),
-                'source_provenance': {'artifact': 'storyboard.snapshot',
+                'source_provenance': {'artifact': 'production_nodes.current_notes',
                                       'requirements': 'story_plans',
                                       'canon': 'projects.state.characters[].identity',
                                       'canon_images_reviewed': False}}
@@ -224,18 +264,57 @@ def verify_verdict(snapshot, job, body):
 
 
 def view(db, job):
+    approval = record(db, 'qa_text_approvals', job['approval_id'])
+    frozen = json.loads(approval['snapshot'])
+    try:
+        is_current(db, approval)
+        source_current, source_issue = True, None
+    except HTTPException as exc:
+        if exc.status_code not in (404, 409):
+            raise
+        source_current, source_issue = False, str(exc.detail)
     reviews = [json.loads(r['body']) for r in db.execute('SELECT body FROM qa_text_verdicts WHERE job_id=? ORDER BY role', (job['id'],))]
     return {'task_id': job['id'], 'project_id': job['project_id'], 'status': job['status'],
+            'approval_id': job['approval_id'],
+            'source_revisions': {key: frozen[key] for key in
+                                 ('artifact_revision', 'brief_revision', 'canon_revision', 'text_sha256')},
+            'source_current': source_current, 'source_issue': source_issue,
+            'historical_review': not source_current,
             'error_code': job['error_code'],
             'review_phase': 'TEXT_PRECHECK', 'requested_scopes': ['TEXT'],
             'required_reviewers': list(ROLES), 'review_round': 1,
             'verdicts': reviews, 'text_precheck_passed': False,
-            'sandbox_mock_passed': job['status'] == 'SANDBOX_TEXT_PRECHECK_PASSED_AWAITING_OWNER',
+            'sandbox_mock_passed': (source_current and
+                                    job['status'] == 'SANDBOX_TEXT_PRECHECK_PASSED_AWAITING_OWNER'),
             'all_passed': False, 'final_release_approved': False, 'quality_claim': False,
             'paid_calls_executed': False, 'owner_approval_required': True}
 
 
 def register(app, studio):
+    # Bound the request body at the HTTP boundary, even for malformed JSON or chunked clients.
+    @app.middleware('http')
+    async def qa_callback_size_limit(request: Request, call_next):
+        if request.url.path.startswith(PREFIX + '/service/jobs/') and request.url.path.endswith('/verdict'):
+            from fastapi.responses import JSONResponse
+            declared = request.headers.get('content-length')
+            if declared and (not declared.isdigit() or int(declared) > 32768):
+                return JSONResponse({'detail': 'QA verdict payload too large'}, status_code=413)
+            chunks, size = [], 0
+            async for part in request.stream():
+                size += len(part)
+                if size > 32768:
+                    return JSONResponse({'detail': 'QA verdict payload too large'}, status_code=413)
+                chunks.append(part)
+            consumed = False
+            async def replay():
+                nonlocal consumed
+                if not consumed:
+                    consumed = True
+                    return {'type': 'http.request', 'body': b''.join(chunks), 'more_body': False}
+                return {'type': 'http.request', 'body': b'', 'more_body': False}
+            request._receive = replay
+        return await call_next(request)
+
     @app.on_event('startup')
     def setup():
         with studio.connect() as db:
