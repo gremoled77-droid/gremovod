@@ -1,8 +1,8 @@
 # CODEX HANDOFF — Ed Hooks / Acting Director для GremoVOD
-**Дата подготовки:** 19.10.2026  
-**Статус:** ТЗ для следующей рабочей сессии Codex; **программный модуль ещё не реализован**.  
-**Репозиторий:** https://github.com/gremoled77-droid/gremovod  
-**Документационный PR:** https://github.com/gremoled77-droid/gremovod/pull/10 (draft, ветка `docs/ed-hooks-acting-director-20261019`).  
+**Дата подготовки:** 19.10.2026<br>
+**Статус:** ТЗ для следующей рабочей сессии Codex; **программный модуль ещё не реализован**.<br>
+**Репозиторий:** https://github.com/gremoled77-droid/gremovod<br>
+**Документационный PR:** https://github.com/gremoled77-droid/gremovod/pull/10 (draft, ветка `docs/ed-hooks-acting-director-20261019`).<br>
 **Issue реализации:** https://github.com/gremoled77-droid/gremovod/issues/12.
 
 > **Главная задача следующей сессии:** изучить материал, сверить настоящий код и работающие схемы, затем добавить в GremoVOD **минимально жизнеспособный, редактируемый и сохраняемый Acting Director / Actor Beat Sheet**. Не ограничиваться ещё одним теоретическим документом. При этом не запускать платные модели, не менять канон, не ломать существующую раскадровку и не работать в пользовательской `main`.
