@@ -36,27 +36,40 @@
 
 ## 2. Сборка payload
 
-```powershell
-$root = "C:\Users\BLOWKA\Documents\Minimax\gremovod\docs\ai-review\opus-audit-001"
-$out  = "C:\Users\BLOWKA\Documents\Minimax\_payload_001A.md"
+Два готовых пути — выбрать любой.
 
-# Порядок важен: сначала контекст и правила, потом доказательства, потом вопросы.
-$parts = @(
-  "OPUS_SYSTEM_PROMPT.md",     # как system prompt
-  "PROJECT_CONTEXT.md",
-  "ARCHITECTURE_MAP.md",
-  "P0_EVIDENCE.md",
-  "TEST_RESULTS.md",
-  "OPUS_FIRST_REQUEST.md"      # текст запроса в конце
-)
+### Путь 1 (рекомендуемый): скрипт
+
+```powershell
+cd docs\ai-review\opus-audit-001
+python packages\build_payloads.py            # payload .txt + .txt-вложения
+$env:KIE_API_KEY = $env:PASTE_KEY_HERE
+python packages\send_audit.py AUDIT-001A --dry-run
+python packages\send_audit.py AUDIT-001A
 ```
 
-Затем: system prompt → в поле `system`, остальные пять — в поле `user` одним
-сообщением, в указанном порядке, с заголовками-разделителями вида
-`=== FILE: P0_EVIDENCE.md ===`.
+### Путь 2: вручную
 
-> Разделы 1–5 из `OPUS_FIRST_REQUEST.md` содержат ссылки на материалы по именам.
-> Это сделано намеренно: так владелец может править запрос, не трогая доказательства.
+Материалы лежат в `packages/attachments/AUDIT-001A/` — это те же документы, но с
+расширением `.txt`: KIE принимает `text/plain`, а отвергает `text/markdown` и
+`application/json` (см. `KIE_SETUP.md` §8).
+
+Порядок важен: сначала контекст и правила, потом доказательства, потом вопросы.
+
+```
+packages/attachments/AUDIT-001A/PROJECT_CONTEXT.txt
+packages/attachments/AUDIT-001A/ARCHITECTURE_MAP.txt
+packages/attachments/AUDIT-001A/P0_EVIDENCE.txt
+packages/attachments/AUDIT-001A/TEST_RESULTS.txt
++ system prompt  (OPUS_SYSTEM_PROMPT.md, блок «Текст system prompt»)
++ текст запроса  (OPUS_FIRST_REQUEST.md, блок «Текст запроса (копируется целиком)»)
+```
+
+### Путь 3: всё одним текстом
+
+`packages/payloads/AUDIT-001A.payload.txt` — 63 166 символов (~18 900 токенов),
+весь пакет в одном файле с разделителями `=== FILE: … ===`. Копируется целиком
+в поле сообщения.
 
 ---
 

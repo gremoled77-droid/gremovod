@@ -1,0 +1,1357 @@
+=== SYSTEM PROMPT (Claude Opus 5.5 / KIE) ===
+Ты — независимый архитектурный аудитор с жёстким стандартом доказательности.
+Ты работаешь в роли senior-архитектора, который провёл 15+ лет ревью
+production-систем, в которых утечка бюджета или гонка данных стоили реальных денег.
+
+## Роль и контекст
+Ты НЕ участник этого проекта. Ты не автор кода, не менеджер и не заказчик.
+Ты не имеешь доступа к репозиторию, к GitHub, к сети, к предыдущим раундам диалога
+и к памяти о прошлых сессиях. Всё, что ты знаешь о системе, — в сообщении пользователя.
+Если чего-то в сообщении нет — считай, что этого нет, и пиши об этом прямо.
+
+## Что ты оцениваешь
+Проект GremoVOD — студия производства ИИ-контента (FastAPI + SQLite + React/Vite + n8n),
+которая платит внешним провайдерам за изображения, видео, речь, звук и музыку.
+Три (а на самом деле четыре) ветки работы висят незакрытыми Draft PR, и в `main` нет ни
+денежного контура, ни n8n-конвейера, ни независимых критиков. Главный риск проекта —
+не «сложно», а то, что код из разных веток выглядит как целостная система.
+
+## Стандарт доказательности (обязателен)
+1. Каждое утверждение о поведении системы подкрепляй ссылкой на файл и строки
+   из присланных материалов, либо прямо помечай как «не проверено — нет данных».
+2. Не достраивай отсутствующее. Нет файла — «файл не найден», нет поведения в коде —
+   «поведение не найдено». Молчаливый додум — худший вид ошибки в аудите.
+3. Различай четыре зрелости и всегда указывай, к какой относишь вывод:
+   - IMPLEMENTED — исполняемый код это делает;
+   - PARTIAL — код есть, но не покрывает весь заявленный случай;
+   - SPEC-ONLY — описан в спецификации/документе, исполнения нет;
+   - MOCK — заглушка, намеренно возвращающая фиктивный результат.
+4. Зелёный тест — это не доказательство отсутствия дефекта, а свидетельство, что
+   заявленный сценарий не сломался. Тест, который проверяет заглушку, доказывает
+   только то, что заглушка работает.
+5. В репозитории встречается намеренный fail-closed (нет доказательства → BLOCKED,
+   а не «пройдено»). Это сильное решение. Не называй его дефектом автоматически —
+   оценивай, соответствует ли он заявленной цели.
+6. Проектируй как владелец денег, а не как эстет: цена вопроса — «сколько реальных
+   кредитов может уйти мимо учёта, при каких гонках, и кто может это вызвать».
+
+## Правило ответа на текущий вопрос (обязательно, приоритетно)
+Каждое входящее сообщение — новая точка отсчёта. Отвечай на ТОТ вопрос, который
+задан сейчас, а не на тот, который ты разбирал в прошлый раз.
+
+1. Определи, о чём именно спрашивают в этом сообщении, и ответь на это. Если в
+   сообщении несколько вопросов — отвечай на каждый, но не перескакивай на то, что
+   не спрашивали.
+2. Не начинай ответ с «как я уже говорил», «как отмечал выше», «в предыдущем ответе
+   я привёл…». Предыдущий ответ — не вводная часть текущего.
+3. Не продолжай рассуждение, начатое ранее, и не достраивай предыдущую мысль.
+   Каждый ответ считай написанным с нуля.
+4. Прежний ответ не является ни основанием, ни контекстом по умолчанию. Если тебе
+   нужны факты из него — бери их из приложенных материалов, а не из памяти о диалоге.
+   Если факта нет в материалах — напиши «в материалах этого нет».
+5. Возвращаться к предыдущему ответу можно только в трёх случаях:
+   (а) владелец прямо попросил его пересмотреть или развить;
+   (б) владелец указал на ошибку в нём;
+   (в) текущий вопрос прямо ссылается на него («а почему ты в прошлый раз сказал…»).
+   Во всех остальных случаях предыдущий ответ не упоминай.
+6. Если текущий вопрос противоречит твоему предыдущему ответу — не защищай прежний
+   вывод. Пересчитай по текущему вопросу и прямо скажи: «это меняет мой прежний
+   вывод, потому что…».
+7. Каждый ответ обязан быть пригоден как самостоятельный документ: человек, который
+   не видел предыдущих сообщений, должен получить из него полный смысл. Поэтому
+   в каждом ответе заново называй предмет (файл, узел, PR, ревизию), а не полагайся
+   на «выше» или «там».
+8. Не перескатывай общие выводы прошлого раунда как вводные. Если они всё ещё
+   верны и нужны — приведи их заново, в одном предложении, с обоснованием, а не
+   отсылкой.
+
+## Формат ответа
+Для каждого раздела:
+- **Вердикт** одной строкой: IMPLEMENTED / PARTIAL / SPEC-ONLY / MOCK / MISSING / RISK
+  + одно предложение-обоснование.
+- **Доказательства** — конкретные `путь:строка` и минимальные верные фрагменты кода
+  (не пересказ, не псевдокод). Если кода нет — приведи текст спецификации, который
+  заменяет код, и пометь это явно.
+- **Что осталось открытым** — что именно ты не смог проверить и почему.
+- **Рекомендация** — одна-две строки, начинающиеся с «Исправить:» или «Проверить:».
+  Не предлагай «добавить тест» там, где отсутствует само доказательство: отсутствие
+  реального материала не лечится тестом.
+
+## Чего не делать
+- Не писать вводных абзацев и не пересказывать проект.
+- Не хвалить и не критиковать ради объёма. Если узкое место не найдено — так и скажи.
+- Не предлагать переписывание системы целиком.
+- Не выдумывать имена файлов, номера строк, названия функций и результаты тестов.
+- Не объединять в один вердикт разные сущности: «в спецификации есть» и «в коде есть»
+  — это разные утверждения.
+- Не ссылаться на предыдущие ответы и не перескатывать их как вводные.
+- Не зацикливаться на самопроверке: один проход, без повторного переразбора
+  собственных формулировок.
+- Не считать количество страниц или слов мерой качества аудита.
+
+## Приоритет
+Если времени или объём ограничены, важнее разобрать:
+(1) пути, по которым уходят реальные деньги; (2) границы доверия и авторизации;
+(3) целостность состояния при сбоях и гонках; (4) соответствие заявлений коду.
+Менее важно: стиль, именование, структура каталогов, отсутствие docstring.
+
+## Ограничение по расходу
+Ты вызываешься один раз на пакет. Автоматических повторов нет. Сформулируй ответ
+за один проход. Если нужно больше данных — запроси их у пользователя явным списком
+в конце ответа, а не догадывайся.
+
+=== FILE: PROJECT_CONTEXT.md ===
+# PROJECT_CONTEXT — GremoVOD
+
+Разделы A–E. Этот документ даёт Opus достаточно контекста, чтобы оценивать
+архитектуру, не читая весь репозиторий. Дальше — наводящие вопросы и материал.
+
+---
+
+## A. Назначение
+
+**GremoVOD** — однопользовательская (private, self-hosted) студия производства
+ИИ-контента. Пользователь описывает идею, студия превращает её в сценарий, раскадровку,
+набор изображений, видео, нативный звук, TTS, SFX и музыку, монтирует и выпускает.
+
+Продуктовая идея: **видео-канал, где сценарий, визуальный канон, звук и монтаж
+согласованы между собой**, а не собраны из независимых генераций. Отсюда вся
+архитектура: канон (canon) — источник правды для всех последующих стадий; каждый
+артефакт должен быть привязан к ревизии канона.
+
+Пользователь — владелец студии (один человек), поэтому «пользователь» в коде почти
+всегда означает владельца, а не многопользовательскую роль.
+
+## B. Технологический стек (проверено в коде)
+
+- **Backend:** Python 3.13, FastAPI, stdlib `sqlite3`. Зависимости зафиксированы в
+  `backend/requirements.lock.txt` (снимок проверенного Windows-окружения).
+  `backend/requirements.txt` — верхние границы диапазонов.
+- **Frontend:** React 18 + TypeScript + Vite. `frontend/package.json`:
+  `@xyflow/react` (графы воркфлоу), `lucide-react`, `typescript`.
+- **Оркестрация:** n8n. JSON-описания воркфлоу в `workflows/`, скрипты импорта в
+  `backend/workflow_import.py`.
+- **Провайдеры:** PiAPI (основной шлюз), KIE, ElevenLabs, Fish Audio — см. `backend/kie.py`,
+  `backend/adapters.py`, `backend/sound.py`.
+- **Хранилище:** один SQLite (`studio.sqlite3`) + файловые каталоги под медиа.
+
+## C. Канонические документы репозитория
+
+- `AGENTS.md` — регламент работы с агентами, ветвление, правила коммитов, гейт
+  «PR = треугольник + скриншот + текст», запрет пушить `main` напрямую.
+- `CLAUDE.md` — описание архитектуры для ИИ-агента (backend-карта, стек, команды).
+- `docs/CODEX_DECISIONS.md` — принятые решения владельца (D-001… и далее). Это
+  источник истины по «почему так», а не «как».
+- `docs/specs/n8n-production-2026-10-19/` — спецификация боевого конвейера.
+
+> ⚠️ `CLAUDE.md` — **описание**, а не доказательство. Где оно расходится с кодом,
+> приоритет у кода. Расхождения зафиксированы в `OPEN_ISSUES.md`.
+
+## D. Ключевые решения владельца (из `docs/CODEX_DECISIONS.md`, PR #29)
+
+- **D-010.** Формирование QA-вердикта: N34 = только техконтроль, без LLM; N35 = замороженное
+  evidence; три независимых A6/A7/A8 — только с реальным покрытием.
+- **Платные провайдеры.** Не тратить реальные кредиты без подтверждённого API,
+  доступного лимита, модели/цены и **явной авторизации конкретного запроса**, которую
+  должен обеспечивать защищённый runtime FastAPI.
+- **Одна рабочая БД.** Второй экземпляр SQLite, работающий с продакшен-данными,
+  запрещён. Это прямое требование к P0-контуру (см. `P0_EVIDENCE.md`, B-05).
+- **Fail-closed.** Отсутствие доказательства = BLOCKED, а не «пройдено».
+
+## E. Честное состояние на дату пакета
+
+Это не жалоба и не оценка — это факты, которые аудитор обязан знать, чтобы не
+принять MOCK за production.
+
+1. **`main` не содержит P0-контура.** Ни бюджета, ни capability-авторизации, ни
+   запрета второй БД. Это в PR #29.
+2. **WF_00–WF_06 в репозитории — MOCK.** Их `name` содержит `MOCK ONLY (SOURCE EXPORT)`,
+   `active=false`, WF_01–WF_06 содержат по 2 узла. Манифест сам объявляет
+   `status: "MOCK_FIRST_NOT_PUBLISHED"`, `real_provider_enabled: false`,
+   `real_media_evidence_available: false`. Подробно — `WORKFLOW_EVIDENCE.md`.
+3. **A8 отключён.** Ремесленная оценка (native audiovisual) требует реального
+   пользовательского MP4 и разрешения владельца, которых нет. `STATUS.md`:
+   `MEDIA-01 → BLOCKED_NO_USER_MP4`.
+4. **Реальные платные вызовы в конвейере не выполнялись.** По матрице N34–N41
+   A8 — `DISABLED и BLOCKED, не SKIPPED`.
+
+Что при этом **реализовано и покрыто тестами** — P0-контур PR #29 (свой бюджет,
+HMAC-подписанные capability, запрет второй БД, UNKNOWN-состояние, дедупликация) и
+бэкенд на `main` (242 теста, 345 в PR #29). Это важный баланс: проект не пустой и не
+«нарисованный», но и не доведён до production.
+
+---
+
+## F. Вопросы к владельцу (не для Opus, для контекста)
+
+Эти пункты не входят в аудит и не требуют ответа модели; они нужны, чтобы понимать,
+какие решения Opus будет предлагать.
+
+- Планируется ли один из трёх PR первым в `main`, или P0-контур ждёт отдельного
+  интеграционного PR?
+- Аудит на Claude Opus 5.5 через KIE — это разовый независимый взгляд, или планируется
+  использовать Opus и как постоянного ревьюера в контуре PR #34/#35?
+- Допустимо ли для владельца поднять `real_media_evidence_available` (реальный MP4),
+  или это осознанно отложено?
+
+
+=== FILE: ARCHITECTURE_MAP.md ===
+# ARCHITECTURE_MAP — GremoVOD
+
+Проверено по коду на `main` @ `82adb2d28efa05bf8face168485fe07ae340e0bc`
+и по PR #29 @ `c082829b11b968965600bdaf87c137b1485a0fa2`.
+Все строки модулей — реальные `wc -l`, не оценка.
+
+---
+
+## 1. Топология рантайма
+
+```
+                    ┌─────────────────────────────────────────┐
+  Браузер  ───────► │  FastAPI  backend/main.py  (764 строки)  │
+                    │  21 модуль register(app, studio)          │
+                    └───────┬──────────────────────┬───────────┘
+                            │                      │
+              ┌─────────────▼──────┐    ┌──────────▼──────────────┐
+              │  SQLite (1 файл)   │    │  Файловые каталоги медиа │
+              │  studio.sqlite3    │    │  media/, library/, ...  │
+              └────────────────────┘    └─────────────────────────┘
+                            │
+        ┌───────────────────┼────────────────────┐
+        │                   │                    │
+   PiAPI / KIE      ElevenLabs / Fish      OpenAI-совместимый LLM
+   (image, video)   (TTS, SFX, music)      (сценарий, чат)
+```
+
+### 1.1 Критично: путь к БД по умолчанию — внутри репозитория
+
+`backend/main.py:22-24`:
+
+```python
+DATA=Path(os.environ['STUDIO_DATA_DIR']).resolve() if os.environ.get('STUDIO_DATA_DIR') else None
+DB=(DATA or ROOT)/'studio.sqlite3'
+```
+
+Если `STUDIO_DATA_DIR` **не задан**, БД создаётся как `backend/studio.sqlite3` —
+то есть **внутри рабочей копии Git**. Это не баг сам по себе (путь в `.gitignore`
+есть: `backend/studio.sqlite3`), но это делает БД зависимой от расположения кода
+и повышает риск коммита/копирования. В PR #29 добавлен `studio_db.resolve()` с
+fail-closed проверкой пути — см. `P0_EVIDENCE.md` B-05.
+
+### 1.2 Режим удалённого доступа
+
+`backend/remote_access.py` (134 строки) — пароль, cookie-сессия, allowlist.
+Регистрируется в `main.py:832`. `backend/security.py` (114 строк) — CORS, `ORIGINS`.
+Регистрируется в `main.py:790`.
+
+### 1.3 Связка с n8n
+
+`backend/workflow_import.py` (84 строки, `main.py:818`) — импорт JSON-описаний воркфлоу.
+То есть n8n-схемы **исполняются n8n**, а FastAPI обслуживает медиа-хранилище,
+состояние и платные вызовы. Прямого исполнения графа воркфлоу внутри Python нет.
+
+---
+
+## 2. Backend: инвентарь модулей (45 модулей, 6 877 строк)
+
+| Модуль | Строк | Роль | Живой? |
+|---|---:|---|---|
+| `main.py` | 764 | Точка входа, FastAPI, 21 `register()` | entry |
+| `reel_recipes_data.py` | 824 | Статические рецепты рилсов (данные) | импорт. |
+| `production_folders.py` | 355 | Файловая структура производства | `register` |
+| `storyboard.py` | 302 | Раскадровка | `register` |
+| `adapters.py` | 288 | Провайдерские адаптеры: build/cost/submit | импорт. |
+| `sound.py` | 267 | TTS, SFX, музыка | `register` |
+| `native_chat.py` | 248 | Нативный LLM-чат | `register` |
+| `visual_plan.py` | 243 | Визуальный план | `register` |
+| `story_plan.py` | 235 | Сценарный план | `register` |
+| `temp_cleanup.py` | 211 | Уборка временных файлов | startup-hook |
+| `model_catalog.py` | 204 | Каталог моделей и цен | импорт. |
+| `edit_list.py` | 167 | Монтажный лист | `register` |
+| `production_entities.py` | 161 | Сущности производства | `register` |
+| `frame_analysis.py` | 146 | Анализ кадров | `register` |
+| `character_voice.py` | 146 | Голоса персонажей | `register` |
+| `llm_guard.py` | 142 | Ограничители LLM-вызовов | `register` |
+| `external_generation.py` | 138 | Внешняя генерация | импорт. |
+| `remote_access.py` | 134 | Удалённый доступ, пароль, cookie | `register` |
+| `connections.py` | 109 | Соединения между сущностями | импорт. |
+| `production_workspace.py` | 110 | Рабочее пространство | импорт. |
+| `reel_recipes.py` | 106 | API рецептов рилсов | `register` |
+| `motion.py` | 94 | Движение камеры/объектов | `register` |
+| `frame_composition.py` | 90 | Композиция кадра | `register` |
+| `activity.py` | 86 | Лента активности | импорт. |
+| `reference_upload.py` | 85 | Загрузка референсов | `register` |
+| `workflow_import.py` | 84 | Импорт n8n-воркфлоу | `register` |
+| `character_versions.py` | 81 | Версии персонажей | импорт. |
+| `prompt_rules.py` | 74 | Правила промптов | импорт. |
+| `car_staging.py` | 73 | Студийная постановка | импорт. |
+| `image_assets.py` | 72 | Изображения | импорт. |
+| `clip_chain.py` | 61 | Цепочка клипов | `register` |
+| `refinement.py` | 61 | Уточнение/рефайн | импорт. |
+| `send_to_reference.py` | 61 | Отправка в референс | импорт. |
+| `economics.py` | 88 | Экономика | `register` |
+| `series_economics.py` | 60 | Экономика серий | `register` |
+| `camera_movements.py` | 66 | Базовые движения камеры | `register` |
+| `job_delivery.py` | 66 | Доставка результатов задач | импорт. |
+| `character_description.py` | 56 | Описания персонажей | импорт. |
+| `kie.py` | 56 | Клиент KIE | импорт. |
+| `llm_response.py` | 43 | Разбор LLM-ответа | импорт. |
+| `job_recovery.py` | 42 | Восстановление задач | импорт. |
+| `prompt_setup.py` | 27 | Настройка промптов | импорт. |
+| `image_pricing.py` | 21 | Расчёт цены изображений | импорт. |
+| `idea_background.py` | 16 | Фон идеи | `register` |
+
+**Мёртвых модулей нет.** Проверено: каждый из 45 либо вызывается через
+`register(...)` в `main.py`, либо импортируется другим модулем. Проверка выполнена
+по `import`-выражениям, а не по упоминанию имени в тексте.
+
+### 2.1 Ключевые рёбра зависимостей
+
+- `main.py` → `adapters`, `kie` (`main.py:17`) — единая точка доступа к провайдерам.
+- `main.py` → `native_chat` (`main.py:774-776`), `economics` (`main.py:777`).
+- `main.py:185` — результат провайдера `kie` забирается через `kie.fetch(...)`;
+  `main.py:471-472` — отправка: `kie.submit(...)` либо `request_piapi(...)`.
+- `adapters` обслуживает **все** внешние вызовы: `adapters.handles(spec)`,
+  `adapters.build`, `adapters.cost`, `adapters.submit_path`, `adapters.wire_body`,
+  `adapters.describe` (`main.py:384-441`).
+
+> Аудитору: `adapters.py` + `main.py:384-472` — это **единственный** путь к платным
+> провайдерам на `main`. P0-контур PR #29 добавляет второй, защищённый путь
+> (`p0_provider_dispatch.py`). Это главный вопрос о дублировании денежных путей.
+
+---
+
+## 3. Frontend (React 18 + TS + Vite)
+
+`frontend/package.json`: `react` 18, `react-dom` 18, `@xyflow/react` (граф воркфлоу),
+`lucide-react` (иконки), `typescript` 5.7, `vite` 5.4. Скрипты: `dev`, `build`,
+`preview`, `test` = `node --experimental-strip-types --test`.
+
+Ключевые компоненты (все существуют, проверено по `frontend/src/`):
+
+| Компонент | Файл | Назначение |
+|---|---|---|
+| `App.tsx` | `frontend/src/App.tsx` | Каркас приложения, маршрутизация экранов |
+| `StageNav` | `frontend/src/components/StageNav.tsx` | Навигация по стадиям производства |
+| `Dock` | `frontend/src/components/Dock.tsx` | Нижняя панель |
+| `HomeScreen` | `frontend/src/HomeScreen.tsx` | Стартовый экран |
+| `CreateScreen` | `frontend/src/CreateScreen.tsx` | Создание проекта |
+| `ProductionStoryboard` | `frontend/src/components/ProductionStoryboard.tsx` | Раскадровка |
+| `WorkflowPanel` | `frontend/src/components/WorkflowPanel.tsx` | Панель воркфлоу |
+| `GenerationReview` | `frontend/src/components/GenerationReview.tsx` | Проверка генераций |
+| `ActivityContext` / `useActivity` | `frontend/src/context/ActivityContext.tsx` | Лента активности |
+| `GenerationWatcher` | `frontend/src/components/GenerationWatcher.tsx` | Наблюдение за задачами |
+
+**Тесты фронтенда:** 26 файлов `*.test.mjs` в `frontend/` (в корне, не в `src/`):
+`createDraft`, `directorState`, `projectMerge`, `visualPlan`, `workspaceNavigation`,
+`attachments`, `boardOrder`, `cameraFrameCatalog`, `characterPrompt`, `directorPresets`,
+`framePrompt`, `frameStatus`, `motionPrompt`, `operatorPrompt`, `outlinePlan`,
+`reelRecipes`, `replaceCharacterPrompt`, `sheetShots`, `soundCues`, `spendLimit`,
+`videoMode`, `workflowConnections`, `workflowLibrary`, `workflowNodes`, `worldBible`.
+
+> **Нюанс окружения (влияет на воспроизводимость):** фронт-тесты подгружают модули
+> `backend/*.py` через дочерний процесс. Интерпретатор выбирается так:
+> `process.env.STUDIO_PYTHON || findVenvPython(cwd) || 'python3'`
+> (`frontend/directorState.test.mjs`). Без `.venv` в корне и без `STUDIO_PYTHON`
+> тесты падают с `ModuleNotFoundError: No module named 'fastapi'` — то есть
+> **не из-за кода, а из-за окружения**. Это же делает фронт-тесты зависимыми от
+> состояния Python-окружения CI. Подробности — `TEST_RESULTS.md`.
+
+---
+
+## 4. Зрелость реализации по доменам
+
+| Домен | Модуль | Путь к провайдеру | Зрелость |
+|---|---|---|---|
+| Сценарий | `story_plan.py`, `native_chat.py` | LLM | **IMPLEMENTED** |
+| Раскадровка | `storyboard.py` | локально | **IMPLEMENTED** |
+| Визуальный план | `visual_plan.py` | локально | **IMPLEMENTED** |
+| Изображения | `adapters.py` (`image_pricing`, `image_assets`) | PiAPI через `adapters` | **IMPLEMENTED** (цена — `image_pricing.py`, 21 строка) |
+| Видео | `adapters.py`, `motion.py`, `clip_chain.py` | PiAPI | **IMPLEMENTED** на `main`; в n8n-конвейере — **MOCK** |
+| Нативный звук | `sound.py` | PiAPI | **IMPLEMENTED** |
+| TTS | `sound.py`, `character_voice.py` | ElevenLabs / Fish | **IMPLEMENTED** |
+| SFX | `sound.py` | провайдер | **IMPLEMENTED** |
+| Музыка | `sound.py` | провайдер | **IMPLEMENTED** |
+| Монтаж | `edit_list.py`, `clip_chain.py` | локально | **IMPLEMENTED** |
+| Релиз/экспорт | `main.py` (медиа-эндпоинты) | локально | **PARTIAL** — нет отдельной сущности «релиз» |
+| **n8n-конвейер WF_00–WF_06** | `workflows/*.json` | — | **MOCK** (`MOCK ONLY (SOURCE EXPORT)`, `active=false`) |
+| **Контракты production** | `docs/specs/n8n-production-2026-10-19/` | — | **SPEC-ONLY** (не исполняемый код) |
+| **P0-бюджет/авторизация** | `backend/p0_*.py` (PR #29) | — | **IMPLEMENTED, но не в `main`** |
+| **Ревьюер MiniMax** | `tools/ai_review/` (PR #35) | — | **MOCK** (адаптер `mock`) |
+
+> Разделение `IMPLEMENTED / PARTIAL / MOCK / SPEC-ONLY` здесь существенно.
+> В проекте зелёный n8n-execution в MOCK-режиме **не** означает рабочий конвейер —
+> это прямо зафиксировано в `docs/AUTORUN_6_STAGES_REPORT.md:42`:
+> «Зелёный n8n execution **не** означает production».
+
+---
+
+## 5. Покрытие тестами (факт, не оценка)
+
+| Зона | Файлов | Строк |
+|---|---:|---:|
+| `backend/test_*.py` | 37 | 3 507 |
+| `frontend/*.test.mjs` | 26 | — |
+| PR #29: `tools/test_*.py` | 2 | — |
+| PR #29: `tests/test_p0_state.js` | 1 | — |
+| PR #34: `tests/test_*.py` | 2 | — |
+| PR #35: `tests/test_*.py` | 8 | — |
+
+**Пустой тест-файл:** `backend/test_production_entities.py` — **0 строк**.
+Файл существует и участвует в discovery, но не проверяет ничего. Проверено
+чтением файла.
+
+**Без тестов (по инвентарю):** `production_workspace`, `connections`, `job_delivery`,
+`job_recovery`, `reel_recipes_data` (данные), `car_staging`, `send_to_reference`,
+`character_description`, `refinement`. Для части из них покрытие есть косвенное —
+через `main`-уровневые тесты, — но собственных модульных тестов у них нет.
+
+---
+
+## 6. Гигиена репозитория
+
+- `.gitignore` покрывает `.env`, `*_API_KEY.txt`, `backend/studio.sqlite3`,
+  `backend/media/`, `projects/`, `runtime/`, `tools/`, `artifacts/`.
+- ⚠️ **Правило `tools/` в `.gitignore` (строка ~47) делает весь каталог `tools/`
+  неотслеживаемым.** PR #34 это исправляет (`!tools/` + `tools/*` + `!tools/ai_review/`),
+  а **PR #35 — нет**: его 14 файлов `tools/ai_review/` в индексе есть (добавлены
+  принудительно), но **любой новый файл под `tools/` на этой ветке будет молча
+  проигнорирован**. См. `OPEN_ISSUES.md` OI-08.
+- `node_modules/` в игноре — установка зависимостей не влияет на состояние Git
+  (проверено: `git status --short` пуст после `npm ci`).
+
+
+=== FILE: P0_EVIDENCE.md ===
+# P0_EVIDENCE — деньги, авторизация, SQLite, состояния, восстановление
+
+**Ревизия:** PR #29, head `c082829b11b968965600bdaf87c137b1485a0fa2`
+(ветка `minimax/p0-budget-authz`), base `codex/p0-fixes-20261019` @ `fc05cafe9…`.
+**НЕ в `main`.** Все строки ниже — из этого ref, проверено чтением файла.
+Ничего из PR #34/#35 сюда не подмешано.
+
+Коммиты PR #29 поверх base:
+```
+c082829 docs(p0): зафиксировать модель подключения Argon (KIE, chat only, разовый diff-review)
+baad79c docs(p0): уточнить диапазон ревью Argon под лимиты инструмента
+cc9204f P0: единый бюджет, серверные capability-власти и запрет второй БД
+```
+> Замечание к гигиене PR: тело PR #29 в поле «Head SHA» указывает `cc9204f1…`, тогда как
+> фактический head — `c082829b…` (на два коммита впереди). `cc9204f` — реальный предок,
+> то есть расхождение — устаревший текст описания, а не расхождение кода. OI-09.
+
+---
+
+## B-01. Авторизация платных операций
+
+**Вердикт: IMPLEMENTED (в PR #29), отсутствует в `main`.**
+
+### Что было сломано (дефект R-05)
+
+Ledger принимал поля доверия **из тела запроса**. `backend/p0_authz.py:29-37`:
+
+```python
+# Legacy trust parameters that used to be accepted by the ledger. They are
+# ...
+LEGACY_TRUST_FIELDS = (
+    "trusted_studio_owner",
+    "trusted_studio_request_authorization",
+    ...
+)
+```
+
+### Как исправлено
+
+Вместо доверия телу запроса — **серверная HMAC-подписанная capability** с TTL и привязкой
+к конкретному запросу. `backend/p0_authz.py:67-101`:
+
+```python
+def mint(purpose: str, binding: dict, *, ttl_ms: int = 120_000) -> str:
+    ...
+    body = json.dumps({"purpose": purpose, "binding": binding,
+                       "exp_ms": now_ms() + int(ttl_ms)}, sort_keys=True, separators=(",", ":"))
+    signature = _b64(hmac.new(signing_key(), body.encode("utf-8"), hashlib.sha256).digest())
+    return f"{_b64(body.encode('utf-8'))}.{signature}"
+
+
+def verify(token: str, *, purpose: str, binding: dict) -> dict:
+    ...
+    expected = _b64(hmac.new(signing_key(), body.encode("utf-8"), hashlib.sha256).digest())
+    if not hmac.compare_digest(signature, expected):
+        raise AuthzError("capability signature is not valid")
+    ...
+    if payload["purpose"] != purpose:
+        raise AuthzError("capability was issued for a different purpose")
+    if payload["exp_ms"] < now_ms():
+        raise AuthzError("capability is expired")
+    if payload["binding"] != binding:
+        raise AuthzError("capability is bound to a different request")
+```
+
+Свойства, которые видны из кода:
+- **HMAC-SHA256**, сравнение через `hmac.compare_digest` (защита от timing-атак).
+- **TTL по умолчанию 120 000 мс** (2 минуты) — `p0_authz.py:67`, `:104`, `:116`.
+- **Привязка к purpose** — capability, выданная на одну операцию, не принимается для другой.
+- **Привязка к binding** — не принимается для другого запроса/run/envelope.
+- Два типа capability: `mint_owner_capability(run_id, envelope_id, cap_cents, stage, provider, model)`
+  (`:103`) и `mint_request_capability(job_id, request_sha, upper_cents)` (`:115`).
+
+### Fail-closed на легаси-поля
+
+`backend/p0_authz.py:124-131`:
+
+```python
+def reject_legacy_trust(extra: dict) -> None:
+    ...
+    offending = sorted(set(extra) & set(LEGACY_TRUST_FIELDS))
+    if offending:
+        raise AuthzError(
+            ...
+```
+
+Вызывается из `p0_control.finish_verified` (`p0_control.py:340-343`) — то есть путь
+«клиент прислал `provider_evidence_verified: true`» блокируется на входе.
+
+### Открытый вопрос для аудита
+
+`signing_key()` (`p0_authz.py:47`) — как именно выводится ключ? Аудитор должен проверить,
+что ключ не попадает в репозиторий и что его отсутствие приводит к отказу, а не к
+«работе без подписи».
+
+---
+
+## B-02. Единый бюджет и резервы
+
+**Вердикт: IMPLEMENTED (в PR #29), отсутствует в `main`.**
+
+### Два слоя бюджета
+
+1. **Legacy-слой** — `backend/spend_ledger.py`, USD-флаты, лимиты проекта и дня.
+2. **P0-слой** — `backend/p0_control.py` + таблицы `p0_budget_envelopes` / `p0_jobs`,
+   **целые центы**, никогда не float.
+
+`spend_ledger.py:113-126`:
+
+```python
+def check(db, project_id: str, cost_usd: float) -> None:
+    """Raise BudgetExceeded when the combined ledger would pass a cap."""
+    value = state(db, project_id)
+    if value["project_reserved_usd"] + cost_usd > value["project_limit_usd"] + 1e-9:
+        raise BudgetExceeded("Превышен серверный бюджет проекта. Измени лимит в разделе «Экономика».")
+    if value["daily_reserved_usd"] + cost_usd > value["daily_limit_usd"] + 1e-9:
+        raise BudgetExceeded("Превышен дневной серверный бюджет. Измени лимит в разделе «Экономика».")
+
+
+def check_cents(db, project_id: str, cost_cents: int) -> None:
+    """Cent-precise variant for the P0 ledger, which never handles floats."""
+    if type(cost_cents) is not int or cost_cents < 0:
+        raise BudgetExceeded("cost in integer cents is required")
+    check(db, project_id, cost_cents / 100)
+```
+
+### Сведение двух слоёв
+
+`spend_ledger.py:89-110` — `state()` складывает legacy и P0:
+
+```python
+    p0_project = sum((r["reserved_cents"] + r["spent_cents"]) / 100 ...)
+    p0_daily   = sum((r["reserved_cents"] + r["spent_cents"]) / 100 ...)
+    ...
+    "project_reserved_usd": round(legacy_project + p0_project, 6),
+    "daily_reserved_usd":   round(legacy_daily + p0_daily, 6),
+    "legacy_reserved_usd":  round(legacy_project, 6),
+    "p0_reserved_usd":      round(p0_project, 6),
+```
+
+То есть **общий лимит считается по объединённой сумме** — P0 не может потратить сверх
+капа, обходя legacy-учёт. Это ключевое свойство, и оно выглядит корректно.
+
+### Резерв как отдельная сущность
+
+Резерв отражается в `p0_budget_envelopes.reserved_cents` и списывается **только**
+подтверждённым терминальным событием (`p0_control.py:364-366`):
+
+```python
+db.execute("""UPDATE p0_budget_envelopes SET reserved_cents=reserved_cents-?,
+      spent_cents=spent_cents+? WHERE envelope_id=?""",
+      (j["reserve_cents"], charged_cents, j["envelope_id"]))
+```
+
+### Потолок резерва
+
+`p0_control.py:359-363`:
+
+```python
+if charged_cents > j["reserve_cents"]:
+    raise Blocked("provider cost exceeds reserved ceiling, manual reconciliation")
+e = _one(db, "SELECT * FROM p0_budget_envelopes WHERE envelope_id=?", (j["envelope_id"],))
+if e["reserved_cents"] < j["reserve_cents"]:
+    raise Conflict("reserve missing")
+```
+
+Провайдер не может списать больше, чем зарезервировано; превышение → ручная сверка,
+а не тихое списание.
+
+---
+
+## B-03. Идемпотентность, состояние UNKNOWN, восстановление
+
+**Вердикт: IMPLEMENTED (в PR #29). Это самая сильная часть контура.**
+
+### Машина состояний задачи
+
+`backend/p0_control.py` — состояния `p0_jobs.state`:
+
+```
+INTENT_CREATED ──authorize()──► AUTHORIZED ──begin_submit()──► SUBMITTING
+                                                                    │
+                              ┌─────────────────────┬───────────────┘
+                              ▼                     ▼
+                       accept_provider_id()   mark_unknown()
+                              │                     │
+                              ▼                     ▼
+                          SUBMITTED              UNKNOWN
+                              │                    (терминально, не возобновляемо)
+                    finish_verified() ─────────────┘
+                        │              │
+                        ▼              ▼
+                   COMPLETED        FAILED
+```
+
+### UNKNOWN — «потерянный ack»
+
+`p0_control.py:308-316`:
+
+```python
+def mark_unknown(db, *, job_id):
+    """Lost acknowledgement: NEVER re-send, NEVER free reserved money without proof."""
+    with atomic(db):
+        j = _one(db, "SELECT state FROM p0_jobs WHERE job_id=?", (job_id,))
+        if j["state"] != "SUBMITTING":
+            raise Conflict("ambiguous submit only after SUBMITTING")
+        db.execute("""UPDATE p0_jobs SET state='UNKNOWN',possible_charge=1,
+            lease_owner=NULL,lease_until_ms=NULL,state_version=state_version+1,
+            updated_at_ms=? WHERE job_id=?""", (now_ms(), job_id))
+```
+
+Три свойства:
+1. **Никогда не переотправляется.** `claim_job` (`p0_control.py:272-284`) требует
+   `state == "AUTHORIZED"`; UNKNOWN туда не попадает:
+   ```python
+   if j["state"] != "AUTHORIZED" or j["state_version"] != expected_version:
+       raise Conflict("job not safe to claim (UNKNOWN is NEVER resumable)")
+   ```
+2. **Деньги не освобождаются без доказательства.** Резерв остаётся зарезервированным;
+   освобождает его только верифицированное терминальное событие.
+3. **Блокирует новые попытки по слоту.** `p0_control.py:194-202`:
+   ```python
+   def _block_unresolved_attempt(db, job):
+       ... AND (state IN ('AUTHORIZED','SUBMITTING','SUBMITTED','UNKNOWN','CANCEL_REQUESTED')
+   ```
+   То есть после UNKNOWN по тому же `run_id`/`slot_id`/`kind` новая попытка не создаётся.
+
+### Дедупликация терминальных колбэков
+
+`p0_control.py:331-372`:
+
+```python
+def finish_verified(db, *, job_id, event_id, event_body, charged_cents,
+                    provider_success, verify_evidence=None, **legacy):
+    """Backend checks provider authenticity; duplicated terminal callbacks do not recharge.
+
+    `verify_evidence` is a server-side callable that authenticates the
+    provider event. The ledger never accepts a boolean that says "this event is
+    genuine": a caller could simply set it. Legacy
+    `provider_evidence_verified` is refused.
+    """
+```
+
+Ключевое:
+- `verify_evidence` — **обязательный серверный callable** (`:344-347`):
+  ```python
+  if not callable(verify_evidence):
+      raise Blocked("server-side provider evidence verification is required")
+  if verify_evidence(event_body) is not True:
+      raise Blocked("provider evidence not verified by backend")
+  ```
+- Повтор с тем же `event_id` → `return False`, повторного списания нет (`:353-356`).
+- **Тот же `event_id` с другим payload → `Conflict("event ID reused with changed payload")`** (`:355`).
+- Финальная стоимость не может превысить резерв (`:359`).
+
+### Атомарность
+
+`p0_control.py:104-105`:
+
+```python
+def atomic(db):
+    db.execute("BEGIN IMMEDIATE")
+```
+
+`BEGIN IMMEDIATE` — общий патч-лок на запись, снимает read-modify-write гонку на
+счётчиках бюджета. Соединение открывается с `isolation_level=None`
+(`p0_control.py:59`), то есть autocommit-режим — транзакции явные.
+
+---
+
+## B-04. Параллельные задачи и гонки
+
+**Вердикт: IMPLEMENTED с оговоркой (см. «Что осталось открытым»).**
+
+### Оптимистичная блокировка по версии
+
+`state_version` инкрементируется на каждое изменение состояния
+(`p0_control.py:250-251`, `:266-267`, `:282-283`, `:304-305`, `:314-316`, `:326-328`, `:367-371`).
+Проверка версии — в `claim_run` / `claim_job` / `begin_submit`.
+
+### Лиза с владельцем и сроком
+
+`p0_control.py:255-270` (`claim_run`) и `:272-286` (`claim_job`):
+
+```python
+if r["state_version"] != expected_version or r["status"] not in ("CREATED","RUNNING","PAUSED"):
+    raise Conflict(...)
+if r["lease_owner"] and r["lease_until_ms"] and r["lease_until_ms"] > t:
+    raise Conflict("job lease already owned")
+```
+
+`lease_ms=120000` по умолчанию. Истечение лизы → `lease_until_ms <= t` → лиза берётся заново.
+
+### Защита от повторной отправки
+
+`p0_control.py:288-306` (`begin_submit`):
+
+```python
+"""Transition persisted to SUBMITTING before HTTP POST; caller makes at most one POST."""
+...
+if (j["state"] != "AUTHORIZED" or j["state_version"] != expected_version or
+        j["lease_owner"] != worker or (j["lease_until_ms"] or 0) <= t or j["submit_count"] != 0):
+    raise Conflict("not authorized, lease expired or already submitted")
+...
+db.execute("""UPDATE p0_jobs SET state='SUBMITTING',submit_count=1, ...""")
+```
+
+`submit_count` выставляется в 1 **до** HTTP POST. Это и есть «не более одного POST»:
+состояние `SUBMITTING` персистится раньше, чем провайдер увидел запрос.
+
+### Что осталось открытым (вопрос аудитору)
+
+1. **Лиза на 2 минуты может истечь, пока провайдер «думает».** Тогда `begin_submit`
+   для этого же job упадёт на `lease_until_ms <= t`, но **уже после** того, как первый
+   POST ушёл. Идемпотентность на стороне провайдера в контуре не прослеживается.
+   Нужен ли провайдерский idempotency-key?
+2. **`claim_run` и `claim_job` — разные лизы.** `claim_run` берёт лизу на run, `claim_job`
+   — на job. Не проверяется ли, что владелец job-лизы согласован с владельцем run-лизы.
+3. **Окно между `submit_count=1` и реальным POST.** Если процесс умирает после
+   `begin_submit`, но до POST — задача навсегда в `SUBMITTING`/`UNKNOWN`, и деньги
+   зарезервированы, хотя провайдер их не списал. Требуется процедура сверки
+   (`provider_job_id` пуст, `possible_charge=1`).
+
+---
+
+## B-05. Запрет второй рабочей SQLite
+
+**Вердикт: IMPLEMENTED (в PR #29).**
+
+### Единая точка правды о пути
+
+`backend/studio_db.py:1-10` (докстринг):
+
+> Single source of truth for the Studio SQLite path. … The Studio database is the one
+> database; every other path is … The Studio path mirrors backend/main.py:
+> `(STUDIO_DATA_DIR or backend/) / "studio.sqlite3"`
+
+`backend/studio_db.py:24-32`:
+
+```python
+def studio_db_path() -> Path:
+    ...
+    base = Path(data).resolve() if data else ROOT
+    return (base / "studio.sqlite3").resolve()
+
+def is_studio_db(path: Path | str) -> bool:
+    ...
+    return Path(path).resolve() == studio_db_path()
+```
+
+### Fail-closed проверка
+
+`backend/studio_db.py:37-51`:
+
+```python
+def resolve(path: Path | str, *, allow_disposable: bool = False) -> Path:
+    """Return the resolved database path or refuse a shadow state.
+
+    `allow_disposable` exists for tests and for explicitly disposable copies
+    of the Studio database. It must never be set on a production code path.
+    """
+    resolved = Path(path).resolve()
+    ...
+    if allow_disposable:
+        return resolved
+    raise ShadowState(
+        ...
+        f"({studio_db_path()}); a second writable database is not allowed: {resolved}"
+    )
+```
+
+И обёртка, превращающая отказ в `Blocked` — `backend/p0_control.py:49-63`:
+
+```python
+def open_db(path: Path | str, *, allow_disposable: bool = False) -> sqlite3.Connection:
+    """Open the Studio SQLite. A second writable database is refused.
+    ...
+    """
+    try:
+        resolved = studio_db.resolve(path, allow_disposable=allow_disposable)
+    except studio_db.ShadowState as exc:
+        raise Blocked(str(exc)) from None
+    db = sqlite3.connect(str(resolved), timeout=10, isolation_level=None)
+    db.row_factory = sqlite3.Row
+    db.execute("PRAGMA foreign_keys=ON")
+    db.execute("PRAGMA busy_timeout=10000")
+    return db
+```
+
+### Аудит escape hatch
+
+Проверено по всему `pr/29`: `allow_disposable=True` встречается **только** в
+тест-файлах и в `scripts/p0_migrate.py` (который требует бэкап). В боевом пути
+`p0_control.open_db` флаг не выставляется. Проверка выполнена поиском по
+`backend/*.py`, `integrations/n8n/*.py`, `scripts/*.py`.
+
+### Согласованность с n8n-пилотом
+
+`integrations/n8n/pilot_state_sqlite.py` (изменён в PR #29, +21 строка) использует тот же
+`studio_db.resolve(...)` и отказывается открывать не-Sstudio БД. Именно это требование
+зафиксировано в `docs/agent_handoffs/minimax-p0-budget-authz.md:89`:
+
+> ролям A6–A8 и по выдаче capability создал бы второй путь к деньгам.
+
+---
+
+## B-06. Защита от повторного платного запроса
+
+**Вердикт: IMPLEMENTED на уровне контура PR #29; на `main` — отсутствует.**
+
+Собранные вместе меры:
+
+| Мера | Где | Что даёт |
+|---|---|---|
+| Capability с TTL 120 c | `p0_authz.py:67-101` | Клиентская подпись не бессрочна |
+| Capability привязана к `request_sha` | `p0_authz.py:115-121` | Нельзя переиспользовать на другой payload |
+| Legacy-поля доверия отвергаются | `p0_authz.py:124-131` | Клиент не может сам объявить себя доверенным |
+| `submit_count` = 1 до POST | `p0_control.py:296-305` | Не более одного HTTP POST на задачу |
+| `state != INTENT_CREATED` → Conflict | `p0_control.py:228-229` | Повторная авторизация невозможна |
+| Запрет второй попытки по слоту | `p0_control.py:244-249` | Не более одного платного задания на слот |
+| UNKNOWN блокирует новые попытки | `p0_control.py:194-202` | После неопределённого исхода — стоп |
+| Дедупликация по `event_id` | `p0_control.py:353-356` | Повторный колбэк не списывает дважды |
+| `event_id` с другим payload → Conflict | `p0_control.py:355` | Защита от подмены |
+| Резерв выше потолка → Blocked | `p0_control.py:359-360` | Провайдер не спишет больше резерва |
+
+> ⚠️ **Второй путь к деньгам.** На `main` платные вызовы идут через
+> `adapters` + `main.py:460-472`, минуя весь P0-контур. То есть перечисленные меры
+> защищают **только** путь PR #29. Пока P0 не в `main`, `main` не защищён.
+> Это главный вопрос аудита: **как гарантируется, что P0-контур не будет обойдён**
+> после мержа? `p0_provider_dispatch.py` (PR #29) — вероятный кандидат на единый шлюз;
+> аудитору нужно проверить, что он действительно закрывает `main`-путь.
+
+---
+
+## B-07. Заморозка плана и манифеста
+
+**Вердикт: IMPLEMENTED (в PR #29).**
+
+`p0_control.py:375-407` (`freeze_manifest`) — полный доверенный план замораживается
+**до** того, как существуют задачи или поставки медиа:
+
+- список слотов валидируется: `{'slot_id','kind','required'}`, `kind` из закрытого набора
+  `{'shot','voice','sfx','music','ambience','title','reference','other'}`, `required` — строго `bool`;
+- дубликаты `slot_id` запрещены (`:388-389`);
+- `source_revision` должен совпасть, иначе `Conflict("stale manifest source")` (`:393-394`);
+- манифест **иммутабелен** для данного source (`:397-400`);
+- заморозка запрещена, если уже есть задачи или сцены (`:401-405`).
+
+> Аудитору: стоит проверить, покрывает ли `freeze_manifest` тот случай, когда
+> владелец меняет канон **после** заморозки, но **до** завершения задач —
+> `p0_jobs` привязан к `source_revision`, но не видно, что делает `finish_verified`
+> с задачей, чей source устарел.
+
+---
+
+## B-08. Сводка P0-компонентов
+
+| Компонент | Статус | Тест |
+|---|---|---|
+| HMAC capability, TTL, привязка, fail-closed | IMPLEMENTED | `backend/test_p0_budget_authz.py` |
+| Отвержение legacy-полей доверия (R-05) | IMPLEMENTED | `backend/test_p0_budget_authz.py` |
+| Единый бюджет (legacy + P0, USD + центы) | IMPLEMENTED | `backend/test_p0_budget_authz.py`, `backend/test_budget_release.py` |
+| Резерв / списание / потолок | IMPLEMENTED | `backend/test_p0_budget_authz.py` |
+| Идемпотентность, дедуп по `event_id` | IMPLEMENTED | `backend/test_p0_regressions.py` |
+| UNKNOWN: нет переотправки, нет освобождения | IMPLEMENTED | `backend/test_p0_control.py`, `backend/test_p0_regressions.py` |
+| `submit_count` — не более одного POST | IMPLEMENTED | `tests/test_p0_state.js` |
+| Запрет второй БД (`studio_db.resolve`) | IMPLEMENTED | `backend/test_p0_migrate.py` |
+| Лиза + `state_version` | IMPLEMENTED | `backend/test_p0_control.py` |
+| `BEGIN IMMEDIATE` (атомарность) | IMPLEMENTED | косвенно, во всех тестах |
+| Заморозка манифеста | IMPLEMENTED | `backend/test_p0_control.py` |
+| Сведение P0 с `main`-путём к провайдерам | **MISSING** | — |
+| Провайдерский idempotency-key | **MISSING** | — |
+| Процедура сверки «зависших» в SUBMITTING/UNKNOWN | **MISSING** | — |
+| Ключ подписи capability: происхождение и отсутствие → отказ | **не проверено** | — |
+
+> Последние четыре строки — **вопросы к аудитору**, а не утверждения об отсутствии
+> (код не изучался настолько детально, чтобы утверждать). Первые три строки
+> «MISSING» получены из факта отсутствия соответствующих символов в `pr/29`
+> (`grep` по `p0_control.py`, `p0_authz.py`, `spend_ledger.py`).
+
+
+=== FILE: TEST_RESULTS.md ===
+# TEST_RESULTS — реально выполненные прогоны
+
+**Дата:** 2026-10-20 · **Среда:** Windows 10.0.19044 x64, PowerShell 5.1, Python 3.13.14,
+Node v24.16.0, Git 2.56.0 · **Платных API-вызовов: 0** · **Сетевых вызовов к провайдерам: 0**
+
+Все команды выполнены в **изолированных worktree** (`git worktree add --detach`) на
+конкретных SHA. Рабочая копия владельца не затрагивалась.
+
+---
+
+## 1. Подготовка окружения
+
+```powershell
+# Изолированное venv ВНЕ репозитория (репозиторий не пачкается)
+cd C:\Users\BLOWKA\Documents\Minimax
+python -m venv .venv-audit
+.\.venv-audit\Scripts\python.exe -m pip install -r gremovod\backend\requirements.txt pytest
+# → fastapi 0.150.0, pytest 9.1.1, httpx 0.28.1, Pillow 12.3.0
+```
+
+```powershell
+# Worktree на каждый исследуемый SHA
+cd C:\Users\BLOWKA\Documents\Minimax\gremovod
+git worktree add --detach C:\Users\BLOWKA\Documents\Minimax\_wt\wt29 pr/29
+git worktree add --detach C:\Users\BLOWKA\Documents\Minimax\_wt\wt34 pr/34
+git worktree add --detach C:\Users\BLOWKA\Documents\Minimax\_wt\wt35 pr/35
+git worktree add --detach C:\Users\BLOWKA\Documents\Minimax\_wt\wt08 origin/feature/qa-text-audit-fixes-20261019
+```
+
+```powershell
+# Защита от записи в рабочую БД — путь БД по умолчанию ВНУТРИ репозитория:
+#   backend/main.py:22-24  DB=(DATA or ROOT)/'studio.sqlite3'
+# поэтому STUDIO_DATA_DIR всегда указывался на временный каталог
+$env:STUDIO_DATA_DIR = "C:\Users\BLOWKA\Documents\Minimax\_testdata"
+```
+
+> ⚠️ Это не формальность. Без `STUDIO_DATA_DIR` pytest создал бы
+> `backend/studio.sqlite3` **внутри репозитория** и изменил бы рабочее состояние
+> Git-дерева. Это зафиксировано как находка OI-10.
+
+---
+
+## 2. Сводная таблица прогонов
+
+| # | Ref | Команда | Результат | Exit |
+|---|---|---|---|---|
+| T1 | `main` `82adb2d` | `pytest backend -q` | **242 passed**, 16 subtests passed, 39 warnings, 76.49 s | **0** |
+| T2 | `main` `82adb2d` | `npm test` (frontend, 26 файлов `.test.mjs`) | **104 tests, 104 pass, 0 fail**, 7003 ms | **0** |
+| T3 | PR #29 `c082829` | `pytest backend -q` | **345 passed**, 26 subtests passed, 39 warnings, 86.78 s | **0** |
+| T4 | PR #29 `c082829` | `pytest backend -q -k "p0 or budget or authz or ledger or idempot"` | **78 passed**, 267 deselected, 10 subtests passed, 13.34 s | **0** |
+| T5 | PR #29 `c082829` | `pytest tools -q` | **14 passed**, 7 subtests passed, 0.07 s | **0** |
+| T6 | PR #29 `c082829` | `node --test tests/test_p0_state.js` | **7 tests, 7 pass, 0 fail**, 2567 ms | **0** |
+| T7 | PR #34 `b3183d2` | `pytest tests -q` | **76 passed**, 73.16 s | **0** |
+| T8 | PR #35 `051ab3a` | `pytest tests -q` | **108 passed**, 29.54 s | **0** |
+| T9 | PR #8 `3979390` | `pytest backend/test_qa_text_precheck.py backend/test_qa_text_app_integration.py -q` | **19 passed**, 67 warnings, 8.49 s | **0** |
+| T10 | PR #8 `3979390` | `pytest backend -q` | **261 passed**, 16 subtests passed, 67 warnings, 107.85 s | **0** |
+
+**Итого: 10 прогонов, все зелёные, exit code 0.**
+
+---
+
+## 3. Точные команды и вывод
+
+### T1 — `main` @ `82adb2d28efa05bf8face168485fe07ae340e0bc`
+
+```
+cd C:\Users\BLOWKA\Documents\Minimax\gremovod
+$env:STUDIO_DATA_DIR = "C:\Users\BLOWKA\Documents\Minimax\_testdata"
+C:\Users\BLOWKA\Documents\Minimax\.venv-audit\Scripts\python.exe -X utf8 -m pytest backend -q
+```
+
+```
+242 passed, 39 warnings, 16 subtests passed in 76.49s (0:01:16)
+EXITCODE=0
+```
+Предупреждения — только `DeprecationWarning: on_event is deprecated, use lifespan
+event handlers instead` (FastAPI ≥ 0.109), в 5 модулях: `character_voice.py:91`,
+`sound.py:134`, `temp_cleanup.py:231`, `story_plan.py:134`, `camera_movements.py`.
+
+### T2 — фронтенд `main`
+
+```
+cd C:\Users\BLOWKA\Documents\Minimax\gremovod\frontend
+npm ci
+$env:STUDIO_PYTHON = "C:\Users\BLOWKA\Documents\Minimax\.venv-audit\Scripts\python.exe"
+$env:STUDIO_DATA_DIR = "C:\Users\BLOWKA\Documents\Minimax\_testdata"
+npm test
+```
+
+```
+tests 104
+suites 0
+pass 104
+fail 0
+cancelled 0
+skipped 0
+todo 0
+duration_ms 7003.1955
+FRONTEND_EXITCODE=0
+```
+
+> **Важно о воспроизводимости.** Без `STUDIO_PYTHON` фронт-тесты падают (см. §5.1).
+> Тест сам ищет интерпретатор: `process.env.STUDIO_PYTHON || findVenvPython(cwd) || 'python3'`
+> (`frontend/directorState.test.mjs`). `findVenvPython` поднимается вверх по каталогам,
+> ища `.venv/Scripts/python.exe` / `.venv/bin/python`. То есть фронт-тесты **требуют
+> venv с установленным `fastapi`** — в любом CI это надо воспроизвести явно.
+
+### T3 / T4 — PR #29 @ `c082829b11b968965600bdaf87c137b1485a0fa2`
+
+```
+cd C:\Users\BLOWKA\Documents\Minimax\_wt\wt29
+python -X utf8 -m pytest backend -q
+→ 345 passed, 39 warnings, 26 subtests passed in 86.78s (0:01:26)   EXITCODE=0
+
+python -X utf8 -m pytest backend -q -k "p0 or budget or authz or ledger or idempot"
+→ 78 passed, 267 deselected, 39 warnings, 10 subtests passed in 13.34s (0:01:13)  EXITCODE=0
+```
+
+Прирост к `main`: **+103 теста** (242 → 345). Это P0-контур PR #29.
+
+### T5 / T6 — PR #29, координация
+
+```
+python -X utf8 -m pytest tools -q
+→ 14 passed, 7 subtests passed in 0.07s          EXITCODE=0
+
+node --test tests/test_p0_state.js
+→ tests 7 | pass 7 | fail 0 | duration_ms 2567.6383   EXITCODE=0
+```
+
+Имена тестов T6 (Node test runner):
+- `test_prompt_or_profile_changed_after_approval_is_rejected`
+- `test_provider_success_charges_once_and_no_duplicate_callbacks`
+- `test_no_legacy_job_overwrite_from_p0_submit`
+- `test_source_changed_before_submit_blocks_billing`
+
+### T7 — PR #34 @ `b3183d28a0e22d5414ab7eef70d62543aa991dfa`
+
+```
+cd C:\Users\BLOWKA\Documents\Minimax\_wt\wt34
+python -X utf8 -m pytest tests -q
+→ 76 passed in 73.16s (0:01:13)                   EXITCODE=0
+```
+
+### T8 — PR #35 @ `051ab3a1182c1ed954b53c9b64f85e8195dbcc91`
+
+```
+cd C:\Users\BLOWKA\Documents\Minimax\_wt\wt35
+python -X utf8 -m pytest tests -q
+→ 108 passed in 29.54s (0:00:29)                  EXITCODE=0
+```
+
+### T9 / T10 — PR #8 @ `3979390`
+
+```
+cd C:\Users\BLOWKA\Documents\Minimax\_wt\wt08
+python -X utf8 -m pytest backend/test_qa_text_precheck.py backend/test_qa_text_app_integration.py -q
+→ 19 passed, 67 warnings in 8.49s                 EXITCODE=0
+
+python -X utf8 -m pytest backend -q
+→ 261 passed, 67 warnings, 16 subtests passed in 107.85s (0:01:47)   EXITCODE=0
+```
+
+---
+
+## 4. Что НЕ запускалось — и почему
+
+| Что | Почему не запускалось | Как это влияет на аудит |
+|---|---|---|
+| **n8n-инстанс** `gremovod.app.n8n.cloud` | Требует сети и учётных данных; workflow не опубликованы (`runtime_status: DRAFT_MOCK_ONLY_NOT_PUBLISHED`, `published: false` у A6/A7/A8) | Все утверждения о поведении n8n — из JSON и документации, **не из исполнения** |
+| **Живые вызовы провайдеров** (PiAPI, KIE, ElevenLabs, Fish) | Платные. Явного разрешения владельца на платные вызовы нет | Поведение платных путей **не проверено вовсе** |
+| **KIE (Claude Opus 5.5)** | Платный маршрут; при подготовке выполнялись только запросы без ключа (§6 KIE_SETUP) | Фактическая стоимость аудита — оценка, а не факт |
+| **Живой вызов A6 в n8n** | По `QA_FASTAPI_CONNECTION_HANDOFF.md:10` единственная попытка провалилась 3× с `AI_APICallError`; повтор не выполнялся | Работоспособность A6 **неизвестна** |
+| **Реальный пользовательский MP4** | Его у владельца нет (`STATUS.md`: `MEDIA-01 → BLOCKED_NO_USER_MP4`) | A8 невозможно проверить в принципе — ни мной, ни Opus |
+| **CI n8n Cloud** | Требует доступа к облачному n8n | Утверждение «CI зелёный» в гейте — **из документации**, не из прогона |
+| **Миграция боевой схемы** | `production_schema_migrated: false` во всех ветках | Боевой БД не мигрирован — контур P0 в бою не работал |
+| **Проверка живой базы владельца** | Принципиально не трогал; `working_db_accessed: false` в записях проекта | Рабочая БД не изучалась |
+
+---
+
+## 5. Провалившиеся прогоны (зафиксированы, а не скрыты)
+
+### 5.1 Фронтенд без установленных зависимостей — exit 1
+
+```
+cd frontend; npm test
+→ ✖ createDraft.test.mjs, directorState.test.mjs, projectMerge.test.mjs,
+  visualPlan.test.mjs, workspaceNavigation.test.mjs  (и ещё 21)
+  Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'typescript'
+FRONTEND_EXITCODE=1
+```
+
+Причина: `node_modules/` отсутствовал. Устранено через `npm ci`.
+
+### 5.2 Фронтенд с зависимостями, но без доступа к venv — exit 1
+
+```
+cd frontend; npm test   # интерпретатор не найден → fallback 'python3'
+→ ModuleNotFoundError: No module named 'fastapi'
+   File "...\backend\camera_movements.py", line 4, in <module>
+   FRONTEND_EXITCODE=1
+```
+
+Причина: тест исполняет `python -c "from backend.camera_movements import basis…"`
+через дочерний процесс, и ему нужен интерпретатор **с установленным `fastapi`**.
+`findVenvPython` ищет `.venv/`, которого в репозитории нет. Устранено через
+`STUDIO_PYTHON`.
+
+> **Это не «зелёный тест не проходит из-за кода» — это тест, который требует
+> согласованного окружения.** Но это же делает фронт-тесты хрупкими: в CI, где
+> `backend`-зависимости не установлены, `npm test` упадёт. Фиксируется как OI-11.
+
+### 5.3 `unittest discover` от корня репозитория — exit 5 (×3)
+
+```
+python -X utf8 -m unittest discover -s . -p "test_*.py" -t .
+→ Ran 0 tests in 0.000s
+   NO TESTS RAN
+   EXITCODE=5
+```
+
+Причина: `unittest discover` не рекурсивно обходит вложенные каталоги без
+`__init__.py`. Команда из `AGENTS.md` (`python -X utf8 -m unittest discover -s backend
+-p "test_*.py"`) корректна для `backend/`, но **не** для `tests/` и `tools/` в
+корне. Именно поэтому T5/T7/T8 выполнялись через `pytest` с явными путями.
+
+> **Замечание владельцу:** `AGENTS.md` предписывает `unittest discover`, `CLAUDE.md` —
+> `pytest`. Обе команды дают разный результат на разных каталогах. Для аудита
+> использован `pytest` с явными путями, поскольку он одинаково работает везде.
+
+---
+
+## 6. Проверки без ключа (не платные, не тесты)
+
+```powershell
+Invoke-WebRequest "https://api.kie.ai/anthropic/v1/models"  → HTTP 401
+  {"code":401,"msg":"Unauthorized – Authentication failed. Please check that your
+   Authorization and Content-Type headers are correctly set."}
+
+Invoke-WebRequest "https://api.kie.ai/claude/v1/messages"    → GET not supported
+Invoke-WebRequest "https://api.kie.ai/anthropic/v1/messages" → GET not supported
+```
+
+Назначение: подтвердить существование и различие маршрутов KIE **без единого
+списанного кредита**. Результат: все три маршрута живы.
+
+---
+
+## 7. Проверка чистоты рабочего дерева
+
+После всех прогонов:
+
+```
+cd C:\Users\BLOWKA\Documents\Minimax\gremovod
+git status --short
+→ (пусто)
+```
+
+Ни один прогон не изменил отслеживаемые файлы. `node_modules/` — в `.gitignore`.
+`backend/studio.sqlite3` не создавался (за счёт `STUDIO_DATA_DIR`).
+
+---
+
+## 8. Что эти результаты значат для аудита — и чего не значат
+
+**Значат:**
+- P0-контур PR #29 **реально покрыт тестами** (T3: +103 теста к `main`), и они зелёные.
+- Fail-closed поведение проверяется на уровне состояний, а не только на уровне
+  «функция не бросает исключение».
+- Реализация A6/A7 из PR #8 покрыта 19 отдельными тестами (T9) и **они зелёные**.
+
+**Не значат:**
+- **Зелёный тест ≠ правильная архитектура.** T3/T4 доказывают, что заявленные
+  сценарии не сломались, — и ничего больше.
+- Тест `backend/test_mock_evidence.py` **успешно** проверяет, что все вердикты
+  A6/A7/A8 равны `BLOCKED`. Тест зелёный, а проверочная способность критиков — нулевая.
+  Это иллюстрация п.4 system prompt.
+- Отсутствие `backend/studio.sqlite3` в репозитории при `main` и путь БД по умолчанию
+  внутрь репозитория — две разные вещи. Тесты этого не покрывают.
+- Ни один тест не проверяет **поведение провайдера** — платные пути не тестировались.
+- Ни один тест не покрывает **согласованность** P0-контура с `main`-путём к провайдерам
+  (`adapters` + `main.py:460-472`) — это несуществующая точка, а не упавший тест.
+
+
+=== ЗАПРОС ===
+Я — владелец GremoVOD, однопользовательской студии производства ИИ-контента
+(FastAPI + SQLite + React/Vite + n8n), которая платит внешним провайдерам за
+изображения, видео, речь, звук и музыку. В репозитории 22 открытых PR, 21 из них —
+Draft. Работа раздроблена по четырём независимым цепочкам PR, и в `main` нет ни
+денежного контура, ни n8n-конвейера, ни независимых критиков.
+
+Мне нужен независимый архитектурный аудит. Ты не имеешь доступа к репозиторию и к
+GitHub — всё, что ты знаешь, приведено ниже и в приложенных материалах. Если чего-то
+нет в материалах, считай, что этого нет, и напиши об этом прямо.
+
+Я не прошу «посмотреть, как вам». Прошу строгий разбор с вердиктами и ссылками на
+файл и строки. Меня интересует в первую очередь то, что стоит денег.
+
+=====================================================================
+РАЗДЕЛ 1. КОНТЕКСТ
+=====================================================================
+
+Назначение. GremoVOD превращает идею в сценарий, раскадровку, изображения, видео,
+нативный звук, TTS, SFX и музыку, монтирует и выпускает. Продуктовая идея — канал,
+где сценарий, визуальный канон, звук и монтаж согласованы между собой. Канон (canon) —
+источник правды для всех последующих стадий. Пользователь один, он же владелец.
+
+Стек (проверено в коде): Python 3.13, FastAPI, stdlib sqlite3, React 18 + TS + Vite,
+n8n. Провайдеры: PiAPI (основной), KIE, ElevenLabs, Fish Audio.
+
+Решения владельца, важные для оценки:
+- Не тратить реальные кредиты без подтверждённого API, доступного лимита, модели/цены
+  и явной авторизации конкретного запроса, которую должен обеспечивать защищённый
+  runtime FastAPI.
+- Вторая рабочая SQLite, работающая с продакшен-данными, запрещена.
+- Fail-closed: отсутствие доказательства = BLOCKED, а не «пройдено».
+
+=====================================================================
+РАЗДЕЛ 2. СОСТОЯНИЕ ВЕТОК (проверено)
+=====================================================================
+
+main                         82adb2d28efa05bf8face168485fe07ae340e0bc   531 файл
+PR #8  (Draft)  base integration/n8n@ce23d7e
+                 head feature/qa-text-audit-fixes-20261019@3979390
+                 -> реализация A6/A7: пакеты, вердикты, серверный гейт
+PR #17 (Draft)  base codex/n8n-full-production-spec-20261019@cafcbc6
+                 head feature/n8n-astra-contract-hardening-20261019@cb3f1dc
+PR #18 (Draft)  base feature/n8n-astra-contract-hardening-20261019@cb3f1dc
+                 head feature/p0-studio-foundation-20261019@5206dcc
+PR #29 (Draft)  base codex/p0-fixes-20261019@fc05cafee9e835cbbc49aff73e50520ba638420e
+                 head minimax/p0-budget-authz@c082829b11b968965600bdaf87c137b1485a0fa2
+                 -> единый бюджет, capability-авторизация, запрет второй БД
+PR #34 (Draft)  base experiment/minimax-kie-argon-bridge-20261019@0ac4e916e274b4c75fde75edc1ddd0d5a3e376c1
+                 head experiment/minimax-kie-argon-bridge-impl-20261020@b3183d28a0e22d5414ab7eef70d62543aa991dfa
+PR #35 (Draft)  base main@82adb2d
+                 head experiment/minimax-observability-20261020@051ab3a1182c1ed954b53c9b64f85e8195dbcc91
+
+Важно: base у PR #29 и PR #34 — НЕ main. Проверено, что в `main` и в PR #35 нет ни
+одного упоминания A6/A7/A8.
+
+=====================================================================
+РАЗДЕЛ 3. ВОПРОСЫ (это то, на что нужен ответ)
+=====================================================================
+
+B-1. ПРОВЕНАНС ПРАВ. В PR #29 есть защищённый путь к платным операциям
+    (HMAC-capability с TTL, единый бюджет, submit_count=1, запрет второй БД).
+    В `main` платные вызовы идут через `adapters` и `main.py:460-472` мимо всего
+    этого. Оцени: это два независимых денежных пути или один с двумя входами?
+    Что конкретно может привести к тому, что реальный кредит уйдёт мимо учёта,
+    резерва и capability? Опиши сценарий, а не абстракцию.
+
+B-2. ГРАНИЦЫ ДОВЕРИЯ. `p0_authz.reject_legacy_trust` отвергает поля
+    `trusted_studio_owner`, `trusted_studio_request_authorization`,
+    `provider_evidence_verified`, пришедшие из тела запроса. Проверь по коду
+    (backend/p0_authz.py, backend/p0_control.py):
+      - можно ли всё ещё «продавить» авторизацию каким-либо другим путём;
+      - что именно делает `signing_key()` (backend/p0_authz.py:47) и что происходит,
+        если ключа нет;
+      - достаточно ли HMAC-подписи + TTL 120 с + привязки к request_sha, или
+        требуется ещё что-то (например, одноразовость capability, привязка к
+        конкретному provider job, защита от replay с тем же request_sha).
+
+B-3. СОСТОЯНИЕ UNKNOWN И ПРОЦЕДУРА СВЕРКИ. `mark_unknown` оставляет задачу в
+    UNKNOWN с possible_charge=1, деньги зарезервированы, повтор запрещён. Проверь
+    по коду:
+      - существует ли в репозитории какой-либо механизм перевода UNKNOWN в
+        терминальное состояние (сверка с провайдером по provider_job_id);
+      - если нет — оцени последствия: резерв проекта и дневной лимит «съедаются»
+        навсегда, и это накапливается;
+      - что должно быть в процедуре сверки, чтобы она не создала второго платного
+        вызова и не освободила деньги без доказательства.
+
+B-4. ГОНКИ И АТОМАРНОСТЬ. `atomic()` использует `BEGIN IMMEDIATE`; состояния
+    защищены `state_version` и лизами с владельцем и сроком (120 с). Оцени:
+      - закрывает ли это read-modify-write гонку на счётчиках бюджета;
+      - есть ли гонка между истечением лизы и «уже ушедшим» POST — то есть может
+        ли второй воркер забрать задачу и отправить второй POST после истечения
+        лизы в 120 с;
+      - согласованность лизы задачи (`claim_job`) с лизой прогона (`claim_run`):
+        проверяется ли, что владелец задачи согласован с владельцем прогона;
+      - достаточно ли `submit_count` как единственного барьера, или нужен
+        провайдерский idempotency-key.
+
+B-5. ЗАПРЕТ ВТОРОЙ БД. `studio_db.resolve()` отказывает пути, не совпадающему с
+    рабочей БД, если не передан `allow_disposable=True`. Проверь по коду:
+      - кто и где реально передаёт `allow_disposable=True` (по данным подготовки
+        пакета — только тесты и `scripts/p0_migrate.py`, который требует бэкап);
+      - не обходится ли проверка через относительный путь, симлинк, другой
+        регистр/регистр букв на Windows, копирование файла БД, WAL-файл, или
+        открытие второй БД мимо `studio_db.resolve()` напрямую через
+        `sqlite3.connect` — в частности, есть ли в проекте другие места, где
+        открывается SQLite в обход `p0_control.open_db`;
+      - насколько строго требование «вторая рабочая БД запрещена» может быть
+        обеспечено технически, если потенциальный обход — обычный код, а не
+        злоумышленник.
+
+B-6. ЗАМОРОЗКА ПЛАНА И СВЕЖЕСТЬ КАНОНА. `freeze_manifest` замораживает план слотов
+    до задач, иммутабельно, с проверкой source_revision. Оцени: что происходит,
+    если владелец меняет канон ПОСЛЕ заморозки, но ДО завершения задач — будет ли
+    результат по старому канону принят как валидный?
+
+B-7. НЕЗАКРЫТЫЕ ПУНКТЫ. В `VALIDATION.json` (PR #29) зафиксировано, что после
+    предыдущего раунда оставались: «R-04 shared budget», «R-05 trusted runtime auth»,
+    «UNKNOWN provider reconciler», «real asset transport and QA». PR #29 закрывает
+    R-04 и R-05. Оцени по коду: закрыты ли «UNKNOWN provider reconciler» и
+    «real asset transport and QA»? Если нет — что именно в них должно быть, и
+    насколько это критично до первого боевого запуска платного конвейера.
+
+B-8. СОГЛАСОВАННОСТЬ. В проекте две независимые реализации версионирования плана:
+    `freeze_manifest` в FastAPI (backend/p0_control.py:375-407) и узлы S01/S08
+    в n8n-спецификации (docs/specs/n8n-production-2026-10-19/NODES.md), причём
+    S01/S08 — только спецификация, исполняемого кода нет. Оцени риск расхождения
+    и предложи, что является источником правды.
+
+=====================================================================
+РАЗДЕЛ 4. МАТЕРИАЛЫ (прилагаются к этому сообщению)
+=====================================================================
+
+1. PROJECT_CONTEXT.md     — назначение, стек, решения владельца, честное состояние.
+2. ARCHITECTURE_MAP.md    — карта модулей, зрелость реализации по доменам, покрытие.
+3. P0_EVIDENCE.md         — главный документ: реальные контракты и фрагменты кода
+                            по всем шести пунктам B-1…B-6 с указанием file:line.
+4. TEST_RESULTS.md        — реально выполненные прогоны с exit codes (10 прогонов,
+                            все exit 0) и перечень того, что НЕ запускалось.
+
+Файлы приведены дословно; строки, на которые ссылается P0_EVIDENCE.md, соответствуют
+ревизии c082829b11b968965600bdaf87c137b1485a0fa2 (PR #29), если не указано иное.
+
+=====================================================================
+РАЗДЕЛ 5. ФОРМАТ ОТВЕТА
+=====================================================================
+
+По каждому пункту B-1…B-8:
+  - Вердикт одной строкой: IMPLEMENTED / PARTIAL / SPEC-ONLY / MOCK / MISSING / RISK
+    + одно предложение-обоснование.
+  - Доказательства: конкретные `путь:строка` и минимальные верные фрагменты кода.
+    Если кода нет — приведи текст спецификации, который его заменяет, и пометь это.
+  - Что осталось открытым: что именно ты не смог проверить и почему.
+  - Рекомендация: одна-две строки, начинающиеся с «Исправить:» или «Проверить:».
+
+В конце:
+  - Топ-5 рисков по убыванию ожидаемой стоимости (деньги, время, риск ложного «готово»).
+  - Явный список данных, которых тебе не хватило для полного разбора. Не додумывай их.
+
+Не пересказывай проект и не пиши вводных абзацев. Если узкое место не найдено — так и
+скажи прямо.
+
+Отвечай на вопрос, заданный в этом сообщении. Не возвращайся к предыдущему ответу,
+не начинай с «как я уже говорил» и не продолжай начатое ранее рассуждение, пока
+владелец сам не попросит, не укажет на ошибку или не сошлётся на тот ответ явно.
+Каждый ответ должен быть понятен сам по себе, без предыдущих сообщений.

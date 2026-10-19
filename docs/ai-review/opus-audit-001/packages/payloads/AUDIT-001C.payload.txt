@@ -1,0 +1,1423 @@
+=== SYSTEM PROMPT (Claude Opus 5.5 / KIE) ===
+Ты — независимый архитектурный аудитор с жёстким стандартом доказательности.
+Ты работаешь в роли senior-архитектора, который провёл 15+ лет ревью
+production-систем, в которых утечка бюджета или гонка данных стоили реальных денег.
+
+## Роль и контекст
+Ты НЕ участник этого проекта. Ты не автор кода, не менеджер и не заказчик.
+Ты не имеешь доступа к репозиторию, к GitHub, к сети, к предыдущим раундам диалога
+и к памяти о прошлых сессиях. Всё, что ты знаешь о системе, — в сообщении пользователя.
+Если чего-то в сообщении нет — считай, что этого нет, и пиши об этом прямо.
+
+## Что ты оцениваешь
+Проект GremoVOD — студия производства ИИ-контента (FastAPI + SQLite + React/Vite + n8n),
+которая платит внешним провайдерам за изображения, видео, речь, звук и музыку.
+Три (а на самом деле четыре) ветки работы висят незакрытыми Draft PR, и в `main` нет ни
+денежного контура, ни n8n-конвейера, ни независимых критиков. Главный риск проекта —
+не «сложно», а то, что код из разных веток выглядит как целостная система.
+
+## Стандарт доказательности (обязателен)
+1. Каждое утверждение о поведении системы подкрепляй ссылкой на файл и строки
+   из присланных материалов, либо прямо помечай как «не проверено — нет данных».
+2. Не достраивай отсутствующее. Нет файла — «файл не найден», нет поведения в коде —
+   «поведение не найдено». Молчаливый додум — худший вид ошибки в аудите.
+3. Различай четыре зрелости и всегда указывай, к какой относишь вывод:
+   - IMPLEMENTED — исполняемый код это делает;
+   - PARTIAL — код есть, но не покрывает весь заявленный случай;
+   - SPEC-ONLY — описан в спецификации/документе, исполнения нет;
+   - MOCK — заглушка, намеренно возвращающая фиктивный результат.
+4. Зелёный тест — это не доказательство отсутствия дефекта, а свидетельство, что
+   заявленный сценарий не сломался. Тест, который проверяет заглушку, доказывает
+   только то, что заглушка работает.
+5. В репозитории встречается намеренный fail-closed (нет доказательства → BLOCKED,
+   а не «пройдено»). Это сильное решение. Не называй его дефектом автоматически —
+   оценивай, соответствует ли он заявленной цели.
+6. Проектируй как владелец денег, а не как эстет: цена вопроса — «сколько реальных
+   кредитов может уйти мимо учёта, при каких гонках, и кто может это вызвать».
+
+## Правило ответа на текущий вопрос (обязательно, приоритетно)
+Каждое входящее сообщение — новая точка отсчёта. Отвечай на ТОТ вопрос, который
+задан сейчас, а не на тот, который ты разбирал в прошлый раз.
+
+1. Определи, о чём именно спрашивают в этом сообщении, и ответь на это. Если в
+   сообщении несколько вопросов — отвечай на каждый, но не перескакивай на то, что
+   не спрашивали.
+2. Не начинай ответ с «как я уже говорил», «как отмечал выше», «в предыдущем ответе
+   я привёл…». Предыдущий ответ — не вводная часть текущего.
+3. Не продолжай рассуждение, начатое ранее, и не достраивай предыдущую мысль.
+   Каждый ответ считай написанным с нуля.
+4. Прежний ответ не является ни основанием, ни контекстом по умолчанию. Если тебе
+   нужны факты из него — бери их из приложенных материалов, а не из памяти о диалоге.
+   Если факта нет в материалах — напиши «в материалах этого нет».
+5. Возвращаться к предыдущему ответу можно только в трёх случаях:
+   (а) владелец прямо попросил его пересмотреть или развить;
+   (б) владелец указал на ошибку в нём;
+   (в) текущий вопрос прямо ссылается на него («а почему ты в прошлый раз сказал…»).
+   Во всех остальных случаях предыдущий ответ не упоминай.
+6. Если текущий вопрос противоречит твоему предыдущему ответу — не защищай прежний
+   вывод. Пересчитай по текущему вопросу и прямо скажи: «это меняет мой прежний
+   вывод, потому что…».
+7. Каждый ответ обязан быть пригоден как самостоятельный документ: человек, который
+   не видел предыдущих сообщений, должен получить из него полный смысл. Поэтому
+   в каждом ответе заново называй предмет (файл, узел, PR, ревизию), а не полагайся
+   на «выше» или «там».
+8. Не перескатывай общие выводы прошлого раунда как вводные. Если они всё ещё
+   верны и нужны — приведи их заново, в одном предложении, с обоснованием, а не
+   отсылкой.
+
+## Формат ответа
+Для каждого раздела:
+- **Вердикт** одной строкой: IMPLEMENTED / PARTIAL / SPEC-ONLY / MOCK / MISSING / RISK
+  + одно предложение-обоснование.
+- **Доказательства** — конкретные `путь:строка` и минимальные верные фрагменты кода
+  (не пересказ, не псевдокод). Если кода нет — приведи текст спецификации, который
+  заменяет код, и пометь это явно.
+- **Что осталось открытым** — что именно ты не смог проверить и почему.
+- **Рекомендация** — одна-две строки, начинающиеся с «Исправить:» или «Проверить:».
+  Не предлагай «добавить тест» там, где отсутствует само доказательство: отсутствие
+  реального материала не лечится тестом.
+
+## Чего не делать
+- Не писать вводных абзацев и не пересказывать проект.
+- Не хвалить и не критиковать ради объёма. Если узкое место не найдено — так и скажи.
+- Не предлагать переписывание системы целиком.
+- Не выдумывать имена файлов, номера строк, названия функций и результаты тестов.
+- Не объединять в один вердикт разные сущности: «в спецификации есть» и «в коде есть»
+  — это разные утверждения.
+- Не ссылаться на предыдущие ответы и не перескатывать их как вводные.
+- Не зацикливаться на самопроверке: один проход, без повторного переразбора
+  собственных формулировок.
+- Не считать количество страниц или слов мерой качества аудита.
+
+## Приоритет
+Если времени или объём ограничены, важнее разобрать:
+(1) пути, по которым уходят реальные деньги; (2) границы доверия и авторизации;
+(3) целостность состояния при сбоях и гонках; (4) соответствие заявлений коду.
+Менее важно: стиль, именование, структура каталогов, отсутствие docstring.
+
+## Ограничение по расходу
+Ты вызываешься один раз на пакет. Автоматических повторов нет. Сформулируй ответ
+за один проход. Если нужно больше данных — запроси их у пользователя явным списком
+в конце ответа, а не догадывайся.
+
+=== FILE: PROJECT_CONTEXT.md ===
+## A. Назначение
+
+**GremoVOD** — однопользовательская (private, self-hosted) студия производства
+ИИ-контента. Пользователь описывает идею, студия превращает её в сценарий, раскадровку,
+набор изображений, видео, нативный звук, TTS, SFX и музыку, монтирует и выпускает.
+
+Продуктовая идея: **видео-канал, где сценарий, визуальный канон, звук и монтаж
+согласованы между собой**, а не собраны из независимых генераций. Отсюда вся
+архитектура: канон (canon) — источник правды для всех последующих стадий; каждый
+артефакт должен быть привязан к ревизии канона.
+
+Пользователь — владелец студии (один человек), поэтому «пользователь» в коде почти
+всегда означает владельца, а не многопользовательскую роль.
+
+## B. Технологический стек (проверено в коде)
+
+- **Backend:** Python 3.13, FastAPI, stdlib `sqlite3`. Зависимости зафиксированы в
+  `backend/requirements.lock.txt` (снимок проверенного Windows-окружения).
+  `backend/requirements.txt` — верхние границы диапазонов.
+- **Frontend:** React 18 + TypeScript + Vite. `frontend/package.json`:
+  `@xyflow/react` (графы воркфлоу), `lucide-react`, `typescript`.
+- **Оркестрация:** n8n. JSON-описания воркфлоу в `workflows/`, скрипты импорта в
+  `backend/workflow_import.py`.
+- **Провайдеры:** PiAPI (основной шлюз), KIE, ElevenLabs, Fish Audio — см. `backend/kie.py`,
+  `backend/adapters.py`, `backend/sound.py`.
+- **Хранилище:** один SQLite (`studio.sqlite3`) + файловые каталоги под медиа.
+
+## C. Канонические документы репозитория
+
+- `AGENTS.md` — регламент работы с агентами, ветвление, правила коммитов, гейт
+  «PR = треугольник + скриншот + текст», запрет пушить `main` напрямую.
+- `CLAUDE.md` — описание архитектуры для ИИ-агента (backend-карта, стек, команды).
+- `docs/CODEX_DECISIONS.md` — принятые решения владельца (D-001… и далее). Это
+  источник истины по «почему так», а не «как».
+- `docs/specs/n8n-production-2026-10-19/` — спецификация боевого конвейера.
+
+> ⚠️ `CLAUDE.md` — **описание**, а не доказательство. Где оно расходится с кодом,
+> приоритет у кода. Расхождения зафиксированы в `OPEN_ISSUES.md`.
+
+## D. Ключевые решения владельца (из `docs/CODEX_DECISIONS.md`, PR #29)
+
+- **D-010.** Формирование QA-вердикта: N34 = только техконтроль, без LLM; N35 = замороженное
+  evidence; три независимых A6/A7/A8 — только с реальным покрытием.
+- **Платные провайдеры.** Не тратить реальные кредиты без подтверждённого API,
+  доступного лимита, модели/цены и **явной авторизации конкретного запроса**, которую
+  должен обеспечивать защищённый runtime FastAPI.
+- **Одна рабочая БД.** Второй экземпляр SQLite, работающий с продакшен-данными,
+  запрещён. Это прямое требование к P0-контуру (см. `P0_EVIDENCE.md`, B-05).
+- **Fail-closed.** Отсутствие доказательства = BLOCKED, а не «пройдено».
+
+## E. Честное состояние на дату пакета
+
+Это не жалоба и не оценка — это факты, которые аудитор обязан знать, чтобы не
+принять MOCK за production.
+
+1. **`main` не содержит P0-контура.** Ни бюджета, ни capability-авторизации, ни
+   запрета второй БД. Это в PR #29.
+2. **WF_00–WF_06 в репозитории — MOCK.** Их `name` содержит `MOCK ONLY (SOURCE EXPORT)`,
+   `active=false`, WF_01–WF_06 содержат по 2 узла. Манифест сам объявляет
+   `status: "MOCK_FIRST_NOT_PUBLISHED"`, `real_provider_enabled: false`,
+   `real_media_evidence_available: false`. Подробно — `WORKFLOW_EVIDENCE.md`.
+3. **A8 отключён.** Ремесленная оценка (native audiovisual) требует реального
+   пользовательского MP4 и разрешения владельца, которых нет. `STATUS.md`:
+   `MEDIA-01 → BLOCKED_NO_USER_MP4`.
+4. **Реальные платные вызовы в конвейере не выполнялись.** По матрице N34–N41
+   A8 — `DISABLED и BLOCKED, не SKIPPED`.
+
+Что при этом **реализовано и покрыто тестами** — P0-контур PR #29 (свой бюджет,
+HMAC-подписанные capability, запрет второй БД, UNKNOWN-состояние, дедупликация) и
+бэкенд на `main` (242 теста, 345 в PR #29). Это важный баланс: проект не пустой и не
+«нарисованный», но и не доведён до production.
+
+---
+
+
+=== FILE: QA_EVIDENCE.md ===
+# QA_EVIDENCE — независимые критики A6 / A7 / A8
+
+> **Важная поправка к исходной постановке задачи.** Реализация A6/A7/A8 находится
+> **не в PR #29, #34, #35**, а в отдельной ветке `feature/qa-text-audit-fixes-20261019`
+> @ `3979390` — это **PR #8** («[DRAFT] QA TEXT_PRECHECK: audit fixes, isolated FastAPI
+> tests, secure A6/A7 connection gate», base `integration/n8n@ce23d7e`, 10 файлов,
+> +1343/−1). Ниже это отражено. Файл
+> `integrations/n8n/QA_A6_A7_SECURE_CONNECTION_GATE_2026-10-19.md` **не входит в PR #29** —
+> проверено: в `pr/29` каталог `integrations/n8n/` содержит ровно два файла
+> (`WF_00_WF_06_MANIFEST.json`, `pilot_state_sqlite.py`).
+
+---
+
+## D-00. Карта веток и PR: четыре независимых цепочки
+
+Это не «три PR», а **четыре независимые цепочки PR** плюс `main`:
+
+| PR | Draft | Base | Head | Содержание |
+|---|---|---|---|---|
+| #8 | да | `integration/n8n@ce23d7e` | `feature/qa-text-audit-fixes-20261019@3979390` | **Реальная реализация A6/A7**, пакеты, вердикты, гейт |
+| #17 | да | `codex/n8n-full-production-spec-20261019@cafcbc6` | `feature/n8n-astra-contract-hardening-20261019@cb3f1dc` | Усиление контрактов Astra (18 файлов, +3710/−46) |
+| #18 | да | `feature/n8n-astra-contract-hardening-20261019@cb3f1dc` | `feature/p0-studio-foundation-20261019@5206dcc` | P0 + 7 WF (26 файлов, +1751/−4) |
+| **#29** | да | `codex/p0-fixes-20261019@fc05caf` | `minimax/p0-budget-authz@c082829` | Единый бюджет, capability, запрет второй БД |
+| **#34** | да | `experiment/minimax-kie-argon-bridge-20261019@0ac4e91` | `…impl-20261020@b3183d2` | Бюджетный шлюз → KIE Argon |
+| **#35** | да | `main@82adb2d` | `experiment/minimax-observability-20261020@051ab3a` | Временный ревьюер MiniMax (P1, MOCK) |
+
+Всего в репозитории **22 открытых PR, из них 21 — Draft**.
+
+> **Вывод для аудита:** `main` и PR #34/#35 **не содержат ни одного упоминания
+> A6/A7/A8** (проверено `git grep -E "\bA[678]\b"` — единственные совпадения в обоих
+> случаях — ложные в HTML-файле `docs/official-prompts/wan3-prompting.html`).
+> То есть ветка PR #29 — единственная из «трёх», где A6/A7/A8 упомянуты, и там они
+> упомянуты **только как спецификация**.
+
+---
+
+## D-01. Где определены A6, A7, A8
+
+### 1.1 Семейство определений A — n8n-манифест и навыки
+
+Ветка `origin/feature/qa-text-audit-fixes-20261019` (и идентичные blob'ы в
+`origin/feature/qa-text-precheck-sandbox-20261019`, `origin/integration/n8n`).
+
+**Записи агентов** — `integrations/n8n/agent-manifest.json` (проверено чтением):
+
+| Роль | `key` | `id` | `name` | `model` | `published` | `enabled` |
+|---|---|---|---|---|---|---|
+| A6 | `"A6"` (`:449`) | `nkmWNxBdJcFEXSMF` (`:450`) | GremoVOD A6 — Независимый критик ТЗ (`:451`) | `anthropic/claude-haiku-5-5` (`:452`) | `false` (`:453`) | `true` (`:475`) |
+| A7 | `"A7"` (`:483`) | `NRWXr5AY2MXAFhcH` (`:484`) | GremoVOD A7 — Независимый критик системы и канона (`:485`) | `anthropic/claude-sonnet-5-5` (`:486`) | `false` | `true` (`:525`) |
+| A8 | `"A8"` (`:533`) | `s7IIGiioapxre90t` (`:534`) | GremoVOD A8 — Независимый критик ремесла (`:535`) | `anthropic/claude-opus-5-5` (`:536`) | `false` | `true` (`:587`) |
+
+> ⚠️ **`published: false` у всех трёх.** Ни один из «независимых критиков» не
+> опубликован в n8n Cloud. Это не мелочь: A8 уже настроен на **Claude Opus 5.5** —
+> то есть ровно на той модели, для которой готовится этот аудит. Прямая
+> смысловая связь: владелец уже заложил Opus 5.5 как ремесленного критика.
+>
+> ⚠️ Отдельная запись в блоке `useWhen` (`:74-88`) для A8 содержит
+> `"enabled": false` (`:87`) и формулировку «FINISH REVIEW ONLY, DISABLED UNTIL
+> TRUSTED EXPERT APPROVAL». То есть A8 отключён **дважды**: как опубликованный агент
+> и как разрешённый субагент.
+
+**Навыки-критерии** — по одному на роль (блоб-хэши `7aa2419…` / `b283d1b…` /
+`7444844…` одинаковы во всех трёх ветках):
+
+- `skills/gremovod-review-requirements/SKILL.md` (A6)
+- `skills/gremovod-review-system/SKILL.md` (A7)
+- `skills/gremovod-review-craft/SKILL.md` (A8)
+
+**Формат вердикта** — `PASS | FAIL | BLOCKED`, одинаково во всех трёх навыках,
+в `integrations/n8n/THREE_CRITICS_LOOP.md:71` («BLOCKED не считается PASS») и
+`integrations/n8n/QA_EVIDENCE_POLICY.md:23`.
+
+**Изоляция как требование** — `SPECIFICATION.md:92` (pr/29):
+> «Для всех режимов: критик получает только артефакт, свою часть требований/канона/bar
+> и минимальные ID; не получает историю изготовления, самооценку автора и вердикт
+> другого критика. … Три финальных пакета ссылаются на одинаковый checksum файла.»
+
+### 1.2 Семейство определений B — спецификация production (pr/29)
+
+`docs/specs/n8n-production-2026-10-19/SPECIFICATION.md:25-27`:
+> `| A6 | Независимое соответствие заданию | Не судит по вкусу и не чинит собственноручно |`
+> `| A7 | Независимая согласованность мира, образов и непрерывности | Не дописывает канон ради оправдания результата |`
+> `| A8 | Независимое ремесло по явным критериям и доступному материалу | Не объявляет просмотр по описанию; не получает бюджет сам от себя |`
+
+`NODES.md:357-385` — узлы N36/N37/N38. У всех трёх:
+> `- **Реализация:** ROLE_ONLY.`
+
+Это прямая пометка автора: **в спецификации эти узлы — роли, а не реализация.**
+
+### 1.3 Проверка гипотезы «A8 не определён»
+
+Гипотеза **опровергнута**: A8 определён в двух независимых местах (n8n-навык +
+production-спецификация). Чего у A8 нет — это **реализации**, а не определения.
+
+---
+
+## D-02. Что критик реально получает
+
+### 2.1 Реальная точка сборки пакета
+
+`backend/qa_text_precheck.py` (только в ветке PR #8). Проверено чтением:
+
+```python
+ROLES = ('REVIEW-REQ', 'REVIEW-SYSTEM')
+ROLE_MODELS = {'REVIEW-REQ': 'mock-a6-v1', 'REVIEW-SYSTEM': 'mock-a7-v1'}
+```
+
+```python
+def role_package(snapshot, job, role):
+    common = {'task_id': job['id'], 'project_id': job['project_id'],
+              'artifact_id': snapshot['artifact_id'], 'artifact_revision': snapshot['artifact_revision'],
+              'review_round': 1, 'review_phase': 'TEXT_PRECHECK', 'requested_scopes': ['TEXT'],
+              'artifact_text': snapshot['artifact_text'], 'text_sha256': snapshot['text_sha256'],
+              'model': ROLE_MODELS[role], 'mock_only': True, 'quality_claim': False,
+              'source_provenance': snapshot['source_provenance']}
+    if role == 'REVIEW-REQ':
+        return {**common, 'role': role, 'approved_requirements': snapshot['requirements'],
+                'brief_revision': snapshot['brief_revision']}
+    return {**common, 'role': role, 'approved_canon': snapshot['canon'],
+            'canon_revision': snapshot['canon_revision']}
+```
+
+Четыре свойства, видимые прямо в коде:
+1. `mock_only: True` — пакет **сам декларирует**, что модель моковая.
+2. `quality_claim: False` — пакет не претендует на подтверждение качества.
+3. `requested_scopes: ['TEXT']` — **только текст**.
+4. A6 получает `approved_requirements`, A7 получает `approved_canon` — **роли разведены
+   на уровне данных**, чужой материал в пакет не попадает.
+
+### 2.2 Что входит в снимок
+
+`context()` собирает: `artifact_text` (текст текущих сцен), `requirements`
+(карточки story-plan + исходная идея), `canon` (текст `projects.state.characters[].identity`),
+и четыре хэша: `artifact_revision`, `brief_revision`, `canon_revision`, `text_sha256`.
+
+Проверено: в снимке жёстко зашито
+```python
+'canon_images_reviewed': False
+```
+и стоит защита от раздувания:
+```python
+if any(len(snapshot[k]) > 150000 for k in ('artifact_text', 'requirements', 'canon')):
+    raise HTTPException(422, 'QA text snapshot is too large')
+```
+
+### 2.3 Таблица «заявлено vs реализовано»
+
+| # | Заявлено (цитата) | Реализовано (цитата) | Разрыв |
+|---|---|---|---|
+| 1 | `SPECIFICATION.md:92` — «критик получает только артефакт, свою часть требований/канона/bar и минимальные ID» | `role_package()` — `artifact_text` + (`approved_requirements` **или** `approved_canon`) + 4 хэша + `mock_only`/`quality_claim` | **СОВПАДАЕТ** для A6/A7 в TEXT. `bar` отсутствует. A8 — пакета нет |
+| 2 | A7 `SKILL.md:10` — «реквизит, одежду, цвет, географию кадра, continuity» | В пакете **нет ни кадра, ни изображения, ни URL**; `canon_images_reviewed: False` | **НЕВОЗМОЖНО** проверить визуальные критерии |
+| 3 | A7 `SKILL.md:19` — канон должен иметь серверные `approved=true`, `canon_revision`; «не принимать свободный текст как окончательное изменение канона» | `canon` = `state['characters'][*]['identity']` — **свободный текст**, редактируемый пользователем, без флага `approved` | **ПРОТИВОРЕЧИТ** собственной спецификации |
+| 4 | A8 `SKILL.md:13` — «При отсутствии исходного рендера, bar.md, нужных кадров/таймкодов — вернуть BLOCKED» | A8 не имеет роли в `ROLES`, не имеет модели, `Verdict.role` его не принимает; n8n-узел A8 жёстко отдаёт `verdict:'BLOCKED'` | **ОТСУТСТВУЕТ** полностью |
+| 5 | `SPECIFICATION.md:92` — «Три финальных пакета ссылаются на одинаковый checksum файла» | `pr/29:workflows/WF_05_Assembly_And_Critics.json:30` — `reviewers:['A6','A7','A8'].map(role=>({role,verdict:'BLOCKED',reason:'MOCK_MEDIA_NOT_REAL'}))` | **MOCK** — ни checksum, ни пакета, ни критика |
+| 6 | `THREE_CRITICS_LOOP.md:7` — «три логически независимых критика» | FastAPI агрегирует **2** вердикта (`len(reviews) == 2`); n8n требует 2 для TEXT_PRECHECK, 3 для FINAL_MEDIA | **ПРОТИВОРЕЧИЕ** — бэкенд сводит двойку, спека требует тройку |
+| 7 | `QA_EVIDENCE_POLICY.md:16` — «`PASS(TEXT)` никогда не повышает статус `IMAGE`/`VIDEO` до `PASS`» | `requested_scopes: tuple[Literal['TEXT']]`, `checked_scopes: list[Literal['TEXT']]`, `verify_verdict` — «Only TEXT scope is supported» | **СОВПАДАЕТ** — реально обеспечено типами |
+| 8 | Гейт `:47` — «Machine-check JSON schema и точные цитаты против замороженного серверного текста» | `verify_verdict` перепроверяет `source[ev.start:ev.end] != ev.quote` → 422 | **РЕАЛИЗОВАНО** — сильнейший контроль в проекте |
+
+### 2.4 Второй путь: жёстко зашитые BLOCKED
+
+| Файл:строка | Что делает |
+|---|---|
+| `pr/29:workflows/WF_05_Assembly_And_Critics.json:30` | `reviewers:['A6','A7','A8'].map(role=>({role,verdict:'BLOCKED',reason:'MOCK_MEDIA_NOT_REAL'}))` — проверено чтением |
+| `pr/29:tools/mock_evidence.py:60` | `"role_reviews":[{"role":x,"verdict":"BLOCKED","reason":"NO_REAL_USER_MEDIA_OR_APPROVED_CAPABILITY"} for x in ("A6","A7","A8")]` — проверено |
+| `pr/29:tools/mock_media_pilot.py:143` | `"A6_A7_A8":"BLOCKED_NOT_REAL_USER_MEDIA"` |
+| `pr/29:integrations/n8n/pilot_state_sqlite.py:246` | `roles=("A6","A7","A8")` — **метки**, ни к чему не привязаны |
+| `pr/29:db/schema.sql:101` | `roles_expected TEXT NOT NULL DEFAULT 'A6,A7,A8'` — **метки** |
+| `pr/29:integrations/n8n/WF_00_WF_06_MANIFEST.json:145` | ключ `"A6_A7_A8"` |
+
+**Проверка через тест (главное доказательство):**
+`pr/29:backend/test_mock_evidence.py:29-30`:
+
+```python
+self.assertEqual({r["role"] for r in evidence["role_reviews"]},{"A6","A7","A8"})
+self.assertTrue(all(r["verdict"]=="BLOCKED" for r in evidence["role_reviews"]))
+```
+
+Тот же тест фиксирует `motion_evaluated: False`, `final_release_approved: False`,
+`stt: "BLOCKED_STT_NOT_AVAILABLE"`.
+
+> **Вывод: единственный исполняемый путь, порождающий вердикты A6/A7/A8, выдаёт
+> BLOCKED по всем трём ролям. Механизма, способного выдать PASS или FAIL
+> для A6/A7/A8 по медиа-критериям, в репозитории нет.**
+
+---
+
+## D-03. Может ли критик технически проверить свой критерий
+
+| Роль | Критерий | Что реально в пакете | Вердикт |
+|---|---|---|---|
+| **A6** (ТЗ) | «Для каждого критерия указать наблюдаемое подтверждение из фактического артефакта… PASS только при доказанном выполнении всех обязательных критериев» | полный `artifact_text` + `approved_requirements` + ревизии; цитаты перепроверяются по байтам | **ЧАСТИЧНО** — текстовые требования проверить может; требования к длительности/формату/lip-sync/порядку событий в артефакте — нет (нет медиа) |
+| **A7** (канон) | «идентичность, ВАЗ-2106, ракурсы и ориентация дверей, реквизит, одежда, цвет, географию кадра, continuity»; «Если визуальная проверка нужна, но кадр не предоставлен, BLOCKED» | текст + `approved_canon` = **свободный текст** из состояния проекта; ни кадра, ни флага `approved`, `canon_images_reviewed: False` | **НЕ МОЖЕТ** — визуальные критерии недостижимы; и сам канон не является утверждённым набором правил |
+| **A8** (ремесло) | «сравнить с открываемым образцом и утверждённым bar.md с 5–7 механиками… BLOCKED без рендера, bar.md, кадров/таймкодов» | **ничего** | **НЕ МОЖЕТ** — входного пакета не существует |
+
+### 3.1 Особая оговорка про A7
+
+Политика проекта (`QA_EVIDENCE_POLICY.md:3`) фиксирует ровно тот отказ, который
+A7 воспроизводит в текущей реализации: «A7 сравнил тексты; никакого реального
+автомобиля, кадра или видео не существовало». То есть A7, как он реализован,
+делает **именно то, чего политика запрещает** — но формально это «PASS(TEXT)»,
+который политика отдельно запрещает превращать в `IMAGE`/`VIDEO` PASS.
+
+> **Вопрос аудитору:** является ли «A7 сравнил текст и выдал PASS» приемлемым
+> результатом, если его собственная спецификация (`SKILL.md:19`) требует
+> утверждённого серверного канона, а вход — свободный текст?
+
+### 3.2 Следствие для «трёхкритического» гейта
+
+Поскольку A8 не даёт **никакой** проверочной способности, а бэкенд агрегирует
+**два** вердикта, фактически «трёхкритический независимый гейт» — это
+**двухкритический текстовый гейт**. Он fail-closed и не пропускает ложное качество —
+но это не тот гейт, который описан.
+
+---
+
+## D-04. Гейт безопасного соединения A6/A7
+
+Файл `integrations/n8n/QA_A6_A7_SECURE_CONNECTION_GATE_2026-10-19.md` — **только** в
+`origin/feature/qa-text-audit-fixes-20261019` (PR #8). В `pr/29` его нет.
+
+### 4.1 Что документ утверждает
+
+`:2` — «19.10.2026 · implementation notes · **NOT a live AI integration**».
+`:13-17` — «**Hard blocker: network topology.** Cloud n8n cannot access GremoVOD's
+*loopback-only* sandbox service route. Do not open the Windows FastAPI port on the
+internet, do not put bearer secrets in GitHub, and do not claim the existing n8n
+Cloud QA workflow is connected.»
+
+### 4.2 Что реально обеспечено кодом
+
+| Контроль | Где | Сила |
+|---|---|---|
+| Service API только с loopback | `qa_text_precheck.py` `service()` — HMAC-сравнение Bearer-токена, затем `remote_access.is_loopback(request)` → 403 | **Реально, принудительно** |
+| Токен из окружения, ≥32 символов | `service()`: `secret = os.environ.get('STUDIO_QA_SANDBOX_TOKEN','')`; `if len(secret) < 32 or not project_id:` → отказ | **Реально** |
+| Владелец ≠ сервис | «Bearer service credentials cannot create approvals, even if browser cookie supplied» | **Реально** |
+| Отвержение устаревшей ревизии | `is_current()` → 409 `STALE_REVISION`; перепроверка при выдаче пакета и при приёме вердикта | **Реально** |
+| Перепроверка цитат по байтам | `verify_verdict` — `source[ev.start:ev.end] != ev.quote` → 422 | **Реально** — ядро антифабрикации |
+| Изоляция чужих цитат | «Evidence from another reviewer is forbidden» | **Реально** |
+| Согласованность вердикт↔scope | `verify_verdict` | **Реально** |
+| Лимит тела колбэка 32 КБ | `QACallbackBodyLimit` | **Реально** |
+| Идемпотентность, один вердикт на роль | `PRIMARY KEY(job_id,role)`, `UNIQUE(job_id,event_id)` | **Реально** |
+| Fail-closed агрегация | 2 ответа: FAIL ⇒ `CHANGES_REQUESTED`, BLOCKED ⇒ `BLOCKED`, иначе `SANDBOX_TEXT_PRECHECK_PASSED_AWAITING_OWNER` | **Реально** |
+| **Транспорт n8n → FastAPI** | — | **НЕ реализовано** |
+| **Живой вызов Agent** | — | **НЕ реализовано** |
+| **Серверное разрешение стоимости** | только `Literal[0]` | **НЕ реализовано** |
+| **Инспекция медиа / coverage-receipts** | — | **НЕ реализовано** |
+
+### 4.3 Что гейт доказывает и чего не доказывает
+
+**Доказывает:** серверная часть fail-closed QA-API — настоящая и покрыта тестами.
+Удалённый вызывающий не достучится; подтверждения выдаёт только владелец; устаревшие
+входы отвергаются; **выдуманные цитаты отвергаются побайтовой сверкой** с
+замороженным серверным текстом. Изоляция ролей подлинна на уровне данных: A6
+физически не видит канон, A7 физически не видит требования.
+
+**Не доказывает:** по собственным словам документа (`:71-76`):
+> «A successful GitHub CI run proves code compatibility in sandbox. It does not prove
+> real saved Agents can be invoked or guarantee provider billing stops. A8/Opus, paid
+> calls, public webhook publication, and main merge are OUT OF SCOPE until separate
+> explicit authorization.»
+
+При этом «соединительная» половина гейта не реализована вовсе: `:11` —
+«`n8n-nodes-base.messageAnAgent` и его Tool-аналог помечены **deprecated/retired**;
+не строить production-зависимость ни на одном из них». `QA_FASTAPI_CONNECTION_HANDOFF.md:12`:
+«Не выдумывать URL /agents/{id}/chat». `QA_ORCHESTRATOR_IMPLEMENTATION.md:3`:
+«**Доступ к QA через сам workflow по-прежнему отсутствует.**»
+
+И отдельно: `QA_FASTAPI_CONNECTION_HANDOFF.md:10` — единственная попытка живого
+вызова A6 **провалилась**: «A6 при одном предпринятом ручном Preview вернул
+**execution_failed после 3 внутренних попыток с AI_APICallError/Internal error**.
+Повтор не выполняли. **Вывод: работоспособность A6 не подтверждена.**»
+
+> **Вывод:** гейт в названии («secure **connection**») не имеет реализации, которую
+> можно было бы протестировать. Реализована и работает **серверная половина**.
+
+---
+
+## D-05. Карта упоминаний A6/A7/A8
+
+### 5.1 ОПРЕДЕЛЕНИЕ (задаёт роли)
+
+- `integrations/n8n/agent-manifest.json:449,483,533` — ключи ролей; `:452,:486,:536` — модели; `:74-88` — мандаты `useWhen`
+- `skills/gremovod-review-requirements/SKILL.md` — критерии A6 + формат вердикта
+- `skills/gremovod-review-system/SKILL.md` — критерии A7
+- `skills/gremovod-review-craft/SKILL.md` — критерии A8
+- `docs/specs/n8n-production-2026-10-19/SPECIFICATION.md:25-27, 79-86, 88-94` (pr/29)
+- `docs/specs/n8n-production-2026-10-19/NODES.md:357-385` (pr/29) — с пометкой `Реализация: ROLE_ONLY`
+- `docs/specs/.../contracts/final-runtime-v1_2.schema.json:319-321, 423-429, 600-602` — enum ролей и вердиктов (pr/29)
+- `integrations/n8n/THREE_CRITICS_LOOP.md`, `QA_EVIDENCE_POLICY.md`, `contracts/qa-reviewer-output-v1.schema.json`
+
+### 5.2 ВЫЗОВ (исполняет или подставляет вердикт)
+
+- `backend/qa_text_precheck.py` — пакеты A6/A7 (`role_package`), приём вердиктов, агрегация (PR #8)
+- `integrations/n8n/workflows/qa-orchestrator.safe-draft.snapshot.json` — узлы A6/A7/A8, **жёсткий BLOCKED**, LLM-узла нет
+- `pr/29:workflows/WF_05_Assembly_And_Critics.json:30` — жёсткий BLOCKED
+- `pr/29:tools/mock_evidence.py:60`, `tools/mock_media_pilot.py:143` — жёсткий BLOCKED
+- `pr/29:integrations/n8n/pilot_state_sqlite.py:246`, `db/schema.sql:101` — **только метки**
+
+### 5.3 ТОЛЬКО ПРОЗА (упоминание в документе без кода) — **главная находка**
+
+**В pr/29 — 18 файлов, 40+ строк:**
+`AGENT_BUILD_MANUAL.md:45,55` · `STATUS.md:23` · `db/README.md:51` ·
+`docs/AUTORUN_6_STAGES_REPORT.md:24,42` · `docs/CODEX_DECISIONS.md:28,47` ·
+`docs/CODEX_NEXT_ACTIONS.md:13,57` · `docs/CODEX_REVIEW_PACKET.md:34` ·
+`docs/agent_handoffs/minimax-p0-budget-authz.md:28,89` ·
+`docs/specs/n8n-production-2026-10-19/ASTRA_FIXES_V1_1.md:35,53,57` ·
+`…/ASTRA_TEST_MATRIX_2026-10-19.md:15,48` · `…/HANDOFF.md:23,31` ·
+`…/IMPLEMENTATION_AND_ACCEPTANCE.md:26,62,95` · `…/N34_N41_RUNTIME_MODEL_MATRIX.md:15,25,26,28,53` ·
+`…/NODES.md:554` · `…/README.md:22,36` · `…/REVIEW_GPT_ASTRA.md:9` ·
+`…/SCENARIO_SKILLS_N01_N11.md:19,35,38,68,74` · `…/SPECIFICATION.md:9,59-61,88,90,92,181,184,186` ·
+`…/contracts/scenario-preprod-v1.schema.json:303-304` ·
+`…/contracts/scenario-skills-routing-v1.json:97` · `…/nodes.json:111,113,162,229,316,462,596,655,770-790,850,862,1114-1116`
+
+**Другие ветки:**
+`origin/chatgpt/n8n-web-skill-sync-20261019:TODO.md:11` · `docs/TODO_N8N_WEB_SKILL_SYNC_2026-10-19.md:21,29` ·
+`origin/codex/n8n-api-contract:TODO.md:11` · `integrations/n8n/README.md:48` ·
+`origin/coordination/agent-roles-handoff-20261019:docs/CODEX_DECISIONS.md:27` · `docs/CODEX_NEXT_ACTIONS.md:9` ·
+`origin/experiment/beta-gateway-first-20261019:beta/DECISIONS.md:7` · `beta/EXPERIMENT_PROTOCOL.md:3,14` · `beta/README.md:7,17` ·
+`origin/feature/qa-text-audit-fixes-20261019:integrations/n8n/QA_A6_A7_SECURE_CONNECTION_GATE_2026-10-19.md:10,44-49` ·
+`QA_ORCHESTRATOR_IMPLEMENTATION.md:41-42,51-52` · `QA_FASTAPI_CONNECTION_HANDOFF.md:7-13,17-45`
+
+### 5.4 Три проза-упоминания, которые стоит проверить в первую очередь
+
+1. **`SPECIFICATION.md:184`** — «E2E demo: 8 узлов, … два Gemini role prompts A6/A7,
+   проверка цитат, owner gate.» + `ASTRA_TEST_MATRIX:15` — живой workflow
+   `2DllTVkrO6imk2IR`, execution #33 с A1/A6/A7 в Gemini Gateway.
+   **Ни workflow-JSON, ни конфигурации агента, ни кода этого пути нет ни в одной
+   ветке репозитория.** Это единственное место, где настоящий A6/A7 мог реально
+   отработать, — и оно **недоступно для аудита** из этого репозитория.
+2. **`SPECIFICATION.md:186`** — «A8 остаётся на Sonnet» vs
+   `agent-manifest.json:536` — `"model": "anthropic/claude-opus-5-5"`.
+   **Прямое противоречие внутри проекта.** Что авторитетно — не определяется.
+3. **`SPECIFICATION.md:92`** («три финальных пакета») vs `qa_text_precheck.py`
+   (агрегация двух) — противоречие спека↔код.
+
+---
+
+## D-06. Контракт вердикта
+
+Существуют **три независимых контракта вердикта. Ни один не free-text. Ни один не
+интероперабелен между собой.**
+
+### 6.1 QA reviewer output v1 — контракт A6/A7/A8
+
+`integrations/n8n/contracts/qa-reviewer-output-v1.schema.json`:
+- `role` enum `["REVIEW-REQ","REVIEW-SYSTEM","REVIEW-CRAFT"]`
+- `verdict` enum `["PASS","FAIL","BLOCKED"]`
+- `scope` enum `["TEXT","IMAGE","VIDEO","AUDIO"]`
+- `evidence_type` enum `["text_quote","image_observation","video_frame","video_segment","audio_observation","transcript_quote","trusted_metadata"]`
+- `additionalProperties: false` на верхнем уровне и на каждом evidence
+- `title`: «GremoVOD QA reviewer observation v1 (**UNTRUSTED MODEL OUTPUT**)»
+
+**Машино-ли? НЕТ.** Код, загружающий этот файл, в репозитории **отсутствует**;
+`TODO.md:439` содержит незакрытый пункт «Реализовать в FastAPI … QA reviewer JSON Schema».
+
+### 6.2 Фактически принудительный контракт — Pydantic в FastAPI
+
+`backend/qa_text_precheck.py`:
+- `role: Literal['REVIEW-REQ','REVIEW-SYSTEM']` — **REVIEW-CRAFT не принимается**
+- `requested_scopes: tuple[Literal['TEXT']]`, `checked_scopes: list[Literal['TEXT']]`
+- `scope_results: dict[Literal['TEXT'], Literal['PASS','FAIL','BLOCKED']]`
+- `verdict: Literal['PASS','FAIL','BLOCKED']`
+- `model_used: Literal['mock-a6-v1','mock-a7-v1']`
+- `estimated_cost_usd: Literal[0]`, `actual_cost_usd: Literal[0]`
+- `artifact_revision: str = Field(pattern=r'^[0-9a-f]{64}$')`
+
+Плюс семантическая валидация в `verify_verdict()`: согласованность вердикт↔scope;
+`PASS ⇒ evidence ∧ ¬missing_inputs`; `FAIL ⇒ evidence ∧ biggest_gap`;
+`BLOCKED ⇒ missing_inputs ∧ ¬evidence`; запрет цитат из чужой роли;
+перепроверка цитат; требование хотя бы одного наблюдения из самого артефакта.
+
+**Это строгий enum + семантика — не free-text.** И он **строже и уже** JSON-схемы:
+только TEXT, две роли, только mock-модели.
+
+### 6.3 Контракт pr/29
+
+`final-runtime-v1_2.schema.json`: `verdict` enum `["PASS","FAIL","BLOCKED"]`;
+`role` enum `["A6","A7","A8"]`; `role_verdict_refs` требует все три;
+`verified_by_trusted_backend`. **Только спецификация** — исполняющего кода нет,
+`WF_05` жёстко отдаёт BLOCKED.
+
+### 6.4 Контракт pr/35 `dev-run-summary/1` — **пересечения с A6/A7/A8 нет**
+
+`tools/ai_review/contract.py` (проверено):
+- `CONTRACT_VERSION = "dev-run-summary/1"`
+- `MODES = ("MOCK","OFFLINE","LIVE")`
+- `TEST_STATUSES = ("PASS","FAIL","NOT_RUN","UNKNOWN")`
+- `REVIEW_STATUSES = ("PASS","FINDINGS","UNCERTAIN","API_ERROR","QUOTA_EXHAUSTED","STALE_REVIEW","NOT_RUN")`
+- `OWNER_DECISIONS = ("PENDING","APPROVED","REJECTED")`, `SEVERITIES = ("P1","P2","P3")`
+- Проверка enum через `_check_enum`, валидация `validate_summary`, семантика
+  (PASS ⇒ пустые findings; тесты FAIL ⇒ review ≠ PASS; MOCK/OFFLINE ⇒ нулевая стоимость;
+  STALE_REVIEW ⇒ `reviewed_sha`; NOT_RUN/QUOTA_EXHAUSTED/API_ERROR ⇒ owner PENDING)
+
+`tools/ai_review/payload.py` — ревьюер получает **дифф git**, а не медиа:
+`build_payload(scope, files, diff, diff_sha256, base_sha, head_sha, tests_status)`.
+
+> **Контракты `dev-run-summary/1` и A6/A7/A8 — ортогональны и не пересекаются.**
+> `dev-run-summary/1` не содержит `role`, `scope_results`, `evidence[]`.
+> Он **не может** валидировать медиа-вердикт A6/A7/A8.
+
+---
+
+## D-07. Сводка по зрелости критиков
+
+| Агент | Статус | Обоснование |
+|---|---|---|
+| **A6** | **PARTIAL** | Пакет строится и выдаётся (`role_package`, `GET …/packet/{role}`); enum + семантика вердикта принудительны; изоляция ролей реальна; CI есть. **Но** `model_used: Literal['mock-a6-v1','mock-a7-v1']`, `mock_only: True`; транспорта в n8n нет; единственная живая попытка A6 провалилась (`AI_APICallError` × 3). Медиа-критерии недостижимы. **Реальный, корректно fail-closed текстовый ревьюер без LLM за ним.** |
+| **A7** | **PARTIAL — не может проверить собственный критерий** | Пакет и канон подаются; один ручной Preview вернул FAIL на синтетическом каноне. **Но**: в пакете нет кадра/медиа; `canon_images_reviewed: False`; канон — свободный текст, что `SKILL.md:19` прямо запрещает. **A7 в текущей реализации сравнивает два текста — ровно тот отказ, который политика писалась, чтобы пресечь.** |
+| **A8** | **ABSENT (только определение)** | Нет роли в `ROLES`, нет модели, `Verdict.role` его не принимает; n8n-узел жёстко BLOCKED; `agent-manifest.json:453,486,536` — `published: false`; `NODES.md:385` — `Реализация: ROLE_ONLY`; `SPECIFICATION.md:90` — «выключен». **Определение есть, реализации ноль.** |
+| **Трёхкритический гейт в целом** | **PARTIAL** | Бэкенд агрегирует **2** вердикта; спека требует **3**. С A8, не дающим ничего, «трёхкритический независимый гейт» — это **двухкритический текстовый гейт**. Fail-closed, но не тот гейт, который заявлен. |
+| **Гейт безопасного соединения (серверная часть)** | **IMPLEMENTED** | loopback+токен; owner/service separation; отвержение устаревших ревизий; побайтовая сверка цитат; лимит 32 КБ; идемпотентность; fail-closed агрегация |
+| **Гейт безопасного соединения (транспортная часть)** | **SPEC-ONLY** | `messageAnAgent` deprecated/retired; «Доступ к QA через сам workflow по-прежнему отсутствует» |
+| **`qa-reviewer-output-v1.schema.json`** | **SPEC-ONLY** | Не загружается кодом; в `TODO.md:439` как нереализованный пункт |
+| **pr/29 WF_00–WF_06 и `dev-run-summary/1`** | **MOCK / ОРТОГОНАЛЬНО** | `WF_05` жёстко BLOCKED; в `main` и pr/35 — **ноль** упоминаний A6/A7/A8; pr/35 валидирует только дифф-ревью |
+
+---
+
+## D-08. Что осталось неизвестным (для аудита, не для владельца)
+
+1. **Живой путь A6/A7 в n8n Cloud невидим репозиторию.** `SPECIFICATION.md:184` +
+   `ASTRA_TEST_MATRIX:15` ссылаются на workflow `2DllTVkrO6imk2IR` (execution #33,
+   A1/A6/A7 в Gemini Gateway). **Ни JSON, ни конфигурации агента, ни кода в репозитории
+   нет.** Это единственное место, где настоящий A6/A7 мог отработать, и оно недоступно
+   для аудита из репозитория. Материальное слепое пятно.
+2. **Инструкции агентов в n8n не синхронизированы с Git.** `agent-manifest.json`
+   фиксирует ID и skill-ID, `syncStatus: "manual-copy"`. Текст навыка в Git может
+   отличаться от задеплоенного текста инструкции.
+3. **Противоречие по модели A8 не разрешено:** `SPECIFICATION.md:186` — «на Sonnet»,
+   `agent-manifest.json:536` — Opus 5.5. Что авторитетно — не определяется.
+4. **Живая работоспособность A6 неизвестна:** единственная попытка — 3× `AI_APICallError`;
+   в `QA_FASTAPI_CONNECTION_HANDOFF.md:10` отмечено, что возможные списания по
+   ошибочным попыткам неизвестны.
+5. **Метки `A6,A7,A8` в `db/schema.sql:101` и `pilot_state_sqlite.py:246` — это
+   метки.** Ничто их не привязывает к модели, промпту или пакету.
+6. **Ни один тестовый набор PR #8 в этом пакете не запускался** (ветка вне трёх
+   рассматриваемых PR). Статусы в §D-07 основаны на чтении кода, а не на прогоне.
+   → Это входит в объём AUDIT-001C.
+
+---
+
+## D-09. Рекомендуемая следующая проверка (для владельца, не обязательна)
+
+Единственный артефакт, которого нет больше нигде, — **серверный утверждённый
+канонический регламент с настоящим `canon_revision`** плюс **media-inspection
+receipt** (`source_asset_id` + таймкод), выпускаемый FastAPI. После этого
+`qa_text_precheck.py` должен отказываться собирать пакет A7 без такого регламента
+(и любой пакет A8 — до его появления). Пока `canon_images_reviewed` жёстко `False`,
+а `checked_scopes` ограничен `['TEXT']`, A7 и A8 остаются структурными заглушками
+независимо от того, сколько документов их описывает.
+
+
+=== FILE: TEST_RESULTS.md ===
+# TEST_RESULTS — реально выполненные прогоны
+
+**Дата:** 2026-10-20 · **Среда:** Windows 10.0.19044 x64, PowerShell 5.1, Python 3.13.14,
+Node v24.16.0, Git 2.56.0 · **Платных API-вызовов: 0** · **Сетевых вызовов к провайдерам: 0**
+
+Все команды выполнены в **изолированных worktree** (`git worktree add --detach`) на
+конкретных SHA. Рабочая копия владельца не затрагивалась.
+
+---
+
+## 1. Подготовка окружения
+
+```powershell
+# Изолированное venv ВНЕ репозитория (репозиторий не пачкается)
+cd C:\Users\BLOWKA\Documents\Minimax
+python -m venv .venv-audit
+.\.venv-audit\Scripts\python.exe -m pip install -r gremovod\backend\requirements.txt pytest
+# → fastapi 0.150.0, pytest 9.1.1, httpx 0.28.1, Pillow 12.3.0
+```
+
+```powershell
+# Worktree на каждый исследуемый SHA
+cd C:\Users\BLOWKA\Documents\Minimax\gremovod
+git worktree add --detach C:\Users\BLOWKA\Documents\Minimax\_wt\wt29 pr/29
+git worktree add --detach C:\Users\BLOWKA\Documents\Minimax\_wt\wt34 pr/34
+git worktree add --detach C:\Users\BLOWKA\Documents\Minimax\_wt\wt35 pr/35
+git worktree add --detach C:\Users\BLOWKA\Documents\Minimax\_wt\wt08 origin/feature/qa-text-audit-fixes-20261019
+```
+
+```powershell
+# Защита от записи в рабочую БД — путь БД по умолчанию ВНУТРИ репозитория:
+#   backend/main.py:22-24  DB=(DATA or ROOT)/'studio.sqlite3'
+# поэтому STUDIO_DATA_DIR всегда указывался на временный каталог
+$env:STUDIO_DATA_DIR = "C:\Users\BLOWKA\Documents\Minimax\_testdata"
+```
+
+> ⚠️ Это не формальность. Без `STUDIO_DATA_DIR` pytest создал бы
+> `backend/studio.sqlite3` **внутри репозитория** и изменил бы рабочее состояние
+> Git-дерева. Это зафиксировано как находка OI-10.
+
+---
+
+## 2. Сводная таблица прогонов
+
+| # | Ref | Команда | Результат | Exit |
+|---|---|---|---|---|
+| T1 | `main` `82adb2d` | `pytest backend -q` | **242 passed**, 16 subtests passed, 39 warnings, 76.49 s | **0** |
+| T2 | `main` `82adb2d` | `npm test` (frontend, 26 файлов `.test.mjs`) | **104 tests, 104 pass, 0 fail**, 7003 ms | **0** |
+| T3 | PR #29 `c082829` | `pytest backend -q` | **345 passed**, 26 subtests passed, 39 warnings, 86.78 s | **0** |
+| T4 | PR #29 `c082829` | `pytest backend -q -k "p0 or budget or authz or ledger or idempot"` | **78 passed**, 267 deselected, 10 subtests passed, 13.34 s | **0** |
+| T5 | PR #29 `c082829` | `pytest tools -q` | **14 passed**, 7 subtests passed, 0.07 s | **0** |
+| T6 | PR #29 `c082829` | `node --test tests/test_p0_state.js` | **7 tests, 7 pass, 0 fail**, 2567 ms | **0** |
+| T7 | PR #34 `b3183d2` | `pytest tests -q` | **76 passed**, 73.16 s | **0** |
+| T8 | PR #35 `051ab3a` | `pytest tests -q` | **108 passed**, 29.54 s | **0** |
+| T9 | PR #8 `3979390` | `pytest backend/test_qa_text_precheck.py backend/test_qa_text_app_integration.py -q` | **19 passed**, 67 warnings, 8.49 s | **0** |
+| T10 | PR #8 `3979390` | `pytest backend -q` | **261 passed**, 16 subtests passed, 67 warnings, 107.85 s | **0** |
+
+**Итого: 10 прогонов, все зелёные, exit code 0.**
+
+---
+
+## 3. Точные команды и вывод
+
+### T1 — `main` @ `82adb2d28efa05bf8face168485fe07ae340e0bc`
+
+```
+cd C:\Users\BLOWKA\Documents\Minimax\gremovod
+$env:STUDIO_DATA_DIR = "C:\Users\BLOWKA\Documents\Minimax\_testdata"
+C:\Users\BLOWKA\Documents\Minimax\.venv-audit\Scripts\python.exe -X utf8 -m pytest backend -q
+```
+
+```
+242 passed, 39 warnings, 16 subtests passed in 76.49s (0:01:16)
+EXITCODE=0
+```
+Предупреждения — только `DeprecationWarning: on_event is deprecated, use lifespan
+event handlers instead` (FastAPI ≥ 0.109), в 5 модулях: `character_voice.py:91`,
+`sound.py:134`, `temp_cleanup.py:231`, `story_plan.py:134`, `camera_movements.py`.
+
+### T2 — фронтенд `main`
+
+```
+cd C:\Users\BLOWKA\Documents\Minimax\gremovod\frontend
+npm ci
+$env:STUDIO_PYTHON = "C:\Users\BLOWKA\Documents\Minimax\.venv-audit\Scripts\python.exe"
+$env:STUDIO_DATA_DIR = "C:\Users\BLOWKA\Documents\Minimax\_testdata"
+npm test
+```
+
+```
+tests 104
+suites 0
+pass 104
+fail 0
+cancelled 0
+skipped 0
+todo 0
+duration_ms 7003.1955
+FRONTEND_EXITCODE=0
+```
+
+> **Важно о воспроизводимости.** Без `STUDIO_PYTHON` фронт-тесты падают (см. §5.1).
+> Тест сам ищет интерпретатор: `process.env.STUDIO_PYTHON || findVenvPython(cwd) || 'python3'`
+> (`frontend/directorState.test.mjs`). `findVenvPython` поднимается вверх по каталогам,
+> ища `.venv/Scripts/python.exe` / `.venv/bin/python`. То есть фронт-тесты **требуют
+> venv с установленным `fastapi`** — в любом CI это надо воспроизвести явно.
+
+### T3 / T4 — PR #29 @ `c082829b11b968965600bdaf87c137b1485a0fa2`
+
+```
+cd C:\Users\BLOWKA\Documents\Minimax\_wt\wt29
+python -X utf8 -m pytest backend -q
+→ 345 passed, 39 warnings, 26 subtests passed in 86.78s (0:01:26)   EXITCODE=0
+
+python -X utf8 -m pytest backend -q -k "p0 or budget or authz or ledger or idempot"
+→ 78 passed, 267 deselected, 39 warnings, 10 subtests passed in 13.34s (0:01:13)  EXITCODE=0
+```
+
+Прирост к `main`: **+103 теста** (242 → 345). Это P0-контур PR #29.
+
+### T5 / T6 — PR #29, координация
+
+```
+python -X utf8 -m pytest tools -q
+→ 14 passed, 7 subtests passed in 0.07s          EXITCODE=0
+
+node --test tests/test_p0_state.js
+→ tests 7 | pass 7 | fail 0 | duration_ms 2567.6383   EXITCODE=0
+```
+
+Имена тестов T6 (Node test runner):
+- `test_prompt_or_profile_changed_after_approval_is_rejected`
+- `test_provider_success_charges_once_and_no_duplicate_callbacks`
+- `test_no_legacy_job_overwrite_from_p0_submit`
+- `test_source_changed_before_submit_blocks_billing`
+
+### T7 — PR #34 @ `b3183d28a0e22d5414ab7eef70d62543aa991dfa`
+
+```
+cd C:\Users\BLOWKA\Documents\Minimax\_wt\wt34
+python -X utf8 -m pytest tests -q
+→ 76 passed in 73.16s (0:01:13)                   EXITCODE=0
+```
+
+### T8 — PR #35 @ `051ab3a1182c1ed954b53c9b64f85e8195dbcc91`
+
+```
+cd C:\Users\BLOWKA\Documents\Minimax\_wt\wt35
+python -X utf8 -m pytest tests -q
+→ 108 passed in 29.54s (0:00:29)                  EXITCODE=0
+```
+
+### T9 / T10 — PR #8 @ `3979390`
+
+```
+cd C:\Users\BLOWKA\Documents\Minimax\_wt\wt08
+python -X utf8 -m pytest backend/test_qa_text_precheck.py backend/test_qa_text_app_integration.py -q
+→ 19 passed, 67 warnings in 8.49s                 EXITCODE=0
+
+python -X utf8 -m pytest backend -q
+→ 261 passed, 67 warnings, 16 subtests passed in 107.85s (0:01:47)   EXITCODE=0
+```
+
+---
+
+## 4. Что НЕ запускалось — и почему
+
+| Что | Почему не запускалось | Как это влияет на аудит |
+|---|---|---|
+| **n8n-инстанс** `gremovod.app.n8n.cloud` | Требует сети и учётных данных; workflow не опубликованы (`runtime_status: DRAFT_MOCK_ONLY_NOT_PUBLISHED`, `published: false` у A6/A7/A8) | Все утверждения о поведении n8n — из JSON и документации, **не из исполнения** |
+| **Живые вызовы провайдеров** (PiAPI, KIE, ElevenLabs, Fish) | Платные. Явного разрешения владельца на платные вызовы нет | Поведение платных путей **не проверено вовсе** |
+| **KIE (Claude Opus 5.5)** | Платный маршрут; при подготовке выполнялись только запросы без ключа (§6 KIE_SETUP) | Фактическая стоимость аудита — оценка, а не факт |
+| **Живой вызов A6 в n8n** | По `QA_FASTAPI_CONNECTION_HANDOFF.md:10` единственная попытка провалилась 3× с `AI_APICallError`; повтор не выполнялся | Работоспособность A6 **неизвестна** |
+| **Реальный пользовательский MP4** | Его у владельца нет (`STATUS.md`: `MEDIA-01 → BLOCKED_NO_USER_MP4`) | A8 невозможно проверить в принципе — ни мной, ни Opus |
+| **CI n8n Cloud** | Требует доступа к облачному n8n | Утверждение «CI зелёный» в гейте — **из документации**, не из прогона |
+| **Миграция боевой схемы** | `production_schema_migrated: false` во всех ветках | Боевой БД не мигрирован — контур P0 в бою не работал |
+| **Проверка живой базы владельца** | Принципиально не трогал; `working_db_accessed: false` в записях проекта | Рабочая БД не изучалась |
+
+---
+
+## 5. Провалившиеся прогоны (зафиксированы, а не скрыты)
+
+### 5.1 Фронтенд без установленных зависимостей — exit 1
+
+```
+cd frontend; npm test
+→ ✖ createDraft.test.mjs, directorState.test.mjs, projectMerge.test.mjs,
+  visualPlan.test.mjs, workspaceNavigation.test.mjs  (и ещё 21)
+  Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'typescript'
+FRONTEND_EXITCODE=1
+```
+
+Причина: `node_modules/` отсутствовал. Устранено через `npm ci`.
+
+### 5.2 Фронтенд с зависимостями, но без доступа к venv — exit 1
+
+```
+cd frontend; npm test   # интерпретатор не найден → fallback 'python3'
+→ ModuleNotFoundError: No module named 'fastapi'
+   File "...\backend\camera_movements.py", line 4, in <module>
+   FRONTEND_EXITCODE=1
+```
+
+Причина: тест исполняет `python -c "from backend.camera_movements import basis…"`
+через дочерний процесс, и ему нужен интерпретатор **с установленным `fastapi`**.
+`findVenvPython` ищет `.venv/`, которого в репозитории нет. Устранено через
+`STUDIO_PYTHON`.
+
+> **Это не «зелёный тест не проходит из-за кода» — это тест, который требует
+> согласованного окружения.** Но это же делает фронт-тесты хрупкими: в CI, где
+> `backend`-зависимости не установлены, `npm test` упадёт. Фиксируется как OI-11.
+
+### 5.3 `unittest discover` от корня репозитория — exit 5 (×3)
+
+```
+python -X utf8 -m unittest discover -s . -p "test_*.py" -t .
+→ Ran 0 tests in 0.000s
+   NO TESTS RAN
+   EXITCODE=5
+```
+
+Причина: `unittest discover` не рекурсивно обходит вложенные каталоги без
+`__init__.py`. Команда из `AGENTS.md` (`python -X utf8 -m unittest discover -s backend
+-p "test_*.py"`) корректна для `backend/`, но **не** для `tests/` и `tools/` в
+корне. Именно поэтому T5/T7/T8 выполнялись через `pytest` с явными путями.
+
+> **Замечание владельцу:** `AGENTS.md` предписывает `unittest discover`, `CLAUDE.md` —
+> `pytest`. Обе команды дают разный результат на разных каталогах. Для аудита
+> использован `pytest` с явными путями, поскольку он одинаково работает везде.
+
+---
+
+## 6. Проверки без ключа (не платные, не тесты)
+
+```powershell
+Invoke-WebRequest "https://api.kie.ai/anthropic/v1/models"  → HTTP 401
+  {"code":401,"msg":"Unauthorized – Authentication failed. Please check that your
+   Authorization and Content-Type headers are correctly set."}
+
+Invoke-WebRequest "https://api.kie.ai/claude/v1/messages"    → GET not supported
+Invoke-WebRequest "https://api.kie.ai/anthropic/v1/messages" → GET not supported
+```
+
+Назначение: подтвердить существование и различие маршрутов KIE **без единого
+списанного кредита**. Результат: все три маршрута живы.
+
+---
+
+## 7. Проверка чистоты рабочего дерева
+
+После всех прогонов:
+
+```
+cd C:\Users\BLOWKA\Documents\Minimax\gremovod
+git status --short
+→ (пусто)
+```
+
+Ни один прогон не изменил отслеживаемые файлы. `node_modules/` — в `.gitignore`.
+`backend/studio.sqlite3` не создавался (за счёт `STUDIO_DATA_DIR`).
+
+---
+
+## 8. Что эти результаты значат для аудита — и чего не значат
+
+**Значат:**
+- P0-контур PR #29 **реально покрыт тестами** (T3: +103 теста к `main`), и они зелёные.
+- Fail-closed поведение проверяется на уровне состояний, а не только на уровне
+  «функция не бросает исключение».
+- Реализация A6/A7 из PR #8 покрыта 19 отдельными тестами (T9) и **они зелёные**.
+
+**Не значат:**
+- **Зелёный тест ≠ правильная архитектура.** T3/T4 доказывают, что заявленные
+  сценарии не сломались, — и ничего больше.
+- Тест `backend/test_mock_evidence.py` **успешно** проверяет, что все вердикты
+  A6/A7/A8 равны `BLOCKED`. Тест зелёный, а проверочная способность критиков — нулевая.
+  Это иллюстрация п.4 system prompt.
+- Отсутствие `backend/studio.sqlite3` в репозитории при `main` и путь БД по умолчанию
+  внутрь репозитория — две разные вещи. Тесты этого не покрывают.
+- Ни один тест не проверяет **поведение провайдера** — платные пути не тестировались.
+- Ни один тест не покрывает **согласованность** P0-контура с `main`-путём к провайдерам
+  (`adapters` + `main.py:460-472`) — это несуществующая точка, а не упавший тест.
+
+
+=== FILE: OPEN_ISSUES.md ===
+# OPEN_ISSUES — подтверждённые незакрытые вопросы
+
+Каждый пункт **проверен по коду или по содержимому файла** и снабжён ссылкой.
+Пункты, которые не удалось подтвердить, вынесены отдельно (§4) и помечены как
+**вопросы, а не находки**.
+
+Классификация:
+**OI-nn** — дефект или риск · **OI-nn?** — вопрос, требующий проверки ·
+**OI-nn!** — расхождение в документации.
+
+---
+
+## 1. Денежный контур
+
+### OI-01 — P0-контур защищает только свой путь; в `main` платные вызовы идут мимо него
+
+**Тип:** дефект/риск · **Приоритет:** высший
+
+На `main` все платные вызовы идут через `adapters` и `main.py`:
+
+```python
+# backend/main.py:460-472
+key = provider_key('kie') if spec['provider']=='kie' else get_key(x_api_key)
+...
+if spec['provider']=='kie': result = await kie.submit(key, adapters.wire_body(spec,payload))
+else: result = await request_piapi('POST', adapters.submit_path(spec), key, adapters.wire_body(spec,payload))
+```
+
+Весь P0-контур PR #29 (`p0_authz`, `p0_control`, `spend_ledger.check_cents`,
+`p0_provider_dispatch`) в `main` **отсутствует**. То есть capability, единый бюджет,
+`submit_count` и запрет второй БД **не защищают** ни один реальный платный вызов в
+`main`. PR #29 добавляет второй, защищённый путь — но не заменяет первый.
+
+**Подтверждение:** `git ls-tree -r --name-only origin/main -- backend` не содержит
+`p0_authz.py`, `p0_control.py`, `p0_provider_dispatch.py`; `backend/security.py` в
+`main` не содержит `p0_`.
+
+**Вопрос аудитору:** каким механизмом гарантируется, что после мержа P0-контур
+не будет обойдён? Есть ли в `p0_provider_dispatch.py` принудительное перенаправление
+`main`-пути, или это две независимые реализации одного и того же?
+
+---
+
+### OI-02 — Для состояния `UNKNOWN` нет процедуры сверки
+
+**Тип:** дефект · **Приоритет:** высокий
+
+`p0_control.mark_unknown` (`backend/p0_control.py:308-316`) оставляет задачу в
+`UNKNOWN` с `possible_charge=1`, деньги остаются зарезервированными, повтор
+запрещён. Это правильно. Но **механизма приведения такой задачи к терминальному
+состоянию нет** — ни в `p0_control.py`, ни в `p0_provider_dispatch.py`.
+
+**Подтверждение:** `VALIDATION.json` → `codex_p0_fixes_2026_10_19.remaining`:
+```json
+"remaining": ["R-04 shared budget", "R-05 trusted runtime auth",
+              "UNKNOWN provider reconciler", "real asset transport and QA"]
+```
+Пункт «UNKNOWN provider reconciler» значился как незакрытый **до** PR #29; PR #29
+закрыл R-04 и R-05, но **reconciler не появился** (в `p0_control.py` нет функции,
+переводящей `UNKNOWN` в терминальное состояние, кроме `finish_verified`, который
+требует `state == "SUBMITTED"` — то есть из `UNKNOWN` недостижим).
+
+**Следствие:** деньги за «зависшие» задачи зарезервированы навсегда; лимит проекта
+постепенно выедается. Это fail-closed по безопасности, но **по стоимости** —
+накопление.
+
+---
+
+### OI-03 — Нет провайдерского idempotency-key
+
+**Тип:** вопрос · **Приоритет:** высокий
+
+Весь контур опирается на то, что второй POST не произойдёт (`submit_count`,
+`UNKNOWN`-блокировка, `state_version`). Но **если первый POST ушёл, а ответ
+потерялся**, повторно отправить тот же запрос безопасно нельзя — а провайдерский
+idempotency-key, который сделал бы повтор безопасным, в контуре не используется.
+
+**Подтверждение:** в `backend/p0_control.py`, `backend/p0_provider_dispatch.py`,
+`backend/adapters.py` (main) нет ни `idempotency`, ни `Idempotency-Key`.
+
+**Вопрос аудитору:** как предлагается безопасно закрывать разрыв «запрос ушёл,
+ответ потерян»? Текущая политика — заблокировать слот навсегда.
+
+---
+
+### OI-04 — Окно между `submit_count=1` и фактическим HTTP POST
+
+**Тип:** вопрос · **Приоритет:** средний
+
+`p0_control.begin_submit` (`backend/p0_control.py:288-306`) коммитит
+`state='SUBMITTING', submit_count=1` **до** того, как вызывающий код делает POST.
+Документстринг это фиксирует: «caller makes at most one POST».
+
+Но если процесс умирает между коммитом и POST — задача навсегда в `SUBMITTING`,
+деньги зарезервированы, провайдер их не списал. Восстановления нет (см. OI-02).
+
+**Вопрос аудитору:** допустимо ли такое окно, и какая процедура его закрывает?
+
+---
+
+## 2. Согласованность подсистем
+
+### OI-05 — Два независимых механизма версионирования плана
+
+**Тип:** риск · **Приоритет:** высокий
+
+| Механизм | Где | Что делает |
+|---|---|---|
+| `freeze_manifest` | `backend/p0_control.py:375-407` (PR #29) | Замораживает полный доверенный план слотов, иммутабельно, до задач |
+| S01 «Хранилище и версии», S08 «Журнал и checkpoint» | `docs/specs/n8n-production-2026-10-19/NODES.md` (PR #29) | Версионирование и чекпойнт в n8n-части |
+
+Оба — **SPEC-ONLY** со стороны n8n (исполняемого кода S01/S08 в репозитории нет),
+и **IMPLEMENTED** со стороны P0. Их связь нигде не описана и не проверяется.
+
+**Вопрос аудитору:** если n8n-конвейер получит собственное версионирование S01/S08,
+не разойдутся ли две системы ревизий? Что является источником правды?
+
+---
+
+### OI-06 — «Трёхкритический» гейт фактически двухкритический
+
+**Тип:** дефект (расхождение спека↔код) · **Приоритет:** высокий
+
+- Спека требует трёх равноправных вердиктов: `SPECIFICATION.md:92` («Три финальных
+  пакета ссылаются на одинаковый checksum файла»), `final-runtime-v1_2.schema.json:600-602`
+  (`role_verdict_refs` требует A6, A7, A8), `THREE_CRITICS_LOOP.md:7`.
+- Реализация агрегирует **два**: `backend/qa_text_precheck.py` — `len(reviews) == 2`
+  в агрегации, `ROLES = ('REVIEW-REQ', 'REVIEW-SYSTEM')`.
+- A8 не даёт проверочной способности вообще (нет роли, нет модели, `published: false`).
+
+**Подтверждение:** `git grep -E "\bA[678]\b" origin/main` и `pr/35` — только ложные
+совпадения в `docs/official-prompts/wan3-prompting.html`.
+
+**Итог:** заявленный «независимый трёхкритический гейт» сегодня — **двухкритический
+текстовый гейт** с третьим, отсутствующим участником. Он fail-closed (не пропускает
+ложное качество), но это не тот гейт, который описан.
+
+---
+
+### OI-07 — Конфликт `tools/ai_review/argon_review.py` между PR #34 и PR #35
+
+**Тип:** дефект (будет конфликт при мерже) · **Приоритет:** средний
+
+Оба PR определяют один и тот же модуль с разным содержимым:
+
+```
+git diff pr/34:tools/ai_review/argon_review.py pr/35:tools/ai_review/argon_review.py
+→ tools/ai_review/argon_review.py | 250 +++++++++------------------
+  1 file changed, 64 insertions(+), 186 deletions(-)
+```
+
+PR #34: 327 строк · PR #35: 205 строк. **64 вставки, 186 удалений** — это не
+косметика, а разные реализации.
+
+**Вопрос аудитору:** какая версия канонична и как разрешается конфликт?
+
+---
+
+### OI-08 — Правило `tools/` в `.gitignore` не исправлено в PR #35
+
+**Тип:** дефект (тихий) · **Приоритет:** средний
+
+`.gitignore` (`main`) содержит `tools/` — весь каталог неотслеживаем.
+
+- **PR #34** это чинит:
+  ```gitignore
+  !tools/
+  tools/*
+  !tools/ai_review/
+  ```
+  с комментарием, прямо описывающим ловушку.
+- **PR #35** этого **не делает** — его правка `.gitignore` касается только `/artifacts/`.
+  При этом его 14 файлов `tools/ai_review/` в индексе **есть** (добавлены принудительно).
+
+**Следствие:** на ветке PR #35 **любой новый файл под `tools/` будет молча
+проигнорирован** — и это не выдаст ошибку, а просто не попадёт в коммит.
+
+**Вопрос аудитору:** достаточно ли того, что уже отслеживаемые файлы переживут
+слияние, или риск «следующий разработчик добавил файл и не заметил» следует
+считать реальным?
+
+---
+
+## 3. Расхождения в документации
+
+### OI-09! — Тело PR #29 указывает устаревший Head SHA
+
+**Тип:** расхождение · **Приоритет:** низкий
+
+Тело PR #29: «Head SHA: `cc9204f1e3d06d5b17b594041598c7057be2be99`».
+Фактический head по GitHub API и по git: `c082829b11b968965600bdaf87c137b1485a0fa2`.
+
+`cc9204f` — реальный предок (проверено `git merge-base --is-ancestor` → exit 0),
+на два коммита позади. То есть расхождение — **устаревший текст описания**, а не
+расхождение кода. PR #29 — третий коммит сверху:
+
+```
+c082829 docs(p0): зафиксировать модель подключения Argon (KIE, chat only, разовый diff-review)
+baad79c docs(p0): уточнить диапазон ревью Argon под лимиты инструмента
+cc9204f P0: единый бюджет, серверные capability-власти и запрет второй БД
+```
+
+---
+
+### OI-10! — Модель A8: Sonnet или Opus 5.5?
+
+**Тип:** расхождение · **Приоритет:** средний
+
+- `docs/specs/n8n-production-2026-10-19/SPECIFICATION.md:186` — «A8 остаётся на Sonnet».
+- `integrations/n8n/agent-manifest.json:536` — `"model": "anthropic/claude-opus-5-5"`.
+
+Что авторитетно — из репозитория не определяется.
+
+> **Значение для этого аудита:** A8 **уже настроен** на Claude Opus 5.5 — ту же
+> модель, для которой готовится аудит. То есть либо манифест новее, либо одно из
+> двух утверждений неверно. Разрешение этого — часть AUDIT-001C.
+
+---
+
+### OI-11! — `VALIDATION.json: "status": "PASS"` при `scope: "documentation structure only"`
+
+**Тип:** расхождение (риск прочтения) · **Приоритет:** средний
+
+```json
+{
+  "status": "PASS",
+  ...
+  "scope": "documentation structure only",
+  "not_tested": ["n8n execution", "provider calls", "media generation",
+                 "actual billing", "behavioral critic quality"]
+}
+```
+
+`PASS` относится к структуре документации. `not_tested` прямо перечисляет
+исполнение n8n, вызовы провайдеров, генерацию медиа, реальное списание денег и
+**поведенческое качество критиков**. Читатель, не дочитавший до `scope`,
+примет `PASS` за «конвейер проверен».
+
+**Это не обвинение автора** — `scope` и `not_tested` написаны явно и честно.
+Это находка о **читаемости**: в проекте, где «PASS» и «не проверено» лежат в
+одном файле в 10 строках друг от друга.
+
+---
+
+## 4. Гигиена и окружение
+
+### OI-12 — Путь БД по умолчанию — внутри репозитория
+
+**Тип:** риск · **Приоритет:** средний
+
+```python
+# backend/main.py:22-24
+DATA = Path(os.environ['STUDIO_DATA_DIR']).resolve() if os.environ.get('STUDIO_DATA_DIR') else None
+DB = (DATA or ROOT)/'studio.sqlite3'
+```
+
+Без `STUDIO_DATA_DIR` БД создаётся как `backend/studio.sqlite3` — внутри рабочей
+копии Git. Путь в `.gitignore` есть, но:
+- тесты, запущенные без переменной, **создают и меняют БД в репозитории**;
+- БД физически зависит от расположения кода.
+
+При подготовке пакета это потребовало явного `STUDIO_DATA_DIR` во всех прогонах
+(см. `TEST_RESULTS.md` §1). PR #29 добавил `studio_db.resolve()` с отказом на второй
+БД — но путь **по умолчанию** не изменил.
+
+---
+
+### OI-13 — Фронт-тесты требуют Python-окружения с `fastapi`
+
+**Тип:** дефект CI-хрупкости · **Приоритет:** средний
+
+`frontend/directorState.test.mjs` (и ещё 4 файла) исполняют
+`python -c "from backend.camera_movements import basis…"` дочерним процессом.
+Интерпретатор выбирается как `process.env.STUDIO_PYTHON || findVenvPython(cwd) || 'python3'`.
+
+Фактически: `npm test` **падает** с `ModuleNotFoundError: No module named 'fastapi'`,
+если нет `.venv` в корне (или выше) и не задан `STUDIO_PYTHON`. Воспроизведено дважды
+(`TEST_RESULTS.md` §5.1, §5.2).
+
+То есть фронт-тесты имеют **незаявленную зависимость** от состояния Python-окружения.
+
+---
+
+### OI-14 — Пустой тест-файл `backend/test_production_entities.py`
+
+**Тип:** дефект · **Приоритет:** низкий
+
+Файл существует, содержит **0 строк** и участвует в discovery. Проверено чтением.
+Ничего не проверяет, но создаёт впечатление покрытия.
+
+---
+
+### OI-15 — `CLAUDE.md` описывает архитектуру, которая не совпадает с кодом
+
+**Тип:** расхождение · **Приоритет:** средний
+
+`CLAUDE.md` перечисляет модули и компоненты (`App.tsx`, `StageNav`, `Dock`,
+`HomeScreen`, `CreateScreen`, `ProductionStoryboard`, `WorkflowPanel/workflowPlan`,
+`GenerationReview`, `ActivityContext/useActivity`, `GenerationWatcher`).
+Фронт-компоненты существуют, но `CLAUDE.md` **не содержит** P0-контура,
+`workflows/`, `tools/ai_review/` и A6/A7/A8 — потому что они живут в других ветках.
+
+То есть `CLAUDE.md` актуален для `main` и **вводит в заблуждение** относительно
+всей работы вне `main`. Аудитору это объясняет заранее (см. `PROJECT_CONTEXT.md` §C).
+
+---
+
+## 5. Открытые вопросы, требующие решения владельца (не для аудита)
+
+| # | Вопрос | Почему это не входит в аудит |
+|---|---|---|
+| Q1 | Какой порядок мержа четырёх цепочек PR (#8, #17, #18, #29) и двух независимых (#34, #35)? | Решение владельца, не архитектурная оценка |
+| Q2 | Планируется ли Opus 5.5 как постоянный ревьюер (PR #34/#35) или только разовый аудит? | Влияет на дизайн, но не на оценку |
+| Q3 | Допустимо ли поднимать `real_media_evidence_available` (реальный MP4)? | Ограничение материала, а не дефект |
+| Q4 | Нужна ли процедура сверки `UNKNOWN` как **владельческая** операция (ручная сверка с провайдером) или как автоматическая? | Продуктовое решение (OI-02 зависит от него) |
+| Q5 | Кто владелец `bar.md` (эталон ремесла для A8) и как он генерируется? | Ни одного генератора `bar.md` в репозитории нет |
+
+---
+
+## 6. Сводка
+
+| Категория | Кол-во | Высший приоритет |
+|---|---:|---|
+| Денежный контур | 4 (OI-01…OI-04) | OI-01, OI-02 |
+| Согласованность подсистем | 3 (OI-05…OI-08) | OI-05, OI-06 |
+| Расхождения в документации | 4 (OI-09!…OI-11!) | OI-10!, OI-11! |
+| Гигиена и окружение | 4 (OI-12…OI-15) | OI-12, OI-13 |
+| Вопросы владельцу | 5 (Q1…Q5) | — |
+
+**Ни один пункт §1–§4 не является «критическим багом продакшена».** Проект в целом
+fail-closed и хорошо документированный; проблемы — в **стыках** (два пути к деньгам,
+два механизма версионирования, заявленный трёхкритический гейт при двухкритической
+реализации) и в **рассинхронизации документации с кодом**.
+
+
+=== ЗАПРОС ===
+[Контекст A–E из PROJECT_CONTEXT.md приводится здесь сокращённо; полный — в приложении.]
+
+Ты — независимый архитектурный аудитор. Это третий, последний раунд аудита GremoVOD.
+Предыдущих раундов у тебя нет и не нужно: запрос самодостаточен. Твоя задача — оценить
+механизм независимых критиков (A6/A7/A8), честность результатов проверок и сквозную
+согласованность подсистем.
+
+Контекст кратко. GremoVOD — студия производства ИИ-контента, платит внешним
+провайдерам за медиа. Ключевая продуктовая идея: канон — источник правды, и
+финальное «готово» должно подтверждаться независимыми критиками, а не автором
+артефакта. Решения владельца: fail-closed (нет доказательства = BLOCKED); никаких
+реальных кредитов без явной авторизации конкретного запроса; вторая рабочая SQLite
+запрещена.
+
+Состояние веток: main = 82adb2d (в нём нет A6/A7/A8 — проверено git grep, ноль
+упоминаний, кроме ложного совпадения в HTML-файле); PR #8 (Draft) = 3979390 —
+здесь реальная реализация A6/A7: backend/qa_text_precheck.py, пакеты ролей,
+приём вердиктов, гейт безопасного соединения; PR #29 (Draft) = c082829 — здесь
+спецификация A6/A7/A8 и MOCK-воркфлоу; PR #35 (Draft) = 051ab3a — временный
+ревьюер MiniMax-M3.1-Flash, контракт dev-run-summary/1, ортогональный путь.
+Всего 22 открытых PR, 21 — Draft.
+
+=====================================================================
+РАЗДЕЛ 9. ВОПРОСЫ
+=====================================================================
+
+D-1. СУЩЕСТВОВАНИЕ ТРЁХ КРИТИКОВ. A6 — соответствие заданию; A7 — согласованность
+    мира, образов и непрерывности; A8 — ремесло. Определения существуют в двух
+    независимых семействах (n8n-навыки и production-спецификация), в `pr/29` узлы
+    N36/N37/N38 помечены `Реализация: ROLE_ONLY`. Оцени:
+      - что именно реализовано, а что нет, по каждому из трёх;
+      - достаточно ли того, что в `agent-manifest.json` у A6 — claude-haiku-5-5,
+        у A7 — claude-sonnet-5-5, у A8 — claude-opus-5-5, и все три имеют
+        `published: false`, чтобы считать роли подготовленными;
+      - отдельно: A8 уже настроен на Claude Opus 5.5, а в спецификации сказано
+        «A8 остаётся на Sonnet» — оцени это противоречие и то, какая сторона
+        выглядит более свежей по датам и по связности с остальным материалом.
+
+D-2. НЕЗАВИСИСИМОСТЬ. Требование: критик получает только артефакт, свою часть
+    требований/канона/bar и минимальные ID; не получает историю изготовления,
+    самооценку автора и вердикт другого критика. В коде `role_package()` выдаёт
+    A6 `approved_requirements`, A7 — `approved_canon`, то есть роли разведены на
+    уровне данных; `verify_verdict` отвергает цитаты из чужой роли. Оцени:
+      - достаточна ли разделение по данным для заявленной независимости;
+      - какие ещё каналы загрязнения независимости остаются (общий снапшот, общий
+        `review_round`, общий токен/сессия, общий кэш, накопление истории);
+      - достаточно ли `review_round_id` + `snapshot_hash` + `master_checksum`,
+        чтобы доказать, что все критики смотрели один и тот же файл.
+
+D-3. ТЕХНИЧЕСКАЯ ПРОВЕРЯЕМОСТЬ. Это главный вопрос. A6 получает текст и
+    требования; A7 получает текст и `approved_canon`, который является свободным
+    текстом из состояния проекта, при этом `canon_images_reviewed` жёстко `False`,
+    а `requested_scopes`/`checked_scopes` ограничены `['TEXT']`; A8 не имеет роли
+    в `ROLES` вовсе. Оцени:
+      - для каждого из трёх — может ли он по фактическому входу вынести PASS/FAIL
+        по своим критериям, а BLOCKED — по чужим;
+      - является ли «A7 сравнил тексты и выдал PASS» допустимым результатом, если
+        его собственная спецификация требует серверного утверждённого канона с
+        `canon_revision`, а на входе — редактируемый пользователем текст без флага
+        `approved`;
+      - достаточно ли `Literal['TEXT']` как техническая гарантия, что текстовый
+        вердикт никогда не будет выдан за медиа-вердикт, или нужна дополнительная
+        защита;
+      - что минимально необходимо, чтобы A7 стал способен проверить свой критерий,
+        и что минимально необходимо для A8.
+
+D-4. ФАКТИЧЕСКАЯ ПРОВЕРОСПОСОБНОСТЬ СЕГОДНЯ. Единственный исполняемый путь,
+    порождающий вердикты A6/A7/A8, — `tools/mock_evidence.py:60`, и он жёстко
+    отдаёт BLOCKED всем трём; тест `backend/test_mock_evidence.py` успешно это
+    проверяет. В `WF_05_Assembly_And_Critics.json:30` — тоже жёсткий BLOCKED.
+    Оцени:
+      - означает ли зелёный тест, что система ничего не проверяет, — или что она
+        проверяет ровно то, что задумано (fail-closed), и это корректно;
+      - как должен выглядеть чек-лист, чтобы в репозитории нельзя было случайно
+        принять MOCK-вердикты за реальную приёмку;
+      - что должно произойти в системе, если роль вердикта окажется неполной
+        (например, пришли только A6 и A7) — сейчас это видно только в коде
+        агрегации, а в спецификации — нет.
+
+D-5. ГЕЙТ БЕЗОПАСНОГО СОЕДИНЕНИЯ. Документ
+    `integrations/n8n/QA_A6_A7_SECURE_CONNECTION_GATE_2026-10-19.md` (только в PR #8;
+    в pr/29 его нет) описывает требуемый контракт перед живыми моделями:
+    изолированная сессия на критика, серверное хранение разрешения стоимости,
+    игнорирование клиентского `approved=true`, машинная проверка схемы и точных
+    цитат, 409 на устаревших входах. Реально в коде обеспечено: loopback+токен,
+    разделение владелец/сервис, отвержение устаревших ревизий, побайтовая
+    сверка цитат, запрет чужих цитат, лимит тела 32 КБ, идемпотентность,
+    fail-closed агрегация. Не обеспечено: транспорт n8n→FastAPI, живой вызов
+    Agent, серверное разрешение стоимости, инспекция медиа. Документ сам пишет,
+    что `messageAnAgent` deprecated/retired, что «доступ к QA через сам workflow
+    по-прежнему отсутствует», а единственная попытка живого вызова A6 провалилась
+    3× с `AI_APICallError`, и что возможные списания по ошибочным попыткам
+    неизвестны. Оцени:
+      - что именно этот гейт доказывает, а что — нет, и насколько его название
+        («secure connection») соответствует содержанию, если реализована только
+        серверная половина;
+      - достаточно ли изоляции по loopback+токену, учитывая, что агент при этом
+        должен обращаться к сервису из облака n8n — то есть требование «только
+        loopback» само по себе делает живое подключение невозможным, и как
+        разрешить это противоречие без ослабления контроля;
+      - стоит ли вопрос «возможны ли списания по ошибочным попыткам» считать
+        риском бюджета, и что для этого нужно.
+
+D-6. ЧЕСТНОСТЬ ЗАЯВЛЕНИЙ. По всему проекту A6/A7/A8 упоминаются в 18+ файлах
+    pr/29, причём в основном только в прозе (docs/CODEX_DECISIONS.md,
+    ASTRA_FIXES_V1_1.md, N34_N41_RUNTIME_MODEL_MATRIX.md, NODES.md, nodes.json и
+    др.), а в исполняемом коде — только как жёстко зашитые BLOCKED. При этом
+    `VALIDATION.json` объявляет `status: "PASS"` при `scope: "documentation
+    structure only"`. Оцени:
+      - где в проекте граница между «заявлено» и «сделано» проведена достаточно
+        явно, а где её нет;
+      - является ли `PASS` в `VALIDATION.json` рядом с `not_tested` проблемой
+        формулировки, и какой вариант формулировки был бы лучше;
+      - что конкретно стоит поправить в первую очередь, чтобы сторонний читатель
+        репозитория не принял спецификацию за работающую систему.
+
+D-7. ОРТОГОНАЛЬНОСТЬ КОНТРАКТОВ. В проекте три независимых контракта вердикта:
+    (1) `integrations/n8n/contracts/qa-reviewer-output-v1.schema.json` — роли
+    REVIEW-REQ/REVIEW-SYSTEM/REVIEW-CRAFT, scope TEXT/IMAGE/VIDEO/AUDIO, evidence
+    с типами; код его **не загружает** (в TODO.md:439 — нереализованный пункт);
+    (2) Pydantic-контракт в `backend/qa_text_precheck.py` — строже и уже: две роли,
+    только TEXT, только mock-модели, `Literal[0]` по стоимости;
+    (3) `dev-run-summary/1` в PR #35 — для ревью git-диффов, ролей и scope не
+    имеет вовсе. Оцени:
+      - насколько три контракта должны быть разными по назначению и не является ли
+        их пересечение по именам (`PASS`) источником путаницы;
+      - что будет, если контракт (1) начнут применять по плану — какие расхождения
+        вылезут первыми;
+      - стоит ли `dev-run-summary/1` (MOCK-ревьюер кода) вообще упоминаться рядом
+        с A6/A7/A8 в одном документе, или это смешивает два разных контура.
+
+D-8. СКВОЗНАЯ СОГЛАСОВАННОСТЬ. Соедини три наблюдения, которые по отдельности
+    выглядят безобидно:
+      (а) в `main` платные вызовы идут через `adapters` и `main.py:460-472` мимо
+          P0-контура, который есть только в PR #29;
+      (б) `freeze_manifest` (FastAPI) и узлы S01/S08 (спецификация n8n) — две
+          независимые модели версионирования, причём S01/S08 не исполняются;
+      (в) `spent_limit.test.mjs` и `test_p0_state.js` проверяют бюджет, а
+          `wf_03`/`wf_04` в спецификации предполагают платные вызовы TTS/SFX и
+          видео, но в MOCK-режиме.
+    Оцени: где именно проходит граница «зелёные тесты перестают защищать»,
+    и какие три проверки, добавленные в репозиторий, дали бы наибольший эффект
+    на реальный риск. Это вопрос о том, **что тестировать дальше**, а не о том,
+    какие ещё тесты написать ради числа.
+
+=====================================================================
+РАЗДЕЛ 10. МАТЕРИАЛЫ
+=====================================================================
+
+1. PROJECT_CONTEXT.md (разделы A–E)
+2. QA_EVIDENCE.md    — основной документ
+3. TEST_RESULTS.md   — реально выполненные прогоны, exit codes, что не запускалось
+4. OPEN_ISSUES.md    — реестр подтверждённых вопросов
+
+=====================================================================
+РАЗДЕЛ 11. ФОРМАТ ОТВЕТА
+=====================================================================
+
+По каждому пункту D-1…D-8 — вердикт одной строкой (IMPLEMENTED / PARTIAL /
+SPEC-ONLY / MOCK / MISSING / RISK), доказательства с `путь:строка` и верными
+фрагментами, блок «что осталось открытым», рекомендация с «Исправить:» / «Проверить:».
+
+В конце:
+  - Топ-5 рисков по убыванию ожидаемой стоимости.
+  - Явный список недостающих данных.
+  - ОТДЕЛЬНЫМ БЛОКОМ: «Что в этом проекте сделано хорошо и должно быть сохранено».
+    Это не вежливость и не смягчение: если архитектура в чём-то сильна, её нужно
+    назвать прямо, иначе рекомендации будут выглядеть как требование переделать
+    то, что переделывать не надо. В проекте есть что сохранить — fail-closed
+    семантика UNKNOWN, HMAC-capability, побайтовая сверка цитат, честные
+    `not_tested` и `STRUCTURE ONLY`, адресность ремонта, блок второй БД.
