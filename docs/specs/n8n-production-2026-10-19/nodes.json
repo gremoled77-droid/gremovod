@@ -1029,7 +1029,7 @@
     },
     {
       "node_id": "N39",
-      "condition": "any_FAIl",
+      "condition": "any_FAIL",
       "next": "N42",
       "reason": "Return to root-cause stage, with new snapshot on change"
     },
