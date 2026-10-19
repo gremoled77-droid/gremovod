@@ -907,7 +907,13 @@ class SelfReviewTest(unittest.TestCase):
     def test_the_repository_sources_do_not_trip_the_secret_guard(self):
         root = ROOT
         offenders = []
-        for path in sorted(root.rglob("*.py")):
+        # Python AND the prose: a credential-shaped literal written into a
+        # report or an example lands in the diff just as firmly as one in code,
+        # and the guard rejects the whole diff either way.
+        suffixes = (".py", ".md", ".json")
+        for path in sorted(root.rglob("*")):
+            if not path.is_file() or path.suffix.lower() not in suffixes:
+                continue
             parts = set(path.parts)
             if ".git" in parts or "node_modules" in parts or "__pycache__" in parts:
                 continue
