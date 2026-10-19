@@ -1,0 +1,55 @@
+# QA Orchestrator — факт внедрения draft в n8n (19.10.2026)
+
+**Создано, проверено двумя офлайн-тестами. Не опубликовано. Реальных LLM/медиа вызовов — 0.**
+
+- **Workflow ID:** `nh3ARcl4XPW6RHqs`, [открыть в n8n](https://gremovod.app.n8n.cloud/workflow/nh3ARcl4XPW6RHqs)
+- **n8n project:** `jG7gkyrK2hH0rEBj` (GremoVOD, personal)
+- **Режим:** Manual Trigger, нет API/HTTP/LLM, нет credentials, нет публикации, запуска живых критиков нет.
+- **Источник для воспроизведения и code review:** [снимок графа](workflows/qa-orchestrator.safe-draft.snapshot.json).
+- **Протокол будущей петли:** [THREE_CRITICS_LOOP.md](THREE_CRITICS_LOOP.md).
+
+## Граф
+
+```text
+Ручной тест (только sandbox)
+       |
+Проверка входа: task_id/project_id/artifact_id/revision,
+   требования, утвержденный brief, bar.md 5-7 механик,
+   benchmark, canon, render_refs
+       |
+       +------> A6 — шлюз ТЗ (Haiku, НЕ ВЫЗЫВАЕТ LLM) ------+
+       |                                                    |
+       +------> A7 — шлюз канона (Sonnet, НЕ ВЫЗЫВАЕТ LLM) --+--> Merge 3 inputs --> Проверка вердиктов
+       |                                                    |
+       +------> A8 — запрет Opus (НЕ ВЫЗЫВАЕТ LLM) ---------+
+```
+
+Каждая ветка получает отдельный пакет проверки; другой критик/ход генерации в пакет не включается. Сборщик проверяет три обязательные роли, одну ревизию, единственный вердикт на роль, статусы `PASS|FAIL|BLOCKED`; в текущей реализации все три **обязательно BLOCKED**, даже если входное сообщение содержит фальшивый `approval.expert_model: true`. Никаких скрытых автоматических retries или side effects.
+
+### Результат тестов
+
+1. **Execution 7, success:** синтетический проект с двумя требованиями, каноном, `bar.md` на 5 пунктов, render_ref и *недоверенным* флагом якобы разрешенного Opus. Три пакета изолированы, три `BLOCKED`, агрегатор `BLOCKED_AWAITING_INTEGRATION`, `all_passed=false`, `paid_calls_executed=false`. A8 сообщает `trusted_expert_approval_not_integrated` и `verified_media_inspection_not_available`.
+2. **Execution 8, success:** полностью пустой вход. В ответе перечисляются недостающие поля, итог `BLOCKED_AWAITING_INTEGRATION`, ни один критик не объявлен прошедшим.
+
+`success` — статус **технического исполнения Code/Merge в n8n**, а не качества сцены. Пользователь/веб-приложение должны смотреть `status` внутри результата; не трактовать успешное выполнение workflow как одобрение.
+
+## Строгие требования к будущей веб-интеграции (Codex)
+
+1. FastAPI остаётся источником истины, создаёт `task_id`, `project_id`, `artifact_id`, `artifact_revision`, `approved_brief`, `canon_revision`, `bar_revision`, `benchmark_ref`; полномочия approval проверяет **на сервере**, а не из текста.
+2. Подключить защищённый workflow trigger/callback и протокол версий, идемпотентную запись результатов. В этом черновике trigger только manual.
+3. Изолировать критиков на практике: новый контекст для каждой отдельной проверочной сессии без builder history, chain-of-thought, без результатов других критиков. Данные пакетов уже разделены, но живой вызов ещё не реализован.
+4. Вместо блокирующих шлюзов A6/A7 сделать отдельные вызовы соответствующих сохранённых n8n Agents с профильными Skills, но только после авторизации и с контролем реальной модели/стоимости; перед вводом в продакшен проверить точные параметры и инструменты. `A6=nkmWNxBdJcFEXSMF`; `A7=NRWXr5AY2MXAFhcH`.
+5. Для A8 `s7IIGiioapxre90t` создать отдельный trusted approval + session cost cap и media inspector: видео→таймкоды/кадры, звук→доступный аудиоматериал/транскрипт, benchmark/bar. До этого **НЕ запускать Opus и не выводить PASS**.
+6. Агрегатор: при 3 `PASS` результат `AWAITING_OWNER_APPROVAL`, при любом `FAIL` — `CHANGES_REQUESTED` с одной главной проблемой и возвратом автору этапа; `BLOCKED` не является PASS. При ошибке JSON, дублировании роли, разных artifact revisions — `BLOCKED_INVALID_REVIEW_SET`.
+7. Не запускать повторную петлю в n8n автоматически до появления дедупликации `review_id/task_id/round/artifact_revision` и согласованных финансовых лимитов. Не подключать к активному workflow `SrlmcCnwPrOZVnFH` до smoke-тестов.
+8. Не пересылать большие файлы и секреты в workflow: библиотека материалов — в FastAPI/Storage, n8n получает проверенные ID/подписанные ссылки с коротким TTL.
+9. Использовать `skills/gremovod-review-*` и `skills/gremovod-qa-producer-loop` как источник инструкций. Sync через GitHub пока не автоматический.
+10. Добавить **тест статусов** для текста, кадра, видеоматериала: отсутствие benchmark/render, mismatch revision, недоверенный expert approval, выпадение одного критика, строгий запрет ложного `PASS`.
+
+## Что остаётся недоделанным
+
+- Нет автоматических вызовов A6/A7/A8 (только подготовка пакетов и агрегирование BLOCKED).
+- Нет технического approval/cost cap/лимита итераций; A8 выключен у A0.
+- Нет записи статусов в Web/FastAPI, нет отдельного сохранения history/round в production database.
+- Нет экспертизы видео/аудио, только ожидание media inspector.
+- Нет webhook-триггера, отсутствует возможность запустить с веб-сайта.
