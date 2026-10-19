@@ -61,3 +61,9 @@
 Офлайн execution IDs 9, 10, 11, 12 — все technical success, `all_passed=false`: (9) только TEXT, (10) поддельный approved_expert_model, псевдоURL рендера и VIDEO, (11) IMAGE только по текстовому описанию, (12) повтор текстового теста после усиления проверки. Без LLM/API/Opus. Источник: [QA_EVIDENCE_POLICY.md](QA_EVIDENCE_POLICY.md), JSON контракт: [qa-reviewer-output-v1.schema.json](contracts/qa-reviewer-output-v1.schema.json).
 
 Не включать реальный reviewer output в агрегатор без независимого серверного evidence verifier и authenticated/approved context, иначе поле `evidence_verified_by_backend` в сырых данных модели может быть подделано.
+
+## Разделение TEXT_PRECHECK и FINAL_MEDIA
+
+Теперь workflow `nh3ARcl4XPW6RHqs` в ручном безопасном draft поддерживает `review_phase` и возвращает `required_reviewers`: `TEXT_PRECHECK → REVIEW-REQ + REVIEW-SYSTEM`, `FINAL_MEDIA → REVIEW-REQ + REVIEW-SYSTEM + REVIEW-CRAFT`. При TEXT_PRECHECK A8 получает `not_applicable_to_this_phase=true` и не вызывается. Самих живых A6/A7 критиков внутри workflow пока тоже нет, поэтому все тех. проверки остаются BLOCKED. Даже будущий положительный текстовый результат не может установить `final_release_approved=true`.
+
+Executions 13–17: правильный текст → TEXT_PRECHECK и BLOCKED_TEXT_REVIEW_NOT_CONNECTED; финальное видео → FINAL_MEDIA и BLOCKED_AWAITING_INTEGRATION; попытка провести видео как текст → BLOCKED_INVALID_INPUT. Никаких платных вызовов. Подробнее: [QA_TEXT_PREFLIGHT.md](QA_TEXT_PREFLIGHT.md). Это обновление сохранено в [snapshot](workflows/qa-orchestrator.safe-draft.snapshot.json).
