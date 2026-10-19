@@ -1,6 +1,8 @@
 # GremoVOD × n8n — рабочая ветка интеграции
 
-**Branch:** `integration/n8n` · **статус:** проектирование, тесты не проводились, публикации нет.
+**Branch:** `integration/n8n` · **статус:** проектирование и безопасный QA Orchestrator draft; два офлайн-теста без платных API, публикации нет.
+
+QA Orchestrator: [схема и тесты](QA_ORCHESTRATOR_IMPLEMENTATION.md) · [снимок узлов](workflows/qa-orchestrator.safe-draft.snapshot.json). A6/A7/A8 пока не вызываются, Opus запрещён, полноценная петля не включена.
 
 Эта ветка объединяет проектирование интеграции GremoVOD Web/FastAPI и n8n Agents. Работа на основной ветке приложения `main` и локальные данные пользователя не затрагиваются до проверки и merge. Ветка наследует зафиксированные задачи из `chatgpt/n8n-web-skill-sync-20261019`.
 
