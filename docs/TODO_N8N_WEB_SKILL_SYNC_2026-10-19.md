@@ -42,3 +42,6 @@
 - [ ] Не подключать n8n Agents к рабочей веб-версии до smoke-тестов на sandbox-проекте с выключенными платными медиа-вызовами и возможностью отката.
 
 Приоритет реализации: 1) схема API и состояния заданий; 2) callback/auth/idempotency/outbox; 3) Skill Sync; 4) agent routing и экономика; 5) UI-подключение и тест на одной сцене. Не менять без необходимости текущую архитектуру FastAPI/React и сохранённые рабочие материалы.
+
+- [x] В QA Orchestrator внедрено разделение `TEXT_PRECHECK` (обязательные A6/A7, A8 не требуется) и `FINAL_MEDIA` (A6/A7/A8, достоверные media evidence и server-side Opus approval). Неактивный 7-узловой workflow протестирован без LLM на execution 13–17; всё остаётся BLOCKED до API. ТЗ [QA_TEXT_PREFLIGHT](../integrations/n8n/QA_TEXT_PREFLIGHT.md).
+- [ ] Для Codex реализовать защищённый `review_phase` и server-side `evidence_receipt` на реальных project/canon/artifact revisions; никакой флаг `verified=true` от LLM или клиентского JSON не считается доказательством, что картинка или ролик были просмотрены. A8 не требуется на текстовом этапе и обязателен только для финального мультимодального QA.
