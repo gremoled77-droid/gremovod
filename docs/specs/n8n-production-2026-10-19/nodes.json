@@ -1,7 +1,7 @@
 {
-  "spec_version": "1.0-review",
+  "spec_version": "1.1-astra-contract-hardening",
   "date": "2026-10-19",
-  "status": "DESIGN_NOT_DEPLOYED",
+  "status": "SPECIFIED_NOT_EXECUTED",
   "node_count": 52,
   "status_legend": {
     "NEW": "Новая операция, не подтверждённая в существующих workflow",
@@ -119,7 +119,10 @@
       "on_fail": "N42",
       "on_blocked": "N43",
       "stage": "concept",
-      "implementation_status": "NEW"
+      "implementation_status": "NEW",
+      "astra_v1_1": {
+        "review_policy": "Review all variants independently; N08 may choose if >=2 distinct acceptable options. Weak extra options do not block."
+      }
     },
     {
       "id": "N08",
@@ -199,7 +202,10 @@
       "on_fail": "N42",
       "on_blocked": "N43",
       "stage": "direction",
-      "implementation_status": "NEW"
+      "implementation_status": "NEW",
+      "astra_v1_1": {
+        "reference_subflow": "Call N15-N19 with mode=reference_candidate; return CANDIDATE to N12; owner approval before approved_ref; absent refs BLOCKED"
+      }
     },
     {
       "id": "N13",
@@ -247,7 +253,14 @@
       "on_fail": "N42",
       "on_blocked": "N43",
       "stage": "image",
-      "implementation_status": "ROLE_ONLY"
+      "implementation_status": "ROLE_ONLY",
+      "astra_v1_1": {
+        "modes": [
+          "shot_image",
+          "reference_candidate"
+        ],
+        "reference_candidate_inputs": "minimal approved identity anchors, not an already complete reference pack"
+      }
     },
     {
       "id": "N16",
@@ -311,7 +324,10 @@
       "on_fail": "N42",
       "on_blocked": "N43",
       "stage": "image",
-      "implementation_status": "NEW"
+      "implementation_status": "NEW",
+      "astra_v1_1": {
+        "on_reference_candidate": "N12 with owner approval; never N20 until reference approved"
+      }
     },
     {
       "id": "N20",
@@ -327,7 +343,15 @@
       "on_fail": "N42",
       "on_blocked": "N43",
       "stage": "audio",
-      "implementation_status": "ROLE_ONLY"
+      "implementation_status": "ROLE_ONLY",
+      "astra_v1_1": {
+        "audio_strategy_source": "freeze speech_strategy and independent required speech/ambience/sfx/music stems before branching",
+        "speech_strategy": [
+          "external_tts",
+          "native_video",
+          "silent"
+        ]
+      }
     },
     {
       "id": "N21",
@@ -359,7 +383,10 @@
       "on_fail": "N42",
       "on_blocked": "N43",
       "stage": "audio",
-      "implementation_status": "NEW"
+      "implementation_status": "NEW",
+      "astra_v1_1": {
+        "native_path": "Only skip external speech synthesis. Music/SFX/ambience jobs remain required. Native dialogue has estimated timing until decoded N30"
+      }
     },
     {
       "id": "N23",
@@ -375,7 +402,10 @@
       "on_fail": "N43",
       "on_blocked": "N43",
       "stage": "audio",
-      "implementation_status": "NEW"
+      "implementation_status": "NEW",
+      "astra_v1_1": {
+        "native_path": "SKIPPED only for speech stem; external effects and music still generated"
+      }
     },
     {
       "id": "N24",
@@ -391,7 +421,10 @@
       "on_fail": "N43",
       "on_blocked": "N43",
       "stage": "audio",
-      "implementation_status": "NEW"
+      "implementation_status": "NEW",
+      "astra_v1_1": {
+        "native_path": "native dialogue measured post-N30, not assumed available before N26"
+      }
     },
     {
       "id": "N25",
@@ -407,7 +440,15 @@
       "on_fail": "N42",
       "on_blocked": "N43",
       "stage": "audio",
-      "implementation_status": "NEW"
+      "implementation_status": "NEW",
+      "astra_v1_1": {
+        "native_path": "native dialogue from video N30 measured here, on PASS go N32 only if native video already accepted",
+        "repair_routes": {
+          "native_speech": "N27",
+          "external_audio": "N21",
+          "mix_issue": "N32"
+        }
+      }
     },
     {
       "id": "N26",
@@ -423,7 +464,11 @@
       "on_fail": "N42",
       "on_blocked": "N43",
       "stage": "video",
-      "implementation_status": "NEW"
+      "implementation_status": "NEW",
+      "astra_v1_1": {
+        "timing": "external uses actual dialogue duration; native uses explicit estimated range marked ESTIMATED and compares after N30",
+        "audio_strategy_source": "N20"
+      }
     },
     {
       "id": "N27",
@@ -455,7 +500,10 @@
       "on_fail": "N42",
       "on_blocked": "N43",
       "stage": "video",
-      "implementation_status": "NEW"
+      "implementation_status": "NEW",
+      "astra_v1_1": {
+        "lip_sync": "Must re-preflight after N30 original video saved and before second N29 paid operation"
+      }
     },
     {
       "id": "N29",
@@ -471,7 +519,14 @@
       "on_fail": "N43",
       "on_blocked": "N43",
       "stage": "video",
-      "implementation_status": "NEW"
+      "implementation_status": "NEW",
+      "astra_v1_1": {
+        "jobs": [
+          "video_generation",
+          "lip_sync"
+        ],
+        "lip_sync_dependency": "saved verified video asset from N30; distinct job/request/hash and approval; do not re-submit source video"
+      }
     },
     {
       "id": "N30",
@@ -487,7 +542,11 @@
       "on_fail": "N43",
       "on_blocked": "N43",
       "stage": "video",
-      "implementation_status": "NEW"
+      "implementation_status": "NEW",
+      "astra_v1_1": {
+        "derivative_provenance": "source_checksum, derivative_checksum, transform_id/version/hash, streams, timing, viewer-side access",
+        "lip_sync_branch": "when needed N28->N29->N30 as separate dependent job"
+      }
     },
     {
       "id": "N31",
@@ -503,7 +562,10 @@
       "on_fail": "N42",
       "on_blocked": "N43",
       "stage": "video",
-      "implementation_status": "NEW"
+      "implementation_status": "NEW",
+      "astra_v1_1": {
+        "scope": "no video or audio verdict PASS without actual modality coverage and matching checksum"
+      }
     },
     {
       "id": "N32",
@@ -519,7 +581,10 @@
       "on_fail": "N42",
       "on_blocked": "N43",
       "stage": "edit",
-      "implementation_status": "ROLE_ONLY"
+      "implementation_status": "ROLE_ONLY",
+      "astra_v1_1": {
+        "manifest": "expected_media_manifest frozen with required shot/dialogue/music/sfx/ambience/title slots and source revisions; all mandatory slots fulfilled before timeline"
+      }
     },
     {
       "id": "N33",
@@ -535,23 +600,47 @@
       "on_fail": "N43",
       "on_blocked": "N43",
       "stage": "edit",
-      "implementation_status": "NEW"
+      "implementation_status": "NEW",
+      "astra_v1_1": {
+        "manifest": "frozen verified slot manifest before export; no partial batch approval"
+      }
     },
     {
       "id": "N34",
-      "name": "Критика монтажа",
-      "executor": "A6 / A7 / A8 через S06/S07",
+      "name": "Техническая проверка экспорта (без LLM)",
+      "executor": "локальный FFmpeg/ffprobe worker + проверка FastAPI",
       "inputs": "Реальный master, текст, выбранные дубли, эталон.",
-      "task": "Проверить целостность, порядок и ритм, переходы, звук, титры, отсутствие обрывов, чёрных/замороженных кадров и пропавших реплик. Проблему исходного дубля вернуть на его этап.",
-      "outputs": "edit.reviewed + timecoded_issues",
-      "acceptance": "Все обязательные EDIT-проверки пройдены; исправления проверены на новом рендере.",
+      "task": "Проверить существование и checksum реального master, декодируемые потоки, длительность, формат/FPS, обязательный звук, заданные технические пороги (LUFS/тишина/чёрные интервалы). Не выполнять художественную критику, не вызывать A6/A7/A8.",
+      "outputs": "TechnicalQCResult (PASS_TECHNICAL/FAIL/BLOCKED)",
+      "acceptance": "Данные от доверенного media worker на актуальном master checksum; отсутствие реального файла = BLOCKED; PASS_TECHNICAL не является creative PASS.",
       "on_pass": [
         "N35"
       ],
       "on_fail": "N42",
       "on_blocked": "N43",
       "stage": "edit",
-      "implementation_status": "NEW"
+      "implementation_status": "NEW",
+      "astra_v1_1": {
+        "technical_only": "Export technical QC only. Non-technical final master craft critics run once in N36/N37/N38."
+      },
+      "astra_v1_2": {
+        "executor_class": "trusted_local_ffmpeg_worker",
+        "runtime_model_class": "NONE",
+        "llm_calls": 0,
+        "input_contract": "TechnicalQCRequest→TechnicalQCResult",
+        "output_contract": "contracts/final-runtime-v1_2.schema.json#/$defs/TechnicalQCResult",
+        "required_evidence": [
+          "real_master_sha256",
+          "ffprobe_streams",
+          "decode",
+          "verified_worker_identity"
+        ],
+        "blocked_without": [
+          "local_worker",
+          "actual_mp4",
+          "matching_content_checksum"
+        ]
+      }
     },
     {
       "id": "N35",
@@ -569,7 +658,28 @@
       "on_fail": "N43",
       "on_blocked": "N43",
       "stage": "final",
-      "implementation_status": "NEW"
+      "implementation_status": "NEW",
+      "astra_v1_1": {
+        "snapshot": "review_round_id, full snapshot_hash=hash(master checksum, expected slots, requirements, canon, review_bar, policies, profile+skills hashes, source dependencies)"
+      },
+      "astra_v1_2": {
+        "executor_class": "trusted_FastAPI_and_local_worker; optionally local or paid_STT",
+        "runtime_model_class": "NONE for manifest (STT separately budgeted)",
+        "llm_calls": 0,
+        "input_contract": "TechnicalQCResult + master+manifest+approved brief/canon/review bar/profile+skill revisions",
+        "output_contract": "contracts/final-runtime-v1_2.schema.json#/$defs/FrozenReviewPacket",
+        "required_evidence": [
+          "master_sha256",
+          "immutable_round_snapshot",
+          "capabilities_and_media_uris",
+          "three_isolated_role_packets"
+        ],
+        "blocked_without": [
+          "real_accessible_media",
+          "trusted_manifest",
+          "approved_policies"
+        ]
+      }
     },
     {
       "id": "N36",
@@ -585,7 +695,26 @@
       "on_fail": "N39",
       "on_blocked": "N39",
       "stage": "final",
-      "implementation_status": "ROLE_ONLY"
+      "implementation_status": "ROLE_ONLY",
+      "astra_v1_1": {
+        "review": "must match exact review_round_id, snapshot_hash and master checksum; distinct isolated reviewer session"
+      },
+      "astra_v1_2": {
+        "executor_class": "independent_video_audio_reviewer",
+        "runtime_model_class": "verified_video_and_audio_capable_Gemini-class_or_equivalent",
+        "default_max_initial_calls": 1,
+        "input_contract": "ReviewerPacket(role=A6)+actual media+requirements IDs",
+        "output_contract": "contracts/final-runtime-v1_2.schema.json#/$defs/CriticVerdict",
+        "required_evidence": [
+          "per_requirement_temporal_coverage",
+          "actual_video_and_audio_as_needed"
+        ],
+        "blocked_without": [
+          "verified_coverage",
+          "request_budget",
+          "approved_source_revision"
+        ]
+      }
     },
     {
       "id": "N37",
@@ -601,7 +730,27 @@
       "on_fail": "N39",
       "on_blocked": "N39",
       "stage": "final",
-      "implementation_status": "ROLE_ONLY"
+      "implementation_status": "ROLE_ONLY",
+      "astra_v1_1": {
+        "review": "must match exact review_round_id, snapshot_hash and master checksum; distinct isolated reviewer session"
+      },
+      "astra_v1_2": {
+        "executor_class": "independent_visual_video_reviewer",
+        "runtime_model_class": "verified_multimodal_video_capable; Sonnet_frame_only_when_criterion_is_static",
+        "default_max_initial_calls": 1,
+        "input_contract": "ReviewerPacket(role=A7)+approved_Vault_refs+actual media",
+        "output_contract": "contracts/final-runtime-v1_2.schema.json#/$defs/CriticVerdict",
+        "required_evidence": [
+          "character_identity",
+          "approved_canon_hash",
+          "continuity_timeline"
+        ],
+        "blocked_without": [
+          "approved_references",
+          "motion_audio_coverage_if_required",
+          "request_budget"
+        ]
+      }
     },
     {
       "id": "N38",
@@ -617,7 +766,29 @@
       "on_fail": "N39",
       "on_blocked": "N39",
       "stage": "final",
-      "implementation_status": "ROLE_ONLY"
+      "implementation_status": "ROLE_ONLY",
+      "astra_v1_1": {
+        "review": "disabled pending access to original media with audio/motion coverage and explicit budget approval"
+      },
+      "astra_v1_2": {
+        "executor_class": "independent_temporal_and_audio_craft_reviewer",
+        "runtime_model_class": "verified_native_audio_video_capable; expensive_model_only_with_owner_grant",
+        "default_max_initial_calls": 1,
+        "input_contract": "ReviewerPacket(role=A8)+actual video+audio+craft_bar",
+        "output_contract": "contracts/final-runtime-v1_2.schema.json#/$defs/CriticVerdict",
+        "required_evidence": [
+          "video_motion",
+          "sound_listening",
+          "cut_boundaries",
+          "dialogue_timing"
+        ],
+        "blocked_without": [
+          "A8_separately_authorized",
+          "verified_multimodal_capability",
+          "actual_mp4"
+        ],
+        "runtime_status": "DISABLED_BLOCKED_UNTIL_MP4_AND_BUDGET"
+      }
     },
     {
       "id": "N39",
@@ -633,7 +804,28 @@
       "on_fail": "N42",
       "on_blocked": "N43",
       "stage": "final",
-      "implementation_status": "NEW"
+      "implementation_status": "NEW",
+      "astra_v1_1": {
+        "gate": "exactly one current verdict per A6/A7/A8 for identical snapshot; reject dup/stale/partial; owner decision still needed"
+      },
+      "astra_v1_2": {
+        "executor_class": "trusted_FastAPI_SQLite_transaction",
+        "runtime_model_class": "NONE",
+        "llm_calls": 0,
+        "input_contract": "3 CriticVerdict + FrozenReviewPacket + evidence provenance",
+        "output_contract": "contracts/final-runtime-v1_2.schema.json#/$defs/DecisionEnvelope",
+        "required_evidence": [
+          "exact_current_round_and_snapshot_hash",
+          "unique_roles",
+          "backend_verified_media",
+          "nonstale_approvals"
+        ],
+        "blocked_without": [
+          "all_3_unique_PASS",
+          "single_frozen_snapshot",
+          "backend_verification"
+        ]
+      }
     },
     {
       "id": "N40",
@@ -649,7 +841,22 @@
       "on_fail": "N42",
       "on_blocked": "N43",
       "stage": "final",
-      "implementation_status": "NEW"
+      "implementation_status": "NEW",
+      "astra_v1_1": {
+        "owner": "authenticated Studio session only; immutable master hash and current snapshot revision"
+      },
+      "astra_v1_2": {
+        "executor_class": "authenticated_Studio_owner_session",
+        "runtime_model_class": "NONE",
+        "llm_calls": 0,
+        "input_contract": "DecisionEnvelope + current owner session + viewable master",
+        "output_contract": "contracts/final-runtime-v1_2.schema.json#/$defs/OwnerReviewDecision",
+        "blocked_without": [
+          "owner_session",
+          "current_review_snapshot",
+          "human_decision"
+        ]
+      }
     },
     {
       "id": "N41",
@@ -665,7 +872,23 @@
       "on_fail": "N43",
       "on_blocked": "N43",
       "stage": "ready",
-      "implementation_status": "NEW"
+      "implementation_status": "NEW",
+      "astra_v1_1": {
+        "ready": "atomically verify unchanged entire snapshot, fresh reviews+owner decision+file checksum; repeat same decision idempotent"
+      },
+      "astra_v1_2": {
+        "executor_class": "trusted_FastAPI_SQLite_storage",
+        "runtime_model_class": "NONE",
+        "llm_calls": 0,
+        "input_contract": "OwnerReviewDecision + current master checksum + verified final round",
+        "output_contract": "contracts/final-runtime-v1_2.schema.json#/$defs/ReadyManifest",
+        "blocked_without": [
+          "same_snapshot",
+          "same_master_checksum",
+          "persisted_trusted_round",
+          "owner_authenticated"
+        ]
+      }
     },
     {
       "id": "N42",
@@ -681,7 +904,10 @@
       "on_fail": "N43",
       "on_blocked": "N43",
       "stage": "control",
-      "implementation_status": "NEW"
+      "implementation_status": "NEW",
+      "astra_v1_1": {
+        "repairs": "native speech=>N27, external speech/music/sfx=>N21, edit/mix=>N32; no bypass preflight or paid approval"
+      }
     },
     {
       "id": "N43",
@@ -697,7 +923,10 @@
       "on_fail": "END",
       "on_blocked": "END",
       "stage": "control",
-      "implementation_status": "NEW"
+      "implementation_status": "NEW",
+      "astra_v1_1": {
+        "unknown": "never auto-retry SUBMITTING after timeout; persist reservation and PAUSED/UNKNOWN"
+      }
     },
     {
       "id": "S01",
@@ -713,7 +942,10 @@
       "on_fail": "N43",
       "on_blocked": "N43",
       "stage": "shared",
-      "implementation_status": "NEW"
+      "implementation_status": "NEW",
+      "astra_v1_1": {
+        "pilot_storage": "existing FastAPI+SQLite as sole durable state; atomic revision CAS/lease, not n8n execution state"
+      }
     },
     {
       "id": "S02",
@@ -761,7 +993,10 @@
       "on_fail": "N43",
       "on_blocked": "N43",
       "stage": "shared",
-      "implementation_status": "NEW"
+      "implementation_status": "NEW",
+      "astra_v1_1": {
+        "budgets": "BudgetGrant limits and per-request immutable authorization; recheck hash/profile/cost and reserve before each paid submit"
+      }
     },
     {
       "id": "S05",
@@ -777,7 +1012,10 @@
       "on_fail": "N43",
       "on_blocked": "N43",
       "stage": "shared",
-      "implementation_status": "NEW"
+      "implementation_status": "NEW",
+      "astra_v1_1": {
+        "unknown": "PREPARED saved before submit; timeout or lost job id => UNKNOWN, preserve reservation, no automatic resubmit"
+      }
     },
     {
       "id": "S06",
@@ -793,7 +1031,14 @@
       "on_fail": "N43",
       "on_blocked": "N43",
       "stage": "shared",
-      "implementation_status": "NEW"
+      "implementation_status": "NEW",
+      "astra_v1_1": {
+        "provenance": "actual media decoded/viewed by critic; derivative checksum/origin/window/stream and validated viewer-side access"
+      },
+      "astra_v1_2": {
+        "local_media_worker": "ffprobe/FFmpeg must run on separate Windows worker, not n8n Cloud Code node",
+        "stt": "Whisper local CPU or paid remote STT separately, word timestamps not perfect sync proof"
+      }
     },
     {
       "id": "S07",
@@ -809,7 +1054,10 @@
       "on_fail": "N42",
       "on_blocked": "N43",
       "stage": "shared",
-      "implementation_status": "PARTIAL"
+      "implementation_status": "PARTIAL",
+      "astra_v1_2": {
+        "critic_policy": "three separate reviewer packets+session ids+model capabilities; text or frames not enough for audio/lip sync"
+      }
     },
     {
       "id": "S08",
@@ -825,7 +1073,10 @@
       "on_fail": "N43",
       "on_blocked": "N43",
       "stage": "shared",
-      "implementation_status": "NEW"
+      "implementation_status": "NEW",
+      "astra_v1_1": {
+        "checkpoint": "durable op/state revision, lease CAS, idempotent callbacks; two resumers cannot execute same paid operation"
+      }
     },
     {
       "id": "S09",
@@ -841,27 +1092,90 @@
       "on_fail": "N43",
       "on_blocked": "N43",
       "stage": "shared",
-      "implementation_status": "NEW"
+      "implementation_status": "NEW",
+      "astra_v1_1": {
+        "approval": "human Studio session scoped exact object/revision/action; service token or LLM cannot approve"
+      }
     }
   ],
   "conditional_routes": [
     {
+      "node_id": "N20",
+      "condition": "speech_strategy=frozen",
+      "next": "N21",
+      "reason": "Freeze strategy and required speech/music/sfx/ambience slots before any branch"
+    },
+    {
       "node_id": "N22",
-      "condition": "audio_strategy=native_video_audio AND audio_text_and_inputs_validated",
+      "condition": "speech_strategy=external_tts AND requests_fully_authorized",
+      "next": "N23",
+      "reason": "External speech and independent mandatory sound stems"
+    },
+    {
+      "node_id": "N22",
+      "condition": "speech_strategy=native_video AND speech_request_validated",
       "next": "N26",
-      "reason": "Подготовка речи проверена, синтез переносится в разрешённый video job; N23/N24 пока SKIPPED."
+      "reason": "Skip only external speech synth; independent external music/sfx/ambience branch still processed via N23–N25; native speech timing remains ESTIMATED"
+    },
+    {
+      "node_id": "N30",
+      "condition": "source_video_saved AND separate_lip_sync_required",
+      "next": "N28",
+      "reason": "Lip-sync dependent job with new approval and preflight; do not repeat source generation"
+    },
+    {
+      "node_id": "N30",
+      "condition": "source_video_saved AND no_lip_sync_required",
+      "next": "N31",
+      "reason": "Inspect real video before reviewer"
     },
     {
       "node_id": "N31",
       "condition": "video_review_passed AND native_audio_not_yet_reviewed",
       "next": "N25",
-      "reason": "Реальная дорожка из клипа направляется на аудиокритику до монтажа."
+      "reason": "Extract and measure actual native speech/audio from saved video first"
     },
     {
       "node_id": "N25",
-      "condition": "audio_from_reviewed_native_video AND video_review_passed",
+      "condition": "native_audio_review_passed AND video_already_reviewed",
       "next": "N32",
-      "reason": "Видео уже принято; не запускать его повторно через N26."
+      "reason": "Avoid loop back to video generation"
+    },
+    {
+      "node_id": "N19",
+      "condition": "image_mode=reference_candidate AND media_review_passed",
+      "next": "N12",
+      "reason": "Register CANDIDATE; owner approval for canon required"
+    },
+    {
+      "node_id": "N19",
+      "condition": "image_mode=shot_image AND media_review_passed",
+      "next": "N20",
+      "reason": "Use verified shot image as production asset"
+    },
+    {
+      "node_id": "N34",
+      "condition": "technical_export_checks_passed",
+      "next": "N35",
+      "reason": "No duplicate creative media review at N34"
+    },
+    {
+      "node_id": "N39",
+      "condition": "A6_A7_A8_unique_PASS_same_current_snapshot AND actual_media_verified",
+      "next": "N40",
+      "reason": "Owner approval required, no auto READY"
+    },
+    {
+      "node_id": "N39",
+      "condition": "any_FAIL",
+      "next": "N42",
+      "reason": "Return to root-cause stage, with new snapshot on change"
+    },
+    {
+      "node_id": "N39",
+      "condition": "BLOCKED_OR_STALE",
+      "next": "N43",
+      "reason": "No majority vote; block missing modality evidence"
     }
   ],
   "repair_targets": [
@@ -881,5 +1195,18 @@
     "N27",
     "N32",
     "N33"
-  ]
+  ],
+  "astra_review_closure_document": "ASTRA_FIXES_V1_1.md",
+  "runtime_status": {
+    "p0_state_and_approvals": "DESIGNED_NOT_INTEGRATED",
+    "p0_submit_recovery": "DESIGNED_NOT_INTEGRATED",
+    "p0_paid_budget": "DESIGNED_NOT_INTEGRATED",
+    "p0_media_capability": "BLOCKED_NO_REAL_MP4",
+    "p1_media_routing": "SPECIFIED",
+    "p1_snapshot_aggregation": "SPECIFIED",
+    "p2_duplicate_review": "REMOVED_FROM_PLANNED_ROUTE"
+  },
+  "astra_runtime_model_matrix": "N34_N41_RUNTIME_MODEL_MATRIX.md",
+  "runtime_schema": "contracts/final-runtime-v1_2.schema.json",
+  "runtime_cost_policy": "no model calls N34,N39,N40,N41; N35 STT approval separate; N36-38 budgeted multimedia only"
 }

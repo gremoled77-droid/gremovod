@@ -1,0 +1,213 @@
+{
+  "spec_version": "1.0-scenario-preproduction-draft",
+  "status": "SPECIFIED_NOT_INTEGRATED",
+  "scenario_priority": "N01-N11_before_UI",
+  "runtime_provider": "NONE_FOR_MOCK",
+  "allow_real_source_without_trusted_backend": false,
+  "source_context": {
+    "canon_authority": "FastAPI approved source snapshot only",
+    "github_skill_refs_are_instructions_not_approved_canon": true,
+    "owner_auth": "Studio only, n8n never grants approval",
+    "test_material": "Graham approaches a VAZ-2106, drives toward airport, full limousine withheld until final reveal",
+    "test_material_status": "SYNTHETIC_DEMO_INPUT"
+  },
+  "skills": [
+    {
+      "id": "skill-idea",
+      "repository_path": "skills/gremovod-stage-idea/SKILL.md",
+      "used_by": [
+        "N03",
+        "N06"
+      ],
+      "kind": "repo_existing",
+      "instruction": "Promise, desire/obstacle, story ending before dialogue"
+    },
+    {
+      "id": "skill-series",
+      "repository_path": "skills/gremovod-series-development/SKILL.md",
+      "used_by": [
+        "N03",
+        "N06",
+        "N09"
+      ],
+      "kind": "repo_existing",
+      "instruction": "Standalone episode and serial continuity"
+    },
+    {
+      "id": "skill-screenplay",
+      "repository_path": "skills/gremovod-screenplay/SKILL.md",
+      "used_by": [
+        "N09",
+        "N11"
+      ],
+      "kind": "repo_existing",
+      "instruction": "Stable scene/frame/dialogue IDs and voice-offscreen vs on-screen distinction"
+    },
+    {
+      "id": "skill-dialogue",
+      "repository_path": "skills/gremovod-dialogue-subtext/SKILL.md",
+      "used_by": [
+        "N09",
+        "N10"
+      ],
+      "kind": "repo_existing",
+      "instruction": "Dialogue as goal/action, subtext and reaction"
+    },
+    {
+      "id": "skill-character",
+      "repository_path": "skills/gremovod-character-comedy/SKILL.md",
+      "used_by": [
+        "N06",
+        "N09",
+        "N10"
+      ],
+      "kind": "repo_existing",
+      "instruction": "Comedy arises from desire and character actions"
+    },
+    {
+      "id": "skill-rewrite",
+      "repository_path": "skills/gremovod-script-rewrite/SKILL.md",
+      "used_by": [
+        "N10",
+        "N42"
+      ],
+      "kind": "repo_existing",
+      "instruction": "Addressed changes preserve source text and untouched scenes"
+    }
+  ],
+  "optional_proposed_techniques": [
+    {
+      "name": "five_lenses",
+      "external_skill_name": "generate-fresh-ideas",
+      "status": "NOT_FOUND_AS_INSTALLED_SKILL",
+      "apply_to": [
+        "N03",
+        "N06"
+      ],
+      "instruction": "Contrarian/personal/evidence/practical/missing detail are editorial prompts; do not treat as five mandatory concepts or facts"
+    },
+    {
+      "name": "showrunner_panel",
+      "external_skill_name": "get-more-perspectives",
+      "status": "NOT_FOUND_AS_INSTALLED_SKILL",
+      "apply_to": [
+        "N07",
+        "N10"
+      ],
+      "instruction": "Five advisory lenses Visionary/Viewer/Operator/Finance/Skeptic; not a substitute for independent A6/A7 evidence-based gate"
+    },
+    {
+      "name": "voice_rewrite",
+      "external_skill_name": "grem",
+      "status": "NOT_FOUND_AS_INSTALLED_SKILL",
+      "apply_to": [
+        "N09"
+      ],
+      "instruction": "Only use character-specific approved dialogue profile, never invent or overwrite author text"
+    },
+    {
+      "name": "style_match",
+      "external_skill_name": "match-my-writing-style",
+      "status": "NOT_FOUND_AS_INSTALLED_SKILL",
+      "apply_to": [
+        "N09",
+        "S09"
+      ],
+      "instruction": "Require actual approved writing samples and owner permission; no ungrounded style imitation"
+    }
+  ],
+  "stages": [
+    {
+      "id": "N01",
+      "role": "OWNER_OR_INTAKE",
+      "engine": "CODE",
+      "produces": "IdeaIntake",
+      "gate": "source_provenance"
+    },
+    {
+      "id": "N02",
+      "role": "INPUT_VALIDATOR",
+      "engine": "CODE",
+      "produces": "IntakeCheck",
+      "gate": "project_access_and_size"
+    },
+    {
+      "id": "N03",
+      "role": "A0",
+      "engine": "BOUNDED_LLM",
+      "produces": "BriefCandidate",
+      "gate": "no_invented_canon"
+    },
+    {
+      "id": "N04",
+      "role": "A4",
+      "engine": "RESEARCH_ON_DEMAND",
+      "produces": "ResearchReportOrSkip",
+      "gate": "traceable_external_sources"
+    },
+    {
+      "id": "N05",
+      "role": "TRUSTED_BACKEND_AND_OWNER",
+      "engine": "CODE_AND_OWNER",
+      "produces": "FrozenBriefSnapshot",
+      "gate": "owner_approval_and_hash"
+    },
+    {
+      "id": "N06",
+      "role": "A1",
+      "engine": "CREATIVE_LLM",
+      "produces": "ConceptCandidates",
+      "gate": "at_least_two_distinct_viable_options;default_three_candidates"
+    },
+    {
+      "id": "N07",
+      "role": "A6_A7_AND_ADVISORY_PERSPECTIVES",
+      "engine": "BOUNDED_LLM_AND_CODE",
+      "produces": "ConceptReview",
+      "gate": "per_concept_requirements_and_canon;five_advisors_not_independent_reviewers"
+    },
+    {
+      "id": "N08",
+      "role": "OWNER",
+      "engine": "OWNER_APPROVAL",
+      "produces": "SelectedConcept",
+      "gate": "owner_selects_concept_id;no_silent_selection"
+    },
+    {
+      "id": "N09",
+      "role": "A1",
+      "engine": "CREATIVE_LLM",
+      "produces": "ScriptDraft",
+      "gate": "frozen_concept_and_approved_character_voice"
+    },
+    {
+      "id": "N10",
+      "role": "A6_A7_OPTIONAL_A8_TEXT",
+      "engine": "BOUNDED_LLM_AND_CODE",
+      "produces": "ScriptReview",
+      "gate": "pass_per_source_revision_not_media_PASSED"
+    },
+    {
+      "id": "N11",
+      "role": "A2",
+      "engine": "DIRECTOR_LLM",
+      "produces": "CastingLocationAssetRequestPlan",
+      "gate": "approved_refs_only;missing_assets_as_requests"
+    }
+  ],
+  "explicit_no_auto": [
+    "OWNER_SELECT",
+    "NEW_CANON",
+    "PAID_GENERATE",
+    "REAL_MEDIA_QA",
+    "READY",
+    "PUBLICATION"
+  ],
+  "execution_boundary": "n8n sub-workflow workers read server-frozen packets; FastAPI issues approvals, budget grants and runtime revision checks",
+  "cost_policy": {
+    "mock_usd": 0,
+    "budget_required_for_any_model": true,
+    "prompt_style": "at most one initial call per creative stage under user-approved envelope",
+    "deterministic_checks_use_code": true
+  }
+}
