@@ -3,6 +3,7 @@
     python -m tools.ai_review.cli review   --base <sha> --head <sha> --scope "..."
     python -m tools.ai_review.cli validate artifacts/ai-review/<run>/summary.json
     python -m tools.ai_review.cli report   artifacts/ai-review/<run>/summary.json
+    python -m tools.ai_review.cli scan     --base <sha> --head <sha>
     python -m tools.ai_review.cli quota    --consent   # только чтение остатка M Plan
 
 Режим по умолчанию — MOCK: без сети, без ключей, без расхода квоты.
@@ -21,7 +22,7 @@ from typing import Any
 
 from . import quota as quota_guard
 from .contract import assert_valid, build_summary, validate_summary
-from .localscan import LocalScanError, collect_diff
+from .localscan import LocalScanError, collect_diff, scan_branch_material
 from .payload import build_payload
 from .report import render_report, render_short_summary
 from .reviewer import ReviewRequest, get_reviewer
@@ -173,6 +174,49 @@ def _make_reviewer(args: argparse.Namespace):
     return get_reviewer(args.provider)
 
 
+def cmd_scan(args: argparse.Namespace) -> int:
+    """Просканировать ветку целиком: секреты, бинарники, чувствительные пути.
+
+    В отличие от `review`, этот режим не строит payload и не отправляет его
+    провайдеру, поэтому лимиты одного запроса (12 файлов / 45 КБ) к нему не
+    применяются: проверяется вся ветка.
+    """
+    repo = Path(args.repo).resolve()
+    try:
+        result = scan_branch_material(repo, args.base, args.head)
+    except LocalScanError as ex:
+        print(f"[BLOCKED] локальная проверка отклонила материал: {ex}", file=sys.stderr)
+        return 2
+
+    print(json.dumps(result, ensure_ascii=False, indent=2))
+
+    problems: list[str] = []
+    if result["blocked_secrets"]:
+        problems.append(
+            "в диффе найден потенциальный секрет: "
+            + ", ".join(sorted(set(result["blocked_secrets"])))
+        )
+    if result["binary_changes"]:
+        problems.append("в диффе есть бинарные изменения")
+    problems.extend(result["blocked_paths"])
+    if problems:
+        print("[FAIL] ветка не прошла безопасностный скан:", file=sys.stderr)
+        for problem in problems:
+            print(f"  - {problem}", file=sys.stderr)
+        return 1
+
+    print(
+        f"[OK] скан ветки пройден: файлов={result['file_count']}, "
+        f"diff_bytes={result['diff_bytes']}, секретов=0, бинарных=0"
+    )
+    if result["allowed_secrets"]:
+        print(
+            "[OK] разрешённые совпадения (из .secrets-allowlist.txt): "
+            + ", ".join(sorted(set(result["allowed_secrets"])))
+        )
+    return 0
+
+
 def cmd_validate(args: argparse.Namespace) -> int:
     data = json.loads(Path(args.path).read_text(encoding="utf-8"))
     problems = validate_summary(data)
@@ -236,6 +280,14 @@ def build_parser() -> argparse.ArgumentParser:
     validate = sub.add_parser("validate", help="проверить summary.json по контракту")
     validate.add_argument("path")
     validate.set_defaults(func=cmd_validate)
+
+    scan = sub.add_parser(
+        "scan", help="просканировать ветку на секреты и бинарники (без сети и без payload)"
+    )
+    scan.add_argument("--repo", default=".")
+    scan.add_argument("--base", required=True)
+    scan.add_argument("--head", required=True)
+    scan.set_defaults(func=cmd_scan)
 
     report = sub.add_parser("report", help="собрать Markdown-отчёт из summary.json")
     report.add_argument("path")

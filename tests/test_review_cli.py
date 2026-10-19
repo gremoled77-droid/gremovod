@@ -127,6 +127,23 @@ class CliTest(unittest.TestCase):
         )
         self.assertEqual(before, git(self.repo, "status", "--porcelain").stdout)
 
+    def test_scan_subcommand_passes_on_clean_branch(self):
+        self.commit_change("x = 2\n")
+        self.assertEqual(
+            main(["scan", "--repo", str(self.repo), "--base", "HEAD~1", "--head", "HEAD"]), 0
+        )
+
+    def test_scan_subcommand_fails_on_secret(self):
+        self.commit_change("api_key = 'AKIAIOSFODNN7EXAMPLEKEY'\n")
+        self.assertEqual(
+            main(["scan", "--repo", str(self.repo), "--base", "HEAD~1", "--head", "HEAD"]), 1
+        )
+
+    def test_scan_subcommand_rejects_unknown_ref(self):
+        self.assertEqual(
+            main(["scan", "--repo", str(self.repo), "--base", "no-such-ref", "--head", "HEAD"]), 2
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

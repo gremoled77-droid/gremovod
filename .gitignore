@@ -54,3 +54,6 @@ docs/*.jpg
 *.sqlite3-wal
 *.sqlite3-shm
 *.sqlite3-journal
+
+# Выходные артефакты AI-ревьюера (summary.json, report.md) — локальные.
+/artifacts/

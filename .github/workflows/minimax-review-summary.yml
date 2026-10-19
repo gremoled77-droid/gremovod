@@ -11,6 +11,7 @@ on:
       - 'workflows/WF_07_MiniMax_Reviewer_MOCK.ts'
       - 'workflows/WF_07_MiniMax_Reviewer_MOCK.json'
       - '.github/workflows/minimax-review-summary.yml'
+      - '.secrets-allowlist.txt'
   workflow_dispatch:
 
 permissions:
@@ -29,50 +30,110 @@ jobs:
         with:
           python-version: '3.13'
 
+      - name: Fetch base branch
+        run: git fetch --no-tags origin main
+
       - name: Offline reviewer test suite (no provider calls)
         run: python -X utf8 -m unittest discover -s tests -p "test_review_*.py" -v
 
       - name: Argon reviewer regression suite (no provider calls)
         run: python -X utf8 -m unittest discover -s tests -p "test_argon_review.py" -v
 
-      - name: MOCK review of the branch diff
+      # Скан проверяет ВСЮ ветку: секреты, бинарники, чувствительные пути.
+      # Лимиты одного запроса (12 файлов / 45 КБ) к нему не применяются —
+      # он ничего не отправляет провайдеру.
+      - name: Whole-branch safety scan (no provider calls)
+        id: scan
         run: |
           set -euo pipefail
-          git fetch --no-tags origin main
+          python -X utf8 -m tools.ai_review.cli scan \
+            --repo . \
+            --base origin/main \
+            --head HEAD
+
+      # Материал одного запроса ограничен намеренно. Ветка целиком в него не
+      # помещается, поэтому на ревью отбирается safety core ревьюера:
+      # по приоритету, пока не исчерпан бюджет в 30 КБ.
+      - name: MOCK review of the reviewer safety core
+        id: mock_review
+        run: |
+          set -euo pipefail
+          budget=30000
+          used=0
+          args=()
+          for path in \
+            tools/ai_review/quota.py \
+            tools/ai_review/contract.py \
+            tools/ai_review/payload.py \
+            tools/ai_review/localscan.py \
+            tools/ai_review/reviewer.py \
+            tools/ai_review/report.py \
+            tools/ai_review/cli.py
+          do
+            if git diff --quiet origin/main HEAD -- "$path"; then
+              continue
+            fi
+            size=$(git diff --no-ext-diff --no-textconv --no-color --unified=3 origin/main HEAD -- "$path" | wc -c)
+            if [ $((used + size)) -gt $budget ]; then
+              echo "skip $path — не помещается в бюджет ${budget} байт"
+              continue
+            fi
+            used=$((used + size))
+            args+=(--allowed-paths "$path")
+          done
+          if [ ${#args[@]} -eq 0 ]; then
+            echo "safety core ревьюера не менялся в этом push — MOCK-ревью пропущено"
+            exit 0
+          fi
+          echo "review slice: ${args[*]} (${used} байт)"
           python -X utf8 -m tools.ai_review.cli review \
             --repo . \
             --base origin/main \
             --head HEAD \
-            --scope "Автоматическая MOCK-проверка ветки ${GITHUB_REF_NAME}" \
+            --scope "Автоматическая MOCK-проверка safety core AI-ревьюера (${GITHUB_REF_NAME})" \
             --task-id "CI-${GITHUB_RUN_ID}" \
             --provider mock \
             --mode MOCK \
             --tests-status PASS \
-            --out-dir artifacts/ai-review
+            --out-dir artifacts/ai-review \
+            "${args[@]}"
 
       - name: Publish report to the job summary
+        if: always()
         run: |
           set -euo pipefail
-          report="$(ls -1 artifacts/ai-review/*/report.md | head -n 1)"
-          summary="$(ls -1 artifacts/ai-review/*/summary.json | head -n 1)"
+          report="$(ls -1 artifacts/ai-review/*/report.md 2>/dev/null | head -n 1 || true)"
+          summary="$(ls -1 artifacts/ai-review/*/summary.json 2>/dev/null | head -n 1 || true)"
           {
             echo "## MOCK-отчёт AI-ревьюера (dev-run-summary/1)"
             echo ""
             echo "Режим MOCK: сетевых вызовов к провайдерам не было, квота M Plan не расходовалась."
             echo ""
-            cat "$report"
+            if [ "${{ steps.scan.outcome }}" = "success" ]; then
+              echo "Скан ветки: запрещённых секретов — 0, бинарных изменений — 0."
+            else
+              echo "Скан ветки: **не пройден** (см. лог шага)."
+            fi
             echo ""
-            echo "<details><summary>Машиночитаемый summary.json</summary>"
-            echo ""
-            echo '```json'
-            cat "$summary"
-            echo '```'
-            echo "</details>"
+            if [ -n "$report" ]; then
+              cat "$report"
+              echo ""
+              echo "<details><summary>Машиночитаемый summary.json</summary>"
+              echo ""
+              echo '```json'
+              cat "$summary"
+              echo '```'
+              echo "</details>"
+            else
+              echo "_MOCK-отчёт не создан: safety core ревьюера не менялся в этом push._"
+            fi
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload MOCK artifacts
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: minimax-review-mock-${{ github.run_id }}
           path: artifacts/ai-review/
           retention-days: 14
+          if-no-files-found: ignore

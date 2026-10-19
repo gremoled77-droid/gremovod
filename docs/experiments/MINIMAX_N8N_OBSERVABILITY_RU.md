@@ -91,10 +91,43 @@ quota-exhausted, expiry cutoff, CI FAIL несмотря на AI PASS.
 
 | Файл | Назначение |
 | --- | --- |
-| `.github/workflows/minimax-review-summary.yml` | Только `workflow_dispatch` + push в свою ветку: офлайн-тесты и MOCK-отчёт в job summary |
+| `.github/workflows/minimax-review-summary.yml` | Только `workflow_dispatch` + push в свою ветку: офлайн-тесты, ветровой скан безопасности и MOCK-отчёт в job summary |
+| `.secrets-allowlist.txt` | Явные исключения из проверки секретов: синтетические значения из тестов, видимые в ревью |
 | `docs/experiments/MINIMAX_N8N_OBSERVABILITY_RU.md` | этот документ |
 | `docs/experiments/MINIMAX_REVIEWER_ADAPTER_RU.md` | контракт и правило переключения MiniMax → Argon |
 | `agents/minimax/HANDOFF_FOR_CODEX.md` | что делать Codex после этого этапа |
+
+### 2.5 Два разных масштаба проверки
+
+Лимиты `MAX_CHANGED_FILES = 12` и `MAX_DIFF_BYTES = 45_000` ограничивают **один запрос**
+к провайдеру. Ветка целиком в них не помещается — и это по построению, а не по ошибке.
+Поэтому проверок две, и они не дублируют друг друга:
+
+| Проверка | Масштаб | Что смотрит | Сеть |
+| --- | --- | --- | --- |
+| `cli review` (узел 03–05 n8n) | материал одного запроса, ≤ 12 файлов и ≤ 45 КБ | лимиты, бинарники, секреты, привязка к SHA | нет |
+| `cli scan` (шаг CI) | вся ветка, без лимитов запроса | секреты, бинарники, чувствительные пути | нет |
+
+`cli scan` ничего не отправляет провайдеру, поэтому лимиты одного запроса к нему не
+применяются — так ловится секрет в файле, который в отправляемый срез не попал бы.
+
+Два известных класса ложных срабатывания закрыты явно, а не «догадками»:
+
+- **Бинарник.** Маркер git — это строка целиком (`Binary files a/x and b/x differ`).
+  Наивная проверка подстроки ловила исходный код самого сканера, где этот маркер
+  стоит литералом. Теперь маркеры привязаны к началу строки.
+- **Тест-фикстуры.** Тесты ревьюера обязаны содержать синтетические ключи, иначе
+  guard нечего проверять. Такие значения перечислены в `.secrets-allowlist.txt`:
+  они не считаются находкой, но остаются видимыми в отчёте как «разрешённое
+  совпадение». Любое значение не из списка по-прежнему блокирует запрос.
+
+### 2.6 Почему CI ревьюит не всю ветку
+
+Шаг MOCK-ревью в CI отбирает **safety core** ревьюера (`quota.py`, `contract.py`,
+`payload.py`, …) по приоритету, пока не исчерпан бюджет в 30 КБ. Причина та же:
+материал одного запроса ограничен намеренно, а CI не должен падать из-за размера
+ветки — это не дефект ревьюера. Полный скан ветки при этом всё равно выполняется
+шагом `cli scan`.
 
 ## 3. Границы, которые мы не переходили
 
@@ -120,12 +153,23 @@ quota-exhausted, expiry cutoff, CI FAIL несмотря на AI PASS.
 ```powershell
 cd C:\Users\BLOWKA\Documents\Minimax\gremovod-mplan
 python -X utf8 -m unittest discover -s tests -p "test_review_*.py" -v
+python -X utf8 -m tools.ai_review.cli scan --repo . --base origin/main --head HEAD
 python -X utf8 -m tools.ai_review.cli review --repo . --base origin/main --head HEAD `
   --scope "Проверка контракта ревьюера" --provider mock --mode MOCK --tests-status PASS `
   --out-dir artifacts/ai-review
 ```
 
 Результат: `artifacts/ai-review/<run_id>/summary.json` и `report.md`.
+
+Ветка целиком в лимиты одного запроса не помещается (36 файлов > 12). Для MOCK-прогона
+по всей ветке сузьте материал явно:
+
+```powershell
+python -X utf8 -m tools.ai_review.cli review --repo . --base origin/main --head HEAD `
+  --scope "Проверка safety core" --provider mock --mode MOCK --tests-status PASS `
+  --allowed-paths tools/ai_review/quota.py --allowed-paths tools/ai_review/contract.py `
+  --out-dir artifacts/ai-review
+```
 
 ## 6. Живой запрос — только после согласия
 

@@ -23,6 +23,9 @@ MAX_DIFF_BYTES = argon_review.MAX_DIFF_BYTES
 MAX_CHANGED_FILES = argon_review.MAX_CHANGED_FILES
 BLOCKED_SUFFIXES = argon_review.BLOCKED_SUFFIXES
 BLOCKED_FILES = argon_review.BLOCKED_FILES
+ALLOWLIST_FILENAME = argon_review.ALLOWLIST_FILENAME
+BINARY_MARKER = argon_review.BINARY_MARKER
+BINARY_PATCH_MARKER = argon_review.BINARY_PATCH_MARKER
 SENSITIVE_DIRS = {".git", "secrets", "private"}
 
 
@@ -93,10 +96,12 @@ def collect_diff(
     head_sha = resolve_sha(repo, head)
 
     if allowed_paths is None:
+        allowlist = argon_review.load_allowlist(repo)
         try:
-            files, diff, digest = argon_review.snapshot(repo, base, head)
+            files, diff, digest = argon_review.snapshot(repo, base, head, allowlist=allowlist)
         except argon_review.ReviewError as ex:
             raise LocalScanError(str(ex)) from None
+        _blocked, permitted = argon_review.find_secret_matches(diff, allowlist)
         return {
             "base_sha": base_sha,
             "head_sha": head_sha,
@@ -105,6 +110,7 @@ def collect_diff(
             "diff_sha256": digest,
             "diff_bytes": len(diff.encode("utf-8")),
             "truncated": False,
+            "allowed_secrets": permitted,
         }
 
     wanted = {str(path).replace("\\", "/") for path in allowed_paths}
@@ -137,9 +143,12 @@ def collect_diff(
         raise LocalScanError(f"Diff exceeds {MAX_DIFF_BYTES} bytes; select smaller commits")
 
     diff = data.decode("utf-8", errors="replace")
-    if "Binary files " in diff or "GIT binary patch" in diff:
+    if BINARY_MARKER.search(diff) or BINARY_PATCH_MARKER.search(diff):
         raise LocalScanError("Binary changes are excluded from AI review")
-    if argon_review.SECRET.search(diff):
+    blocked, permitted = argon_review.find_secret_matches(
+        diff, argon_review.load_allowlist(repo)
+    )
+    if blocked:
         raise LocalScanError("Potential secret in diff; review locally before any API request")
 
     return {
@@ -150,6 +159,64 @@ def collect_diff(
         "diff_sha256": hashlib.sha256(data).hexdigest(),
         "diff_bytes": len(diff.encode("utf-8")),
         "truncated": False,
+        "allowed_secrets": permitted,
+    }
+
+
+def scan_branch_material(repo: Path, base: str, head: str) -> dict:
+    """Просканировать весь дифф ветки на секреты, бинарники и чувствительные пути.
+
+    Лимиты `MAX_DIFF_BYTES` / `MAX_CHANGED_FILES` ограничивают ОДИН запрос к
+    провайдеру. Этот скан ничего не отправляет, поэтому лимиты запроса к нему
+    не применяются: он проверяет ветку целиком — именно так ловится секрет,
+    который иначе уехал бы к провайдеру вместе с большим диффом.
+
+    Ни одного сетевого вызова.
+    """
+    repo = Path(repo).resolve()
+    base_sha = resolve_sha(repo, base)
+    head_sha = resolve_sha(repo, head)
+
+    files = changed_files(repo, base, head)
+
+    blocked: list[str] = []
+    for path in files:
+        try:
+            check_file_allowed(path)
+        except LocalScanError as ex:
+            blocked.append(str(ex))
+
+    # --unified=0: интересуют только изменённые строки. Контекстные строки
+    # не менялись и не могут внести новый секрет, но дали бы ложное
+    # срабатывание на секрете из соседнего файла того же коммита.
+    data = _git(
+        repo,
+        "diff",
+        "--no-ext-diff",
+        "--no-textconv",
+        "--no-color",
+        "--unified=0",
+        base,
+        head,
+        "--",
+    )
+    diff = data.decode("utf-8", errors="replace")
+    blocked_secrets, permitted_secrets = argon_review.find_secret_matches(
+        diff, argon_review.load_allowlist(repo)
+    )
+
+    return {
+        "base_sha": base_sha,
+        "head_sha": head_sha,
+        "files": files,
+        "file_count": len(files),
+        "diff_bytes": len(data),
+        "blocked_paths": blocked,
+        "binary_changes": bool(
+            BINARY_MARKER.search(diff) or BINARY_PATCH_MARKER.search(diff)
+        ),
+        "blocked_secrets": blocked_secrets,
+        "allowed_secrets": permitted_secrets,
     }
 
 

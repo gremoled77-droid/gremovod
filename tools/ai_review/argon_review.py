@@ -23,6 +23,13 @@ BLOCKED_SUFFIXES = {".pem", ".key", ".p12", ".pfx", ".pdf", ".png", ".jpg", ".mp
 BLOCKED_FILES = {".env", ".npmrc", "id_rsa", "id_ed25519", "credentials.json", "secrets.json"}
 SECRET = re.compile(r"(?:-----BEGIN [A-Z ]*PRIVATE KEY-----|\b(?:ghp_|github_pat_|sk-)[A-Za-z0-9_\-]{12,}|\b(?:api[_-]?key|password|secret|access[_-]?token)\s*[=:]\s*['\"]?(?!example|dummy|test|placeholder)[A-Za-z0-9/+_\-]{12,})", re.I)
 REF = re.compile(r"^[A-Za-z0-9_.\-/~^]+$")
+# Маркеры бинарника git совпадают только в начале строки. Наивная проверка
+# подстроки давала ложное срабатывание на исходном коде самого сканера,
+# где эти строки встречаются как литералы ("Binary files " in diff).
+BINARY_MARKER = re.compile(r"^Binary files .* differ$", re.MULTILINE)
+BINARY_PATCH_MARKER = re.compile(r"^GIT binary patch$", re.MULTILINE)
+# Явные исключения из проверки секретов: синтетические значения из тестов.
+ALLOWLIST_FILENAME = ".secrets-allowlist.txt"
 
 
 class ReviewError(Exception):
@@ -42,7 +49,44 @@ def validate_ref(ref: str) -> str:
     return ref
 
 
-def snapshot(repo: Path, base: str, head: str):
+def load_allowlist(repo: Path) -> list[str]:
+    """Прочитать явный белый список синтетических значений из репозитория.
+
+    Файл `.secrets-allowlist.txt` — auditable-исключение: каждая строка видна
+    в ревью и содержит значение, которое заведомо не является реальным секретом
+    (тест-фикстура или пример из документации). Пустой или отсутствующий файл
+    означает «исключений нет».
+    """
+    path = Path(repo) / ALLOWLIST_FILENAME
+    if not path.is_file():
+        return []
+    entries: list[str] = []
+    for raw in path.read_text(encoding="utf-8").splitlines():
+        line = raw.split("#", 1)[0].strip()
+        if line:
+            entries.append(line)
+    return entries
+
+
+def find_secret_matches(diff: str, allowlist: list[str] | None = None) -> tuple[list[str], list[str]]:
+    """Разделить совпадения регулярного выражения на запрещённые и разрешённые.
+
+    Возвращает (запрещённые, разрешённые). Значение из белого списка не считается
+    находкой, но остаётся видимым: исключения должны быть видны в отчёте.
+    """
+    allowed = allowlist or []
+    blocked: list[str] = []
+    permitted: list[str] = []
+    for match in SECRET.finditer(diff):
+        text = match.group(0)
+        if any(entry in text for entry in allowed):
+            permitted.append(text)
+        else:
+            blocked.append(text)
+    return blocked, permitted
+
+
+def snapshot(repo: Path, base: str, head: str, allowlist: list[str] | None = None):
     repo = repo.resolve()
     run_git(repo, "rev-parse", "--is-inside-work-tree")
     base, head = validate_ref(base), validate_ref(head)
@@ -62,9 +106,10 @@ def snapshot(repo: Path, base: str, head: str):
     if len(data) > MAX_DIFF_BYTES:
         raise ReviewError(f"Diff exceeds {MAX_DIFF_BYTES} bytes; select smaller commits")
     diff = data.decode("utf-8", errors="replace")
-    if "Binary files " in diff or "GIT binary patch" in diff:
+    if BINARY_MARKER.search(diff) or BINARY_PATCH_MARKER.search(diff):
         raise ReviewError("Binary changes are excluded from AI review")
-    if SECRET.search(diff):
+    blocked, _permitted = find_secret_matches(diff, allowlist)
+    if blocked:
         raise ReviewError("Potential secret in diff; review locally before any API request")
     return files, diff, hashlib.sha256(data).hexdigest()
 
