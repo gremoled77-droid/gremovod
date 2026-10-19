@@ -4,7 +4,7 @@
 
 ## Три строки для следующего исполнителя
 
-- **Сделано:** разработаны P0-модуль памяти/бюджета и 7 связанных MOCK workflow; код проверен изолированными SQLite/FFmpeg тестами. Подготовлены правила для Codex, Claude Code, Argon.
+- **Сделано:** разработаны P0-модуль памяти/бюджета и 7 связанных MOCK workflow; код проверен изолированными SQLite/FFmpeg тестами. Подготовлены правила для Codex, Claude Code, Argon, 7 обезличенных JSON-экспортов и CI-защита чужих областей в новых task-ветках.
 - **Файлы:** `AGENT_BUILD_MANUAL.md`, `STATUS.md`, `docs/CODEX_REVIEW_PACKET.md`, `docs/CODEX_DECISIONS.md`, `docs/CODEX_NEXT_ACTIONS.md`, `db/schema.sql`, `backend/p0_control.py`, `integrations/n8n/WF_00_WF_06_MANIFEST.json`, `workflows/`, `prompts/`.
 - **Следующий шаг:** **Codex** ревью зависимости PR #17 → #18, поиск конфликтов с существующими `backend/main.py` / Studio SQL, фиксация contracts в отдельной ветке и выдача двух независимых build-заданий Claude/Argon. Никаких изменений main до ревью.
 
