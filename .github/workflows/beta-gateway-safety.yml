@@ -1,0 +1,26 @@
+name: BETA Gateway Lab no-spend safety
+
+on:
+  push:
+    branches:
+      - experiment/beta-gateway-first-20261019
+  pull_request:
+    paths:
+      - 'beta/**'
+      - '.github/workflows/beta-gateway-safety.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  beta-no-spend-safety:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Verify manual Gateway balance gate and no external API credentials
+        run: python -m unittest -v beta.test_beta_safety
