@@ -1,8 +1,19 @@
 """P0 Studio ledger: five additive p0_* tables in the EXISTING Studio SQLite.
 
-No HTTP routes, model calls or provider submission. All consent booleans are
-INTERNAL TRUST-BOUNDARY PLACEHOLDERS, never pass untrusted n8n/HTTP fields to them.
-A verified Studio session must supply owner identity before production wiring.
+No HTTP routes, model calls or provider submission.
+
+Trust boundary: the ledger never accepts a boolean that grants permission.
+Owner rights arrive as a server-signed capability bound to one envelope, a
+request approval as a capability bound to one immutable request hash, and
+provider evidence is checked by a server-side callable. Forwarding the old
+`trusted_*` fields from an HTTP or n8n body is rejected explicitly.
+
+Budget boundary: this ledger and the legacy Studio share one spending
+counter (backend/spend_ledger.py), so the second layer cannot spend what the
+first layer still allows.
+
+Database boundary: the ledger may only open the Studio SQLite; a second
+writable database is refused (backend/studio_db.py).
 """
 from __future__ import annotations
 
@@ -13,6 +24,7 @@ import time
 from contextlib import contextmanager
 from pathlib import Path
 
+from backend import p0_authz, spend_ledger, studio_db
 
 SCHEMA = Path(__file__).resolve().parents[1] / "db" / "schema.sql"
 
@@ -34,8 +46,17 @@ def sha256(payload) -> str:
                                      separators=(",", ":")).encode("utf-8")).hexdigest()
 
 
-def open_db(path: Path | str) -> sqlite3.Connection:
-    db = sqlite3.connect(str(path), timeout=10, isolation_level=None)
+def open_db(path: Path | str, *, allow_disposable: bool = False) -> sqlite3.Connection:
+    """Open the Studio SQLite. A second writable database is refused.
+
+    `allow_disposable` is for tests and for explicitly disposable copies of
+    the Studio database; it must never be set on a production code path.
+    """
+    try:
+        resolved = studio_db.resolve(path, allow_disposable=allow_disposable)
+    except studio_db.ShadowState as exc:
+        raise Blocked(str(exc)) from None
+    db = sqlite3.connect(str(resolved), timeout=10, isolation_level=None)
     db.row_factory = sqlite3.Row
     db.execute("PRAGMA foreign_keys=ON")
     db.execute("PRAGMA busy_timeout=10000")
@@ -110,15 +131,30 @@ def create_run(db, *, run_id, project_id, snapshot_sha, source_revision):
 
 def create_envelope(db, *, envelope_id, run_id, owner_decision_ref, cap_cents,
                     max_calls, max_attempts_per_slot, stage, provider, model,
-                    expires_at_ms, trusted_studio_owner):
-    """trusted_studio_owner MUST be derived server-side from Studio session."""
-    if trusted_studio_owner is not True or not owner_decision_ref:
-        raise Blocked("owner budget permission not verified")
+                    expires_at_ms, owner_capability=None, **legacy):
+    """Owner permission is a server-signed capability, never a caller-supplied flag.
+
+    The capability is bound to this run, this envelope, this ceiling, stage,
+    provider and model, so an approval for one grant cannot be replayed for
+    another. Legacy `trusted_studio_owner` from an HTTP or n8n body is refused.
+    """
+    try:
+        p0_authz.reject_legacy_trust(legacy)
+    except p0_authz.AuthzError as exc:
+        raise Blocked(str(exc)) from None
     if any(type(n) is not int for n in (cap_cents,max_calls,max_attempts_per_slot,expires_at_ms)):
         raise Blocked("budget integers required")
     if (cap_cents <= 0 or max_calls <= 0 or max_attempts_per_slot <= 0 or
             expires_at_ms <= now_ms() or not all((stage,provider,model))):
         raise Blocked("invalid budget envelope")
+    try:
+        p0_authz.verify(owner_capability, purpose="envelope", binding={
+            "run_id": run_id, "envelope_id": envelope_id, "cap_cents": cap_cents,
+            "stage": stage, "provider": provider, "model": model})
+    except p0_authz.AuthzError as exc:
+        raise Blocked(str(exc)) from None
+    if not owner_decision_ref:
+        raise Blocked("owner budget permission not verified")
     t=now_ms()
     with atomic(db):
         _one(db,"SELECT run_id FROM p0_runs WHERE run_id=?",(run_id,))
@@ -166,12 +202,25 @@ def _block_unresolved_attempt(db, job):
 
 
 def authorize(db, *, job_id, request_sha, profile_revision, upper_cents,
-              trusted_studio_request_authorization):
-    """Atomic reserve. Owner's PACKAGE grant != specific immutable request approval."""
-    if trusted_studio_request_authorization is not True:
-        raise Blocked("specific request not authorized by trusted Studio")
+              request_capability=None, **legacy):
+    """Atomic reserve. Owner's PACKAGE grant != specific immutable request approval.
+
+    The approval is a server-signed capability bound to this job, this request
+    hash and this ceiling. The combined Studio budget (legacy approvals plus
+    P0 envelopes) is checked in the same transaction as the reserve, so the
+    second ledger cannot spend what the first one still allows.
+    """
+    try:
+        p0_authz.reject_legacy_trust(legacy)
+    except p0_authz.AuthzError as exc:
+        raise Blocked(str(exc)) from None
     if type(upper_cents) is not int or upper_cents <= 0:
         raise Blocked("known upper price ceiling in integer cents is required")
+    try:
+        p0_authz.verify(request_capability, purpose="request", binding={
+            "job_id": job_id, "request_sha": request_sha, "upper_cents": upper_cents})
+    except p0_authz.AuthzError as exc:
+        raise Blocked(str(exc)) from None
     with atomic(db):
         j=_one(db,"SELECT * FROM p0_jobs WHERE job_id=?",(job_id,))
         e=_one(db,"SELECT * FROM p0_budget_envelopes WHERE envelope_id=?",(j["envelope_id"],))
@@ -188,6 +237,10 @@ def authorize(db, *, job_id, request_sha, profile_revision, upper_cents,
         if (e["expires_at_ms"]<=now_ms() or e["reserved_cents"]+e["spent_cents"]+upper_cents>e["cap_cents"]
             or e["calls_reserved"]>=e["max_calls"]):
             raise Blocked("insufficient budget, calls or expired permission")
+        try:
+            spend_ledger.check_cents(db, r["project_id"], upper_cents)
+        except spend_ledger.BudgetExceeded as exc:
+            raise Blocked(str(exc)) from None
         prior=db.execute("SELECT COUNT(*) FROM p0_jobs WHERE run_id=? AND slot_id=? AND kind=? AND state!='INTENT_CREATED'",
                          (j["run_id"],j["slot_id"],j["kind"])).fetchone()[0]
         if prior>=e["max_attempts_per_slot"] or j["attempt_no"]>e["max_attempts_per_slot"]:
@@ -276,9 +329,21 @@ def accept_provider_id(db, *, job_id, provider_job_id):
 
 
 def finish_verified(db, *, job_id, event_id, event_body, charged_cents,
-                    provider_success, provider_evidence_verified):
-    """Backend checks provider authenticity; duplicated terminal callbacks do not recharge."""
-    if provider_evidence_verified is not True:
+                    provider_success, verify_evidence=None, **legacy):
+    """Backend checks provider authenticity; duplicated terminal callbacks do not recharge.
+
+    `verify_evidence` is a server-side callable that authenticates the
+    provider event. The ledger never accepts a boolean that says "this event is
+    genuine": a caller could simply set it. Legacy
+    `provider_evidence_verified` is refused.
+    """
+    try:
+        p0_authz.reject_legacy_trust(legacy)
+    except p0_authz.AuthzError as exc:
+        raise Blocked(str(exc)) from None
+    if not callable(verify_evidence):
+        raise Blocked("server-side provider evidence verification is required")
+    if verify_evidence(event_body) is not True:
         raise Blocked("provider evidence not verified by backend")
     if type(charged_cents) is not int or charged_cents < 0 or not event_id:
         raise Blocked("invalid confirmed cost/event")

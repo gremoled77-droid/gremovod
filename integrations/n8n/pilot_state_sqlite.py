@@ -3,6 +3,10 @@
 Never pass LLM-supplied "approved" fields into these functions. Only authenticated
 Studio routes may issue owner decisions and grants. All costs are upper-bound CENTS.
 Media/READY remain blocked until trusted backend media provenance is implemented.
+
+The pilot tables are a REFERENCE control plane, not a second production ledger:
+`connect` therefore only accepts an explicitly disposable database and refuses
+the Studio SQLite, whose schema must keep exactly the five `p0_*` tables.
 """
 from __future__ import annotations
 
@@ -12,6 +16,8 @@ import sqlite3
 import time
 from pathlib import Path
 from typing import Any
+
+from backend import studio_db
 
 
 class Conflict(ValueError):
@@ -26,8 +32,19 @@ def stable_hash(data: Any) -> str:
     return hashlib.sha256(json.dumps(data, sort_keys=True, ensure_ascii=False, separators=(",", ":")).encode()).hexdigest()
 
 
-def connect(filename: str | Path) -> sqlite3.Connection:
-    db = sqlite3.connect(str(filename), isolation_level=None, timeout=4)
+def connect(filename: str | Path, *, allow_disposable: bool = False) -> sqlite3.Connection:
+    """Open the disposable reference pilot database.
+
+    The pilot is reference material: it must never be pointed at the Studio
+    SQLite (which keeps exactly the five p0_* tables) and it must never be
+    reachable from a production route.
+    """
+    if not allow_disposable:
+        raise Blocked("reference pilot state requires an explicitly disposable database")
+    resolved = Path(filename).resolve()
+    if studio_db.is_studio_db(resolved):
+        raise Blocked("reference pilot tables must not be created in the Studio SQLite")
+    db = sqlite3.connect(str(resolved), isolation_level=None, timeout=4)
     db.row_factory = sqlite3.Row
     db.execute("PRAGMA foreign_keys=ON")
     db.executescript("""
