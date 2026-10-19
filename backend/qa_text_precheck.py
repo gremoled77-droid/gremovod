@@ -290,30 +290,49 @@ def view(db, job):
             'paid_calls_executed': False, 'owner_approval_required': True}
 
 
+class QACallbackBodyLimit:
+    """Pure ASGI length gate: replay the original body to FastAPI after inspection."""
+    def __init__(self, application):
+        self.application = application
+
+    async def __call__(self, scope, receive, send):
+        path = scope.get('path', '') if scope.get('type') == 'http' else ''
+        if not (path.startswith(PREFIX + '/service/jobs/') and path.endswith('/verdict')):
+            return await self.application(scope, receive, send)
+
+        from starlette.responses import JSONResponse
+        limit = 32768
+        headers = dict(scope.get('headers', []))
+        declared = headers.get(b'content-length')
+        if declared:
+            if not declared.isdigit() or int(declared) > limit:
+                return await JSONResponse({'detail': 'QA verdict payload too large'},
+                                          status_code=413)(scope, receive, send)
+        messages, size = [], 0
+        while True:
+            item = await receive()
+            if item['type'] != 'http.request':
+                return
+            size += len(item.get('body', b''))
+            if size > limit:
+                return await JSONResponse({'detail': 'QA verdict payload too large'},
+                                          status_code=413)(scope, receive, send)
+            messages.append(item)
+            if not item.get('more_body', False):
+                break
+        idx = 0
+        async def replay():
+            nonlocal idx
+            if idx < len(messages):
+                item = messages[idx]
+                idx += 1
+                return item
+            return await receive()
+        return await self.application(scope, replay, send)
+
+
 def register(app, studio):
-    # Bound the request body at the HTTP boundary, even for malformed JSON or chunked clients.
-    @app.middleware('http')
-    async def qa_callback_size_limit(request: Request, call_next):
-        if request.url.path.startswith(PREFIX + '/service/jobs/') and request.url.path.endswith('/verdict'):
-            from fastapi.responses import JSONResponse
-            declared = request.headers.get('content-length')
-            if declared and (not declared.isdigit() or int(declared) > 32768):
-                return JSONResponse({'detail': 'QA verdict payload too large'}, status_code=413)
-            chunks, size = [], 0
-            async for part in request.stream():
-                size += len(part)
-                if size > 32768:
-                    return JSONResponse({'detail': 'QA verdict payload too large'}, status_code=413)
-                chunks.append(part)
-            consumed = False
-            async def replay():
-                nonlocal consumed
-                if not consumed:
-                    consumed = True
-                    return {'type': 'http.request', 'body': b''.join(chunks), 'more_body': False}
-                return {'type': 'http.request', 'body': b'', 'more_body': False}
-            request._receive = replay
-        return await call_next(request)
+    app.add_middleware(QACallbackBodyLimit)
 
     @app.on_event('startup')
     def setup():
