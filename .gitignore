@@ -23,6 +23,7 @@ runtime/prompt-chat/worker-token.txt
 OPENAI_API_KEY.txt
 node_modules/
 .pytest_cache/
+.ruff_cache/
 tmp/
 exports/
 output/
@@ -31,6 +32,7 @@ tools/
 _archive/
 model-studio/data/
 frontend/tsconfig.tsbuildinfo
+frontend/.studio-python
 projects/**/*.png
 projects/**/*.jpg
 projects/**/*.jpeg

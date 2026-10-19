@@ -1,7 +1,6 @@
 """Edit list for CapCut (order of shots, files, durations, cut contrast), 9:16 recompose prompt and project-level rules text."""
 import csv
 import io
-import json
 import shutil
 import subprocess
 from pathlib import Path
