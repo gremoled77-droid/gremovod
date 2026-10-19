@@ -16,6 +16,8 @@ on:
       - 'tests/test_p0_state.js'
       - 'db/schema.sql'
       - 'scripts/p0_migrate.py'
+      - 'tools/mock_media_pilot.py'
+      - 'backend/test_mock_media_pilot.py'
       - 'docs/specs/n8n-production-2026-10-19/**'
   workflow_dispatch:
 
@@ -31,8 +33,10 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.13'
+      - name: Confirm FFmpeg and ffprobe available
+        run: ffmpeg -version && ffprobe -version
       - name: Offline SQLite pilot regression tests
-        run: python -m unittest -v backend.test_n8n_astra_pilot backend.test_n8n_final_routing_spec backend.test_n8n_scenario_skills_contract backend.test_p0_control
+        run: python -m unittest -v backend.test_n8n_astra_pilot backend.test_n8n_final_routing_spec backend.test_n8n_scenario_skills_contract backend.test_p0_control backend.test_mock_media_pilot
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
