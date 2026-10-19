@@ -45,6 +45,11 @@ API_URL = "https://api.kie.ai/claude/v1/messages"
 MODEL = "claude-opus-5-5"
 MAX_TOKENS = 16000
 
+# Режим --git: файлы не прикладываются, модель берёт их сама по raw-ссылкам
+# публичного GitHub. Требует инструмента веб-доступа.
+WEB_FETCH_TOOL = {"type": "web_fetch_20250910", "name": "web_fetch", "max_uses": 20}
+GIT_FETCH_SYSTEM_MARK = "## 3. System prompt (в поле `system`)"
+
 # Документы каждого пакета: (метка, файл-источник в пакете)
 DOCS: dict[str, list[tuple[str, str]]] = {
     "AUDIT-001A": [
@@ -120,42 +125,78 @@ def attachments(pkg: str) -> list[dict]:
     return out
 
 
+def git_system_prompt() -> str:
+    """System prompt для режима --git: из OPUS_GIT_FETCH_PROMPT.md, раздел §3."""
+    import re
+
+    p = ROOT / "packages" / "OPUS_GIT_FETCH_PROMPT.md"
+    if not p.exists():
+        raise SystemExit("нет packages/OPUS_GIT_FETCH_PROMPT.md — выполните make_git_fetch_prompt.py")
+    md = p.read_text(encoding="utf-8")
+    part = md.split(GIT_FETCH_SYSTEM_MARK, 1)[1]
+    m = re.search(r"```\n(.*?)\n```", part, re.S)
+    if not m:
+        raise SystemExit("OPUS_GIT_FETCH_PROMPT.md: не найден system prompt в §3")
+    return m.group(1).strip()
+
+
+def git_user_message(pkg: str) -> str:
+    p = ROOT / "packages" / "payloads" / f"{pkg}.gitfetch.txt"
+    if not p.exists():
+        raise SystemExit(f"нет {p.name} — выполните make_git_fetch_prompt.py")
+    return p.read_text(encoding="utf-8").strip()
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("package", choices=sorted(DOCS))
     ap.add_argument("--dry-run", action="store_true", help="собрать запрос и показать, не отправляя")
     ap.add_argument("--out", default=None, help="куда сохранить сырой ответ")
+    ap.add_argument("--git", action="store_true",
+                    help="режим веб-доступа: файлы не прикладываются, модель берёт их "
+                         "сама по raw-ссылкам GitHub (нужен инструмент web_fetch)")
     args = ap.parse_args()
 
     key = os.environ.get("KIE_API_KEY", "").strip()
     if not key and not args.dry_run:
         raise SystemExit("не задана переменная окружения KIE_API_KEY")
 
-    body = {
-        "model": MODEL,
-        "max_tokens": MAX_TOKENS,
-        "stream": False,
-        "messages": [{
-            "role": "user",
-            "content": attachments(args.package) + [{
-                "type": "text",
-                "text": request_text(args.package),
+    if args.git:
+        system = git_system_prompt()
+        user_text = git_user_message(args.package)
+        body = {
+            "model": MODEL,
+            "max_tokens": MAX_TOKENS,
+            "stream": False,
+            "tools": [WEB_FETCH_TOOL],
+            "system": system,
+            "messages": [{"role": "user", "content": [{"type": "text", "text": user_text}]}],
+        }
+        print("РЕЖИМ: --git (модель берёт файлы сама по raw-ссылкам GitHub)")
+    else:
+        system = system_prompt()
+        user_text = request_text(args.package)
+        body = {
+            "model": MODEL,
+            "max_tokens": MAX_TOKENS,
+            "stream": False,
+            "system": system,
+            "messages": [{
+                "role": "user",
+                "content": attachments(args.package) + [{"type": "text", "text": user_text}],
             }],
-        }],
-    }
-    payload = {
-        "model": body["model"],
-        "max_tokens": body["max_tokens"],
-        "system": system_prompt(),
-        "messages": body["messages"],
-    }
+        }
+        print("РЕЖИМ: вложения (document, media_type=text/plain)")
 
-    raw = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+    raw = json.dumps(body, ensure_ascii=False).encode("utf-8")
     print(f"Пакет           : {args.package}")
     print(f"Модель          : {MODEL}")
-    print(f"Вложений        : {len(DOCS[args.package])} (media_type=text/plain)")
-    print(f"System prompt   : {len(system_prompt()):,} символов")
-    print(f"Тело запроса    : {len(request_text(args.package)):,} символов")
+    if not args.git:
+        print(f"Вложений        : {len(DOCS[args.package])} (media_type=text/plain)")
+    else:
+        print(f"Инструмент      : {WEB_FETCH_TOOL['type']}, max_uses={WEB_FETCH_TOOL['max_uses']}")
+    print(f"System prompt   : {len(system):,} символов")
+    print(f"Текст запроса   : {len(user_text):,} символов")
     print(f"JSON тела       : {len(raw):,} байт")
     print(f"URL             : {API_URL}")
 
