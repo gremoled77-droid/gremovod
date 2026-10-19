@@ -27,7 +27,8 @@ tmp/
 exports/
 output/
 runtime/
-tools/
+tools/*
+!tools/ai_review/
 _archive/
 model-studio/data/
 frontend/tsconfig.tsbuildinfo
@@ -54,3 +55,7 @@ docs/*.jpg
 *.sqlite3-wal
 *.sqlite3-shm
 *.sqlite3-journal
+
+# Aider local chat/history artefacts stay on this machine.
+.aider*
+.aider.tags.cache.v4
