@@ -1,0 +1,271 @@
+{
+  "package": "GremoVOD external architecture audit — AUDIT-001",
+  "version": "1.0",
+  "prepared_at": "2026-10-20",
+  "prepared_by": "MCode (mavis), read-only preparation for the repository owner",
+  "status": "PREPARED_OFFLINE",
+  "paid_api_calls_during_preparation": 0,
+  "network_calls_during_preparation": [
+    "github.com API (public, read-only: repo metadata, PRs, issues)",
+    "docs.kie.ai / kie.ai (public documentation and pricing pages)",
+    "api.kie.ai route probe WITHOUT credentials (401 / GET-not-supported responses only)"
+  ],
+
+  "repository": {
+    "url": "https://github.com/gremoled77-droid/gremovod",
+    "visibility": "public",
+    "default_branch": "main",
+    "main_sha": "82adb2d28efa05bf8face168485fe07ae340e0bc",
+    "main_file_count": 531,
+    "open_pr_count": 22,
+    "draft_pr_count": 21,
+    "issue_count_total": 35
+  },
+
+  "review_chain": {
+    "note": "Работа раздроблена по независимым цепочкам PR. Ни одна из них не слита в main.",
+    "chains": [
+      {
+        "pr": 8,
+        "title": "[DRAFT] QA TEXT_PRECHECK: audit fixes, isolated FastAPI tests, secure A6/A7 connection gate",
+        "state": "open",
+        "draft": true,
+        "base_ref": "integration/n8n",
+        "base_sha": "ce23d7e",
+        "head_ref": "feature/qa-text-audit-fixes-20261019",
+        "head_sha": "3979390",
+        "files_changed": 10,
+        "insertions": 1343,
+        "deletions": 1,
+        "url": "https://github.com/gremoled77-droid/gremovod/pull/8",
+        "contains": ["backend/qa_text_precheck.py", "integrations/n8n/QA_A6_A7_SECURE_CONNECTION_GATE_2026-10-19.md", "integrations/n8n/agent-manifest.json", "skills/gremovod-review-*/SKILL.md"],
+        "relevance": "РЕАЛЬНАЯ реализация A6/A7. Не назван в исходной постановке задачи — найдено в ходе подготовки. Без него картина критиков была бы неполной.",
+        "verified": true
+      },
+      {
+        "pr": 17,
+        "title": "[DRAFT] n8n: закрыть P0/P1/P2 Astra до реального медиатеста",
+        "state": "open",
+        "draft": true,
+        "base_ref": "codex/n8n-full-production-spec-20261019",
+        "base_sha": "cafcbc6",
+        "head_ref": "feature/n8n-astra-contract-hardening-20261019",
+        "head_sha": "cb3f1dc",
+        "files_changed": 18,
+        "insertions": 3710,
+        "deletions": 46,
+        "url": "https://github.com/gremoled77-droid/gremovod/pull/17",
+        "verified": true
+      },
+      {
+        "pr": 18,
+        "title": "[DRAFT] GremoVOD P0 + 7 WF: SQLite budget recovery, free media QA and six-stage mock",
+        "state": "open",
+        "draft": true,
+        "base_ref": "feature/n8n-astra-contract-hardening-20261019",
+        "base_sha": "cb3f1dc",
+        "head_ref": "feature/p0-studio-foundation-20261019",
+        "head_sha": "5206dcc",
+        "files_changed": 26,
+        "insertions": 1751,
+        "deletions": 4,
+        "url": "https://github.com/gremoled77-droid/gremovod/pull/18",
+        "verified": true
+      },
+      {
+        "pr": 29,
+        "title": "P0: единый бюджет, серверные capability-власти и запрет второй БД (MiniMax Code)",
+        "state": "open",
+        "draft": true,
+        "base_ref": "codex/p0-fixes-20261019",
+        "base_sha": "fc05cafee9e835cbbc49aff73e50520ba638420e",
+        "head_ref": "minimax/p0-budget-authz",
+        "head_sha": "c082829b11b968965600bdaf87c137b1485a0fa2",
+        "files_changed_vs_main": 78,
+        "insertions_vs_main": 9786,
+        "deletions_vs_main": 28,
+        "commits_on_base": [
+          "c082829b11b968965600bdaf87c137b1485a0fa2 docs(p0): зафиксировать модель подключения Argon (KIE, chat only, разовый diff-review)",
+          "baad79c docs(p0): уточнить диапазон ревью Argon под лимиты инструмента",
+          "cc9204f P0: единый бюджет, серверные capability-власти и запрет второй БД"
+        ],
+        "url": "https://github.com/gremoled77-droid/gremovod/pull/29",
+        "known_defect_in_body": "Тело PR указывает Head SHA cc9204f1e3d06d5b17b594041598c7057be2be99; фактический head — c082829b11b968965600bdaf87c137b1485a0fa2. cc9204f проверен как реальный предок (merge-base --is-ancestor, exit 0). Расхождение только в тексте описания. → OPEN_ISSUES.md OI-09!",
+        "verified": true
+      },
+      {
+        "pr": 34,
+        "title": "[IMPL][OFFLINE] Бюджетный шлюз MiniMax -> KIE Argon: лимиты, ledger, учёт кредитов",
+        "state": "open",
+        "draft": true,
+        "base_ref": "experiment/minimax-kie-argon-bridge-20261019",
+        "base_sha": "0ac4e916e274b4c75fde75edc1ddd0d5a3e376c1",
+        "head_ref": "experiment/minimax-kie-argon-bridge-impl-20261020",
+        "head_sha": "b3183d28a0e22d5414ab7eef70d62543aa991dfa",
+        "files_changed_vs_main": 17,
+        "insertions_vs_main": 4359,
+        "url": "https://github.com/gremoled77-droid/gremovod/pull/34",
+        "note": "base НЕ main. При сравнении 'vs main' часть файлов — изменения относительно main, а не относительно base PR.",
+        "conflict_with": "pr/35 — оба определяют tools/ai_review/argon_review.py (327 против 205 строк; 64 вставки, 186 удалений) → OPEN_ISSUES.md OI-07",
+        "verified": true
+      },
+      {
+        "pr": 35,
+        "title": "feat(ai-review): временный ревьюер MiniMax-M3.1-Flash через M Plan (P1, MOCK)",
+        "state": "open",
+        "draft": true,
+        "base_ref": "main",
+        "base_sha": "82adb2d28efa05bf8face168485fe07ae340e0bc",
+        "head_ref": "experiment/minimax-observability-20261020",
+        "head_sha": "051ab3a1182c1ed954b53c9b64f85e8195dbcc91",
+        "files_changed_vs_main": 38,
+        "insertions_vs_main": 5527,
+        "url": "https://github.com/gremoled77-droid/gremovod/pull/35",
+        "note": "Orthogonal to A6/A7/A8: git grep -E '\\bA[678]\\b' pr/35 даёт только ложное совпадение в docs/official-prompts/wan3-prompting.html. Контракт dev-run-summary/1 не содержит role/scope/evidence.",
+        "verified": true
+      }
+    ]
+  },
+
+  "package_files": [
+    { "path": "README.md", "bytes": 10286, "role": "Навигация по пакету, состав, правила", "status": "written" },
+    { "path": "PROJECT_CONTEXT.md", "bytes": 7239, "role": "Назначение, стек, решения владельца, честное состояние", "status": "written" },
+    { "path": "ARCHITECTURE_MAP.md", "bytes": 15450, "role": "Карта модулей, зависимости, зрелость по доменам, покрытие", "status": "written" },
+    { "path": "P0_EVIDENCE.md", "bytes": 24631, "role": "Доказательства по авторизации, бюджету, UNKNOWN, гонкам, второй БД, заморозке", "status": "written" },
+    { "path": "WORKFLOW_EVIDENCE.md", "bytes": 25412, "role": "Реальность WF_00–WF_06, манифест, контракты, маршруты, артефакты", "status": "written" },
+    { "path": "QA_EVIDENCE.md", "bytes": 38575, "role": "A6/A7/A8: определения, пакеты, проверяемость, гейт, карта упоминаний", "status": "written" },
+    { "path": "TEST_RESULTS.md", "bytes": 14935, "role": "10 реальных прогонов с exit codes + что не запускалось", "status": "written" },
+    { "path": "OPEN_ISSUES.md", "bytes": 19560, "role": "Реестр подтверждённых открытых вопросов", "status": "written" },
+    { "path": "EVIDENCE_MANIFEST.json", "bytes": null, "role": "Этот файл", "status": "written" },
+    { "path": "OPUS_SYSTEM_PROMPT.md", "bytes": 9906, "role": "Правила строгого архитектурного аудита (system prompt)", "status": "written" },
+    { "path": "OPUS_FIRST_REQUEST.md", "bytes": 16638, "role": "Готовый текст первого сообщения + параметры вызова", "status": "written" },
+    { "path": "KIE_SETUP.md", "bytes": 11764, "role": "Два маршрута KIE, цены, расчёт бюджета, тест подключения", "status": "written" },
+    { "path": "packages/AUDIT-001A.md", "bytes": 7558, "role": "Пакет 1: P0-контур", "status": "written" },
+    { "path": "packages/AUDIT-001B.md", "bytes": 16240, "role": "Пакет 2: n8n-конвейер", "status": "written" },
+    { "path": "packages/AUDIT-001C.md", "bytes": 21398, "role": "Пакет 3: критики, тесты, согласованность", "status": "written" }
+  ],
+
+  "evidence_sources": [
+    {
+      "id": "E-01",
+      "ref": "c082829b11b968965600bdaf87c137b1485a0fa2",
+      "ref_label": "PR #29 head (minimax/p0-budget-authz)",
+      "files_read": ["backend/p0_authz.py", "backend/p0_control.py", "backend/spend_ledger.py", "backend/studio_db.py", "backend/p0_provider_dispatch.py", "backend/security.py", "integrations/n8n/pilot_state_sqlite.py", "workflows/WF_00…WF_06.json", "integrations/n8n/WF_00_WF_06_MANIFEST.json", "docs/specs/n8n-production-2026-10-19/**", "backend/test_mock_evidence.py", "backend/test_n8n_final_routing_spec.py", "tools/mock_evidence.py", "tools/check_agent_scope.py"],
+      "method": "git show <ref>:<path> + git grep",
+      "verified": true
+    },
+    {
+      "id": "E-02",
+      "ref": "3979390",
+      "ref_label": "PR #8 head (feature/qa-text-audit-fixes-20261019)",
+      "files_read": ["backend/qa_text_precheck.py", "integrations/n8n/agent-manifest.json", "integrations/n8n/QA_A6_A7_SECURE_CONNECTION_GATE_2026-10-19.md", "integrations/n8n/THREE_CRITICS_LOOP.md", "integrations/n8n/QA_EVIDENCE_POLICY.md", "integrations/n8n/contracts/qa-reviewer-output-v1.schema.json", "skills/gremovod-review-*/SKILL.md"],
+      "method": "git show <ref>:<path> + git grep",
+      "note": "Ветка найдена в ходе подготовки, не была названа в постановке задачи.",
+      "verified": true
+    },
+    {
+      "id": "E-03",
+      "ref": "b3183d28a0e22d5414ab7eef70d62543aa991dfa",
+      "ref_label": "PR #34 head",
+      "files_read": ["tools/ai_review/argon_review.py", "tools/ai_review/build_review_packet.py", "tools/ai_review/review_gate.py", "tests/test_argon_review.py", "tests/test_argon_review_gate.py"],
+      "method": "git show <ref>:<path> + pytest",
+      "verified": true
+    },
+    {
+      "id": "E-04",
+      "ref": "051ab3a1182c1ed954b53c9b64f85e8195dbcc91",
+      "ref_label": "PR #35 head",
+      "files_read": ["tools/ai_review/contract.py", "tools/ai_review/payload.py", "tools/ai_review/quota.py", "tools/ai_review/localscan.py", "tools/ai_review/reviewer.py", "tools/ai_review/adapters/*", "workflows/WF_07_MiniMax_Reviewer_MOCK.json", ".github/workflows/minimax-review-summary.yml", ".secrets-allowlist.txt"],
+      "method": "git show <ref>:<path> + pytest",
+      "verified": true
+    },
+    {
+      "id": "E-05",
+      "ref": "82adb2d28efa05bf8face168485fe07ae340e0bc",
+      "ref_label": "main",
+      "files_read": ["backend/*.py (45 prod modules)", "backend/main.py", "backend/security.py", "backend/remote_access.py", "frontend/package.json", "frontend/src/**", "frontend/*.test.mjs (26)", ".gitignore"],
+      "method": "checkout + read + pytest + npm test",
+      "verified": true
+    }
+  ],
+
+  "test_runs": [
+    { "id": "T1", "ref": "82adb2d", "command": "python -X utf8 -m pytest backend -q", "result": "242 passed, 16 subtests passed, 39 warnings, 76.49s", "exit_code": 0 },
+    { "id": "T2", "ref": "82adb2d", "command": "npm test (frontend, 26 .test.mjs)", "result": "104 tests, 104 pass, 0 fail, 7003ms", "exit_code": 0, "precondition": "STUDIO_PYTHON=<venv python>, STUDIO_DATA_DIR=<temp>" },
+    { "id": "T3", "ref": "c082829", "command": "python -X utf8 -m pytest backend -q", "result": "345 passed, 26 subtests passed, 39 warnings, 86.78s", "exit_code": 0 },
+    { "id": "T4", "ref": "c082829", "command": "python -X utf8 -m pytest backend -q -k \"p0 or budget or authz or ledger or idempot\"", "result": "78 passed, 267 deselected, 10 subtests passed, 13.34s", "exit_code": 0 },
+    { "id": "T5", "ref": "c082829", "command": "python -X utf8 -m pytest tools -q", "result": "14 passed, 7 subtests passed, 0.07s", "exit_code": 0 },
+    { "id": "T6", "ref": "c082829", "command": "node --test tests/test_p0_state.js", "result": "7 tests, 7 pass, 0 fail, 2567ms", "exit_code": 0 },
+    { "id": "T7", "ref": "b3183d2", "command": "python -X utf8 -m pytest tests -q", "result": "76 passed, 73.16s", "exit_code": 0 },
+    { "id": "T8", "ref": "051ab3a", "command": "python -X utf8 -m pytest tests -q", "result": "108 passed, 29.54s", "exit_code": 0 },
+    { "id": "T9", "ref": "3979390", "command": "python -X utf8 -m pytest backend/test_qa_text_precheck.py backend/test_qa_text_app_integration.py -q", "result": "19 passed, 67 warnings, 8.49s", "exit_code": 0 },
+    { "id": "T10", "ref": "3979390", "command": "python -X utf8 -m pytest backend -q", "result": "261 passed, 16 subtests passed, 67 warnings, 107.85s", "exit_code": 0 }
+  ],
+  "failed_runs_recorded": [
+    { "context": "frontend, node_modules отсутствует", "error": "ERR_MODULE_NOT_FOUND: Cannot find package 'typescript'", "exit_code": 1, "cause": "environment" },
+    { "context": "frontend, зависимости есть, venv не найден", "error": "ModuleNotFoundError: No module named 'fastapi' (backend/camera_movements.py:4)", "exit_code": 1, "cause": "environment" },
+    { "context": "unittest discover -s . -t . от корня репозитория (3 ветки)", "error": "Ran 0 tests / NO TESTS RAN", "exit_code": 5, "cause": "discovery does not recurse" }
+  ],
+
+  "kie": {
+    "model": "claude-opus-5-5",
+    "kie_doc_id": "market/claude/claude-opus-5-5",
+    "context_window_tokens": 1000000,
+    "max_output_tokens": 128000,
+    "credit_pricing": {
+      "input_per_mtok_credits": 320,
+      "output_per_mtok_credits": 1600,
+      "usd_per_credit": 0.005,
+      "input_per_mtok_usd": 1.6,
+      "output_per_mtok_usd": 8.0,
+      "upstream_anthropic_input_per_mtok_usd": 4.0,
+      "upstream_anthropic_output_per_mtok_usd": 20.0
+    },
+    "routes": [
+      {
+        "id": "A",
+        "name": "Direct Messages API",
+        "url": "https://api.kie.ai/claude/v1/messages",
+        "method": "POST",
+        "auth_header": "Authorization: Bearer <KIE_API_KEY>",
+        "note": "Anthropic SDK clients that send x-api-key must set it to 'Bearer <KEY>'.",
+        "probe_result": "GET → {\"code\":404,\"msg\":\"GET request not supported\"} — route exists, POST only"
+      },
+      {
+        "id": "B",
+        "name": "Claude Code (Anthropic-compatible)",
+        "base_url": "https://api.kie.ai/anthropic",
+        "base_url_note": "Без /v1/messages — клиент дописывает сам.",
+        "env_auth_token": "ANTHROPIC_AUTH_TOKEN=<KIE_API_KEY> (сырой ключ, без Bearer)",
+        "env_api_key": "ANTHROPIC_API_KEY=Bearer <KIE_API_KEY>",
+        "probe_result": "GET /anthropic/v1/messages → 404 GET not supported; GET /anthropic/v1/models → 401 Unauthorized — both routes exist"
+      }
+    ],
+    "recommended_for_audit": "A",
+    "planned_spend": {
+      "AUDIT-001A": { "input_tokens": 25000, "output_tokens": 16000, "credits": 33.6, "usd": 0.168, "worst_case": true },
+      "AUDIT-001B": { "input_tokens": 18000, "output_tokens": 15000, "credits": 29.8, "usd": 0.149, "worst_case": true },
+      "AUDIT-001C": { "input_tokens": 30000, "output_tokens": 16000, "credits": 35.2, "usd": 0.176, "worst_case": true },
+      "total_max": { "credits": 98.6, "usd": 0.493 }
+    }
+  },
+
+  "secret_scan": {
+    "performed": true,
+    "scope": "все 15 файлов пакета",
+    "patterns_checked": ["sk-…", "Bearer …", "AKIA…", "ghp_/gho_/ghu_/ghs_/ghr_", "KIE_API_KEY=…"],
+    "real_credentials_included": 0,
+    "result": "clean",
+    "note": "Ключ KIE не входит в пакет. В KIE_SETUP.md фигурирует только имя переменной окружения."
+  },
+
+  "unverified": [
+    "Поведение n8n-инстанса gremovod.app.n8n.cloud (нет доступа; workflow не опубликованы)",
+    "Живые вызовы провайдеров PiAPI / KIE / ElevenLabs / Fish Audio (платные, разрешения нет)",
+    "Рабочая БД владельца (не запрашивалась и не открывалась)",
+    "Боевой cloud-n8n CI (требует доступа к облачному n8n)",
+    "Живой вызов A6/A7 в n8n Cloud — по QA_FASTAPI_CONNECTION_HANDOFF.md:10 единственная попытка провалилась 3× с AI_APICallError; возможные списания по ошибочным попыткам неизвестны",
+    "Единственный путь A6/A7 в n8n Cloud (workflow 2DllTVkrO6imk2IR, execution #33) не представлен в репозитории",
+    "Соответствие текста навыков в Git тексту инструкций, задеплоенных в n8n (syncStatus: manual-copy)"
+  ]
+}
