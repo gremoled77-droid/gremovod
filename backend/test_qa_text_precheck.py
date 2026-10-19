@@ -249,7 +249,7 @@ class QAReviewTests(unittest.TestCase):
     def test_invalid_bearer_and_callback_limits(self):
         # Non-ASCII untrusted Authorization must return 401, never 500.
         self.assertEqual(self.ctx.get(self.url+'/service/queue',
-                         headers={'Authorization':'Bearer ÿ'}).status_code,401)
+                         headers={b'authorization': b'Bearer \xff'}).status_code,401)
         task=self.job();self.claim(task)
         invalid=self.verdict(task,'REVIEW-REQ',dry_run=True)
         invalid['verdict']='BLOCKED'
