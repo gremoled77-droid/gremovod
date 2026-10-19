@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - feature/qa-text-precheck-sandbox-20261019
+      - feature/qa-text-audit-fixes-20261019
   workflow_dispatch:
 permissions:
   contents: read
