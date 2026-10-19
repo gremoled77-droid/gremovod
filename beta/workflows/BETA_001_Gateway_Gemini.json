@@ -1,0 +1,128 @@
+{
+  "name": "BETA-001 — 2 сценарные завязки (1 Gateway call, manual) (BETA EXPORT - manual only)",
+  "active": false,
+  "nodes": [
+    {
+      "id": "7c7c7472-d44c-44c9-b683-cb778833eb47",
+      "name": "00 · BETA single manual paid call",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {},
+      "disabled": false
+    },
+    {
+      "id": "7a9c415b-7be1-4430-a8fa-d923bd78626f",
+      "name": "01 · BETA-001: идея и ограничения",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const observedGatewayBalanceUsd=null; // NEVER GUESS: enter current value manually from n8n Gateway credits dashboard\nconst observedBalanceTime=null; // YYYY-MM-DDTHH:mm:ssZ from the owner's real balance check\nconst minReserveUsd=1;const perCallBudgetCeilingUsd=0.10;const safetyMarginUsd=0.25;\nif(typeof observedGatewayBalanceUsd!=='number'||!Number.isFinite(observedGatewayBalanceUsd)||typeof observedBalanceTime!=='string'){\n throw Error('BETA_PRE_FLIGHT_BLOCKED: read current n8n Gateway credits balance; no calls until a verified balance is entered');\n}\nif(observedGatewayBalanceUsd<minReserveUsd+perCallBudgetCeilingUsd+safetyMarginUsd)throw Error('BETA_STOP_GATEWAY_CREDIT_RESERVE');\nif(Date.now()-Date.parse(observedBalanceTime)>10*60*1000||Date.now()<Date.parse(observedBalanceTime))throw Error('BETA_BALANCE_TOO_OLD_RECHECK');\nconst task={experiment_id:'BETA-001',mode:'LIVE_GATEWAY_TEXT',source:'USER_APPROVED_TEST_SETUP',canon_status:'NOT_APPROVED',idea:'Грэм едет к аэропорту на необычном ВАЗ-2106. Первые кадры скрывают удлинение; полный вид машины впервые открывается в финале.',constraint:'Только 2 разных коротких логлайна. Не добавлять биографию, одежду, голоса, адреса. Без публикации.',owner_release_approved:false,auto_continue:false,verified_gateway_balance_usd:observedGatewayBalanceUsd,verified_gateway_balance_at:observedBalanceTime};return [{json:task}];"
+      },
+      "disabled": false
+    },
+    {
+      "id": "2ba6810e-b886-45fe-bae0-3d6d891c1375",
+      "name": "02 · Gemini Flash (Gateway credits)",
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1.2,
+      "position": [
+        448,
+        0
+      ],
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "models/gemini-3-flash-preview",
+          "cachedResultName": "Gemini 3 Flash Preview"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "={{ 'Ты A1 тестовой анимационной студии GremoVOD. Это оплачиваемый из n8n Gateway разовый творческий тест, НЕ канон. Сформулируй ровно две разные короткие русские завязки (каждая до 25 слов) для истории: '+$('01 · BETA-001: идея и ограничения').first().json.idea+' Условия: '+$('01 · BETA-001: идея и ограничения').first().json.constraint+' Верни только JSON с полем hooks — массив из двух строк, без пояснений.' }}"
+            }
+          ]
+        },
+        "jsonOutput": true,
+        "builtInTools": {
+          "googleSearch": false,
+          "urlContext": false,
+          "codeExecution": false
+        },
+        "options": {
+          "maxOutputTokens": 256,
+          "temperature": 0.45,
+          "thinkingBudget": 0
+        }
+      },
+      "disabled": false
+    },
+    {
+      "id": "cf1d5926-1322-40e7-b8e3-ff0db8823547",
+      "name": "03 · BETA result only (no publish)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const a=$('01 · BETA-001: идея и ограничения').first().json;const res=$input.first().json;let raw=res.content?.parts?.map(x=>x.text||'').join('')??res.text??res.output??'';let parsed=null;try{parsed=JSON.parse(raw)}catch(e){parsed=null};if(Array.isArray(parsed)&&parsed.length===1)parsed=parsed[0];const hooks=Array.isArray(parsed?.hooks)?parsed.hooks:[];const valid=hooks.length===2&&hooks.every(x=>typeof x==='string'&&x.length>=12&&x.length<300);return [{json:{experiment_id:a.experiment_id,model:\"models/gemini-3-flash-preview\",billing_source:\"N8N_GATEWAY\",requested_calls:1,provider_response_received:typeof raw==='string'&&raw.length>0,response_format_valid:valid,candidate_hooks:valid?hooks:[],raw_response_truncated:valid?null:String(raw).slice(0,1000),result:valid?\"CANDIDATES_NEED_HUMAN_REVIEW\":\"MODEL_OUTPUT_NEEDS_REVIEW\",canon_mutated:false,production_modified:false,owner_approved:false,paid_media_calls:0,gateway_spend_usd:\"CHECK_N8N_CLOUD_BALANCE\",auto_retry:false,continue_automatically:false,final_release_approved:false}}];"
+      },
+      "disabled": false
+    }
+  ],
+  "connections": {
+    "00 · BETA single manual paid call": {
+      "main": [
+        [
+          {
+            "node": "01 · BETA-001: идея и ограничения",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "01 · BETA-001: идея и ограничения": {
+      "main": [
+        [
+          {
+            "node": "02 · Gemini Flash (Gateway credits)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "02 · Gemini Flash (Gateway credits)": {
+      "main": [
+        [
+          {
+            "node": "03 · BETA result only (no publish)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true
+  },
+  "pinData": {},
+  "tags": []
+}
