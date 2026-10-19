@@ -41,6 +41,7 @@ OWNED = {
         "workflows/",       # bootstrap PR only; subsequent implementation owned by Argon
         "prompts/README.md",
         "tools/test_agent_coordination.py", "tools/check_agent_scope.py",
+        "tools/test_agent_scope.py",
         ".github/workflows/agent-coordination.yml",
         ".github/workflows/agent-scope-guard.yml",
     ),
@@ -52,7 +53,7 @@ def forbidden_files(branch, paths):
     if role is None:
         return []
     return [p for p in paths if not any(
-        p == prefix or p.startswith(prefix) for prefix in OWNED[role]
+        p == prefix or ((prefix.endswith("/") or prefix.endswith("-")) and p.startswith(prefix)) for prefix in OWNED[role]
     )]
 
 
