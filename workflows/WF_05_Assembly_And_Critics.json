@@ -1,0 +1,52 @@
+{
+  "name": "WF_05_Assembly_And_Critics — MOCK ONLY (SOURCE EXPORT)",
+  "active": false,
+  "nodes": [
+    {
+      "id": "c99eda12-6cd7-478f-8643-ef44d4b24a6c",
+      "name": "Input from WF_00",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "inputSource": "passthrough"
+      }
+    },
+    {
+      "id": "0b6fb50a-9fe2-4aa1-9519-1f370b71904b",
+      "name": "N32–N41 / MOCK ONLY",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const p=$input.first().json;if(!p.MOCK_MODE||p.video.length!==3||p.audio.length!==3)throw Error('MOCK_ONLY');return [{json:{...p,manifest:[...p.video.map(x=>x.slot_id),...p.audio.map(x=>x.id)],technical_qc:'BLOCKED_NO_REAL_MEDIA',reviewers:['A6','A7','A8'].map(role=>({role,verdict:'BLOCKED',reason:'MOCK_MEDIA_NOT_REAL'})),review_status:'BLOCKED_NO_REAL_MEDIA',final_release_approved:false,history:[...p.history,'WF_05:MOCK'],paid_calls:0}}];"
+      }
+    }
+  ],
+  "connections": {
+    "Input from WF_00": {
+      "main": [
+        [
+          {
+            "node": "N32–N41 / MOCK ONLY",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "tags": []
+}
