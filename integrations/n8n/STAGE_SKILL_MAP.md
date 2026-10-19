@@ -39,6 +39,20 @@
 - Прямую запись AI-решений в утверждённый канон запрещать; ответ агента является предложением до подтверждения человека.
 - Связь с GremoVOD Web разрабатывать через FastAPI `/api/v1` контракты с общими ID, ревизиями, idempotency и scoped auth. См. `docs/N8N_CODEX_HANDOFF_2026-10-19.md`.
 
+## Дополнение: независимые рецензенты A6–A8 (19.10.2026)
+
+Проверено на живом n8n: три новых **unpublished draft** Agents, память отключена; профильные Skills прикреплены, **вызовы через A0 отключены** до FastAPI approval и поддержки просмотра конечных медиа. У A0 есть отдельный Skill `gremovod-qa-producer-loop`, который описывает организацию петли.
+
+| Agent | Роль | Skills | Модель |
+|---|---|---|---|
+| A6 | REVIEW-REQ — проверка обязательных требований | `gremovod-review-requirements`, `gremovod-stage-release` | Claude Haiku 5.5 |
+| A7 | REVIEW-SYSTEM — контроль утверждённого канона и визуальных правил | `gremovod-review-system`, `gremovod-stage-world`, `gremovod-character-dramaturgy`, `cinema-image-system` | Claude Sonnet 5.5 |
+| A8 | REVIEW-CRAFT — художественное ремесло по отрендеренному материалу, `bar.md` и эталону | `gremovod-review-craft`, `cinema-shot-design`, `cinema-visual-structure`, `cinema-editing`, `gremovod-comedy-staging`, `cinema-sound-design` | Claude Opus 5.5 — approval обязателен |
+
+A0 получает независимые вердикты и отправляет FAIL автору соответствующего этапа; он не должен подменять рецензентов. **Все три PASS** — только успешная QA-проверка, не публикация и не утверждение канона. `BLOCKED` не считается PASS. Видеокритик без реального рендера/инструмента просмотра обязан возвращать BLOCKED.
+
+Теперь в GitHub 35 исходных отраслевых навыков + четыре новых `gremovod-qa-producer-loop`, `gremovod-review-*`. Отдельные QA-навыки нужно включить в GitHub Skill Sync и их version/hash audit. Полный протокол: [THREE_CRITICS_LOOP.md](THREE_CRITICS_LOOP.md).
+
 ## Что дальше: контрольные точки
 
 - **Пункт 2.** Маршрутизация моделей Kie по сложности (Haiku/Sonnet/Opus), лимиты, учёт токенов; проверить каталог и реальную стоимость отдельно, платные тесты по разрешению владельца.
