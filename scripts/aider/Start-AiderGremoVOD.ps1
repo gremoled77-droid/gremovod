@@ -131,8 +131,13 @@ $env:PYTHONUTF8 = '1'
 
 Push-Location $RepoPath
 try {
+    # Aider writes progress to stderr; with ErrorActionPreference=Stop that would
+    # abort the script, so relax it around the native call.
+    $ErrorActionPreference = 'Continue'
     & aider @cmdArgs
-    exit $LASTEXITCODE
+    $code = $LASTEXITCODE
+    $ErrorActionPreference = 'Stop'
+    exit $code
 }
 finally {
     Pop-Location
