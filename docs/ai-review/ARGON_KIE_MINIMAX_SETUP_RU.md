@@ -34,7 +34,7 @@ cd C:\Users\BLOWKA\Documents\Minimax\gremovod-argon-bridge
 python -X utf8 -m unittest discover -s tests -p "test_*.py"
 ```
 
-Ожидаемый результат: `Ran 41 tests ... OK`. Ни один тест не обращается в сеть.
+Ожидаемый результат: `Ran 71 tests ... OK`. Ни один тест не обращается в сеть.
 
 ---
 
@@ -44,12 +44,12 @@ python -X utf8 -m unittest discover -s tests -p "test_*.py"
 |---|---|---|
 | `KIE_API_KEY` | ключ KIE. Только локально, никогда в чат и никогда в коммит | нет → LIVE заблокирован |
 | `ARGON_REVIEW_STATE_DIR` | каталог ledger, пакетов и слотов | `~\.gremovod\argon-review` |
-| `ARGON_MAX_CALLS_PER_PR` | максимум вызовов Argon на один PR | `1` |
-| `ARGON_MAX_CALLS_PER_DAY` | максимум вызовов в сутки (UTC) | `2` |
-| `ARGON_MAX_CALLS_PER_WEEK` | максимум вызовов за 7 суток | `5` |
-| `ARGON_MAX_CONCURRENT` | одновременных платных вызовов | `1` |
-| `ARGON_MAX_PACKET_BYTES` | потолок сериализованного user payload | `6144` (6 КиБ) |
-| `ARGON_MAX_PACKET_FILES` | максимум файлов в пакете | `4` |
+| `ARGON_MAX_CALLS_PER_PR` | максимум вызовов Argon на один PR | `1` (потолок) |
+| `ARGON_MAX_CALLS_PER_DAY` | максимум вызовов в сутки (UTC) | `2` (потолок) |
+| `ARGON_MAX_CALLS_PER_WEEK` | максимум вызовов за 7 суток | `5` (потолок) |
+| `ARGON_MAX_CONCURRENT` | одновременных платных вызовов | `1` (потолок) |
+| `ARGON_MAX_PACKET_BYTES` | потолок сериализованного user payload | `6144` (6 КиБ, потолок) |
+| `ARGON_MAX_PACKET_FILES` | максимум файлов в пакете | `4` (потолок) |
 | `ARGON_RETRY_COUNT` | **всегда 0.** Значение ≠ 0 блокирует запуск | `0`, изменить нельзя |
 | `ARGON_MAX_KIE_CREDITS_PER_DAY` | потолок кредитов KIE за сутки | **не задан → LIVE заблокирован** |
 | `ARGON_MAX_KIE_CREDITS_PER_CALL` | оценка максимальной цены одного вызова | **не задан → LIVE заблокирован** |
@@ -60,6 +60,33 @@ python -X utf8 -m unittest discover -s tests -p "test_*.py"
 Три кредитных лимита не имеют значений по умолчанию **намеренно**: без тарифа нельзя честно выбрать
 число, а «цену неизвестна» означает, что LIVE заблокирован. Кредиты — не USD; `usd_amount` в ledger
 всегда `null`, пока владелец не подтвердит тариф.
+
+### 3.1. Потолки в коде — их нельзя поднять окружением
+
+Лимиты вызовов и размера пакета — это **потолки**, зашитые в
+`tools/ai_review/review_gate.py`: `HARD_MAX_CALLS_PER_PR = 1`,
+`HARD_MAX_CALLS_PER_DAY = 2`, `HARD_MAX_CALLS_PER_WEEK = 5`,
+`HARD_MAX_PACKET_BYTES = 6144`, `HARD_MAX_PACKET_FILES = 4`,
+`HARD_MAX_CONCURRENT = 1`.
+
+Окружение может **только сузить** лимит. Значение выше потолка не применяется:
+шлюз приводит его к потолку, записывает факт в отчёт (раздел «Limits in force»)
+и продолжает работу.
+
+```powershell
+$env:ARGON_MAX_CALLS_PER_DAY = "500"   # НЕ сработает: будет 2
+```
+
+Проверка одной строкой:
+
+```powershell
+python -X utf8 -c "import sys; sys.path.insert(0,'tools/ai_review'); import review_gate; p=review_gate.Policy.from_env(); print(p.max_calls_per_day, p.clamped)"
+```
+
+Потолок применяется в двух местах: при чтении окружения **и в точке вызова**.
+Поэтому `Policy`, собранный в коде Python, тоже не даёт большего бюджета.
+Поднять потолок — сознательное решение владельца в отдельном ревью, а не
+переменная окружения. Это и есть требование «агент не меняет лимиты».
 
 ---
 
@@ -73,6 +100,7 @@ python -X utf8 tools/ai_review/build_review_packet.py `
   --pr-url "https://github.com/gremoled77-droid/gremovod/pull/33" `
   --task-id "ARGON-BRIDGE" `
   --scope "Проверь реализацию офлайн-моста: лимиты, ledger, отсутствие сетевых вызовов" `
+  --project-context "GremoVOD — AI-студия для производства серий. Деньги, capability-проверки и лимиты генераций — критичные зоны." `
   --summary "MiniMax: добавлены build_review_packet/review_gate + тесты" `
   --test "python -X utf8 -m unittest discover -s tests -p test_*.py" `
   --link "https://github.com/gremoled77-droid/gremovod/pull/33/files" `
@@ -81,6 +109,14 @@ python -X utf8 tools/ai_review/build_review_packet.py `
 
 Печатает `base_sha`, `head_sha`, `diff_sha256`, число файлов/hunks, `payload bytes` и `payload_sha256`.
 Если `payload bytes` больше 6144 — пакет не соберётся, это защита, а не ошибка.
+
+`--project-context` — короткий (до 500 символов) фон о проекте. Argon видит
+только hunks, без истории репозитория, и без этого контекста не может отличить
+сознательное решение студии от ошибки. Значение по умолчанию — описание GremoVOD;
+`--project-context ""` убирает его совсем.
+
+Пакет **неполный по построению**: до 4 файлов из всех изменённых. Список
+пропущенных файлов виден в `selection.files_omitted` и в отчёте.
 
 ### 4.2 Прогнать шлюз в режиме OFFLINE (по умолчанию)
 
@@ -110,6 +146,12 @@ python -X utf8 scripts/make_argon_examples.py
 ## 5. Включение LIVE (этап B) — только после отдельного разрешения владельца
 
 Порядок обязателен. Каждый шаг можно выполнить отдельно и посмотреть на результат.
+
+> **Один путь трат.** Платный вызов делает **только** `review_gate.py`.
+> `argon_review.py --live` больше не тратит кредиты сам: он передаёт запрос
+> шлюзу, поэтому ledger, потолки, кредитные лимиты и одобрение владельца
+> применяются к любому платному вызову. Второго пути, который тратит мимо
+> лимитов, не осталось.
 
 ### Шаг 1. Владелец задаёт бюджет
 
@@ -163,6 +205,25 @@ python -X utf8 tools/ai_review/review_gate.py `
 Один запуск = **не более одного** платного запроса. Повторный запуск на том же PR/SHA вернёт
 `BLOCKED / no_new_call` и новых кредитов не потратит.
 
+### Шаг 4а. Тот же запуск через старый скрипт (необязательно)
+
+`argon_review.py --live` остаётся рабочим, но тратит кредиты **только через шлюз**.
+Поэтому он требует те же `--pr-url`, `--approval` и `--state-dir`:
+
+```powershell
+python -X utf8 tools/ai_review/argon_review.py `
+  --repo . --base origin/main --head HEAD `
+  --pr-url "https://github.com/gremoled77-droid/gremovod/pull/33" `
+  --task-id "ARGON-BRIDGE" --scope "..." `
+  --live `
+  --approval "$env:LOCALAPPDATA\GremoVOD\argon-review\approval.json" `
+  --state-dir "$env:LOCALAPPDATA\GremoVOD\argon-review" `
+  --out "$env:TEMP\argon-report.md"
+```
+
+Скрипт дополнительно спросит `Type REVIEW <sha> to send ONE request` — это второй
+ручной барьер поверх одобрения владельца. Без `--approval` запрос не состоится.
+
 ### Шаг 5. Разбор замечаний без цикла
 
 Замечания Argon разбираются в новом коммите. Повторное платное ревью — **только по новому SHA** и
@@ -170,8 +231,14 @@ python -X utf8 tools/ai_review/review_gate.py `
 повтор того же пакета дедуплицируется по `(repo, PR, head_sha, payload_sha256)`.
 
 Если Argon вернул `NEED_CONTEXT`, шлюз пишет `BLOCKED / need_context` и **не** делает второй вызов.
-Эскалация (уровень B) — отдельный пакет по указанным путям, отдельное одобрение, новый
-`payload_sha256` и отдельное решение владельца по повышению `ARGON_MAX_CALLS_PER_PR`.
+Эскалация (уровень B) — отдельный пакет по указанным путям, отдельное одобрение и новый
+`payload_sha256`. Сам шлюз дополнительных запросов не делает.
+
+Обратите внимание: лимит «1 вызов на PR» считается **по PR, а не по SHA** — после первого
+платного вызова по PR следующий запуск на том же PR вернёт `BLOCKED / no_new_call`,
+даже если head SHA изменился. Это потолок в коде (§3.1), и поднять его можно
+только изменением кода, которое владелец сначала посмотрит глазами. Дневной (2)
+и недельный (5) лимиты при этом продолжают действовать.
 
 ---
 
@@ -212,6 +279,10 @@ $env:ARGON_EMERGENCY_STOP = "1"
 тест). Перед записью текст проходит через регулярку секретов и через маскирование длинных
 непрозрачных токенов; git SHA и дайджесты остаются читаемыми.
 
+В отчёте есть раздел **«Limits in force»** — фактически действовавшие лимиты и, если какой-то
+из них был приведён к потолку, строка о том, что именно запросили и что применили. По отчёту
+видно, в каких рамках уложился вызов.
+
 ---
 
 ## 8. Таблица статусов
@@ -228,6 +299,7 @@ $env:ARGON_EMERGENCY_STOP = "1"
 | Не заданы кредитные лимиты | `BLOCKED / no_budget_policy` | нет |
 | Баланс ниже пола или не читается | `BLOCKED / insufficient_balance` / `balance_unknown` | нет |
 | Исчерпан лимит или повтор пакета | `BLOCKED / no_new_call` | нет |
+| Запрошенный лимит выше потолка | применён потолок, факт в отчёте | нет |
 | Уже есть один вызов в полёте | `BLOCKED / no_new_call: concurrency limit` | нет |
 | Включён аварийный стоп | `BLOCKED / emergency_stop` | нет |
 | Ответ Argon: `PASS` | `PASS` | 1 запрос |

@@ -9,10 +9,10 @@
 - base_sha: `1147129b74b6f85b5fe9ba107ceea34bea0f185d`
 - head_sha: `8635c671e778eb67ab9f57ad3a3f2fbf37719d8b`
 - diff_sha256: `e44a6dcbc0ffb9ff40fa027a95e4ed6aee66c8401c962cb45526e9fedfc5d75b`
-- payload_sha256: `7150434a6f67ceb324b340d20426004ea36ab6c224ab119c24b54b570af7fe93`
-- payload bytes: 1172 / 6144
+- payload_sha256: `280e79f8be62e514f928b163b671461df6970b300b1cda2aa657c623309aefd5`
+- payload bytes: 1712 / 6144
 - Network calls: 1
-- Ledger entry: `20261019T093000Z-17f04969`
+- Ledger entry: `20261019T093000Z-e589836b`
 
 ## Packet scope
 
@@ -35,6 +35,16 @@ verdict: FINDINGS; findings: 1; requested_context: 0
   - evidence: verify() returns True for any non-empty payload
   - fix: compare the signature before accepting the envelope
   - test: unittest: a tampered payload must be rejected
+
+## Limits in force
+
+- max_calls_per_pr: `1`
+- max_calls_per_day: `2`
+- max_calls_per_week: `5`
+- max_concurrent: `1`
+- max_packet_bytes: `6144`
+- max_packet_files: `4`
+- retry_count: `0`
 
 ## Spend accounting
 
