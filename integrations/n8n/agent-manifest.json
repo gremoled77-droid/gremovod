@@ -1,0 +1,139 @@
+{
+  "schemaVersion": "1.0",
+  "snapshotDate": "2026-10-19",
+  "purpose": "Read-only inventory of n8n resources and skill assignments; not a deployment mechanism.",
+  "security": "No API keys, credential IDs, tokens, or user files committed. Resource IDs are identifiers, not authorization.",
+  "branch": "integration/n8n",
+  "source": "n8n MCP read-only inspection",
+  "linkPolicy": "Resources are draft, unpublished; skills persist in n8n and do not auto-update from GitHub.",
+  "agents": [
+    {
+      "key": "A0",
+      "id": "QVAsMhmnDgQVnSCN",
+      "name": "GremoVOD A0 — Продюсер и координатор",
+      "model": "anthropic/claude-sonnet-5-5",
+      "published": false,
+      "skills": [
+        {
+          "name": "skill-creator",
+          "source": "https://github.com/anthropics/skills/blob/main/skills/skill-creator/SKILL.md"
+        },
+        {
+          "name": "doc-coauthoring",
+          "source": "https://github.com/anthropics/skills/blob/main/skills/doc-coauthoring/SKILL.md"
+        },
+        {
+          "name": "xlsx",
+          "source": "https://github.com/anthropics/skills/blob/main/skills/xlsx/SKILL.md"
+        }
+      ],
+      "toolsConnected": 0
+    },
+    {
+      "key": "A1",
+      "id": "z3v7YE2uNrWxy7CY",
+      "name": "GremoVOD A1 — Сценарист и хранитель канона",
+      "model": "anthropic/claude-sonnet-5-5",
+      "published": false,
+      "skills": [
+        {
+          "name": "gremovod-screenplay",
+          "source": "https://github.com/gremoled77-droid/gremovod/blob/main/skills/gremovod-screenplay/SKILL.md"
+        },
+        {
+          "name": "gremovod-dialogue-subtext",
+          "source": "https://github.com/gremoled77-droid/gremovod/blob/main/skills/gremovod-dialogue-subtext/SKILL.md"
+        },
+        {
+          "name": "gremovod-character-dramaturgy",
+          "source": "https://github.com/gremoled77-droid/gremovod/blob/main/skills/gremovod-character-dramaturgy/SKILL.md"
+        }
+      ],
+      "toolsConnected": 0
+    },
+    {
+      "key": "A2",
+      "id": "uLxJzQ142zYRfmBl",
+      "name": "GremoVOD A2 — Режиссёр раскадровки",
+      "model": "anthropic/claude-sonnet-5-5",
+      "published": false,
+      "skills": [
+        {
+          "name": "gremovod-stage-storyboard",
+          "source": "https://github.com/gremoled77-droid/gremovod/blob/main/skills/gremovod-stage-storyboard/SKILL.md"
+        },
+        {
+          "name": "cinema-shot-design",
+          "source": "https://github.com/gremoled77-droid/gremovod/blob/main/skills/cinema-shot-design/SKILL.md"
+        },
+        {
+          "name": "cinema-camera-work",
+          "source": "https://github.com/gremoled77-droid/gremovod/blob/main/skills/cinema-camera-work/SKILL.md"
+        }
+      ],
+      "toolsConnected": 0
+    },
+    {
+      "key": "A3",
+      "id": "LtxRZ0cK8LI1vyRL",
+      "name": "GremoVOD A3 — Промпт-инженер",
+      "model": "anthropic/claude-sonnet-5-5",
+      "published": false,
+      "skills": [
+        {
+          "name": "video-kling-3-omni",
+          "source": "https://github.com/gremoled77-droid/gremovod/blob/main/skills/video-kling-3-omni/SKILL.md"
+        },
+        {
+          "name": "video-seedance-2-5",
+          "source": "https://github.com/gremoled77-droid/gremovod/blob/main/skills/video-seedance-2-5/SKILL.md"
+        },
+        {
+          "name": "gremovod-stage-frames",
+          "source": "https://github.com/gremoled77-droid/gremovod/blob/main/skills/gremovod-stage-frames/SKILL.md"
+        }
+      ],
+      "toolsConnected": 0
+    },
+    {
+      "key": "A4",
+      "id": "ylW6J9muCXXELT12",
+      "name": "GremoVOD A4 — Исследователь",
+      "model": "anthropic/claude-sonnet-5-5",
+      "published": false,
+      "skills": [
+        {
+          "name": "pdf",
+          "source": "https://github.com/anthropics/skills/blob/main/skills/pdf/SKILL.md"
+        },
+        {
+          "name": "gremovod-world-design",
+          "source": "https://github.com/gremoled77-droid/gremovod/blob/main/skills/gremovod-world-design/SKILL.md"
+        }
+      ],
+      "toolsConnected": 0
+    },
+    {
+      "key": "A5",
+      "id": "ubHXs6DSwFrxSh8X",
+      "name": "GremoVOD A5 — Монтаж, графика и выпуск",
+      "model": "anthropic/claude-sonnet-5-5",
+      "published": false,
+      "skills": [
+        {
+          "name": "remotion-best-practices",
+          "source": "https://github.com/remotion-dev/skills/blob/main/skills/remotion-best-practices/SKILL.md"
+        },
+        {
+          "name": "gremovod-stage-editing",
+          "source": "https://github.com/gremoled77-droid/gremovod/blob/main/skills/gremovod-stage-editing/SKILL.md"
+        },
+        {
+          "name": "cinema-editing",
+          "source": "https://github.com/gremoled77-droid/gremovod/blob/main/skills/cinema-editing/SKILL.md"
+        }
+      ],
+      "toolsConnected": 0
+    }
+  ]
+}
