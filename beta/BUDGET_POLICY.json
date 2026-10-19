@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "mode": "MANUAL_PER_EXPERIMENT",
+  "credit_source": "N8N_GATEWAY_CREDITS_ONLY",
+  "starting_credit_usd_claimed_by_owner": 5,
+  "current_verified_gateway_balance_usd": null,
+  "min_target_reserve_usd": 1,
+  "recommended_stop_threshold_usd": 1.25,
+  "max_planned_cost_per_text_experiment_usd": 0.1,
+  "manual_balance_verification_required": true,
+  "automatic_switch_to_own_api": false,
+  "external_credentials_allowed": false,
+  "auto_top_up": false,
+  "parallel_requests": 0,
+  "auto_retry": false,
+  "paid_image_video_audio_requires_model_price_and_manual_review": true,
+  "production_or_canon_mutation": false,
+  "credit_shared_across_instance": true,
+  "status": "BALANCE_NOT_VERIFIED_CANNOT_GUARANTEE_EXACT_ONE_DOLLAR_RESERVE"
+}
