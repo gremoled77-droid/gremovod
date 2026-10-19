@@ -133,11 +133,47 @@ class Policy:
         )
 
 
+def _verdict_text(parsed: dict, content: str) -> str:
+    """Short human-readable verdict line. The raw answer never goes into a report."""
+    verdict = parsed.get("verdict")
+    if verdict:
+        findings = parsed.get("findings") or []
+        requested = parsed.get("requested_context") or []
+        return (f"verdict: {verdict}; findings: {len(findings)}; "
+                f"requested_context: {len(requested)}")
+    return redact_free_text((content or "")[:300]) or "(no usable answer)"
+
+
 def redact(text: str) -> str:
     """Never let a credential-shaped string reach a committable report."""
     if not text:
         return ""
     return BEARER.sub("Bearer [REDACTED]", argon_review.SECRET.sub("[REDACTED]", text))
+
+
+TOKENISH = re.compile(r"(?<![A-Za-z0-9_])[A-Za-z0-9_]{20,}(?![A-Za-z0-9_])")
+
+
+def redact_free_text(text: str) -> str:
+    """Redact provider-authored prose: secrets plus long opaque token shapes.
+
+    Pure hex strings are kept: they are git SHAs and digests, not credentials.
+    """
+    if not text:
+        return ""
+    cleaned = redact(text)
+
+    def _mask(match: re.Match) -> str:
+        token = match.group(0)
+        if re.fullmatch(r"[0-9a-f]{32,}", token):
+            return token
+        if not any(ch.isdigit() for ch in token):
+            return token
+        if not any(ch.isupper() for ch in token):
+            return token
+        return "[REDACTED]"
+
+    return TOKENISH.sub(_mask, cleaned)
 
 
 # --------------------------------------------------------------------------- ledger
@@ -347,17 +383,24 @@ def load_approval(path: Path | None) -> dict | None:
     return data if isinstance(data, dict) else None
 
 
+def canonical_pr(pr_url: str) -> str:
+    """One spelling per PR. The ledger key must not depend on a trailing slash."""
+    return (pr_url or "").strip().rstrip("/")
+
+
 def approval_matches(approval: dict, pr_url: str, head_sha: str) -> tuple[bool, str]:
     """One-time approval bound to a PR and a SHA. A new commit invalidates it."""
     if not approval:
         return False, "approval_missing"
     if approval.get("approved") is not True:
         return False, "approval_missing"
-    approved_pr = str(approval.get("pr", "")).rstrip("/")
-    if approved_pr != str(pr_url or "").rstrip("/"):
+    approved_pr = canonical_pr(str(approval.get("pr", "")))
+    if approved_pr != canonical_pr(pr_url):
         return False, "approval_stale: approval is for another PR"
     approved_sha = str(approval.get("head_sha", "")).strip()
-    if approved_sha and approved_sha != head_sha:
+    if not approved_sha:
+        return False, "approval_stale: approval does not name a head_sha"
+    if approved_sha != head_sha:
         return False, "approval_stale: approval is for another head_sha"
     return True, "approved"
 
@@ -386,7 +429,10 @@ def parse_verdict(content: str) -> tuple[str, dict]:
         return STATUS_HALTED_UNKNOWN, {"reason": "unknown_verdict", "raw": text[:400]}
 
     findings = []
-    for item in (data.get("findings") or [])[:MAX_FINDINGS]:
+    raw_findings = data.get("findings")
+    if raw_findings is not None and not isinstance(raw_findings, list):
+        return STATUS_HALTED_UNKNOWN, {"reason": "response_not_json", "raw": text[:400]}
+    for item in (raw_findings or [])[:MAX_FINDINGS]:
         if not isinstance(item, dict):
             continue
         findings.append({
@@ -398,7 +444,10 @@ def parse_verdict(content: str) -> tuple[str, dict]:
             "test": str(item.get("test", ""))[:200],
         })
     requested = []
-    for item in (data.get("requested_context") or [])[:MAX_FINDINGS]:
+    raw_requested = data.get("requested_context")
+    if raw_requested is not None and not isinstance(raw_requested, list):
+        return STATUS_HALTED_UNKNOWN, {"reason": "response_not_json", "raw": text[:400]}
+    for item in (raw_requested or [])[:MAX_FINDINGS]:
         if not isinstance(item, dict):
             continue
         requested.append({
@@ -406,6 +455,11 @@ def parse_verdict(content: str) -> tuple[str, dict]:
             "lines": str(item.get("lines", ""))[:80],
             "reason": str(item.get("reason", ""))[:300],
         })
+    if verdict == "PASS" and findings:
+        # A clean verdict next to a list of findings is not a conclusion we can verify.
+        return STATUS_HALTED_UNKNOWN, {"reason": "contradictory_verdict", "verdict": verdict,
+                                       "findings": findings, "requested_context": requested,
+                                       "raw": text[:400]}
     return VERDICT_MAP[verdict], {"verdict": verdict, "findings": findings, "requested_context": requested}
 
 
@@ -459,17 +513,19 @@ def render_report(outcome: dict) -> str:
             where = f"{item.get('path', '?')}:{item.get('line')}" if item.get("line") else item.get("path", "?")
             lines.append(f"- **{item.get('severity', '-')}** `{where}`")
             if item.get("evidence"):
-                lines.append(f"  - evidence: {item['evidence']}")
+                lines.append(f"  - evidence: {redact_free_text(item['evidence'])}")
             if item.get("fix"):
-                lines.append(f"  - fix: {item['fix']}")
+                lines.append(f"  - fix: {redact_free_text(item['fix'])}")
             if item.get("test"):
-                lines.append(f"  - test: {item['test']}")
+                lines.append(f"  - test: {redact_free_text(item['test'])}")
         lines.append("")
     requested = outcome.get("requested_context") or []
     if requested:
         lines += ["## Requested context (Level B, needs a separate owner approval)", ""]
         for item in requested:
-            lines.append(f"- `{item.get('path', '?')}` lines `{item.get('lines', '?')}` — {item.get('reason', '')}")
+            lines.append(f"- `{redact_free_text(item.get('path', '?'))}` lines "
+                         f"`{redact_free_text(item.get('lines', '?'))}` — "
+                         f"{redact_free_text(item.get('reason', ''))}")
         lines.append("")
     credits = outcome.get("credits") or {}
     lines += [
@@ -478,6 +534,7 @@ def render_report(outcome: dict) -> str:
         f"- credits_before: `{credits.get('credits_before')}`",
         f"- credits_after: `{credits.get('credits_after')}`",
         f"- credits_consumed: `{credits.get('credits_consumed')}`",
+        f"- credits_reported_by_provider: `{credits.get('credits_reported')}`",
         f"- usd_amount: `{credits.get('usd_amount')}` (credits are not USD; no confirmed tariff)",
         f"- accounting: `{credits.get('accounting')}`",
         "",
@@ -561,15 +618,15 @@ def run(*, repo: Path, base: str, head: str, pr_url: str, task_id: str, scope: s
     """
     state_dir = Path(state_dir) if state_dir else _default_state_dir()
     now = now or _now()
-    policy = policy or Policy.from_env()
     try:
+        policy = policy or Policy.from_env()
         outcome = _run(repo=repo, base=base, head=head, pr_url=pr_url, task_id=task_id, scope=scope,
                        summary=summary, tests=tests, links=links, mode=mode, policy=policy,
                        state_dir=state_dir, approval_path=approval_path,
                        expected_head_sha=expected_head_sha, provider=provider,
                        credits_reader=credits_reader, api_key=api_key, now=now)
     except GateError as ex:
-        outcome = _new_outcome(repo, pr_url, mode, now, policy, tests)
+        outcome = _new_outcome(repo, pr_url, mode, now, policy or Policy(), tests)
         outcome["status"] = STATUS_BLOCKED
         outcome["reason"] = ex.reason
         outcome["message"] = str(ex)
@@ -589,6 +646,7 @@ def _run(*, repo: Path, base: str, head: str, pr_url: str, task_id: str, scope: 
     provider = provider or argon_review.ask_argon_detailed
     credits_reader = credits_reader or argon_review.fetch_credits
     api_key = api_key if api_key is not None else os.environ.get("KIE_API_KEY", "").strip()
+    pr_url = canonical_pr(pr_url)
 
     outcome: dict = _new_outcome(repo, pr_url, mode, now, policy, tests)
 
@@ -743,7 +801,11 @@ def _run(*, repo: Path, base: str, head: str, pr_url: str, task_id: str, scope: 
         "usd_amount": None,
         "http_status": None,
     }
-    allowed, why = ledger.reserve(record, policy, now)
+    try:
+        allowed, why = ledger.reserve(record, policy, now)
+    except GateError:
+        guard.release(slot)
+        raise
     if not allowed:
         guard.release(slot)
         outcome["status"] = STATUS_BLOCKED
@@ -754,6 +816,8 @@ def _run(*, repo: Path, base: str, head: str, pr_url: str, task_id: str, scope: 
 
     try:
         messages = packets.make_packet_prompt(packet)
+        # The request is going out now: count it even if the provider fails.
+        outcome["network_calls"] = 1
         try:
             result = provider(messages, api_key)
         except argon_review.ProviderError as ex:
@@ -772,12 +836,12 @@ def _run(*, repo: Path, base: str, head: str, pr_url: str, task_id: str, scope: 
                                        "reason": "provider_error"})
             return outcome
 
-        outcome["network_calls"] = 1
         content = result.get("content") if isinstance(result, dict) else ""
         status, parsed = parse_verdict(content)
         outcome["findings"] = parsed.get("findings", [])
         outcome["requested_context"] = parsed.get("requested_context", [])
-        outcome["verdict_text"] = parsed.get("raw") or (content or "")[:2000]
+        outcome["verdict_text"] = _verdict_text(parsed, content)
+        outcome["raw_answer"] = content
         if status == STATUS_HALTED_UNKNOWN:
             outcome["reason"] = parsed.get("reason") or (
                 "model_unsure" if parsed.get("verdict") == "UNSURE" else "unverifiable_answer")
@@ -786,14 +850,15 @@ def _run(*, repo: Path, base: str, head: str, pr_url: str, task_id: str, scope: 
 
         credits_after = credits_reader(api_key)
         reported = result.get("credits_consumed") if isinstance(result, dict) else None
-        accounting, note = _account(credits_before, credits_after, reported, policy)
+        accounting, note, consumed = _account(credits_before, credits_after, reported, policy)
         outcome["credits"].update({
             "credits_after": credits_after,
-            "credits_consumed": reported,
+            "credits_consumed": consumed,
+            "credits_reported": reported,
             "usd_amount": None,
             "accounting": accounting,
         })
-        if status == STATUS_PASS and accounting != "OK":
+        if status in (STATUS_PASS, STATUS_FINDINGS) and accounting != "OK":
             status = STATUS_HALTED_UNKNOWN
             outcome["reason"] = "credit_accounting_mismatch"
             outcome["message"] = note
@@ -805,7 +870,8 @@ def _run(*, repo: Path, base: str, head: str, pr_url: str, task_id: str, scope: 
             "status": status,
             "reason": outcome.get("reason"),
             "credits_after": credits_after,
-            "credits_consumed": reported,
+            "credits_consumed": consumed,
+            "credits_reported": reported,
             "usd_amount": None,
             "http_status": result.get("http_status") if isinstance(result, dict) else None,
         })
@@ -834,21 +900,34 @@ def _provider_failure(ex: argon_review.ProviderError) -> tuple[str, str]:
     return STATUS_HALTED_UNKNOWN, "provider_error"
 
 
-def _account(before, after, reported, policy: Policy) -> tuple[str, str]:
-    """Compare the reported spend with the observed balance change."""
+def _account(before, after, reported, policy: Policy) -> tuple[str, str, float | None]:
+    """Compare the reported spend with the observed balance change.
+
+    Returns (accounting, note, effective_consumed). The effective value is what
+    the ledger records, so the daily credit ceiling keeps working even when the
+    provider omits credits_consumed.
+    """
     if before is None or after is None:
-        return "UNKNOWN", "balance could not be read before/after the call"
+        return "UNKNOWN", "balance could not be read before/after the call", None
     delta = before - after
     if delta < 0:
-        return "MISMATCH", f"balance went up by {abs(delta)} during the call"
-    if reported is not None:
-        try:
-            reported = float(reported)
-        except (TypeError, ValueError):
-            return "UNKNOWN", "credits_consumed in the response is not a number"
-        if abs(reported - delta) > policy.credit_delta_tolerance:
-            return "MISMATCH", (f"provider reported {reported} credits but the balance moved by {delta}")
-    return "OK", ""
+        return "MISMATCH", f"balance went up by {abs(delta)} during the call", None
+    ceiling = policy.max_kie_credits_per_call
+    if reported is None:
+        if delta > 0 and ceiling is not None and delta > ceiling:
+            return ("MISMATCH",
+                    f"the call spent {delta} credits, above the per-call ceiling {ceiling}", delta)
+        return "OK", "", delta
+    try:
+        reported = float(reported)
+    except (TypeError, ValueError):
+        return "UNKNOWN", "credits_consumed in the response is not a number", None
+    if abs(reported - delta) > policy.credit_delta_tolerance:
+        return ("MISMATCH",
+                f"provider reported {reported} credits but the balance moved by {delta}", reported)
+    if ceiling is not None and reported > ceiling:
+        return "MISMATCH", f"the call spent {reported} credits, above the per-call ceiling {ceiling}", reported
+    return "OK", "", reported
 
 
 def _write_local_artifacts(state_dir: Path, outcome: dict) -> None:
@@ -863,6 +942,13 @@ def _write_local_artifacts(state_dir: Path, outcome: dict) -> None:
             with target.open("w", encoding="utf-8", newline="\n") as f:
                 json.dump(packet, f, ensure_ascii=False, indent=2, sort_keys=True)
                 f.write("\n")
+        raw = outcome.get("raw_answer")
+        if raw:
+            answers_dir = state_dir / "answers"
+            answers_dir.mkdir(parents=True, exist_ok=True)
+            target = answers_dir / f"{outcome.get('ledger_id') or 'unknown'}.txt"
+            with target.open("w", encoding="utf-8", newline="\n") as f:
+                f.write(str(raw))
     except OSError:
         pass
 

@@ -12,7 +12,7 @@
 - payload_sha256: `7150434a6f67ceb324b340d20426004ea36ab6c224ab119c24b54b570af7fe93`
 - payload bytes: 1172 / 6144
 - Network calls: 1
-- Ledger entry: `20261019T093000Z-9d528de2`
+- Ledger entry: `20261019T093000Z-17f04969`
 
 ## Packet scope
 
@@ -27,7 +27,7 @@
 
 ## Verdict
 
-{"verdict": "FINDINGS", "findings": [{"severity": "P1", "path": "example_capability.py", "line": 3, "evidence": "verify() returns True for any non-empty payload", "fix": "compare the signature before accepting the envelope", "test": "unittest: a tampered payload must be rejected"}], "requested_context": []}
+verdict: FINDINGS; findings: 1; requested_context: 0
 
 ## Findings
 
@@ -41,6 +41,7 @@
 - credits_before: `100.0`
 - credits_after: `98.5`
 - credits_consumed: `1.5`
+- credits_reported_by_provider: `1.5`
 - usd_amount: `None` (credits are not USD; no confirmed tariff)
 - accounting: `OK`
 

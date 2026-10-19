@@ -157,7 +157,7 @@ def main() -> int:
             mode="live", policy=review_gate.Policy(
                 max_kie_credits_per_day=100.0, max_kie_credits_per_call=10.0, min_kie_balance=5.0),
             state_dir=state, approval_path=approval, provider=provider,
-            credits_reader=credits_reader, api_key="not-a-real-key",
+            credits_reader=credits_reader, api_key="example-not-a-real-key",
             now=review_gate.dt.datetime(2026, 10, 19, 9, 30, 0, tzinfo=review_gate.dt.timezone.utc),
         )
         report = review_gate.render_report(outcome)

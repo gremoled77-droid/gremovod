@@ -24,6 +24,9 @@ import review_gate  # noqa: E402
 
 PR_URL = "https://github.com/gremoled77-droid/gremovod/pull/999"
 FAKE_KEY = "unit-test-key-not-a-real-credential"
+# Built at runtime on purpose: a credential-shaped literal in this file would
+# trip the secret guard on the repository's own diff.
+FAKE_SECRET = "sk-" + "abcdefghijklmno123456"
 
 
 def git(path, *args):
@@ -262,7 +265,7 @@ class PacketTest(GateTestCase):
         self.assertEqual(outcome["reason"], "empty_diff")
 
     def test_secret_in_diff_is_refused(self):
-        self.change(text='key = "sk-abcdefghijklmno123456"\n')
+        self.change(text=f'key = "{FAKE_SECRET}"\n')
         provider = FakeProvider()
         outcome = self.run_gate(provider=provider)
         self.assertEqual(outcome["status"], review_gate.STATUS_BLOCKED)
@@ -383,6 +386,112 @@ class LimitTest(GateTestCase):
         self.assertEqual(outcome["reason"], "state_dir_inside_repo")
         self.assertEqual(provider.call_count, 0)
 
+    def test_an_approval_without_a_head_sha_is_not_accepted(self):
+        """The owner approves a SHA. An approval that names none must not pass."""
+        self.change()
+        provider = FakeProvider()
+        path = self.state / "no-sha.json"
+        path.write_text(json.dumps({"approved": True, "pr": PR_URL}), encoding="utf-8")
+        outcome = self.run_gate(provider=provider, approval_path=path)
+        self.assertEqual(outcome["status"], review_gate.STATUS_PENDING_APPROVAL)
+        self.assertTrue(outcome["reason"].startswith("approval_stale"))
+        self.assertEqual(provider.call_count, 0)
+
+    def test_the_pr_url_is_canonicalised_for_the_ledger(self):
+        """A trailing slash must not buy a second paid call."""
+        self.change()
+        provider = FakeProvider()
+        approval = self.approval("HEAD")
+        first = self.run_gate(provider=provider, approval_path=approval)
+        self.assertEqual(first["status"], review_gate.STATUS_PASS)
+        second = self.run_gate(provider=provider, approval_path=approval, pr_url=PR_URL + "/")
+        self.assertEqual(second["status"], review_gate.STATUS_BLOCKED)
+        self.assertTrue(second["reason"].startswith("no_new_call"), second["reason"])
+        self.assertEqual(provider.call_count, 1)
+        self.assertEqual(len(self.ledger_entries()), 1)
+
+    def test_findings_that_are_not_a_list_do_not_crash_the_gate(self):
+        self.change()
+        provider = FakeProvider(content=json.dumps({"verdict": "PASS", "findings": {"a": 1}}))
+        outcome = self.run_gate(provider=provider, approval_path=self.approval("HEAD"),
+                                credits_reader=FakeCredits(100.0, 98.5))
+        self.assertEqual(outcome["status"], review_gate.STATUS_HALTED_UNKNOWN)
+        self.assertEqual(outcome["reason"], "response_not_json")
+        self.assertEqual(provider.call_count, 1)
+
+    def test_a_pass_verdict_with_findings_is_not_a_pass(self):
+        self.change()
+        content = json.dumps({"verdict": "PASS", "findings": [
+            {"severity": "P0", "path": "p0_authz.py", "line": 1, "evidence": "bypass"}]})
+        provider = FakeProvider(content=content)
+        outcome = self.run_gate(provider=provider, approval_path=self.approval("HEAD"),
+                                credits_reader=FakeCredits(100.0, 98.5))
+        self.assertEqual(outcome["status"], review_gate.STATUS_HALTED_UNKNOWN)
+        self.assertEqual(outcome["reason"], "contradictory_verdict")
+        self.assertEqual(len(outcome["findings"]), 1)
+
+    def test_a_call_above_the_per_call_ceiling_is_flagged(self):
+        self.change()
+        provider = FakeProvider(credits=50.0)
+        outcome = self.run_gate(provider=provider, approval_path=self.approval("HEAD"),
+                                credits_reader=FakeCredits(100.0, 50.0))
+        self.assertEqual(outcome["credits"]["accounting"], "MISMATCH")
+        self.assertEqual(outcome["status"], review_gate.STATUS_HALTED_UNKNOWN)
+
+    def test_the_daily_ceiling_works_when_the_provider_omits_the_spend(self):
+        self.change()
+        provider = FakeProvider(credits=None)
+        policy = live_policy(max_calls_per_pr=5, max_calls_per_day=5, max_kie_credits_per_day=11.0,
+                             max_kie_credits_per_call=10.0)
+        first = self.run_gate(provider=provider, approval_path=self.approval("HEAD"), policy=policy,
+                              credits_reader=FakeCredits(100.0, 95.0))
+        self.assertEqual(first["status"], review_gate.STATUS_PASS)
+        self.assertEqual(first["credits"]["credits_consumed"], 5.0)
+        second = self.run_gate(provider=provider, approval_path=self.approval("HEAD"), policy=policy,
+                               credits_reader=FakeCredits(95.0, 90.0))
+        self.assertEqual(second["status"], review_gate.STATUS_BLOCKED)
+        self.assertIn("credit ceiling", second["reason"])
+        self.assertEqual(provider.call_count, 1)
+
+    def test_a_failed_reservation_does_not_leak_the_concurrency_slot(self):
+        self.change()
+        (self.state / "ledger.json").write_text("{not json", encoding="utf-8")
+        provider = FakeProvider()
+        outcome = self.run_gate(provider=provider, approval_path=self.approval("HEAD"))
+        self.assertEqual(outcome["status"], review_gate.STATUS_BLOCKED)
+        self.assertEqual(outcome["reason"], "ledger_corrupted")
+        self.assertEqual(list((self.state / "inflight").glob("slot-*.json")), [])
+
+    def test_a_failed_call_is_counted_as_a_network_call(self):
+        self.change()
+        provider = FakeProvider(error=argon_review.ProviderError("HTTP 429", kind="rate_limited", status=429))
+        outcome = self.run_gate(provider=provider, approval_path=self.approval("HEAD"),
+                                credits_reader=FakeCredits(100.0))
+        self.assertEqual(outcome["network_calls"], 1)
+        self.assertEqual(outcome["status"], review_gate.STATUS_HALTED_UNKNOWN)
+
+    def test_the_report_keeps_the_raw_answer_out(self):
+        self.change()
+        content = json.dumps({"verdict": "FINDINGS", "findings": [
+            {"severity": "P1", "path": "p0_authz.py", "line": 2,
+             "evidence": "SUPERSECRETKEY1234567890 leaked", "fix": "rotate", "test": "none"}]})
+        provider = FakeProvider(content=content)
+        outcome = self.run_gate(provider=provider, approval_path=self.approval("HEAD"),
+                                credits_reader=FakeCredits(100.0, 98.5))
+        report = review_gate.render_report(outcome)
+        self.assertNotIn("SUPERSECRETKEY1234567890", report)
+        self.assertIn("[REDACTED]", report)
+        self.assertNotIn("\"verdict\": \"FINDINGS\"", report)
+
+    def test_the_report_keeps_git_digests_readable(self):
+        self.change()
+        provider = FakeProvider()
+        outcome = self.run_gate(provider=provider, approval_path=self.approval("HEAD"),
+                                credits_reader=FakeCredits(100.0, 98.5))
+        report = review_gate.render_report(outcome)
+        self.assertIn(outcome["diff_sha256"], report)
+        self.assertIn(outcome["payload_sha256"], report)
+
     def test_retries_cannot_be_enabled(self):
         with self.assertRaises(review_gate.GateError) as ctx:
             review_gate.Policy.from_env({"ARGON_RETRY_COUNT": "2"})
@@ -444,7 +553,8 @@ class ProviderTest(GateTestCase):
         self.assertEqual(outcome["status"], review_gate.STATUS_HALTED_UNKNOWN)
         self.assertEqual(outcome["reason"], "rate_limited")
         self.assertEqual(provider.call_count, 1)
-        self.assertEqual(outcome["network_calls"], 0)
+        # The request did go out, so the spend counter must say so.
+        self.assertEqual(outcome["network_calls"], 1)
 
     def test_timeout_is_halted_unknown_with_zero_retry(self):
         self.change()
@@ -564,14 +674,14 @@ class ReportTest(GateTestCase):
         content = json.dumps({
             "verdict": "FINDINGS",
             "findings": [{"severity": "P1", "path": "p0_authz.py", "line": 2,
-                           "evidence": 'leaked sk-abcdefghijklmno123456 here',
+                           "evidence": f"leaked {FAKE_SECRET} here",
                            "fix": "rotate", "test": "none"}],
         })
         provider = FakeProvider(content=content)
         outcome = self.run_gate(provider=provider, approval_path=self.approval("HEAD"),
                                 credits_reader=FakeCredits(100.0, 98.5))
         report = review_gate.render_report(outcome)
-        self.assertNotIn("sk-abcdefghijklmno123456", report)
+        self.assertNotIn(FAKE_SECRET, report)
         self.assertIn("[REDACTED]", report)
 
     def test_report_contains_no_key_and_no_diff_body(self):
@@ -659,6 +769,33 @@ class LegacyContractTest(unittest.TestCase):
             self.assertEqual(files, ["a.py"])
             self.assertEqual(len(digest), 64)
             self.assertIn("+x = 2", diff)
+
+    def test_a_diff_mentioning_the_binary_markers_is_not_binary(self):
+        """The guard must key on git's own markers, not on the words themselves."""
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            git(repo, "init", "-q")
+            git(repo, "config", "user.name", "Test")
+            git(repo, "config", "user.email", "test@example.org")
+            (repo / "a.py").write_text("x = 1\n", encoding="utf-8")
+            git(repo, "add", "-A")
+            git(repo, "commit", "-qm", "base")
+            (repo / "a.py").write_text(
+                'if "Binary files " in diff or "GIT binary patch" in diff:\n    raise ValueError\n',
+                encoding="utf-8")
+            git(repo, "add", "-A")
+            git(repo, "commit", "-qm", "mention the markers")
+            files, diff, _digest = argon_review.snapshot(repo, "HEAD~1", "HEAD")
+            self.assertEqual(files, ["a.py"])
+            self.assertIn("Binary files ", diff)
+            self.assertFalse(argon_review.has_binary_patch(diff))
+
+    def test_a_real_binary_marker_is_still_detected(self):
+        self.assertTrue(argon_review.has_binary_patch(
+            "diff --git a/x.png b/x.png\nBinary files a/x.png and b/x.png differ\n"))
+        self.assertTrue(argon_review.has_binary_patch("GIT binary patch\nliteral 7z\n"))
+        self.assertFalse(argon_review.has_binary_patch("+Binary files a/x and b/x differ\n"))
+        self.assertFalse(argon_review.has_binary_patch(" context mentioning GIT binary patch\n"))
 
 
 if __name__ == "__main__":

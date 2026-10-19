@@ -24,6 +24,21 @@ BLOCKED_SUFFIXES = {".pem", ".key", ".p12", ".pfx", ".pdf", ".png", ".jpg", ".mp
 BLOCKED_FILES = {".env", ".npmrc", "id_rsa", "id_ed25519", "credentials.json", "secrets.json"}
 SECRET = re.compile(r"(?:-----BEGIN [A-Z ]*PRIVATE KEY-----|\b(?:ghp_|github_pat_|sk-)[A-Za-z0-9_\-]{12,}|\b(?:api[_-]?key|password|secret|access[_-]?token)\s*[=:]\s*['\"]?(?!example|dummy|test|placeholder)[A-Za-z0-9/+_\-]{12,})", re.I)
 REF = re.compile(r"^[A-Za-z0-9_.\-/~^]+$")
+BINARY_MARKERS = ("Binary files ", "GIT binary patch")
+
+
+def has_binary_patch(diff: str) -> bool:
+    """True only for git's own binary markers.
+
+    The markers must start a line. A plain substring search would reject any
+    diff that merely mentions the words - including a diff of this very file,
+    whose source contains the marker strings.
+    """
+    for line in diff.splitlines():
+        for marker in BINARY_MARKERS:
+            if line.startswith(marker):
+                return True
+    return False
 
 
 class ReviewError(Exception):
@@ -93,7 +108,7 @@ def _snapshot(repo: Path, base: str, head: str, max_diff_bytes: int | None, max_
     if max_diff_bytes is not None and len(data) > max_diff_bytes:
         raise ReviewError(f"Diff exceeds {max_diff_bytes} bytes; select smaller commits")
     diff = data.decode("utf-8", errors="replace")
-    if "Binary files " in diff or "GIT binary patch" in diff:
+    if has_binary_patch(diff):
         raise ReviewError("Binary changes are excluded from AI review")
     if SECRET.search(diff):
         raise ReviewError("Potential secret in diff; review locally before any API request")
