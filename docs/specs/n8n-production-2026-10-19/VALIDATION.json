@@ -39,5 +39,21 @@
     "canon_mutated": false,
     "release_approved": false,
     "status": "TESTED_MOCK_ONLY_REQUIRES_CODEX"
+  },
+  "codex_review_2026_10_19": {
+    "reviewed_head": "928745552553537f11b16e0fdb568a7654e6cc35",
+    "decision": "CHANGES_REQUESTED",
+    "report": "CODEX_REVIEW_2026-10-19.md",
+    "windows_python_tests_passed": 83,
+    "node_tests_passed": 7,
+    "node_repeats_python_cases": true,
+    "new_acceptance_regressions_failed": 3,
+    "regressions": "review_p0_regressions.py",
+    "regression_log": "CODEX_REGRESSION_RESULTS.txt",
+    "production_approved": false,
+    "working_db_accessed": false,
+    "paid_provider_calls": 0,
+    "cloud_workflows_changed": false,
+    "agent_tasks_dispatched": false
   }
 }

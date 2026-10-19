@@ -1,4 +1,6 @@
 # CODEX NEXT ACTIONS — после бесплатного пилота GremoVOD
+
+**Обновление Codex REVIEW-00, 19.10.2026:** архитектурное ревью выполнено, [решение CHANGES_REQUESTED](specs/n8n-production-2026-10-19/CODEX_REVIEW_2026-10-19.md). Первые исправления TASK-01/03: UNKNOWN под новым job ID, полный expected manifest, атомарная миграция. [Готовый контракт Claude](agent_handoffs/codex-task-claude-build01.md); [независимый контракт Argon](agent_handoffs/codex-task-argon-integrate01.md). Эти задания ещё не запущены. Исходная очередь ниже сохранена; production gates остаются закрыты.
 Дата проверки: 2026-10-19. Источник правды для очередности: мастер-ТЗ пользователя (6 этапов), `docs/CODEX_DECISIONS.md`, фактический результат n8n execution #39 и GitHub Actions.
 
 ## Базовое состояние, не завышать статус
