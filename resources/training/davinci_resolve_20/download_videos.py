@@ -10,6 +10,8 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 import shutil
 import subprocess
@@ -100,22 +102,83 @@ def extract_videos(archive: Path, target: Path) -> int:
     return count
 
 
+def remote_zip_size(url: str) -> int | None:
+    """Try HEAD to read Content-Length without transferring the ZIP body."""
+    curl = shutil.which("curl.exe") or shutil.which("curl")
+    if not curl:
+        return None
+    try:
+        response = subprocess.run(
+            [curl, "--head", "--location", "--silent", "--show-error",
+             "--retry", "1", "--connect-timeout", "10", "--max-time", "25", url],
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False, timeout=35,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    if response.returncode:
+        return None
+    # With redirects/proxies there may be multiple HTTP header blocks; read the final one.
+    blocks = re.split(rb"\r?\n\r?\n", response.stdout)
+    for block in reversed(blocks):
+        lines = block.decode("latin-1", errors="replace").splitlines()
+        if not lines or not re.match(r"^HTTP/\S+\s+2\d\d(?:\s|$)", lines[0]):
+            continue
+        for line in lines[1:]:
+            m = re.match(r"(?i)^content-length:\s*(\d+)\s*$", line.strip())
+            if m:
+                return int(m.group(1))
+    return None
+
+
+def show_sizes(entries: list[dict]) -> int:
+    print("Проверяю размеры по HTTP-заголовкам (ZIP НЕ скачиваются).\n")
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        sizes = list(pool.map(lambda item: remote_zip_size(item["url"]), entries))
+    known_total = 0
+    unknown = 0
+    for item, size in zip(entries, sizes):
+        if size is None:
+            unknown += 1
+            description = "размер не предоставлен сервером"
+        else:
+            known_total += size
+            description = f"{size / (1024 ** 3):.2f} ГиБ ({size:,} байт)"
+        print(f"[{item['section']}] {item['title']}: {description}")
+    print(f"\nИзвестный суммарный объём: {known_total / (1024 ** 3):.2f} ГиБ")
+    if unknown:
+        print(f"Нет размера для {unknown} из {len(entries)} файлов; полный объём неизвестен.")
+    else:
+        print("Точный общий объём по текущим HTTP-заголовкам получен.")
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--section", choices=SECTIONS, action="append",
                         help="Скачать только выбранную категорию (можно повторить)")
     parser.add_argument("--list", action="store_true", help="Показать список, ничего не скачивать")
+    parser.add_argument("--sizes", action="store_true", help="Проверить вес архивов без загрузки данных (HEAD)")
+    parser.add_argument("--match", action="append", metavar="TEXT", help="Скачать лишь видео, где название содержит TEXT; можно повторить")
     parser.add_argument("--extract", action="store_true", help="Дополнительно извлечь видеофайлы из ZIP")
     parser.add_argument("--force", action="store_true", help="Перекачать существующие ZIP")
     args = parser.parse_args()
 
     catalog = json.loads(CATALOG.read_text(encoding="utf-8"))
     entries = [item for item in catalog["videos"] if not args.section or item["section"] in args.section]
+    if args.match:
+        terms = [term.casefold().strip() for term in args.match if term.strip()]
+        entries = [item for item in entries if any(term in item["title"].casefold() for term in terms)]
+    if not entries:
+        print("Под выбранные фильтры ничего не найдено.", file=sys.stderr)
+        return 2
     print(f"Источник: {catalog['source']}\nАрхивов в выбранных категориях: {len(entries)}")
     if args.list:
         for idx, item in enumerate(entries, 1):
             print(f"{idx:2d}. [{item['section']}] {item['title']}  ({item['filename']})")
         return 0
+
+    if args.sizes:
+        return show_sizes(entries)
 
     results = []
     errors = []
