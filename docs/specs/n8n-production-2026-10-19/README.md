@@ -34,3 +34,8 @@
 Опытная SQLite-модель `integrations/n8n/pilot_state_sqlite.py` и её временные офлайн-тесты `backend/test_n8n_astra_pilot.py` — **reference implementation**, ещё не связаны с production FastAPI. Текущий облачный workflow для отрицательных тестов — симуляция, не media inspection.
 
 **Согласованная последовательность:** исправления Astra → бесплатный mock и офлайн-тесты → реальный короткий MP4, когда появится → полный пилот → дизайн Studio. До MP4 A8/FINAL_MEDIA/READY остаются BLOCKED.
+
+
+### Runtime N34–N41: правило экономии и мультимодальные входы
+
+[Матрица моделей и контрактов финальной приёмки](N34_N41_RUNTIME_MODEL_MATRIX.md) · [машинные схемы JSON](contracts/final-runtime-v1_2.schema.json). Технический N34 работает без LLM через локальный media worker; N35 готовит доказательства и отдельно бюджетируемый STT; только N36–N38 используют обоснованные мультимодальные модели. N39–N41 — строго backend и решение владельца, без LLM. n8n Cloud **не** исполняет локальные ffprobe/FFmpeg команды. Все медиапути пока BLOCKED_NO_REAL_MP4.
