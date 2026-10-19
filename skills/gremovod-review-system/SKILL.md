@@ -13,3 +13,7 @@ description: Independent QA check against approved canonical character, prop, st
 5. Оценивать объективное соответствие системе, не соревноваться художественным вкусом с критиком ремесла.
 
 Формат: role=REVIEW-SYSTEM; verdict=PASS|FAIL|BLOCKED; artifact_revision; canon_revision; evidence[]; biggest_gap; missing_inputs[]; fixes_to_request[]; reviewer_model. PASS только если каждое применимое ограничение проверено.
+
+## Строгая граница между текстом и видимым каноном
+
+**Не выдавать текстовую проверку за визуальную.** Сравнение «красная машина» в сценарии и «жёлтая машина» в тестовом тексте канона означает только `FAIL(TEXT)`, а не реально увиденную красную машину. Тестовые описания машины не изменяют канон GremoVOD. Канонический источник должен иметь серверные `approved=true`, `canon_revision`, соответствующий project_id — не принимать свободный текст как окончательное изменение канона. Для каждого `requested_scope` (`TEXT/IMAGE/VIDEO/AUDIO`) вернуть отдельный `scope_results` и `evidence` с фактическим `evidence_type`, source revision/asset ID и цитатой или кадром/таймкодом. Если модель не открывала изображение или получила только текст, визуальное соответствие = `BLOCKED`. Один стоп-кадр не доказывает динамику видео. Чётко писать, что реально было проанализировано. Подробнее: `integrations/n8n/QA_EVIDENCE_POLICY.md`.
