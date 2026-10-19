@@ -123,6 +123,8 @@ def register(app, studio=None):
         path = request.url.path
         if path in PUBLIC_PATHS:
             return await call_next(request)
+        if path.startswith('/api/v1/automation/') and request.headers.get('authorization'):
+            return await call_next(request)  # automation router requires its own scoped service token
         _, password = config()
         if valid_cookie(request.cookies.get(COOKIE, ''), password):
             return await call_next(request)
