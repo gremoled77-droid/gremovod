@@ -11,7 +11,7 @@
       "key": "A0",
       "id": "QVAsMhmnDgQVnSCN",
       "name": "GremoVOD A0 — Продюсер и координатор",
-      "model": "anthropic/claude-sonnet-5-5",
+      "model": "anthropic/claude-haiku-5-5",
       "published": false,
       "toolsConnected": 0,
       "skills": [
@@ -33,7 +33,38 @@
           "source": "https://github.com/anthropics/skills/tree/main/skills/xlsx",
           "references": []
         }
-      ]
+      ],
+      "reasoning": "low",
+      "subAgents": {
+        "maxChildren": 1,
+        "agents": [
+          {
+            "agentId": "z3v7YE2uNrWxy7CY",
+            "useWhen": "A1: этапы «Идея», «Сценарий», «Мир»; сценарная структура, диалоги, юмор, мотивы, сцены и проверка канона, без утверждения новых правил."
+          },
+          {
+            "agentId": "uLxJzQ142zYRfmBl",
+            "useWhen": "A2: этап «Раскадровка»; функция шотов, расстановка, камера, свет, монтажные реакции; сложные композиционные решения для «Кадров»."
+          },
+          {
+            "agentId": "LtxRZ0cK8LI1vyRL",
+            "useWhen": "A3: этапы «Кадры» и «Видео»; перевод утверждённого решения в промпт выбранной image/video модели с валидными параметрами и референсами; генерации не запускать."
+          },
+          {
+            "agentId": "ylW6J9muCXXELT12",
+            "useWhen": "A4: изучение доступных текстов/исследований; извлечение фактов, цитат, сравнение источников. Не утверждать, что агент сам прочёл недоступный PDF или использовал отсутствующие инструменты."
+          },
+          {
+            "agentId": "ubHXs6DSwFrxSh8X",
+            "useWhen": "A5: этапы «Звук», «Монтаж», «Выпуск»; монтажный и звуковой лист, передача в CapCut, контроль файлов; без генерации, рендера и публикации."
+          }
+        ],
+        "modelsByDifficulty": {
+          "low": "anthropic/claude-haiku-5-5",
+          "medium": "anthropic/claude-sonnet-5-5",
+          "high": "anthropic/claude-opus-5-5"
+        }
+      }
     },
     {
       "key": "A1",
@@ -131,7 +162,8 @@
           "sourceBlobSha": "0e72899d884c87f18e6a49a14955ebb739835551",
           "references": []
         }
-      ]
+      ],
+      "reasoning": "medium"
     },
     {
       "key": "A2",
@@ -204,13 +236,14 @@
           "sourceBlobSha": "7cb65721ddd19f0ad1a579182b978d5a3f97e830",
           "references": []
         }
-      ]
+      ],
+      "reasoning": "medium"
     },
     {
       "key": "A3",
       "id": "LtxRZ0cK8LI1vyRL",
       "name": "GremoVOD A3 — Промпт-инженер",
-      "model": "anthropic/claude-sonnet-5-5",
+      "model": "anthropic/claude-haiku-5-5",
       "published": false,
       "toolsConnected": 0,
       "skills": [
@@ -299,13 +332,14 @@
             "references/character-sheet-and-storyboard.md"
           ]
         }
-      ]
+      ],
+      "reasoning": "low"
     },
     {
       "key": "A4",
       "id": "ylW6J9muCXXELT12",
       "name": "GremoVOD A4 — Исследователь",
-      "model": "anthropic/claude-sonnet-5-5",
+      "model": "anthropic/claude-haiku-5-5",
       "published": false,
       "toolsConnected": 0,
       "skills": [
@@ -328,13 +362,14 @@
           "source": "https://github.com/anthropics/skills/tree/main/skills/doc-coauthoring",
           "references": []
         }
-      ]
+      ],
+      "reasoning": "low"
     },
     {
       "key": "A5",
       "id": "ubHXs6DSwFrxSh8X",
       "name": "GremoVOD A5 — Монтаж, графика и выпуск",
-      "model": "anthropic/claude-sonnet-5-5",
+      "model": "anthropic/claude-haiku-5-5",
       "published": false,
       "toolsConnected": 0,
       "skills": [
@@ -379,8 +414,9 @@
           "sourceBlobSha": "16a5010df0878e77556e4876bfde164973feffb6",
           "references": []
         }
-      ]
+      ],
+      "reasoning": "low"
     }
   ],
-  "syncStatus": "manual-copy-no-auto-sync"
+  "syncStatus": "manual-copy-no-auto-sync; model routing draft validated; no paid tests"
 }
