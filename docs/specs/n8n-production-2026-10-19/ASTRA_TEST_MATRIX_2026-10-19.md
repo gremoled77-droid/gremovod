@@ -53,3 +53,10 @@ Base: `codex/n8n-full-production-spec-20261019` (не main).
 19.10.2026 добавлены [конкретная матрица классов моделей, входных форматов и причин BLOCKED](N34_N41_RUNTIME_MODEL_MATRIX.md) и [структурные JSON contracts](contracts/final-runtime-v1_2.schema.json). Машинный каталог `nodes.json` дополнен `astra_v1_2` для N34–N41 и S06/S07: N34/N39–41 = 0 LLM, N35 локальная подготовка доказательств + отдельный STT-бюджет, N36–N38 = только проверенные мультимодальные профили и авторизация. `backend.test_n8n_final_routing_spec` проверяет согласованность каталога. Реальный видео/аудио бенчмарк **не выполнялся**.
 
 Execute Sub-workflow **действительно** вызвал child MOCK на n8n (execution #36), 0 платных запросов. Это подтверждает механизм вызова другого workflow и ожидания результата, но НЕ доказывает работоспособность saved Agent и не подтверждает ни одной медиа-модальности.
+
+
+## Сценарное направление N01–N11 — отдельный mock
+
+Опубликованы [SCENARIO_SKILLS_N01_N11.md](SCENARIO_SKILLS_N01_N11.md), [skill routing](contracts/scenario-skills-routing-v1.json), [preproduction JSON schema](contracts/scenario-preprod-v1.schema.json). Тестовый n8n [workflow GVIVMLP7566MqU3Q](https://gremovod.app.n8n.cloud/workflow/GVIVMLP7566MqU3Q), execution **#38**: 11 пунктов маршрута учтены, остановка у owner gate N05 корректна, последующие N06–N11 `BLOCKED_NOT_RUN`, `final_release_approved=false`, `paid_model_calls=0`. Это **не** подтверждает живую A1/A2 креативную генерацию, реальную Studio owner auth, скилл-резолвер S02 или мультимодальный QA.
+
+CI добавляет `backend.test_n8n_scenario_skills_contract` — строгое соответствие стадий, существующих файлов навыков, owner gate и структурных данных. Runtime skill packages остаются неинтегрированными.
