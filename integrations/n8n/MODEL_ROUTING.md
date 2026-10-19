@@ -58,6 +58,7 @@ Haiku при prompt >100K токенов может использовать б�
 - [x] Проверить Credential Anthropic Kie и наличие трёх Claude в доступном каталоге.
 - [x] Перевести A0, A3, A4, A5 на Haiku, оставить A1/A2 Sonnet; проверить, что Skill assignments не исчезли.
 - [x] Настроить A0.subAgents с A1–A5, maxChildren=1 и low/medium/high model mapping.
+- [x] Настроить reasoning: low у A0/A3/A4/A5, medium у A1/A2 (проверка конфигурации успешна).
 - [x] Проверить `validate_agent` на всех шести (валидны без missing fields).
 - [ ] Серверные лимиты и авторизация Opus через FastAPI; до этого A0 не публиковать.
 - [ ] Определить приемлемый ежемесячный/сеансовый лимит и параметры guardrails с владельцем.
