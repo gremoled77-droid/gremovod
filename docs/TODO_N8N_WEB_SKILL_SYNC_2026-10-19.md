@@ -17,9 +17,10 @@
 
 ### P1 — Продюсерская петля качества
 
-- [x] Спроектирована петля по `integrations/n8n/THREE_CRITICS_LOOP.md`, созданы независимые A6/A7/A8 в n8n с профильными навыками; в A0 они добавлены отключёнными, память критиков отключена.
+- [x] Спроектирована петля по `integrations/n8n/THREE_CRITICS_LOOP.md`, созданы независимые A6/A7/A8; память критиков отключена. A6/A7 включены у A0 в черновике, A8 оставлен disabled.
 - [x] QA Orchestrator `nh3ARcl4XPW6RHqs` создан **как безопасный manual draft**: раздельные пакеты, 3 детерминированных BLOCKED-шлюза (никаких LLM/HTTP), Merge, проверка трёх вердиктов/совпадения ревизий; execution 7 и 8 успешно прошли офлайн-тесты. См. `integrations/n8n/QA_ORCHESTRATOR_IMPLEMENTATION.md`.
-- [ ] Реализовать настоящие вызовы критиков с отдельной историей, media inspector для рендера, утверждённый benchmark/bar.md, защищённый Opus approval и cost cap в FastAPI; обрабатывать PASS/FAIL/ BLOCKED и возвращать ровно одну главную проблему исполнителю, не делая повторной платной генерации автоматически.
+- [x] Независимый живой QA Preview: A7 через Sonnet обнаружил два нарушения на синтетическом каноне. A6 через Haiku вернул internal API error после 3 внутренних attempts; повтор остановлен. Предварительные guardrails A6/A7/A8 заданы. См. `integrations/n8n/QA_FASTAPI_CONNECTION_HANDOFF.md`.
+- [ ] Реализовать FastAPI QA job и настоящие вызовы saved Agents через **поддерживаемую n8n интеграцию**: node `messageAnAgent` объявлен retired, в новый workflow не добавлять. Добавить media inspector для A8 и защищённые expert approval/cost cap. Пока 7-узловой workflow намеренно возвращает BLOCKED; никаких зацикленных платных генераций.
 
 ### P1 — GremoVOD Skill Sync (GitHub → n8n Agents)
 
