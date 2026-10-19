@@ -159,7 +159,29 @@ class PilotStateTests(unittest.TestCase):
         a=self.reviewers();a[2]["role"]="A7"
         self.assertEqual(self.gate(reviewers=a),"BLOCKED_REVIEWER_SET")
 
+    def trusted_round(self):
+        return s.record_trusted_final_round(
+            self.db,run_id="r1",frozen_snapshot="snap1",active_snapshot="snap1",
+            master_checksum="sha:master",reviewers=self.reviewers(),required_evidence=True,
+            media_capabilities_verified=True,expected_slots=[],delivered_slots=[],
+            trusted_backend_verifier=True)
+
+    def test_owner_ready_without_persisted_media_gate_blocked(self):
+        with self.assertRaises(s.Blocked):
+            s.owner_ready(self.db,decision_id="unsafe",owner_id="person",run_id="r1",
+                          snapshot_sha="snap1",gate_result="AWAITING_OWNER_APPROVAL",
+                          owner_session_verified=True)
+
+    def test_trusted_round_cannot_be_claimed_by_n8n(self):
+        with self.assertRaises(s.Blocked):
+            s.record_trusted_final_round(
+                self.db,run_id="r1",frozen_snapshot="snap1",active_snapshot="snap1",
+                master_checksum="sha:master",reviewers=self.reviewers(),required_evidence=True,
+                media_capabilities_verified=True,expected_slots=[],delivered_slots=[],
+                trusted_backend_verifier=False)
+
     def test_owner_ready_idempotent_and_stale_denied(self):
+        self.trusted_round()
         with self.assertRaises(s.Blocked):
             s.owner_ready(self.db,decision_id="d1",owner_id="person",run_id="r1",snapshot_sha="snap1",
                           gate_result="AWAITING_OWNER_APPROVAL",owner_session_verified=False)
