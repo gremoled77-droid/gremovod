@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "1.3",
+  "schemaVersion": "1.4",
   "snapshotDate": "2026-10-19",
   "purpose": "Read-only inventory of n8n resources and skill assignments; not a deployment mechanism.",
   "security": "No API keys, credential IDs, tokens, or user files committed. Resource IDs are identifiers, not authorization.",
@@ -39,7 +39,8 @@
           "name": "gremovod-qa-producer-loop",
           "n8nSkillId": "skill_ts9eUVFpBQ8kuCri",
           "source": "https://github.com/gremoled77-droid/gremovod/blob/integration/n8n/skills/gremovod-qa-producer-loop/SKILL.md",
-          "references": []
+          "references": [],
+          "sourceBlobSha": "b91bc09734af12623a5ffb3763ea7fdd0eb5b392"
         }
       ],
       "subAgents": {
@@ -458,7 +459,8 @@
           "name": "gremovod-review-requirements",
           "n8nSkillId": "skill_cxHObvclEezFzLJN",
           "source": "https://github.com/gremoled77-droid/gremovod/blob/integration/n8n/skills/gremovod-review-requirements/SKILL.md",
-          "references": []
+          "references": [],
+          "sourceBlobSha": "7aa24197106d644f887c29c557483c08ba093d8c"
         },
         {
           "name": "gremovod-stage-release",
@@ -491,7 +493,8 @@
           "name": "gremovod-review-system",
           "n8nSkillId": "skill_7xdvzWypSUA9qeQ1",
           "source": "https://github.com/gremoled77-droid/gremovod/blob/integration/n8n/skills/gremovod-review-system/SKILL.md",
-          "references": []
+          "references": [],
+          "sourceBlobSha": "b283d1bde3e4031d35ef71dd724a1816d0b8546c"
         },
         {
           "name": "gremovod-stage-world",
@@ -540,7 +543,8 @@
           "name": "gremovod-review-craft",
           "n8nSkillId": "skill_otEKGeMAKLxM4BCm",
           "source": "https://github.com/gremoled77-droid/gremovod/blob/integration/n8n/skills/gremovod-review-craft/SKILL.md",
-          "references": []
+          "references": [],
+          "sourceBlobSha": "74448448228d5e6af9f257370131a54230db47d6"
         },
         {
           "name": "cinema-shot-design",
@@ -588,5 +592,5 @@
       }
     }
   ],
-  "syncStatus": "manual-copy; A6/A7 enabled as A0 subagents in unpublished drafts; A8 disabled; A6 preview failed; A7 preview PASS/FAIL test succeeded"
+  "syncStatus": "manual-copy; verified scope policy four QA skills updated in GitHub and n8n drafts; no automatic GitHub sync, reviewers unpublished"
 }
