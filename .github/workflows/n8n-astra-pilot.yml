@@ -20,6 +20,7 @@ on:
       - 'backend/test_mock_media_pilot.py'
       - 'backend/p0_provider_dispatch.py'
       - 'backend/test_p0_provider_dispatch.py'
+      - 'backend/test_p0_migrate.py'
       - 'docs/specs/n8n-production-2026-10-19/**'
   workflow_dispatch:
 
@@ -40,7 +41,7 @@ jobs:
       - name: Confirm FFmpeg and ffprobe available
         run: ffmpeg -version && ffprobe -version
       - name: Offline SQLite pilot regression tests
-        run: python -m unittest -v backend.test_n8n_astra_pilot backend.test_n8n_final_routing_spec backend.test_n8n_scenario_skills_contract backend.test_p0_control backend.test_mock_media_pilot backend.test_p0_provider_dispatch
+        run: python -m unittest -v backend.test_n8n_astra_pilot backend.test_n8n_final_routing_spec backend.test_n8n_scenario_skills_contract backend.test_p0_control backend.test_mock_media_pilot backend.test_p0_provider_dispatch backend.test_p0_migrate
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
