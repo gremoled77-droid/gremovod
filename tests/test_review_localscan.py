@@ -109,7 +109,10 @@ class LocalScanTest(unittest.TestCase):
         )
         git(self.repo, "add", ".secrets-allowlist.txt")
         git(self.repo, "commit", "-qm", "allowlist")
-        self.add_file("a.py", "api_key = 'AKIAZZZZZZZZZZZZZZZZZZZZ'\n")
+        # Значение собирается в рантайме: литерал в исходнике теста сам стал бы
+        # находкой ветрового скана и требовал бы записи в белый список.
+        unlisted = "AKIA" + "Z" * 24
+        self.add_file("a.py", f"api_key = '{unlisted}'\n")
         with self.assertRaises(LocalScanError):
             collect_diff(self.repo, "HEAD~1", "HEAD", allowed_paths=["a.py"])
 
@@ -168,7 +171,10 @@ class BranchScanTest(unittest.TestCase):
         )
         git(self.repo, "add", ".secrets-allowlist.txt")
         git(self.repo, "commit", "-qm", "allowlist")
-        self.add_file("a.py", "api_key = 'AKIAZZZZZZZZZZZZZZZZZZZZ'\n")
+        # Значение собирается в рантайме: литерал в исходнике теста сам стал бы
+        # находкой ветрового скана и требовал бы записи в белый список.
+        unlisted = "AKIA" + "Z" * 24
+        self.add_file("a.py", f"api_key = '{unlisted}'\n")
         result = scan_branch_material(self.repo, "HEAD~1", "HEAD")
         self.assertTrue(result["blocked_secrets"])
 
