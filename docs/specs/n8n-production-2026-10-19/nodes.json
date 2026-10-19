@@ -607,12 +607,12 @@
     },
     {
       "id": "N34",
-      "name": "Критика монтажа",
-      "executor": "A6 / A7 / A8 через S06/S07",
+      "name": "Техническая проверка экспорта (без LLM)",
+      "executor": "локальный FFmpeg/ffprobe worker + проверка FastAPI",
       "inputs": "Реальный master, текст, выбранные дубли, эталон.",
-      "task": "Проверить целостность, порядок и ритм, переходы, звук, титры, отсутствие обрывов, чёрных/замороженных кадров и пропавших реплик. Проблему исходного дубля вернуть на его этап.",
-      "outputs": "edit.reviewed + timecoded_issues",
-      "acceptance": "Все обязательные EDIT-проверки пройдены; исправления проверены на новом рендере.",
+      "task": "Проверить существование и checksum реального master, декодируемые потоки, длительность, формат/FPS, обязательный звук, заданные технические пороги (LUFS/тишина/чёрные интервалы). Не выполнять художественную критику, не вызывать A6/A7/A8.",
+      "outputs": "TechnicalQCResult (PASS_TECHNICAL/FAIL/BLOCKED)",
+      "acceptance": "Данные от доверенного media worker на актуальном master checksum; отсутствие реального файла = BLOCKED; PASS_TECHNICAL не является creative PASS.",
       "on_pass": [
         "N35"
       ],
@@ -622,6 +622,24 @@
       "implementation_status": "NEW",
       "astra_v1_1": {
         "technical_only": "Export technical QC only. Non-technical final master craft critics run once in N36/N37/N38."
+      },
+      "astra_v1_2": {
+        "executor_class": "trusted_local_ffmpeg_worker",
+        "runtime_model_class": "NONE",
+        "llm_calls": 0,
+        "input_contract": "TechnicalQCRequest→TechnicalQCResult",
+        "output_contract": "contracts/final-runtime-v1_2.schema.json#/$defs/TechnicalQCResult",
+        "required_evidence": [
+          "real_master_sha256",
+          "ffprobe_streams",
+          "decode",
+          "verified_worker_identity"
+        ],
+        "blocked_without": [
+          "local_worker",
+          "actual_mp4",
+          "matching_content_checksum"
+        ]
       }
     },
     {
@@ -643,6 +661,24 @@
       "implementation_status": "NEW",
       "astra_v1_1": {
         "snapshot": "review_round_id, full snapshot_hash=hash(master checksum, expected slots, requirements, canon, review_bar, policies, profile+skills hashes, source dependencies)"
+      },
+      "astra_v1_2": {
+        "executor_class": "trusted_FastAPI_and_local_worker; optionally local or paid_STT",
+        "runtime_model_class": "NONE for manifest (STT separately budgeted)",
+        "llm_calls": 0,
+        "input_contract": "TechnicalQCResult + master+manifest+approved brief/canon/review bar/profile+skill revisions",
+        "output_contract": "contracts/final-runtime-v1_2.schema.json#/$defs/FrozenReviewPacket",
+        "required_evidence": [
+          "master_sha256",
+          "immutable_round_snapshot",
+          "capabilities_and_media_uris",
+          "three_isolated_role_packets"
+        ],
+        "blocked_without": [
+          "real_accessible_media",
+          "trusted_manifest",
+          "approved_policies"
+        ]
       }
     },
     {
@@ -662,6 +698,22 @@
       "implementation_status": "ROLE_ONLY",
       "astra_v1_1": {
         "review": "must match exact review_round_id, snapshot_hash and master checksum; distinct isolated reviewer session"
+      },
+      "astra_v1_2": {
+        "executor_class": "independent_video_audio_reviewer",
+        "runtime_model_class": "verified_video_and_audio_capable_Gemini-class_or_equivalent",
+        "default_max_initial_calls": 1,
+        "input_contract": "ReviewerPacket(role=A6)+actual media+requirements IDs",
+        "output_contract": "contracts/final-runtime-v1_2.schema.json#/$defs/CriticVerdict",
+        "required_evidence": [
+          "per_requirement_temporal_coverage",
+          "actual_video_and_audio_as_needed"
+        ],
+        "blocked_without": [
+          "verified_coverage",
+          "request_budget",
+          "approved_source_revision"
+        ]
       }
     },
     {
@@ -681,6 +733,23 @@
       "implementation_status": "ROLE_ONLY",
       "astra_v1_1": {
         "review": "must match exact review_round_id, snapshot_hash and master checksum; distinct isolated reviewer session"
+      },
+      "astra_v1_2": {
+        "executor_class": "independent_visual_video_reviewer",
+        "runtime_model_class": "verified_multimodal_video_capable; Sonnet_frame_only_when_criterion_is_static",
+        "default_max_initial_calls": 1,
+        "input_contract": "ReviewerPacket(role=A7)+approved_Vault_refs+actual media",
+        "output_contract": "contracts/final-runtime-v1_2.schema.json#/$defs/CriticVerdict",
+        "required_evidence": [
+          "character_identity",
+          "approved_canon_hash",
+          "continuity_timeline"
+        ],
+        "blocked_without": [
+          "approved_references",
+          "motion_audio_coverage_if_required",
+          "request_budget"
+        ]
       }
     },
     {
@@ -700,6 +769,25 @@
       "implementation_status": "ROLE_ONLY",
       "astra_v1_1": {
         "review": "disabled pending access to original media with audio/motion coverage and explicit budget approval"
+      },
+      "astra_v1_2": {
+        "executor_class": "independent_temporal_and_audio_craft_reviewer",
+        "runtime_model_class": "verified_native_audio_video_capable; expensive_model_only_with_owner_grant",
+        "default_max_initial_calls": 1,
+        "input_contract": "ReviewerPacket(role=A8)+actual video+audio+craft_bar",
+        "output_contract": "contracts/final-runtime-v1_2.schema.json#/$defs/CriticVerdict",
+        "required_evidence": [
+          "video_motion",
+          "sound_listening",
+          "cut_boundaries",
+          "dialogue_timing"
+        ],
+        "blocked_without": [
+          "A8_separately_authorized",
+          "verified_multimodal_capability",
+          "actual_mp4"
+        ],
+        "runtime_status": "DISABLED_BLOCKED_UNTIL_MP4_AND_BUDGET"
       }
     },
     {
@@ -719,6 +807,24 @@
       "implementation_status": "NEW",
       "astra_v1_1": {
         "gate": "exactly one current verdict per A6/A7/A8 for identical snapshot; reject dup/stale/partial; owner decision still needed"
+      },
+      "astra_v1_2": {
+        "executor_class": "trusted_FastAPI_SQLite_transaction",
+        "runtime_model_class": "NONE",
+        "llm_calls": 0,
+        "input_contract": "3 CriticVerdict + FrozenReviewPacket + evidence provenance",
+        "output_contract": "contracts/final-runtime-v1_2.schema.json#/$defs/DecisionEnvelope",
+        "required_evidence": [
+          "exact_current_round_and_snapshot_hash",
+          "unique_roles",
+          "backend_verified_media",
+          "nonstale_approvals"
+        ],
+        "blocked_without": [
+          "all_3_unique_PASS",
+          "single_frozen_snapshot",
+          "backend_verification"
+        ]
       }
     },
     {
@@ -738,6 +844,18 @@
       "implementation_status": "NEW",
       "astra_v1_1": {
         "owner": "authenticated Studio session only; immutable master hash and current snapshot revision"
+      },
+      "astra_v1_2": {
+        "executor_class": "authenticated_Studio_owner_session",
+        "runtime_model_class": "NONE",
+        "llm_calls": 0,
+        "input_contract": "DecisionEnvelope + current owner session + viewable master",
+        "output_contract": "contracts/final-runtime-v1_2.schema.json#/$defs/OwnerReviewDecision",
+        "blocked_without": [
+          "owner_session",
+          "current_review_snapshot",
+          "human_decision"
+        ]
       }
     },
     {
@@ -757,6 +875,19 @@
       "implementation_status": "NEW",
       "astra_v1_1": {
         "ready": "atomically verify unchanged entire snapshot, fresh reviews+owner decision+file checksum; repeat same decision idempotent"
+      },
+      "astra_v1_2": {
+        "executor_class": "trusted_FastAPI_SQLite_storage",
+        "runtime_model_class": "NONE",
+        "llm_calls": 0,
+        "input_contract": "OwnerReviewDecision + current master checksum + verified final round",
+        "output_contract": "contracts/final-runtime-v1_2.schema.json#/$defs/ReadyManifest",
+        "blocked_without": [
+          "same_snapshot",
+          "same_master_checksum",
+          "persisted_trusted_round",
+          "owner_authenticated"
+        ]
       }
     },
     {
@@ -903,6 +1034,10 @@
       "implementation_status": "NEW",
       "astra_v1_1": {
         "provenance": "actual media decoded/viewed by critic; derivative checksum/origin/window/stream and validated viewer-side access"
+      },
+      "astra_v1_2": {
+        "local_media_worker": "ffprobe/FFmpeg must run on separate Windows worker, not n8n Cloud Code node",
+        "stt": "Whisper local CPU or paid remote STT separately, word timestamps not perfect sync proof"
       }
     },
     {
@@ -919,7 +1054,10 @@
       "on_fail": "N42",
       "on_blocked": "N43",
       "stage": "shared",
-      "implementation_status": "PARTIAL"
+      "implementation_status": "PARTIAL",
+      "astra_v1_2": {
+        "critic_policy": "three separate reviewer packets+session ids+model capabilities; text or frames not enough for audio/lip sync"
+      }
     },
     {
       "id": "S08",
@@ -1067,5 +1205,8 @@
     "p1_media_routing": "SPECIFIED",
     "p1_snapshot_aggregation": "SPECIFIED",
     "p2_duplicate_review": "REMOVED_FROM_PLANNED_ROUTE"
-  }
+  },
+  "astra_runtime_model_matrix": "N34_N41_RUNTIME_MODEL_MATRIX.md",
+  "runtime_schema": "contracts/final-runtime-v1_2.schema.json",
+  "runtime_cost_policy": "no model calls N34,N39,N40,N41; N35 STT approval separate; N36-38 budgeted multimedia only"
 }
