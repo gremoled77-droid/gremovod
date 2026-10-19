@@ -12,7 +12,7 @@
 - payload_sha256: `280e79f8be62e514f928b163b671461df6970b300b1cda2aa657c623309aefd5`
 - payload bytes: 1712 / 6144
 - Network calls: 1
-- Ledger entry: `20261019T093000Z-e589836b`
+- Ledger entry: `20261019T093000Z-d35c614a`
 
 ## Packet scope
 

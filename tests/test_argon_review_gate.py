@@ -251,6 +251,54 @@ class PacketTest(GateTestCase):
         self.assertEqual(packets.packet_digest(packet),
                          __import__("hashlib").sha256(payload.encode("utf-8")).hexdigest())
 
+    def test_a_big_new_file_can_reach_the_reviewer(self):
+        """A brand new file arrives as one huge hunk that cannot fit the 6 KiB
+        packet. Such a file used to be skipped entirely, so the packet carried
+        only whatever small file happened to fit."""
+        big = "".join(f"line_{i} = 'value {i}'\n" for i in range(400))
+        self.change(text=big, name="big_module.py")
+        packet = packets.build_packet(self.repo, self.base_sha, "HEAD", pr_url=PR_URL,
+                                      task_id="T", scope="scope", summary="summary")
+        self.assertIn("big_module.py", packet["selection"]["files_included"])
+        payload = packets.packet_user_payload(packet)
+        self.assertLessEqual(len(payload.encode("utf-8")), packets.MAX_PACKET_BYTES)
+
+    def test_the_packet_covers_several_files_not_just_the_top_one(self):
+        """One file must not eat the whole budget."""
+        for name in ("alpha_service.py", "beta_service.py", "gamma_service.py"):
+            self.change(text=f"def {name.split('_')[0]}():\n    return 1\n", name=name)
+        packet = packets.build_packet(self.repo, self.base_sha, "HEAD", pr_url=PR_URL,
+                                      task_id="T", scope="scope", summary="summary")
+        included = packet["selection"]["files_included"]
+        self.assertGreaterEqual(len(included), 2)
+
+    def test_implementation_outranks_documentation(self):
+        """A document that merely mentions 'secret' must not outrank the code."""
+        (self.repo / "docs").mkdir(exist_ok=True)
+        self.change(text="TOKEN = 'x'  # secret credential token\n", name="docs/notes.md")
+        self.change(text="def run():\n    return 1\n", name="app_service.py")
+        packet = packets.build_packet(self.repo, self.base_sha, "HEAD", pr_url=PR_URL,
+                                      task_id="T", scope="scope", summary="summary")
+        included = packet["selection"]["files_included"]
+        self.assertIn("app_service.py", included)
+
+    def test_path_weight_prefers_source_over_prose(self):
+        self.assertGreater(packets.path_weight("tools/ai_review/review_gate.py"),
+                           packets.path_weight("docs/ai-review/examples/report.example.md"))
+        self.assertLess(packets.path_weight("docs/ai-review/PLAN_RU.md"),
+                        packets.path_weight("backend/kie.py"))
+
+    def test_split_hunk_keeps_valid_headers(self):
+        body = [f"+line {i}\n" for i in range(200)]
+        pieces = packets.split_hunk("@@ -0,0 +1,200 @@", body, max_bytes=400)
+        self.assertGreater(len(pieces), 1)
+        for header, chunk in pieces:
+            self.assertTrue(header.startswith("@@"))
+            self.assertTrue(packets.HUNK_HEADER.match(header))
+            self.assertLessEqual(len(("\n".join(chunk)).encode("utf-8")), 600)
+        joined = "".join("".join(chunk) for _header, chunk in pieces)
+        self.assertEqual(joined.count("+line "), 200)
+
     def test_the_packet_carries_the_project_context(self):
         """Argon sees a diff with no history; it needs to know what the project is."""
         self.change()

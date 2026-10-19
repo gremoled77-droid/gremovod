@@ -57,8 +57,14 @@ docs/*.jpg
 
 # The Argon review tooling under tools/ai_review is source code and must stay
 # tracked. The blanket tools/ rule above would silently ignore it; these
-# entries re-open only that folder and keep the local binaries ignored.
+# entries re-open only that folder and keep everything else under tools/ out
+# of version control.
+#
+# tools/* ignores every direct child of tools/, so a new local binary or
+# download folder cannot be committed by accident. !tools/ai_review/ then
+# re-opens exactly the one folder that holds source code. The earlier
+# !tools/ + re-ignore pair had the opposite effect: it re-opened all of tools/
+# and only re-closed the two folders that happened to exist at the time.
 !tools/
-tools/downloads/
-tools/ffmpeg/
+tools/*
 !tools/ai_review/
