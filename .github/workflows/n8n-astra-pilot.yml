@@ -13,6 +13,7 @@ on:
       - 'backend/test_n8n_scenario_skills_contract.py'
       - 'backend/p0_control.py'
       - 'backend/test_p0_control.py'
+      - 'backend/test_p0_regressions.py'
       - 'tests/test_p0_state.js'
       - 'db/schema.sql'
       - 'scripts/p0_migrate.py'
@@ -43,7 +44,7 @@ jobs:
       - name: Confirm FFmpeg and ffprobe available
         run: ffmpeg -version && ffprobe -version
       - name: Offline SQLite pilot regression tests
-        run: python -m unittest -v backend.test_n8n_astra_pilot backend.test_n8n_final_routing_spec backend.test_n8n_scenario_skills_contract backend.test_p0_control backend.test_mock_media_pilot backend.test_p0_provider_dispatch backend.test_p0_migrate backend.test_mock_evidence
+        run: python -m unittest -v backend.test_n8n_astra_pilot backend.test_n8n_final_routing_spec backend.test_n8n_scenario_skills_contract backend.test_p0_control backend.test_p0_regressions backend.test_mock_media_pilot backend.test_p0_provider_dispatch backend.test_p0_migrate backend.test_mock_evidence
       - uses: actions/setup-node@v4
         with:
           node-version: '24'

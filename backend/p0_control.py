@@ -44,7 +44,39 @@ def open_db(path: Path | str) -> sqlite3.Connection:
 
 def install_schema(db: sqlite3.Connection):
     """Only call on a disposable DB or after explicit backed-up migration approval."""
-    db.executescript(SCHEMA.read_text(encoding="utf-8"))
+    if db.in_transaction:
+        raise Blocked("schema installation requires its own transaction")
+    script = SCHEMA.read_text(encoding="utf-8")
+    reference = sqlite3.connect(":memory:")
+    try:
+        reference.executescript(script)
+        expected = {
+            name: {r[1]: tuple(r)[1:] for r in reference.execute(f"PRAGMA table_info({name})")}
+            for (name,) in reference.execute("SELECT name FROM sqlite_master WHERE type='table'")
+        }
+    finally:
+        reference.close()
+    with atomic(db):
+        for table, columns in expected.items():
+            actual = {r[1]: tuple(r)[1:] for r in db.execute(f"PRAGMA table_info({table})")}
+            prior = dict(columns)
+            if table == "p0_runs" and "expected_media_manifest" not in actual:
+                prior.pop("expected_media_manifest")
+            if actual and actual != prior:
+                raise sqlite3.OperationalError(f"incompatible P0 table: {table}")
+        # executescript commits an existing transaction; execute complete statements individually.
+        statement = ""
+        for line in script.splitlines(keepends=True):
+            statement += line
+            if sqlite3.complete_statement(statement):
+                db.execute(statement)
+                statement = ""
+        if statement.strip():
+            raise sqlite3.OperationalError("incomplete P0 schema statement")
+        if "expected_media_manifest" not in {r[1] for r in db.execute("PRAGMA table_info(p0_runs)")}:
+            db.execute("ALTER TABLE p0_runs ADD COLUMN expected_media_manifest TEXT")
+        if db.execute("PRAGMA quick_check").fetchone()[0] != "ok":
+            raise sqlite3.DatabaseError("P0 schema integrity failure")
 
 
 @contextmanager
@@ -54,7 +86,8 @@ def atomic(db):
         yield
         db.execute("COMMIT")
     except BaseException:
-        db.execute("ROLLBACK")
+        if db.in_transaction:
+            db.rollback()
         raise
 
 
@@ -122,6 +155,16 @@ def create_intent(db, *, job_id, run_id, envelope_id, slot_id, kind, attempt_no,
              request_sha,snapshot_sha,source_revision,provider,model,profile_revision,t,t))
 
 
+def _block_unresolved_attempt(db, job):
+    other = db.execute("""SELECT job_id FROM p0_jobs
+        WHERE run_id=? AND slot_id=? AND kind=? AND job_id<>?
+        AND (state IN ('AUTHORIZED','SUBMITTING','SUBMITTED','UNKNOWN','CANCEL_REQUESTED')
+             OR possible_charge=1) LIMIT 1""",
+        (job["run_id"], job["slot_id"], job["kind"], job["job_id"])).fetchone()
+    if other:
+        raise Blocked("previous slot operation unresolved; reconcile before another attempt")
+
+
 def authorize(db, *, job_id, request_sha, profile_revision, upper_cents,
               trusted_studio_request_authorization):
     """Atomic reserve. Owner's PACKAGE grant != specific immutable request approval."""
@@ -135,6 +178,7 @@ def authorize(db, *, job_id, request_sha, profile_revision, upper_cents,
         r=_one(db,"SELECT * FROM p0_runs WHERE run_id=?",(j["run_id"],))
         if j["state"]!="INTENT_CREATED":
             raise Conflict("request already authorized or attempted")
+        _block_unresolved_attempt(db, j)
         if (j["request_sha"]!=request_sha or j["profile_revision"]!=profile_revision or
             j["snapshot_sha"]!=r["snapshot_sha"] or j["source_revision"]!=r["source_revision"]):
             raise Conflict("request hash/profile/revision changed after authorization")
@@ -198,6 +242,7 @@ def begin_submit(db, *, job_id, worker, expected_version, request_sha, profile_r
         if (j["state"]!="AUTHORIZED" or j["state_version"]!=expected_version or
             j["lease_owner"]!=worker or (j["lease_until_ms"] or 0)<=t or j["submit_count"]!=0):
             raise Conflict("not authorized, lease expired or already submitted")
+        _block_unresolved_attempt(db, j)
         if (j["request_sha"]!=request_sha or j["profile_revision"]!=profile_revision or
             r["snapshot_sha"]!=j["snapshot_sha"] or r["source_revision"]!=j["source_revision"]):
             raise Conflict("source or request changed before paid call")
@@ -262,15 +307,71 @@ def finish_verified(db, *, job_id, event_id, event_body, charged_cents,
         return True
 
 
+def freeze_manifest(db, *, run_id, expected_source_revision, slots):
+    """Freeze the complete trusted plan before jobs or media deliveries exist."""
+    kinds = {'shot','voice','sfx','music','ambience','title','reference','other'}
+    if not isinstance(slots, list) or not slots:
+        raise Blocked("nonempty expected slot list required")
+    plan = []
+    for slot in slots:
+        if (not isinstance(slot, dict) or set(slot) != {'slot_id','kind','required'} or
+                not isinstance(slot['slot_id'], str) or not slot['slot_id'].strip() or
+                not isinstance(slot['kind'], str) or slot['kind'] not in kinds or
+                type(slot['required']) is not bool):
+            raise Blocked("invalid expected slot")
+        plan.append(dict(slot))
+    if len({x['slot_id'] for x in plan}) != len(plan):
+        raise Blocked("duplicate expected slot")
+    plan.sort(key=lambda x: x['slot_id'])
+    with atomic(db):
+        r = _one(db, "SELECT * FROM p0_runs WHERE run_id=?", (run_id,))
+        if r['source_revision'] != expected_source_revision:
+            raise Conflict("stale manifest source")
+        frozen = json.dumps({'snapshot_sha':r['snapshot_sha'], 'slots':plan},
+                            sort_keys=True, separators=(',', ':'))
+        if r['expected_media_manifest'] is not None:
+            if r['expected_media_manifest'] != frozen:
+                raise Conflict("expected manifest is immutable for this source")
+            return
+        if (db.execute("SELECT 1 FROM p0_jobs WHERE run_id=? AND source_revision=? LIMIT 1",
+                       (run_id,expected_source_revision)).fetchone() or
+                db.execute("SELECT 1 FROM p0_scene_manifest WHERE run_id=? AND source_revision=? LIMIT 1",
+                           (run_id,expected_source_revision)).fetchone()):
+            raise Blocked("freeze manifest before production")
+        db.execute("UPDATE p0_runs SET expected_media_manifest=?,updated_at_ms=? WHERE run_id=?",
+                   (frozen, now_ms(), run_id))
+        db.executemany("""INSERT INTO p0_scene_manifest
+            (run_id,slot_id,kind,required,source_revision,status,updated_at_ms)
+            VALUES(?,?,?,?,?,'MISSING',?) ON CONFLICT(run_id,slot_id) DO NOTHING""",
+            [(run_id,x['slot_id'],x['kind'],int(x['required']),expected_source_revision,now_ms()) for x in plan])
+
+
 def manifest_ready(db, *, run_id, expected_source_revision):
-    """Skip optional slots. A missing or stale required asset blocks assembly."""
-    r=_one(db,"SELECT source_revision FROM p0_runs WHERE run_id=?",(run_id,))
-    if r["source_revision"]!=expected_source_revision:
-        return False
-    rows=db.execute("SELECT * FROM p0_scene_manifest WHERE run_id=?",(run_id,)).fetchall()
-    required=[x for x in rows if x["required"]]
-    return bool(required) and all(x["status"]=="FULFILLED" and x["asset_sha"] and
-                                  x["source_revision"]==expected_source_revision for x in required)
+    """Compare deliveries to the frozen plan, never infer the plan from deliveries."""
+    with atomic(db):
+        r = _one(db, "SELECT * FROM p0_runs WHERE run_id=?", (run_id,))
+        if r['source_revision'] != expected_source_revision or r['expected_media_manifest'] is None:
+            return False
+        frozen = json.loads(r['expected_media_manifest'])
+        if frozen['snapshot_sha'] != r['snapshot_sha']:
+            return False
+        plan = {x['slot_id']:x for x in frozen['slots']}
+        rows = {x['slot_id']:x for x in db.execute("SELECT * FROM p0_scene_manifest WHERE run_id=? AND source_revision=?",
+                                                 (run_id,expected_source_revision))}
+        if rows.keys() - plan.keys() or not any(x['required'] for x in plan.values()):
+            return False
+        for slot_id, slot in plan.items():
+            row = rows.get(slot_id)
+            if row is None:
+                if slot['required']:
+                    return False
+                continue
+            if (row['kind'] != slot['kind'] or bool(row['required']) != slot['required'] or
+                    row['source_revision'] != expected_source_revision):
+                return False
+            if slot['required'] and (row['status'] != 'FULFILLED' or not row['asset_sha']):
+                return False
+        return True
 
 
 def update_snapshot_revision(db, *, run_id, expected_version, new_sha, new_revision):
@@ -285,5 +386,5 @@ def update_snapshot_revision(db, *, run_id, expected_version, new_sha, new_revis
             raise Blocked("cannot silently change source while paid jobs may still charge")
         db.execute("""UPDATE p0_runs SET snapshot_sha=?,source_revision=?,
             state_version=state_version+1,status='PAUSED',lease_owner=NULL,
-            lease_until_ms=NULL,updated_at_ms=? WHERE run_id=?""",
+            lease_until_ms=NULL,expected_media_manifest=NULL,updated_at_ms=? WHERE run_id=?""",
             (new_sha,new_revision,now_ms(),run_id))

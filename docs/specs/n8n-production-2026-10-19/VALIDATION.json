@@ -55,5 +55,32 @@
     "paid_provider_calls": 0,
     "cloud_workflows_changed": false,
     "agent_tasks_dispatched": false
+  },
+  "codex_p0_fixes_2026_10_19": {
+    "branch": "codex/p0-fixes-20261019",
+    "source_review_commit": "c4aaf3f",
+    "status": "THREE_DEFECTS_FIXED_NOT_PRODUCTION_READY",
+    "fixed": [
+      "R-01",
+      "R-02",
+      "R-03"
+    ],
+    "backend_tests_passed": 327,
+    "coordination_tests_passed": 14,
+    "node_tests_passed": 7,
+    "acceptance_regressions_passed": 11,
+    "wal_concurrent_connections_tested": true,
+    "ddl_and_alter_rollback_fault_injection_tested": true,
+    "legacy_p0_upgrade_tested": true,
+    "production_schema_migrated": false,
+    "real_provider_calls_performed": false,
+    "remaining": [
+      "R-04 shared budget",
+      "R-05 trusted runtime auth",
+      "UNKNOWN provider reconciler",
+      "real asset transport and QA"
+    ],
+    "handoff": "../../agent_handoffs/codex-p0-fixes-20261019.md",
+    "regression_log": "CODEX_P0_FIX_RESULTS.txt"
   }
 }

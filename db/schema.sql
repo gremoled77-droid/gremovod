@@ -16,7 +16,8 @@ CREATE TABLE IF NOT EXISTS p0_runs (
   lease_owner TEXT,
   lease_until_ms INTEGER,
   created_at_ms INTEGER NOT NULL,
-  updated_at_ms INTEGER NOT NULL
+  updated_at_ms INTEGER NOT NULL,
+  expected_media_manifest TEXT      -- frozen source snapshot + complete slot plan; NULL blocks assembly
 );
 CREATE INDEX IF NOT EXISTS idx_p0_runs_project ON p0_runs(project_id,updated_at_ms);
 

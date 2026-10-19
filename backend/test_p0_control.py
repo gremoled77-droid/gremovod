@@ -174,15 +174,13 @@ class P0SafetyTests(unittest.TestCase):
         self.assertEqual(self.row("p0_budget_envelopes","envelope_id","env")["reserved_cents"],250)
 
     def test_manifest_needs_all_required_slots_and_current_assets(self):
-        self.db.execute("""INSERT INTO p0_scene_manifest
-            (run_id,slot_id,kind,required,source_revision,asset_sha,status,updated_at_ms)
-            VALUES ('r1','shot_01','shot',1,'v1',NULL,'MISSING',0)""")
+        p.freeze_manifest(self.db,run_id="r1",expected_source_revision="v1",slots=[
+            {"slot_id":"shot_01","kind":"shot","required":True},
+            {"slot_id":"music","kind":"music","required":False}])
         self.assertFalse(p.manifest_ready(self.db,run_id="r1",expected_source_revision="v1"))
         self.db.execute("UPDATE p0_scene_manifest SET status='FULFILLED',asset_sha='hash1' WHERE slot_id='shot_01'")
         self.assertTrue(p.manifest_ready(self.db,run_id="r1",expected_source_revision="v1"))
-        self.db.execute("""INSERT INTO p0_scene_manifest
-            (run_id,slot_id,kind,required,source_revision,status,updated_at_ms)
-            VALUES ('r1','music','music',0,'v1','SKIPPED',0)""")
+        self.db.execute("UPDATE p0_scene_manifest SET status='SKIPPED' WHERE slot_id='music'")
         self.assertTrue(p.manifest_ready(self.db,run_id="r1",expected_source_revision="v1"))
         self.assertFalse(p.manifest_ready(self.db,run_id="r1",expected_source_revision="v2"))
 

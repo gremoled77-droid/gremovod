@@ -1,6 +1,8 @@
 # STATUS — GremoVOD · эстафета трёх разработчиков
 
-**Проверено:** 2026-10-19. **Текущий владелец эстафеты:** координатор (ChatGPT, подготовка передачи Codex). **Состояние:** `READY_FOR_CODEX_REVIEW`, не `PRODUCTION_READY`.
+**Проверено:** 2026-10-19. **Текущий владелец эстафеты этой ветки:** Codex, прямое поручение владельца исправить R-01–R-03. **Состояние:** `P0_FIXES_READY_FOR_CODEX_REVIEW`, не `PRODUCTION_READY`.
+
+R-01–R-03 исправлены в `codex/p0-fixes-20261019`; shared CI и этот STATUS в рамках задачи редактирует Codex. [Актуальный handoff](docs/agent_handoffs/codex-p0-fixes-20261019.md). Ранее подготовленный Claude BUILD-01 не должен повторно выполнять эти исправления; защищённый runtime/единый бюджет остаются незавершёнными.
 
 ## Три строки для следующего исполнителя
 
@@ -12,7 +14,8 @@
 
 | ID | Кому | Область | Статус | Условие приёмки |
 |---|---|---|---|---|
-| REVIEW-00 | Codex | Архитектура PR #17 и PR #18, D-001–D-012, P0 data reconciliation | **READY_TO_PICK_UP** | No shadow SQLite, documented safe migration/rollback |
+| REVIEW-00 | Codex | Архитектура PR #17 и PR #18, D-001–D-012, P0 data reconciliation | **REVIEWED_CHANGES_REQUESTED** | Runtime budget/auth integration still pending |
+| FIX-P0 | Codex | R-01–R-03: unresolved attempts, frozen manifest, atomic migration | **VERIFIED_ON_TEMP_DATA** | Regression tests, WAL race, fault-injected DDL rollback; no production migration |
 | BUILD-01 | Claude Code | Реальный FastAPI State Manager S01 + Studio auth S09 + восстановление S04/S05 | **NOT_ASSIGNED_IN_LOCAL_WORKTREE** | Тесты на копии SQLite, два Resume, права, zero real spend |
 | BUILD-02 | Claude Code | Windows media worker, FFmpeg/ffprobe и safe asset access | **NOT_ASSIGNED_IN_LOCAL_WORKTREE** | Хэши реальных бесплатных test файлов совпали на обеих сторонах |
 | INTEGRATE-01 | Argon | Seven n8n draft modules, source-controlled workflow JSON, mock dispatcher | **NOT_ASSIGNED_IN_LOCAL_WORKTREE** | Реальные asset IDs вместо `mock://`; модельных вызовов 0 |

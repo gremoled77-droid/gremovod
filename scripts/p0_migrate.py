@@ -34,21 +34,16 @@ def migrate(path: Path, *, apply: bool, backup_path: Path | None = None):
         if backup==path or backup.exists():
             raise FileExistsError("Backup must be a new, distinct path")
         backup.parent.mkdir(parents=True,exist_ok=True)
+        with backup.open("xb"):
+            pass  # Reserve the backup name exclusively before SQLite opens it.
         dest=p.open_db(backup)
         try:
             db.backup(dest)  # includes WAL state, produces a consistent snapshot
         finally:
             dest.close()
-        try:
-            p.install_schema(db)
-            after=inspect(db)
-            if after["missing_p0_tables"] or after["integrity"]!="ok":
-                raise RuntimeError("P0 tables missing or integrity failure; restore from backup")
-            return {"mode":"APPLIED_WITH_BACKUP","database":str(path),
-                    "backup":str(backup),"before":before,"after":after}
-        except BaseException:
-            # Keep backup; never destroy production content or auto-restore.
-            raise
+        p.install_schema(db)  # Preflight + DDL + integrity check commit or roll back together.
+        return {"mode":"APPLIED_WITH_BACKUP","database":str(path),
+                "backup":str(backup),"before":before,"after":inspect(db)}
     finally:
         db.close()
 

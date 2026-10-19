@@ -1,5 +1,7 @@
 # Контракт для Claude Code — BUILD-01
 
+**Обновление:** владелец поручил R-01–R-03 Codex; они исправлены в `codex/p0-fixes-20261019`. [Результат и проверки](codex-p0-fixes-20261019.md). Не повторять исходные три исправления ниже. Следующий backend-контракт должен отдельно охватывать R-04/R-05 (единый бюджет и trusted auth) после review. Ниже сохранён первоначальный текст задания для истории.
+
 - Сделано: Codex проверил PR #17–19 и воспроизвёл R-01/R-02/R-03. Контракт подготовлен; Claude не запущен, сообщение не отправлено.
 - Файлы: разрешённая область `backend/p0_control.py`, `backend/test_p0_control.py`, `backend/test_p0_migrate.py`, `db/schema.sql`, `scripts/p0_migrate.py`, собственный `docs/agent_handoffs/claude-build01.md`. Не править workflows/, integrations/n8n/, docs/specs/, canon/, shared STATUS/CI.
 - Следующий шаг: в отдельной ветке `build/claude/p0-state-recovery` от проверенного head `9287455` перенести три [регрессии](../specs/n8n-production-2026-10-19/review_p0_regressions.py) в backend tests и сделать их зелёными; затем сдать PR Codex. Не переключать существующую claude/work.

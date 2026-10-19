@@ -1,5 +1,7 @@
 # CODEX NEXT ACTIONS — после бесплатного пилота GremoVOD
 
+**После исправлений Codex:** R-01/R-02/R-03 закрываются в `codex/p0-fixes-20261019`, [состав и проверки](agent_handoffs/codex-p0-fixes-20261019.md). Не выдавать повторно Claude задание исправить те же три дефекта. Следующая незавершённая работа — R-04/R-05: единый бюджет Studio, доверенные session/ACL/request approvals и provider reconciliation. Автоматический production merge/migration по-прежнему не разрешён.
+
 **Обновление Codex REVIEW-00, 19.10.2026:** архитектурное ревью выполнено, [решение CHANGES_REQUESTED](specs/n8n-production-2026-10-19/CODEX_REVIEW_2026-10-19.md). Первые исправления TASK-01/03: UNKNOWN под новым job ID, полный expected manifest, атомарная миграция. [Готовый контракт Claude](agent_handoffs/codex-task-claude-build01.md); [независимый контракт Argon](agent_handoffs/codex-task-argon-integrate01.md). Эти задания ещё не запущены. Исходная очередь ниже сохранена; production gates остаются закрыты.
 Дата проверки: 2026-10-19. Источник правды для очередности: мастер-ТЗ пользователя (6 этапов), `docs/CODEX_DECISIONS.md`, фактический результат n8n execution #39 и GitHub Actions.
 
