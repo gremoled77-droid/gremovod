@@ -1,0 +1,212 @@
+{
+  "schemaVersion": "1.0",
+  "snapshotDate": "2026-10-19",
+  "notice": "Reference snapshot only, no credentials. Unpublished offline n8n draft.",
+  "sourceWorkflowId": "nh3ARcl4XPW6RHqs",
+  "name": "GremoVOD QA Orchestrator — safe draft",
+  "active": false,
+  "versionId": "ba549b3c-e82a-4fbb-a60d-6f23690c2638",
+  "nodes": [
+    {
+      "name": "Ручной тест: без API вызовов",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        160,
+        340
+      ],
+      "parameters": {}
+    },
+    {
+      "name": "Проверка входа",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        420,
+        340
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const d=$input.first()?.json??{};const p=(d.review_request&&typeof d.review_request==='object')?d.review_request:d;const miss=[];for(const k of ['task_id','project_id','artifact_id','artifact_revision']){if(typeof p[k]!=='string'||!p[k].trim())miss.push(k)}const requirements=Array.isArray(p.requirements)?p.requirements:[];if(requirements.length===0)miss.push('approved_requirements');const canon=p.canon&&typeof p.canon==='object'?p.canon:{};const bar=p.bar&&typeof p.bar==='object'?p.bar:{};const art=p.artifact&&typeof p.artifact==='object'?p.artifact:{};if(p.brief_approved!==true)miss.push('approved_brief');if(p.bar_approved!==true||!Array.isArray(bar.mechanics)||bar.mechanics.length<5||bar.mechanics.length>7)miss.push('approved_bar_5_to_7_mechanics');if(typeof p.benchmark_ref!=='string'||!p.benchmark_ref.trim())miss.push('accessible_benchmark');const pack={task_id:p.task_id??null,project_id:p.project_id??null,artifact_id:p.artifact_id??null,artifact_revision:p.artifact_revision??null,review_round:Number.isInteger(p.review_round)&&p.review_round>0?p.review_round:1,requirements,canon:{revision:canon.revision??null,rules:Array.isArray(canon.rules)?canon.rules:[]},bar:{revision:bar.revision??null,mechanics:Array.isArray(bar.mechanics)?bar.mechanics:[]},benchmark_ref:p.benchmark_ref??null,artifact:{kind:art.kind??'unknown',render_refs:Array.isArray(art.render_refs)?art.render_refs:[],text_ref:art.text_ref??null},missing:miss,safe_mode:'DRAFT_NO_LLM_NO_COST',untrusted_approval_ignored:true};return[{json:pack}];"
+      }
+    },
+    {
+      "name": "A6 — шлюз ТЗ",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        720,
+        100
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const p=$input.first().json;const missing=[...p.missing];return[{json:{role:'REVIEW-REQ',model:'anthropic/claude-haiku-5-5',task_id:p.task_id,project_id:p.project_id,artifact_id:p.artifact_id,artifact_revision:p.artifact_revision,review_round:p.review_round,package:{requirements:p.requirements,artifact:p.artifact},verdict:'BLOCKED',ready_for_future_review:missing.length===0,missing_inputs:[...new Set([...missing,'reviewer_not_integrated'])],evidence:[],biggest_gap:null,revision_locked:true}}];"
+      }
+    },
+    {
+      "name": "Собрать три ветки",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        1000,
+        340
+      ],
+      "parameters": {
+        "mode": "append",
+        "numberInputs": 3
+      }
+    },
+    {
+      "name": "A7 — шлюз канона",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        720,
+        340
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const p=$input.first().json;const missing=[...p.missing];if(!p.canon.revision||p.canon.rules.length===0)missing.push('approved_canon_revision_and_rules');return[{json:{role:'REVIEW-SYSTEM',model:'anthropic/claude-sonnet-5-5',task_id:p.task_id,project_id:p.project_id,artifact_id:p.artifact_id,artifact_revision:p.artifact_revision,review_round:p.review_round,package:{canon:p.canon,artifact:p.artifact},verdict:'BLOCKED',ready_for_future_review:missing.length===0,missing_inputs:[...new Set([...missing,'reviewer_not_integrated'])],evidence:[],biggest_gap:null,revision_locked:true}}];"
+      }
+    },
+    {
+      "name": "A8 — запрет Opus",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        720,
+        580
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const p=$input.first().json;const missing=[...p.missing];if(p.artifact.render_refs.length===0)missing.push('render_refs');missing.push('verified_media_inspection_not_available');missing.push('trusted_expert_approval_not_integrated');return[{json:{role:'REVIEW-CRAFT',model:'anthropic/claude-opus-5-5',task_id:p.task_id,project_id:p.project_id,artifact_id:p.artifact_id,artifact_revision:p.artifact_revision,review_round:p.review_round,package:{bar:p.bar,benchmark_ref:p.benchmark_ref,artifact:p.artifact},verdict:'BLOCKED',ready_for_future_review:missing.length===0,missing_inputs:[...new Set([...missing,'reviewer_not_integrated'])],evidence:[],biggest_gap:null,revision_locked:true}}];"
+      }
+    },
+    {
+      "name": "Сбор вердиктов",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1280,
+        340
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const a=$input.all().map(i=>i.json);const roles=['REVIEW-REQ','REVIEW-SYSTEM','REVIEW-CRAFT'];const counts={};for(const r of a)counts[r.role]=(counts[r.role]??0)+1;const missing=roles.filter(k=>counts[k]!==1);const same=a.length===3&&a.every(x=>x.task_id===a[0].task_id&&x.artifact_id===a[0].artifact_id&&x.artifact_revision===a[0].artifact_revision&&x.review_round===a[0].review_round);const valid=a.length===3&&missing.length===0&&same;const verdicts=a.map(x=>({role:x.role,model:x.model,verdict:x.verdict,ready_for_future_review:x.ready_for_future_review,missing_inputs:x.missing_inputs,evidence:x.evidence,biggest_gap:x.biggest_gap}));const fail=a.filter(x=>x.verdict==='FAIL');const blocked=a.filter(x=>x.verdict==='BLOCKED');const passed=valid&&a.every(x=>x.verdict==='PASS');const status=!valid?'BLOCKED_INVALID_REVIEW_SET':fail.length?'CHANGES_REQUESTED':blocked.length?'BLOCKED_AWAITING_INTEGRATION':passed?'AWAITING_OWNER_APPROVAL':'BLOCKED_UNKNOWN_VERDICT';return[{json:{task_id:a[0]?.task_id??null,artifact_id:a[0]?.artifact_id??null,artifact_revision:a[0]?.artifact_revision??null,review_round:a[0]?.review_round??1,status,all_passed:passed,owner_approval_required:true,paid_calls_executed:false,quality_claim:false,reviewer_count:a.length,missing_or_duplicate_roles:missing,verdicts,next_action:status==='CHANGES_REQUESTED'?'return_top_gap_to_original_builder':status==='AWAITING_OWNER_APPROVAL'?'wait_for_owner_approval':'do_not_dispatch_paid_models; complete FastAPI gates and media inspector'}}];"
+      }
+    }
+  ],
+  "connections": {
+    "Ручной тест: без API вызовов": {
+      "main": [
+        [
+          {
+            "node": "Проверка входа",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Проверка входа": {
+      "main": [
+        [
+          {
+            "node": "A6 — шлюз ТЗ",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "A7 — шлюз канона",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "A8 — запрет Opus",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "A6 — шлюз ТЗ": {
+      "main": [
+        [
+          {
+            "node": "Собрать три ветки",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Собрать три ветки": {
+      "main": [
+        [
+          {
+            "node": "Сбор вердиктов",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "A7 — шлюз канона": {
+      "main": [
+        [
+          {
+            "node": "Собрать три ветки",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "A8 — запрет Opus": {
+      "main": [
+        [
+          {
+            "node": "Собрать три ветки",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    }
+  },
+  "nodeGroups": [
+    {
+      "id": "9adfb158-1d02-4675-b7fd-0709a648e51a",
+      "name": "Трёхкратная проверка: независимые пакеты",
+      "nodeNames": [
+        "A6 — шлюз ТЗ"
+      ],
+      "description": "A6: отдельный пакет ТЗ, вызовы моделей пока отключены"
+    },
+    {
+      "id": "1b863a1b-c006-48e4-948b-fdbad6235047",
+      "name": "Канонические ограничения",
+      "nodeNames": [
+        "A7 — шлюз канона"
+      ],
+      "description": "A7: отдельный пакет подтверждённого канона"
+    },
+    {
+      "id": "372f1dca-5e68-4d79-be6f-f5b581aaac60",
+      "name": "Экспертный стоп-кран",
+      "nodeNames": [
+        "A8 — запрет Opus"
+      ],
+      "description": "A8 Opus: без медиапросмотра и доверенного approval всегда BLOCKED"
+    }
+  ],
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  }
+}
