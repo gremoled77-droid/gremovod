@@ -39,9 +39,9 @@ React/Vite GremoVOD Web
 ## Текущий n8n (проверено 19.10.2026)
 
 - Draft workflow **GremoVOD Studio v1 (без генерации)** — 15 узлов, не активирован. Это **workflow-узлы**, а не автоматические вызовы отдельных сохранённых n8n Agents.
-- 6 **самостоятельных n8n Agents** A0–A5, все **draft, unpublished**; на момент снимка каждый настроен на **Anthropic Claude Sonnet 5.5** через Kie credential, в каждом есть сохранённые Skills, вызовы моделей не запускались.
+- 6 **самостоятельных n8n Agents** A0–A5, все **draft, unpublished**; на 19.10.2026 A0/A3/A4/A5 = **Claude Haiku 5.5**, A1/A2 = **Claude Sonnet 5.5** через Kie credential, в каждом есть сохранённые Skills, вызовы моделей не запускались.
 - Из 35 навыков проекта GitHub в агенты добавлена часть; актуальную карту см. в `agent-manifest.json`. Для полного исполнения ссылочных инструкций потребуется импорт `references/**`.
-- **Skill Sync**, веб-API для n8n, Agent orchestration, A6/A7 — планы, **не реализованы**.
+- **Skill Sync**, веб-API для n8n и A6/A7 — планы, **не реализованы**. A0 как маршрутизатор A1–A5 с low/medium/high = Haiku/Sonnet/Opus подготовлен **только в черновике**; Opus нельзя допускать к живому запуску до серверного approval и бюджетного ограничения. Подробнее: [MODEL_ROUTING.md](MODEL_ROUTING.md).
 - Не надо принимать наличие n8n Skills или workflow за наличие готового веб-интеграционного API.
 
 ## Предлагаемые назначения
