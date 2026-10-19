@@ -1,0 +1,201 @@
+{
+  "version": "1.0-stage-1",
+  "status": "MOCK_FIRST_NOT_PUBLISHED",
+  "physical_workflows": [
+    {
+      "id": "WF_00",
+      "name": "WF_00_Core_Infra",
+      "logical": [
+        "S01",
+        "S02",
+        "S03",
+        "S04",
+        "S05",
+        "S06",
+        "S07",
+        "S08",
+        "S09"
+      ],
+      "responsibilities": [
+        "project_state",
+        "budget_reservations",
+        "leases",
+        "human_approvals",
+        "asset_registry"
+      ],
+      "executable_gate": "BACKEND_REQUIRED_FOR_PRODUCTION",
+      "n8n_workflow_id": "j8Xqv8GQHjfJ5fVI",
+      "n8n_link": "https://gremovod.app.n8n.cloud/workflow/j8Xqv8GQHjfJ5fVI",
+      "runtime_status": "DRAFT_MOCK_ONLY_NOT_PUBLISHED"
+    },
+    {
+      "id": "WF_01",
+      "name": "WF_01_Writers_Room",
+      "logical": [
+        "N01",
+        "N02",
+        "N03",
+        "N04",
+        "N05",
+        "N06",
+        "N07",
+        "N08",
+        "N09",
+        "N10",
+        "N11"
+      ],
+      "responsibilities": [
+        "idea",
+        "concepts",
+        "scripts",
+        "skills",
+        "director_plan"
+      ],
+      "executable_gate": "APPROVED_BRIEF_OWNER_AND_CANON_REQUIRED",
+      "n8n_workflow_id": "ojYcjohXuJG6QEF7",
+      "n8n_link": "https://gremovod.app.n8n.cloud/workflow/ojYcjohXuJG6QEF7",
+      "runtime_status": "DRAFT_MOCK_ONLY_NOT_PUBLISHED"
+    },
+    {
+      "id": "WF_02",
+      "name": "WF_02_Canon_And_Images",
+      "logical": [
+        "N12",
+        "N13",
+        "N14",
+        "N15",
+        "N16",
+        "N17",
+        "N18",
+        "N19"
+      ],
+      "responsibilities": [
+        "canon_vault",
+        "references",
+        "image_factory"
+      ],
+      "executable_gate": "APPROVED_ASSETS_AND_AUTHORIZED_SPEND_REQUIRED",
+      "n8n_workflow_id": "O6nukP9aeAA8jY8o",
+      "n8n_link": "https://gremovod.app.n8n.cloud/workflow/O6nukP9aeAA8jY8o",
+      "runtime_status": "DRAFT_MOCK_ONLY_NOT_PUBLISHED"
+    },
+    {
+      "id": "WF_03",
+      "name": "WF_03_Audio_Factory",
+      "logical": [
+        "N20",
+        "N21",
+        "N22",
+        "N23",
+        "N24",
+        "N25"
+      ],
+      "responsibilities": [
+        "external_tts",
+        "voice_timing",
+        "music",
+        "sfx"
+      ],
+      "executable_gate": "AUDIO_TRACK_MANIFEST_COMPLETE",
+      "n8n_workflow_id": "Xq1PbgUKrPazypI6",
+      "n8n_link": "https://gremovod.app.n8n.cloud/workflow/Xq1PbgUKrPazypI6",
+      "runtime_status": "DRAFT_MOCK_ONLY_NOT_PUBLISHED"
+    },
+    {
+      "id": "WF_04",
+      "name": "WF_04_Video_And_LipSync",
+      "logical": [
+        "N26",
+        "N27",
+        "N28",
+        "N29",
+        "N30",
+        "N31"
+      ],
+      "responsibilities": [
+        "video_generation",
+        "separate_lipsync",
+        "video_inspection"
+      ],
+      "executable_gate": "VIDEO_SOURCE_VERIFIED_BEFORE_LIPSYNC",
+      "n8n_workflow_id": "E7mHOPGX1g21KSx1",
+      "n8n_link": "https://gremovod.app.n8n.cloud/workflow/E7mHOPGX1g21KSx1",
+      "runtime_status": "DRAFT_MOCK_ONLY_NOT_PUBLISHED"
+    },
+    {
+      "id": "WF_05",
+      "name": "WF_05_Assembly_And_Critics",
+      "logical": [
+        "N32",
+        "N33",
+        "N34",
+        "N35",
+        "N36",
+        "N37",
+        "N38",
+        "N39",
+        "N40",
+        "N41"
+      ],
+      "responsibilities": [
+        "manifest_gate",
+        "ffmpeg_assembly",
+        "N34_technical_no_llm",
+        "N35_evidence",
+        "A6_A7_A8",
+        "human_ready"
+      ],
+      "executable_gate": "3_CURRENT_MEDIA_VERDICTS_PLUS_OWNER",
+      "n8n_workflow_id": "cjX3LH2bFeVGVy6f",
+      "n8n_link": "https://gremovod.app.n8n.cloud/workflow/cjX3LH2bFeVGVy6f",
+      "runtime_status": "DRAFT_MOCK_ONLY_NOT_PUBLISHED"
+    },
+    {
+      "id": "WF_06",
+      "name": "WF_06_Repair_Router",
+      "logical": [
+        "N42",
+        "N43"
+      ],
+      "responsibilities": [
+        "targeted_repair",
+        "safe_resume",
+        "asset_cache"
+      ],
+      "executable_gate": "REPAIR_ONLY_FAILED_SLOT",
+      "n8n_workflow_id": "AzJ5so5Hl5ysx60d",
+      "n8n_link": "https://gremovod.app.n8n.cloud/workflow/AzJ5so5Hl5ysx60d",
+      "runtime_status": "DRAFT_MOCK_ONLY_NOT_PUBLISHED"
+    }
+  ],
+  "pilot": {
+    "MOCK_MODE": true,
+    "native_audio_enabled": false,
+    "external_tts_first": true,
+    "independent_audio_tracks": [
+      "voice",
+      "sfx",
+      "music"
+    ],
+    "optional_track": "ambience",
+    "no_auto_publish": true,
+    "real_provider_enabled": false,
+    "real_media_evidence_available": false
+  },
+  "decision_log": "docs/CODEX_DECISIONS.md",
+  "notes": "N/S logical IDs remain metadata; only seven physical workflows intended for the actual project; previous experiments remain archived/test drafts.",
+  "mock_test": {
+    "workflow_id": "j8Xqv8GQHjfJ5fVI",
+    "execution_id": "39",
+    "status": "MOCK_PIPELINE_COMPLETE_NO_REAL_APPROVAL",
+    "physical_modules_executed": 7,
+    "synthetic_shots": 3,
+    "synthetic_audio_tracks": 3,
+    "repaired_slot_id": "shot_02",
+    "other_shots_reused": true,
+    "paid_calls": 0,
+    "real_media_verified": false,
+    "production_release": false
+  },
+  "workflow_count": 7
+}

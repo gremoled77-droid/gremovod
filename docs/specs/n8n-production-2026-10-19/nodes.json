@@ -351,6 +351,18 @@
           "native_video",
           "silent"
         ]
+      },
+      "p0_pilot": {
+        "pilot_strategy": "external_tts",
+        "native_audio_enabled": false,
+        "required_stems": [
+          "voice",
+          "sfx",
+          "music"
+        ],
+        "optional_stems": [
+          "ambience"
+        ]
       }
     },
     {
@@ -367,7 +379,15 @@
       "on_fail": "N42",
       "on_blocked": "N43",
       "stage": "audio",
-      "implementation_status": "NEW"
+      "implementation_status": "NEW",
+      "p0_pilot": {
+        "required_stems": [
+          "voice",
+          "sfx",
+          "music"
+        ],
+        "voice_timing": "measured_with_ffprobe"
+      }
     },
     {
       "id": "N22",
@@ -386,6 +406,10 @@
       "implementation_status": "NEW",
       "astra_v1_1": {
         "native_path": "Only skip external speech synthesis. Music/SFX/ambience jobs remain required. Native dialogue has estimated timing until decoded N30"
+      },
+      "p0_pilot": {
+        "pilot_policy": "external_tts_only",
+        "native_audio": "DISABLED_UNTIL_CODEX_REVIEW"
       }
     },
     {
@@ -405,6 +429,9 @@
       "implementation_status": "NEW",
       "astra_v1_1": {
         "native_path": "SKIPPED only for speech stem; external effects and music still generated"
+      },
+      "p0_pilot": {
+        "pilot_policy": "external_tts_only_and_independent_SFX_music"
       }
     },
     {
@@ -424,6 +451,9 @@
       "implementation_status": "NEW",
       "astra_v1_1": {
         "native_path": "native dialogue measured post-N30, not assumed available before N26"
+      },
+      "p0_pilot": {
+        "timing": "measure_actual_audio_length_with_ffprobe_before_N26"
       }
     },
     {
@@ -448,6 +478,9 @@
           "external_audio": "N21",
           "mix_issue": "N32"
         }
+      },
+      "p0_pilot": {
+        "audio_review": "actual_voice+effects+music required, not merely LLM text"
       }
     },
     {
@@ -468,6 +501,9 @@
       "astra_v1_1": {
         "timing": "external uses actual dialogue duration; native uses explicit estimated range marked ESTIMATED and compares after N30",
         "audio_strategy_source": "N20"
+      },
+      "p0_pilot": {
+        "duration_source": "actual_measured_voice_milliseconds; no estimated native sound"
       }
     },
     {
@@ -526,6 +562,9 @@
           "lip_sync"
         ],
         "lip_sync_dependency": "saved verified video asset from N30; distinct job/request/hash and approval; do not re-submit source video"
+      },
+      "p0_pilot": {
+        "video_generation_and_lipsync": "different jobs, profile, request_hash, cost authorization; no re-render original on lip-sync fail"
       }
     },
     {
@@ -546,6 +585,9 @@
       "astra_v1_1": {
         "derivative_provenance": "source_checksum, derivative_checksum, transform_id/version/hash, streams, timing, viewer-side access",
         "lip_sync_branch": "when needed N28->N29->N30 as separate dependent job"
+      },
+      "p0_pilot": {
+        "must_persist_verified_source_before_lipsync": true
       }
     },
     {
@@ -640,6 +682,10 @@
           "actual_mp4",
           "matching_content_checksum"
         ]
+      },
+      "p0_pilot": {
+        "llm_calls": 0,
+        "executor": "local_ffprobe_ffmpeg_worker"
       }
     },
     {
@@ -679,6 +725,9 @@
           "trusted_manifest",
           "approved_policies"
         ]
+      },
+      "p0_pilot": {
+        "without_mp4": "BLOCKED_REAL_MEDIA"
       }
     },
     {
@@ -788,6 +837,10 @@
           "actual_mp4"
         ],
         "runtime_status": "DISABLED_BLOCKED_UNTIL_MP4_AND_BUDGET"
+      },
+      "p0_pilot": {
+        "without_real_multimodal": "BLOCKED",
+        "enabled": false
       }
     },
     {
@@ -888,6 +941,9 @@
           "persisted_trusted_round",
           "owner_authenticated"
         ]
+      },
+      "p0_pilot": {
+        "ready_requires": "human_auth+master_hash+three_current_role_verdicts"
       }
     },
     {
@@ -907,6 +963,9 @@
       "implementation_status": "NEW",
       "astra_v1_1": {
         "repairs": "native speech=>N27, external speech/music/sfx=>N21, edit/mix=>N32; no bypass preflight or paid approval"
+      },
+      "p0_pilot": {
+        "repair": "only failed slot, cache other slots by verified checksum"
       }
     },
     {
@@ -945,6 +1004,9 @@
       "implementation_status": "NEW",
       "astra_v1_1": {
         "pilot_storage": "existing FastAPI+SQLite as sole durable state; atomic revision CAS/lease, not n8n execution state"
+      },
+      "p0_pilot": {
+        "source_of_truth": "existing SQLite Studio, additive p0_ schema"
       }
     },
     {
@@ -996,6 +1058,9 @@
       "implementation_status": "NEW",
       "astra_v1_1": {
         "budgets": "BudgetGrant limits and per-request immutable authorization; recheck hash/profile/cost and reserve before each paid submit"
+      },
+      "p0_pilot": {
+        "spend_gate": "immutable request-specific authorization and cap_cents"
       }
     },
     {
@@ -1015,6 +1080,9 @@
       "implementation_status": "NEW",
       "astra_v1_1": {
         "unknown": "PREPARED saved before submit; timeout or lost job id => UNKNOWN, preserve reservation, no automatic resubmit"
+      },
+      "p0_pilot": {
+        "unknown": "never retry without provider reconciliation"
       }
     },
     {
@@ -1076,6 +1144,9 @@
       "implementation_status": "NEW",
       "astra_v1_1": {
         "checkpoint": "durable op/state revision, lease CAS, idempotent callbacks; two resumers cannot execute same paid operation"
+      },
+      "p0_pilot": {
+        "resume": "single atomic lease and state_version"
       }
     },
     {
@@ -1208,5 +1279,20 @@
   },
   "astra_runtime_model_matrix": "N34_N41_RUNTIME_MODEL_MATRIX.md",
   "runtime_schema": "contracts/final-runtime-v1_2.schema.json",
-  "runtime_cost_policy": "no model calls N34,N39,N40,N41; N35 STT approval separate; N36-38 budgeted multimedia only"
+  "runtime_cost_policy": "no model calls N34,N39,N40,N41; N35 STT approval separate; N36-38 budgeted multimedia only",
+  "physical_workflows_manifest": "integrations/n8n/WF_00_WF_06_MANIFEST.json",
+  "physical_workflows_count": 7,
+  "pilot": {
+    "MOCK_MODE": true,
+    "native_audio_enabled": false,
+    "speech_strategy": "external_tts",
+    "audio_tracks": [
+      "voice",
+      "sfx",
+      "music"
+    ],
+    "actual_provider_enabled": false,
+    "production_release_enabled": false
+  },
+  "implementation_status": "PARTIAL_MOCK_AND_ISOLATED_SQLITE_TESTS_NOT_PRODUCTION"
 }

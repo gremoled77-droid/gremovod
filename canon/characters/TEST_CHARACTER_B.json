@@ -1,0 +1,10 @@
+{
+  "id": "TEST_CHARACTER_B",
+  "kind": "MOCK_CHARACTER_ONLY",
+  "name": "Тестовый персонаж Б",
+  "approved": false,
+  "canonical": false,
+  "voice_id": null,
+  "identity_reference_id": null,
+  "description": "Только для проверки библиотечного маршрута. Не герой GremoVOD."
+}

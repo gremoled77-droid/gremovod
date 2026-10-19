@@ -546,3 +546,9 @@
 | S01/S04/S05/S06/S08/S09 | Единое постоянное состояние FastAPI/SQLite; per-request budget; сохранённый intent до submit; unknown reserve; проверяемые медиапроизводные; CAS+lease; signed/verified owner approvals. |
 
 Точные события, поля, негативные тесты и отложенная проверка реального видео: [ASTRA_FIXES_V1_1.md](ASTRA_FIXES_V1_1.md). Поля `astra_v1_1` и `conditional_routes` отражены в [nodes.json](nodes.json). Содержательный audio/video PASS пока запрещён без настоящего файла.
+
+## Пилотная структура из 7 физических модулей (с 19.10.2026)
+
+Логические N/S узлы не превращать в 52 отдельных физических workflow. Список 7 WF и реальные n8n draft IDs: `integrations/n8n/WF_00_WF_06_MANIFEST.json`. Один родитель WF_00 вызывает ровно 6 независимых дочерних workflow через Execute Sub-workflow; все они пока MOCK_ONLY.
+
+**Важные переопределения первой версии:** N20 ставит `external_tts` и три независимые дорожки `voice/sfx/music`; `native_audio` для пилота DISABLED. N24 измеряет реальную длительность, только после неё N26 подстраивает движение камеры и длительность видео. N29/N30 имеют разные job IDs для `video_generation` и `lip_sync`. N34 — только local `ffprobe/ffmpeg`, zero LLM. N35 и финальные A6/A7/A8 не могут принимать mock:// за видео. N39–N41 в Code/SQLite запрещают READY без real evidence + Studio owner. N42 ремонтирует конкретный slot_id и сохраняет остальные source checksums.
