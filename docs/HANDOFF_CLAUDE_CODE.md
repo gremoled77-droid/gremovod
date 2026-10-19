@@ -174,3 +174,27 @@
 Проверено: `npx tsc --noEmit`, `npm run build`, `npm test` (58 зелёных, новый `workflowConnections.test.mjs`), prettier; в браузере (отдельный бэкенд :8100 с чистым STUDIO_DATA_DIR и vite :5273): узлы создаются, текст→Изображение соединяется, текст→вход «изображение» Видео отклоняется с сообщением. Скриншот: `docs/design/workflow-screen-2026-10-17.jpg`. Платных вызовов не было.
 
 Не сделано / осталось: «В референсы» и «Перегенерировать» не прогонялись на реальном результате (нет платной генерации); выбор категории референса (утверждённый / для модели) в меню — пока по умолчанию «утверждённый»; узел Аудио остаётся референсом (ElevenLabs/Fish — нет); три старых демо-узла из начального состояния проекта в App.tsx не тронуты; телефонная версия воркфлоу; слияние с main вместе с владельцем (в основной папке параллельно правятся App.tsx, SettingsPanel.tsx).
+
+## Codex: первый контракт GremoVOD Web ↔ n8n — 19.10.2026
+
+Отдельная ветка `codex/n8n-api-contract` от `origin/integration/n8n`, каталог
+`C:/AI_Workflow_Studio/.worktrees/n8n-api`. Занятые codex/work и claude/work
+не менялись; их незакоммиченные файлы сохранены. Рабочий main/SQLite/порты не тронуты.
+
+Реализован sandbox API `/api/v1/automation`: существующие project/production/node IDs,
+контекст с ревизией доски и hash канона/Vault/файловых связей, durable pull queue,
+атомарный claim с n8n execution_id, callback dedup, отмена и review предложения.
+Service token ограничен одним source project и не может создавать/утверждать задания.
+Только storyboard/A2 и stub/echo, нулевая стоимость. Оплата и автоматическая правка
+канона запрещены схемой/маршрутами. Существующие provider jobs и agent_runs не изменены.
+
+Контракт и карта повторного использования: `docs/N8N_API_CONTRACT.md`.
+Проверки: полный backend-набор — 250 тестов; после финальных правок — 31 тест
+(automation, skill sync, storyboard, remote_access). OpenAPI: 8 операций на 7 путях,
+закрытая схема Job; git diff --check. Все данные временные, внешние провайдеры
+запрещены тестовыми fixtures. Frontend не менялся, его build/browser не запускались.
+Есть прежнее предупреждение Starlette об устаревшем httpx TestClient.
+
+Следующий срез: echo flow в sandbox n8n только после разрешения на запись workflow,
+UI/лента, затем привязка серверных денежных approvals и LLM-резервов. Пока нет
+автовыдачи зависших running, media URLs, SSE, применения канона и live n8n smoke.
