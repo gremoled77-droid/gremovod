@@ -1,0 +1,274 @@
+{
+  "name": "WF_00_Core_Infra — MOCK ONLY (SOURCE EXPORT)",
+  "active": false,
+  "nodes": [
+    {
+      "id": "8a30fba3-2c38-46c4-a1a1-ebcc30b3a3cd",
+      "name": "00 · Manual MOCK only",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "f18a5c66-8ea1-406c-87df-641534015465",
+      "name": "P0 · Инициировать тест (0 $)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "return [{json:{run_id:'PILOT-MOCK-001',project:'GremoVOD',MOCK_MODE:true,approved_for_production:false,source_revision:'SYNTHETIC-TEST',owner_approval:false,history:['WF_00:P0_MOCK'],paid_calls:0,final_release_approved:false}}];"
+      }
+    },
+    {
+      "id": "ea55b6fe-0060-4565-ba0f-23dbe6dafa19",
+      "name": "1 · Execute WF_01",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.4,
+      "position": [
+        448,
+        0
+      ],
+      "parameters": {
+        "mode": "once",
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "REPLACE_WITH_IMPORTED_WF_01_ID"
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      }
+    },
+    {
+      "id": "733087dc-0ab8-4a8c-bf89-33f396de656d",
+      "name": "2 · Execute WF_02",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.4,
+      "position": [
+        672,
+        0
+      ],
+      "parameters": {
+        "mode": "once",
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "REPLACE_WITH_IMPORTED_WF_02_ID"
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      }
+    },
+    {
+      "id": "ea0673a0-4a89-4445-a771-aefae12ca6ca",
+      "name": "3 · Execute WF_03",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.4,
+      "position": [
+        896,
+        0
+      ],
+      "parameters": {
+        "mode": "once",
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "REPLACE_WITH_IMPORTED_WF_03_ID"
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      }
+    },
+    {
+      "id": "cfd572fe-491d-4a27-85f2-51aa2461d5a5",
+      "name": "4 · Execute WF_04",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.4,
+      "position": [
+        1120,
+        0
+      ],
+      "parameters": {
+        "mode": "once",
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "REPLACE_WITH_IMPORTED_WF_04_ID"
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      }
+    },
+    {
+      "id": "be25b071-bebb-4956-b23e-8303d901b877",
+      "name": "5 · Execute WF_05",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.4,
+      "position": [
+        1344,
+        0
+      ],
+      "parameters": {
+        "mode": "once",
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "REPLACE_WITH_IMPORTED_WF_05_ID"
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      }
+    },
+    {
+      "id": "afccf486-2b25-4183-acd4-38c5105b3427",
+      "name": "6 · Execute WF_06",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.4,
+      "position": [
+        1568,
+        0
+      ],
+      "parameters": {
+        "mode": "once",
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "REPLACE_WITH_IMPORTED_WF_06_ID"
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      }
+    },
+    {
+      "id": "e9e5876b-3fbd-4f76-ab10-21d366be304f",
+      "name": "07 · Проверить трубу и запретить READY",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1792,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const p=$input.first().json;const ordered=['WF_00','WF_01','WF_02','WF_03','WF_04','WF_05','WF_06'];const seen=p.history.map(s=>s.split(':')[0]);const ok=ordered.every((x,i)=>seen[i]===x);return [{json:{run_id:p.run_id,mode:'MOCK_ONLY',modules_expected:7,modules_seen:seen,all_seven_modules_ran:ok,shots:p.shots?.length||0,mock_audio_slots:p.audio?.length||0,manifest_slots:p.manifest?.length||0,targeted_repair_slot:p.repaired_slot_id,untouched_shots_reused:p.unchanged_cached,review_status:p.review_status,paid_calls:p.paid_calls,final_release_approved:false,stage_2_real_media_qa:'BLOCKED_AWAITING_REAL_MP4',status:ok&&p.unchanged_cached&&p.paid_calls===0?'MOCK_PIPELINE_COMPLETE_NO_REAL_APPROVAL':'MOCK_FAILED'}}];"
+      }
+    }
+  ],
+  "connections": {
+    "00 · Manual MOCK only": {
+      "main": [
+        [
+          {
+            "node": "P0 · Инициировать тест (0 $)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "P0 · Инициировать тест (0 $)": {
+      "main": [
+        [
+          {
+            "node": "1 · Execute WF_01",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "1 · Execute WF_01": {
+      "main": [
+        [
+          {
+            "node": "2 · Execute WF_02",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "2 · Execute WF_02": {
+      "main": [
+        [
+          {
+            "node": "3 · Execute WF_03",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "3 · Execute WF_03": {
+      "main": [
+        [
+          {
+            "node": "4 · Execute WF_04",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "4 · Execute WF_04": {
+      "main": [
+        [
+          {
+            "node": "5 · Execute WF_05",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "5 · Execute WF_05": {
+      "main": [
+        [
+          {
+            "node": "6 · Execute WF_06",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "6 · Execute WF_06": {
+      "main": [
+        [
+          {
+            "node": "07 · Проверить трубу и запретить READY",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "tags": []
+}
