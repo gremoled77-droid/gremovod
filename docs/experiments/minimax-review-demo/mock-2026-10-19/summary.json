@@ -1,0 +1,31 @@
+{
+  "schema_version": "dev-run-summary/1",
+  "task_id": "T-27-P1",
+  "run_id": "mock-2026-10-19",
+  "agent": "minimax-code",
+  "provider": "mock",
+  "mode": "MOCK",
+  "base_sha": "82adb2d28efa05bf8face168485fe07ae340e0bc",
+  "head_sha": "bd96bce81a42a6f688551286af8f73143636c341",
+  "diff_sha256": "47b7944477168d108c0635fa529fe751ac00cc6f88636066271e36a0ee517b12",
+  "branch": "experiment/minimax-observability-20261020",
+  "scope": "Универсальный интерфейс AI-ревьюера: контракт dev-run-summary/1, охранник квоты M Plan, адаптеры mock/minimax/argon",
+  "code_changes": [
+    "tools/ai_review/contract.py",
+    "tools/ai_review/quota.py"
+  ],
+  "tests_status": "PASS",
+  "review_status": "PASS",
+  "reviewer_model": "mock-deterministic-v1",
+  "reviewed_sha": "bd96bce81a42a6f688551286af8f73143636c341",
+  "findings": [],
+  "pr_url": null,
+  "actions_run_url": null,
+  "n8n_execution_url": null,
+  "provider_usage": null,
+  "actual_cost": null,
+  "quota": null,
+  "owner_decision": "PENDING",
+  "last_updated": "2026-10-19T21:15:42+00:00",
+  "blocked_reason": null
+}
