@@ -8,6 +8,7 @@ import sqlite3
 from pathlib import Path
 
 from backend import p0_control as p
+from backend import studio_db
 
 TABLES={"p0_runs","p0_budget_envelopes","p0_jobs","p0_scene_manifest","p0_review_snapshots"}
 
@@ -19,11 +20,15 @@ def inspect(db):
             "integrity":db.execute("PRAGMA quick_check").fetchone()[0]}
 
 
-def migrate(path: Path, *, apply: bool, backup_path: Path | None = None):
-    path=path.resolve()
+def migrate(path: Path, *, apply: bool, backup_path: Path | None = None,
+            allow_disposable: bool = False):
+    try:
+        path=studio_db.resolve(path, allow_disposable=allow_disposable)
+    except studio_db.ShadowState as exc:
+        raise p.Blocked(str(exc)) from None
     if not path.is_file():
         raise FileNotFoundError(f"Studio DB not found: {path}")
-    db=p.open_db(path)
+    db=p.open_db(path,allow_disposable=True)
     try:
         before=inspect(db)
         if before["integrity"]!="ok":
@@ -36,7 +41,7 @@ def migrate(path: Path, *, apply: bool, backup_path: Path | None = None):
         backup.parent.mkdir(parents=True,exist_ok=True)
         with backup.open("xb"):
             pass  # Reserve the backup name exclusively before SQLite opens it.
-        dest=p.open_db(backup)
+        dest=p.open_db(backup,allow_disposable=True)
         try:
             db.backup(dest)  # includes WAL state, produces a consistent snapshot
         finally:
