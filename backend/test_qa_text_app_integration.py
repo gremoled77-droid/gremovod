@@ -209,7 +209,7 @@ class QATextAppIntegrationTests(unittest.TestCase):
     def test_non_ascii_bearer_and_huge_callback_rejected(self):
         task, _ = self.prepare()
         bad = self.worker.get(self.prefix+'/service/queue',
-                              headers={'Authorization': 'Bearer ÿ'})
+                              headers={b'authorization': b'Bearer \xff'})
         self.assertEqual(bad.status_code, 401, bad.text)
         self.claim(task)
         packet = self.worker.get(f'{self.prefix}/service/jobs/{task}/packet/REVIEW-REQ',
