@@ -23,7 +23,10 @@
         "human_approvals",
         "asset_registry"
       ],
-      "executable_gate": "BACKEND_REQUIRED_FOR_PRODUCTION"
+      "executable_gate": "BACKEND_REQUIRED_FOR_PRODUCTION",
+      "n8n_workflow_id": "j8Xqv8GQHjfJ5fVI",
+      "n8n_link": "https://gremovod.app.n8n.cloud/workflow/j8Xqv8GQHjfJ5fVI",
+      "runtime_status": "DRAFT_MOCK_ONLY_NOT_PUBLISHED"
     },
     {
       "id": "WF_01",
@@ -48,7 +51,10 @@
         "skills",
         "director_plan"
       ],
-      "executable_gate": "APPROVED_BRIEF_OWNER_AND_CANON_REQUIRED"
+      "executable_gate": "APPROVED_BRIEF_OWNER_AND_CANON_REQUIRED",
+      "n8n_workflow_id": "ojYcjohXuJG6QEF7",
+      "n8n_link": "https://gremovod.app.n8n.cloud/workflow/ojYcjohXuJG6QEF7",
+      "runtime_status": "DRAFT_MOCK_ONLY_NOT_PUBLISHED"
     },
     {
       "id": "WF_02",
@@ -68,7 +74,10 @@
         "references",
         "image_factory"
       ],
-      "executable_gate": "APPROVED_ASSETS_AND_AUTHORIZED_SPEND_REQUIRED"
+      "executable_gate": "APPROVED_ASSETS_AND_AUTHORIZED_SPEND_REQUIRED",
+      "n8n_workflow_id": "O6nukP9aeAA8jY8o",
+      "n8n_link": "https://gremovod.app.n8n.cloud/workflow/O6nukP9aeAA8jY8o",
+      "runtime_status": "DRAFT_MOCK_ONLY_NOT_PUBLISHED"
     },
     {
       "id": "WF_03",
@@ -87,7 +96,10 @@
         "music",
         "sfx"
       ],
-      "executable_gate": "AUDIO_TRACK_MANIFEST_COMPLETE"
+      "executable_gate": "AUDIO_TRACK_MANIFEST_COMPLETE",
+      "n8n_workflow_id": "Xq1PbgUKrPazypI6",
+      "n8n_link": "https://gremovod.app.n8n.cloud/workflow/Xq1PbgUKrPazypI6",
+      "runtime_status": "DRAFT_MOCK_ONLY_NOT_PUBLISHED"
     },
     {
       "id": "WF_04",
@@ -105,7 +117,10 @@
         "separate_lipsync",
         "video_inspection"
       ],
-      "executable_gate": "VIDEO_SOURCE_VERIFIED_BEFORE_LIPSYNC"
+      "executable_gate": "VIDEO_SOURCE_VERIFIED_BEFORE_LIPSYNC",
+      "n8n_workflow_id": "E7mHOPGX1g21KSx1",
+      "n8n_link": "https://gremovod.app.n8n.cloud/workflow/E7mHOPGX1g21KSx1",
+      "runtime_status": "DRAFT_MOCK_ONLY_NOT_PUBLISHED"
     },
     {
       "id": "WF_05",
@@ -130,7 +145,10 @@
         "A6_A7_A8",
         "human_ready"
       ],
-      "executable_gate": "3_CURRENT_MEDIA_VERDICTS_PLUS_OWNER"
+      "executable_gate": "3_CURRENT_MEDIA_VERDICTS_PLUS_OWNER",
+      "n8n_workflow_id": "cjX3LH2bFeVGVy6f",
+      "n8n_link": "https://gremovod.app.n8n.cloud/workflow/cjX3LH2bFeVGVy6f",
+      "runtime_status": "DRAFT_MOCK_ONLY_NOT_PUBLISHED"
     },
     {
       "id": "WF_06",
@@ -144,7 +162,10 @@
         "safe_resume",
         "asset_cache"
       ],
-      "executable_gate": "REPAIR_ONLY_FAILED_SLOT"
+      "executable_gate": "REPAIR_ONLY_FAILED_SLOT",
+      "n8n_workflow_id": "AzJ5so5Hl5ysx60d",
+      "n8n_link": "https://gremovod.app.n8n.cloud/workflow/AzJ5so5Hl5ysx60d",
+      "runtime_status": "DRAFT_MOCK_ONLY_NOT_PUBLISHED"
     }
   ],
   "pilot": {
@@ -162,5 +183,19 @@
     "real_media_evidence_available": false
   },
   "decision_log": "docs/CODEX_DECISIONS.md",
-  "notes": "N/S logical IDs remain metadata; only seven physical workflows intended for the actual project; previous experiments remain archived/test drafts."
+  "notes": "N/S logical IDs remain metadata; only seven physical workflows intended for the actual project; previous experiments remain archived/test drafts.",
+  "mock_test": {
+    "workflow_id": "j8Xqv8GQHjfJ5fVI",
+    "execution_id": "39",
+    "status": "MOCK_PIPELINE_COMPLETE_NO_REAL_APPROVAL",
+    "physical_modules_executed": 7,
+    "synthetic_shots": 3,
+    "synthetic_audio_tracks": 3,
+    "repaired_slot_id": "shot_02",
+    "other_shots_reused": true,
+    "paid_calls": 0,
+    "real_media_verified": false,
+    "production_release": false
+  },
+  "workflow_count": 7
 }
