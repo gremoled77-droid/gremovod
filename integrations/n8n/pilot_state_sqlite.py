@@ -160,6 +160,12 @@ def mark_submitting(db, *, operation_id, owner, expected_revision, now=None):
         op = db.execute("SELECT * FROM operations WHERE operation_id=?", (operation_id,)).fetchone()
         if not op or op["state_revision"] != expected_revision or op["status"] != "AUTHORIZED" or op["lease_owner"] != owner or (op["lease_until"] or 0)<=now:
             raise Conflict("not authorized/leased")
+        run=db.execute("SELECT * FROM runs WHERE run_id=?",(op["run_id"],)).fetchone()
+        grant=db.execute("SELECT * FROM grants WHERE grant_id=?",(op["grant_id"],)).fetchone()
+        if not run or run["source_revision"]!=op["source_revision"] or run["current_snapshot"]!=op["snapshot_sha"]:
+            raise Conflict("stale inputs before paid submit")
+        if not grant or grant["expires_at"]<=now:
+            raise Blocked("grant expired before paid submit")
         db.execute("UPDATE operations SET status='SUBMITTING',state_revision=state_revision+1 WHERE operation_id=?", (operation_id,))
     _tx(db, inner)
 
@@ -206,6 +212,7 @@ def update_snapshot(db, *, run_id, expected_snapshot, new_snapshot, new_source_r
 
 def complete_manifest(expected_slots, delivered_slots):
     """Slots are trusted backend records, not LLM claims."""
+    if len({x["slot_id"] for x in expected_slots})!=len(expected_slots): return False
     actual={x["slot_id"]:x for x in delivered_slots}
     if len(actual)!=len(delivered_slots): return False
     for e in expected_slots:
@@ -256,9 +263,16 @@ def record_trusted_final_round(db, *, run_id, frozen_snapshot, active_snapshot, 
         run=db.execute("SELECT current_snapshot FROM runs WHERE run_id=?",(run_id,)).fetchone()
         if not run or run["current_snapshot"]!=active_snapshot:
             raise Conflict("snapshot changed before final verdict was recorded")
-        db.execute("""INSERT OR REPLACE INTO validated_final_rounds
+        existing=db.execute("SELECT master_checksum,status FROM validated_final_rounds WHERE run_id=? AND snapshot_sha=?",
+                            (run_id,frozen_snapshot)).fetchone()
+        if existing:
+            if existing["master_checksum"]!=master_checksum or existing["status"]!=status:
+                raise Conflict("cannot replace reviewed master in same snapshot")
+            return False
+        db.execute("""INSERT INTO validated_final_rounds
             (run_id,snapshot_sha,master_checksum,status,provenance) VALUES(?,?,?,?,?)""",
             (run_id,frozen_snapshot,master_checksum,status,"trusted_backend_verified"))
+        return True
     _tx(db, inner)
     return status
 
