@@ -64,3 +64,9 @@ https://gremovod.app.n8n.cloud/workflow/2DllTVkrO6imk2IR
 7. **Не выполнять реальных платных тестов без явного разрешения владельца.**
 
 По состоянию на тест n8n-модель вызывается только через управляемый `Gateway credits`, а сохранённые A6/A7 draft Agents всё ещё привязаны к отдельному Anthropic credential; их не запускали.
+
+### Ещё один бесплатный негативный тест
+
+- Основной оркестратор execution **#26** — вход без одобренных требований и brief.
+- Все узлы выполнились технически; итог **`BLOCKED_INVALID_INPUT`**, `input_errors=[approved_requirements,approved_brief]`, `quality_claim=false`, `final_release_approved=false`.
+- Paid API: **0** в этом запуске.
