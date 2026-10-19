@@ -1,0 +1,9 @@
+{
+  "id": "TEST_LOCATION",
+  "kind": "MOCK_LOCATION_ONLY",
+  "name": "Тестовый фон",
+  "approved": false,
+  "canonical": false,
+  "asset_sha": null,
+  "description": "Отсутствует реальный референс. Не место действия мультсериала."
+}
