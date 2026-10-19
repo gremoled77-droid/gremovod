@@ -1,6 +1,6 @@
 # QA Orchestrator — факт внедрения draft в n8n (19.10.2026)
 
-**Создано, проверено двумя офлайн-тестами. Не опубликовано. Реальных LLM/медиа вызовов — 0.**
+**Этот конкретный workflow создан и проверен двумя офлайн-тестами: ноль LLM/media вызовов внутри workflow, не опубликован.** Позднее вне workflow выполнены отдельные Preview-тесты saved Agents: A7 Sonnet успешно выдал FAIL на синтетическом нарушении, A6 Haiku завершился API internal error после 3 retries. Доступ к QA через сам workflow по-прежнему отсутствует. См. [QA_FASTAPI_CONNECTION_HANDOFF.md](QA_FASTAPI_CONNECTION_HANDOFF.md).
 
 - **Workflow ID:** `nh3ARcl4XPW6RHqs`, [открыть в n8n](https://gremovod.app.n8n.cloud/workflow/nh3ARcl4XPW6RHqs)
 - **n8n project:** `jG7gkyrK2hH0rEBj` (GremoVOD, personal)
