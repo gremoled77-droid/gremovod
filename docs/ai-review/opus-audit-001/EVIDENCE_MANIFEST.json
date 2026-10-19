@@ -137,7 +137,7 @@
     { "path": "TEST_RESULTS.md", "bytes": 14935, "role": "10 реальных прогонов с exit codes + что не запускалось", "status": "written" },
     { "path": "OPEN_ISSUES.md", "bytes": 19560, "role": "Реестр подтверждённых открытых вопросов", "status": "written" },
     { "path": "EVIDENCE_MANIFEST.json", "bytes": null, "role": "Этот файл", "status": "written" },
-    { "path": "OPUS_SYSTEM_PROMPT.md", "bytes": 9906, "role": "Правила строгого архитектурного аудита (system prompt)", "status": "written" },
+    { "path": "OPUS_SYSTEM_PROMPT.md", "bytes": null, "role": "Правила строгого архитектурного аудита (system prompt), версия 1.1 — добавлено правило «отвечать на текущий вопрос, не возвращаясь к предыдущему ответу»", "status": "written" },
     { "path": "OPUS_FIRST_REQUEST.md", "bytes": 16638, "role": "Готовый текст первого сообщения + параметры вызова", "status": "written" },
     { "path": "KIE_SETUP.md", "bytes": 11764, "role": "Два маршрута KIE, цены, расчёт бюджета, тест подключения", "status": "written" },
     { "path": "packages/AUDIT-001A.md", "bytes": 7558, "role": "Пакет 1: P0-контур", "status": "written" },
