@@ -99,7 +99,7 @@ def register(app, studio):
         if origin and origin not in ORIGINS and not remote_access.allowed_origin(origin) or request.headers.get('sec-fetch-site') == 'cross-site':
             return JSONResponse({'detail':'Запрос с постороннего сайта запрещён'}, status_code=403)
         public = request.url.path in {'/api/health','/api/session','/api/login','/api/logout','/login'} or not (request.url.path.startswith('/api/') or request.url.path in {'/docs','/redoc','/openapi.json','/docs/oauth2-redirect'})
-        worker = request.url.path.startswith('/api/chatgpt/worker/')
+        worker = request.url.path.startswith('/api/chatgpt/worker/') or request.url.path.startswith('/api/v1/qa/text/service/')
         supplied = request.headers.get('x-studio-session') or request.cookies.get('studio_session', '')
         if not public and not worker and not secrets.compare_digest(supplied.encode(), LAUNCH_TOKEN.encode()):
             return JSONResponse({'detail':'Локальная сессия отсутствует. Обнови страницу студии.'}, status_code=401)
