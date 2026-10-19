@@ -13,6 +13,7 @@ import VisualRulesForm from './VisualRulesForm';
 import EditListPanel from './EditListPanel';
 import FrameTakes from './FrameTakes';
 import SceneCast from './SceneCast';
+import ActingNotes from './ActingNotes';
 import AnimateDialog from './AnimateDialog';
 import FrameCast from './FrameCast';
 import {soundLabel, sceneSound, type Cue, type FrameSound} from './soundCues';
@@ -693,6 +694,7 @@ export default function ProductionStoryboard({
                 onOpen={inspect}
                 onChange={patch => savePatch(scene.id, patch, 'Состав сцены сохранён.')}
               />
+              <ActingNotes pid={pid} sid={sid} sceneId={scene.id} />
               <VisualPlanForm
                 kind="scene"
                 plan={visual.plans[scene.id]}
