@@ -1,0 +1,78 @@
+name: minimax reviewer offline checks
+
+on:
+  push:
+    branches:
+      - experiment/minimax-observability-20261020
+  pull_request:
+    paths:
+      - 'tools/ai_review/**'
+      - 'tests/test_review_*.py'
+      - 'workflows/WF_07_MiniMax_Reviewer_MOCK.ts'
+      - 'workflows/WF_07_MiniMax_Reviewer_MOCK.json'
+      - '.github/workflows/minimax-review-summary.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  offline-review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Offline reviewer test suite (no provider calls)
+        run: python -X utf8 -m unittest discover -s tests -p "test_review_*.py" -v
+
+      - name: Argon reviewer regression suite (no provider calls)
+        run: python -X utf8 -m unittest discover -s tests -p "test_argon_review.py" -v
+
+      - name: MOCK review of the branch diff
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin main
+          python -X utf8 -m tools.ai_review.cli review \
+            --repo . \
+            --base origin/main \
+            --head HEAD \
+            --scope "Автоматическая MOCK-проверка ветки ${GITHUB_REF_NAME}" \
+            --task-id "CI-${GITHUB_RUN_ID}" \
+            --provider mock \
+            --mode MOCK \
+            --tests-status PASS \
+            --out-dir artifacts/ai-review
+
+      - name: Publish report to the job summary
+        run: |
+          set -euo pipefail
+          report="$(ls -1 artifacts/ai-review/*/report.md | head -n 1)"
+          summary="$(ls -1 artifacts/ai-review/*/summary.json | head -n 1)"
+          {
+            echo "## MOCK-отчёт AI-ревьюера (dev-run-summary/1)"
+            echo ""
+            echo "Режим MOCK: сетевых вызовов к провайдерам не было, квота M Plan не расходовалась."
+            echo ""
+            cat "$report"
+            echo ""
+            echo "<details><summary>Машиночитаемый summary.json</summary>"
+            echo ""
+            echo '```json'
+            cat "$summary"
+            echo '```'
+            echo "</details>"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload MOCK artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: minimax-review-mock-${{ github.run_id }}
+          path: artifacts/ai-review/
+          retention-days: 14

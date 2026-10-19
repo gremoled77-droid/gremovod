@@ -1,5 +1,22 @@
 # Пожелания и задачи AI Workflow Studio
 
+## AI-ревьюер MiniMax через Subscription API (M Plan) — 19.10.2026
+
+Сводка: docs/experiments/MINIMAX_N8N_OBSERVABILITY_RU.md, контракт и переключение провайдера: docs/experiments/MINIMAX_REVIEWER_ADAPTER_RU.md, handoff: agents/minimax/HANDOFF_FOR_CODEX.md. Issue #27 (временное расширение от 19.10), Issue #28. Ветка `experiment/minimax-observability-20261020`.
+
+- [x] Единый контракт `dev-run-summary/1` и один интерфейс ревьюера для `mock` / `minimax` / `argon` (`tools/ai_review/`: contract, reviewer, payload, localscan, quota, report, cli). Смена провайдера — одно значение, архитектура не меняется.
+- [x] Охранник квоты M Plan: остаток проверяется до каждого запроса, не подтверждён → стоп; окно подписки закрывается 2026-10-25 00:00 (+03:00); credit packs и pay-as-you-go не затрагиваются.
+- [x] Адаптер MiniMax-M3.1-Flash через официальный OpenAI-совместимый API (`POST https://api.minimax.io/v1/chat/completions`, `thinking: adaptive`, `reasoning_effort: low`, без автоповторов). Живой вызов — только при явном согласии владельца.
+- [x] 83 офлайн-теста, ноль сетевых вызовов: контракт, независимый контекст, маскирование секретов, stale SHA, исчерпание квоты, отсечка 25.10, CI FAIL при AI PASS.
+- [x] n8n-черновик «GremoVOD Dev Observability — MOCK (MiniMax Reviewer)», 13 узлов, не активен, без credential, узлы 07/11 выключены: https://gremovod.app.n8n.cloud/workflow/XInjy5I69fd11iLv
+- [x] CI `minimax-review-summary.yml` — только ручной запуск и push в свою ветку, только MOCK-отчёт в job summary.
+- [ ] Задать `MINIMAX_SUBSCRIPTION_KEY` в окружении (Subscription Key M Plan, не pay-as-you-go ключ).
+- [ ] Проверить остаток квоты: `python -m tools.ai_review.cli quota` (только чтение).
+- [ ] Первый живой запрос к MiniMax — один, по отдельному согласию владельца, с лимитом по токенам.
+- [ ] Включить узлы 07 и 11 в n8n с назначенными credential; опубликовать workflow — отдельное решение владельца.
+- [ ] Запушить ветку и открыть Draft PR с MOCK-отчётом в описании.
+- [ ] После 25.10: переключить `provider` на `argon`, снять отсечку только осознанно; контракт и n8n-структура остаются прежними.
+
 ## Видеомодели: навыки и адаптер Seedance 2.5 — 17.10.2026
 
 Сводка: docs/VIDEO_MODELS_PROMPTING_2026-10-17.md, правила моделей: skills/video-*, пять столпов: skills/cinema-five-pillars.
