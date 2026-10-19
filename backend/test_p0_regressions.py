@@ -6,6 +6,7 @@ import unittest
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
+from backend import p0_authz
 from backend import p0_control as p
 from backend import test_p0_control as fixtures
 from scripts.p0_migrate import migrate
@@ -41,7 +42,8 @@ class DraftAcceptanceRegressions(unittest.TestCase):
         p.create_envelope(self.db, envelope_id="another", run_id="r1", owner_decision_ref="owner-2",
                           cap_cents=1000, max_calls=3, max_attempts_per_slot=3, stage="N29",
                           provider="mock", model="video-mock", expires_at_ms=p.now_ms()+100000,
-                          trusted_studio_owner=True)
+                          owner_capability=p0_authz.mint_owner_capability("r1", envelope_id="another",
+                              cap_cents=1000, stage="N29", provider="mock", model="video-mock"))
         p.create_intent(self.db,job_id="j2",run_id="r1",envelope_id="another",slot_id="shot_01",
                         kind="video_generation",attempt_no=2,stage="N29",request_sha="requestA",
                         snapshot_sha="snapA",source_revision="v1",provider="mock",
@@ -70,12 +72,13 @@ class DraftAcceptanceRegressions(unittest.TestCase):
         barrier = threading.Barrier(2)
 
         def authorize(job_id):
-            db = p.open_db(self.fixture.path)
+            db = p.open_db(self.fixture.path, allow_disposable=True)
             try:
                 barrier.wait(timeout=5)
                 try:
                     p.authorize(db,job_id=job_id,request_sha="requestA",profile_revision="prof1",
-                                upper_cents=100,trusted_studio_request_authorization=True)
+                                upper_cents=100,request_capability=p0_authz.mint_request_capability(
+                                    job_id, request_sha="requestA", upper_cents=100))
                     return "AUTHORIZED"
                 except p.Blocked:
                     return "BLOCKED"
@@ -94,7 +97,7 @@ class DraftAcceptanceRegressions(unittest.TestCase):
         self.fixture.submit()
         p.accept_provider_id(self.db,job_id="j1",provider_job_id="provider-1")
         p.finish_verified(self.db,job_id="j1",event_id="failed-1",event_body={"status":"failed"},
-                          charged_cents=0,provider_success=False,provider_evidence_verified=True)
+                          charged_cents=0,provider_success=False,verify_evidence=lambda body: True)
         self.fixture.intent("j2", "shot_01", attempt=2)
         self.fixture.auth("j2", cents=100)
         self.fixture.submit("j2")
@@ -114,7 +117,7 @@ class DraftAcceptanceRegressions(unittest.TestCase):
     def test_failed_migration_leaves_schema_unchanged(self):
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder) / "copy.sqlite3"
-            db = p.open_db(path)
+            db = p.open_db(path, allow_disposable=True)
             try:
                 db.execute("CREATE TABLE jobs(id TEXT PRIMARY KEY, payload TEXT)")
                 db.execute("INSERT INTO jobs VALUES('legacy', 'preserve')")
@@ -123,8 +126,9 @@ class DraftAcceptanceRegressions(unittest.TestCase):
             finally:
                 db.close()
             with self.assertRaises(sqlite3.OperationalError):
-                migrate(path, apply=True, backup_path=Path(folder) / "backup.sqlite3")
-            db = p.open_db(path)
+                migrate(path, apply=True, backup_path=Path(folder) / "backup.sqlite3",
+                        allow_disposable=True)
+            db = p.open_db(path, allow_disposable=True)
             try:
                 self.assertEqual(db.execute("SELECT payload FROM jobs").fetchone()[0], "preserve")
                 after = list(db.execute("SELECT name, sql FROM sqlite_master ORDER BY name"))

@@ -4,6 +4,7 @@ import tempfile
 import time
 import unittest
 from pathlib import Path
+from backend import p0_authz
 from backend import p0_control as p
 
 
@@ -12,17 +13,22 @@ class P0SafetyTests(unittest.TestCase):
         self.temp=tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.path=Path(self.temp.name)/"studio.sqlite3"
-        self.db=p.open_db(self.path)
+        self.db=p.open_db(self.path,allow_disposable=True)
         self.addCleanup(self.db.close)
         # Mimic a production LEGACY jobs table. Its payload must survive P0 install.
         self.db.execute("CREATE TABLE jobs(id TEXT PRIMARY KEY,request TEXT,status TEXT)")
         self.db.execute("INSERT INTO jobs VALUES('legacy-1','important-original','done')")
         p.install_schema(self.db)
+        # The shared Studio budget limits live in the same SQLite; the P0 ledger
+        # must see them, so the fixture creates a permissive pair.
+        self.db.execute("CREATE TABLE IF NOT EXISTS spending_limits(id INTEGER PRIMARY KEY,project_usd REAL NOT NULL,daily_usd REAL NOT NULL)")
+        self.db.execute("INSERT OR REPLACE INTO spending_limits(id,project_usd,daily_usd) VALUES(1,50,50)")
         p.create_run(self.db,run_id="r1",project_id="proj",snapshot_sha="snapA",source_revision="v1")
         p.create_envelope(self.db,envelope_id="env",run_id="r1",owner_decision_ref="owner-session-decision",
                           cap_cents=500,max_calls=2,max_attempts_per_slot=1,stage="N29",
                           provider="mock",model="video-mock",expires_at_ms=p.now_ms()+100000,
-                          trusted_studio_owner=True)
+                          owner_capability=p0_authz.mint_owner_capability("r1",envelope_id="env",
+                              cap_cents=500,stage="N29",provider="mock",model="video-mock"))
 
     def row(self,table,key_name,key):
         return self.db.execute(f"SELECT * FROM {table} WHERE {key_name}=?",(key,)).fetchone()
@@ -34,7 +40,8 @@ class P0SafetyTests(unittest.TestCase):
 
     def auth(self, id="j1", cents=250, request="requestA"):
         p.authorize(self.db,job_id=id,request_sha=request,profile_revision="prof1",
-                    upper_cents=cents,trusted_studio_request_authorization=True)
+                    upper_cents=cents,request_capability=p0_authz.mint_request_capability(
+                        id,request_sha=request,upper_cents=cents))
 
     def submit(self, id="j1"):
         version=self.row("p0_jobs","job_id",id)["state_version"]
@@ -55,10 +62,10 @@ class P0SafetyTests(unittest.TestCase):
             p.create_envelope(self.db,envelope_id="evil",run_id="r1",owner_decision_ref="fake",
                               cap_cents=10,max_calls=1,max_attempts_per_slot=1,stage="N29",
                               provider="mock",model="video-mock",expires_at_ms=p.now_ms()+9000,
-                              trusted_studio_owner=False)
+                              owner_capability="forged-owner-capability")
 
     def test_two_resume_clicks_only_one_wins_even_across_connections(self):
-        con2=p.open_db(self.path)
+        con2=p.open_db(self.path,allow_disposable=True)
         try:
             v=p.claim_run(self.db,run_id="r1",worker="one",expected_version=0,at_ms=1000)
             self.assertEqual(v,1)
@@ -74,7 +81,7 @@ class P0SafetyTests(unittest.TestCase):
         self.intent()
         with self.assertRaises(p.Blocked):
             p.authorize(self.db,job_id="j1",request_sha="requestA",profile_revision="prof1",
-                        upper_cents=100,trusted_studio_request_authorization=False)
+                        upper_cents=100,request_capability="forged-request-capability")
         self.assertEqual(self.row("p0_jobs","job_id","j1")["state"],"INTENT_CREATED")
 
     def test_prompt_or_profile_changed_after_approval_is_rejected(self):
@@ -83,7 +90,8 @@ class P0SafetyTests(unittest.TestCase):
             self.auth(request="other-hash")
         with self.assertRaises(p.Conflict):
             p.authorize(self.db,job_id="j1",request_sha="requestA",profile_revision="different",
-                        upper_cents=200,trusted_studio_request_authorization=True)
+                        upper_cents=200,request_capability=p0_authz.mint_request_capability(
+                            "j1",request_sha="requestA",upper_cents=200))
         self.assertEqual(self.row("p0_budget_envelopes","envelope_id","env")["reserved_cents"],0)
 
     def test_budget_ceiling_and_total_call_count(self):
@@ -151,14 +159,14 @@ class P0SafetyTests(unittest.TestCase):
         p.accept_provider_id(self.db,job_id="j1",provider_job_id="provider123")
         self.assertTrue(p.finish_verified(self.db,job_id="j1",event_id="event01",
                                          event_body={"status":"done"},charged_cents=180,
-                                         provider_success=True,provider_evidence_verified=True))
+                                         provider_success=True,verify_evidence=lambda body: True))
         self.assertFalse(p.finish_verified(self.db,job_id="j1",event_id="event01",
                                           event_body={"status":"done"},charged_cents=180,
-                                          provider_success=True,provider_evidence_verified=True))
+                                          provider_success=True,verify_evidence=lambda body: True))
         with self.assertRaises(p.Conflict):
             p.finish_verified(self.db,job_id="j1",event_id="event01",
                               event_body={"status":"tampered"},charged_cents=180,
-                              provider_success=True,provider_evidence_verified=True)
+                              provider_success=True,verify_evidence=lambda body: True)
         envelope=self.row("p0_budget_envelopes","envelope_id","env")
         self.assertEqual((envelope["spent_cents"],envelope["reserved_cents"]),(180,0))
 
@@ -167,10 +175,10 @@ class P0SafetyTests(unittest.TestCase):
         p.accept_provider_id(self.db,job_id="j1",provider_job_id="provider123")
         with self.assertRaises(p.Blocked):
             p.finish_verified(self.db,job_id="j1",event_id="event1",event_body={},
-                              charged_cents=10,provider_success=True,provider_evidence_verified=False)
+                              charged_cents=10,provider_success=True,verify_evidence=lambda body: False)
         with self.assertRaises(p.Blocked):
             p.finish_verified(self.db,job_id="j1",event_id="event2",event_body={},
-                              charged_cents=999,provider_success=True,provider_evidence_verified=True)
+                              charged_cents=999,provider_success=True,verify_evidence=lambda body: True)
         self.assertEqual(self.row("p0_budget_envelopes","envelope_id","env")["reserved_cents"],250)
 
     def test_manifest_needs_all_required_slots_and_current_assets(self):

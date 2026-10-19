@@ -11,7 +11,7 @@ class PilotStateTests(unittest.TestCase):
     def setUp(self):
         self.temp=tempfile.TemporaryDirectory()
         self.path=Path(self.temp.name)/"pilot.sqlite3"
-        self.db=s.connect(self.path)
+        self.db=s.connect(self.path, allow_disposable=True)
         s.new_run(self.db,run_id="r1",project_id="p1",source_revision="v1",snapshot_sha="snap1")
         s.new_grant(self.db,grant_id="g1",run_id="r1",project_id="p1",cap_cents=50,max_calls=2,
                     expires_at=time.time()+10000,owner_authenticated=True)
@@ -78,7 +78,7 @@ class PilotStateTests(unittest.TestCase):
         first=self.row()["state_revision"]
         next_rev=s.claim(self.db,operation_id="o1",owner="w1",expected_revision=first,now=1000)
         self.assertEqual(next_rev,first+1)
-        other=s.connect(self.path)
+        other=s.connect(self.path, allow_disposable=True)
         try:
             with self.assertRaises(s.Conflict):
                 s.claim(other,operation_id="o1",owner="w2",expected_revision=first,now=1000)
