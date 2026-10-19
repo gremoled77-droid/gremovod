@@ -5,7 +5,7 @@ import hashlib
 import json
 import math
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime
 
 from fastapi import HTTPException
 from pydantic import BaseModel, Field

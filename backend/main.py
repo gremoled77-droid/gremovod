@@ -13,7 +13,7 @@ from backend.connections import router as connections_router, credential, provid
 from backend.image_assets import download_image, inspect_image, output_urls, download_video
 from backend.prompt_rules import RULES_VERSION, system_rules, PROFILES, reference_label, validate_prompt
 from backend.llm_response import chat_text, upstream_error
-from backend.model_catalog import MODEL_SPECS, ALLOWED_CHAT, IMAGE_TASKS, VIDEO_MODELS
+from backend.model_catalog import MODEL_SPECS, ALLOWED_CHAT
 from backend import adapters, kie
 from backend import camera_movements
 from backend import frame_composition
