@@ -143,6 +143,91 @@ class QATextAppIntegrationTests(unittest.TestCase):
         r = self.worker.get(f'{self.prefix}/service/jobs/{task}/packet/REVIEW-REQ', headers=self.svc)
         self.assertEqual(r.status_code, 409, r.text)
 
+
+    def test_current_scene_editor_wins_over_import_history(self):
+        scene = test_production.ProductionTests.new(self, 'episode', 'Сцена у аэропорта', self.series['id'])
+        frame = test_production.ProductionTests.new(self, 'frame', 'Реакция героя', scene['id'])
+        old_text = 'Грэм подъезжает к аэропорту. Исторический импорт.'
+        with main.connect() as db:
+            db.execute('INSERT INTO storyboard_imports VALUES(?,?,?,?,?,?)',
+                       ('qa-historical-import', self.series['id'], 'historical-hash',
+                        old_text, '[]', main.now()))
+        saved = self.client.put(f'/api/productions/{self.pid}/nodes/{scene["id"]}/notes',
+                                json={'notes': 'Гость уже улетел. Поездка отменена.'})
+        self.assertEqual(saved.status_code, 200, saved.text)
+        saved = self.client.put(f'/api/productions/{self.pid}/nodes/{frame["id"]}/notes',
+                                json={'notes': 'Грэм смотрит на пустую стоянку.'})
+        self.assertEqual(saved.status_code, 200, saved.text)
+        preview = self.client.get(self.context_path)
+        self.assertEqual(preview.status_code, 200, preview.text)
+        current = preview.json()
+        self.assertIn('Гость уже улетел. Поездка отменена.', current['artifact_text'])
+        self.assertIn('Грэм смотрит на пустую стоянку.', current['artifact_text'])
+        self.assertNotIn('Исторический импорт.', current['artifact_text'])
+        self.assertLess(current['artifact_text'].index(scene['id']),
+                        current['artifact_text'].index(frame['id']))
+        self.assertEqual(current['source_provenance']['artifact'], 'production_nodes.current_notes')
+        task, frozen = self.prepare()
+        self.assertEqual(frozen['text_sha256'], current['text_sha256'])
+        self.claim(task)
+        packet = self.worker.get(f'{self.prefix}/service/jobs/{task}/packet/REVIEW-REQ',
+                                 headers=self.svc)
+        self.assertEqual(packet.status_code, 200, packet.text)
+        self.assertIn('Гость уже улетел', packet.json()['artifact_text'])
+
+    def test_real_story_plan_requirements_and_stale_approval(self):
+        task, snapshot = self.prepare()
+        self.assertIn('summary: Грэм подъезжает к аэропорту.', snapshot['requirements'])
+        self.assertIn('change: Ожидание → встреча', snapshot['requirements'])
+        self.assertIn('qa-card-1', snapshot['requirements'])
+        self.claim(task)
+        plan_path = f'/api/productions/{self.pid}/series/{self.series["id"]}/story-plan'
+        changed = {
+            'base_revision': 1, 'source': 'Грэм встречает гостя у аэропорта.',
+            'source_kind': 'idea',
+            'cards': [{
+                'id': 'qa-card-1', 'scene_id': None, 'title': 'Встреча',
+                'summary': 'Гость уже улетел.', 'character_ids': [self.char['id']],
+                'location_id': None, 'stage': 'setup',
+                'change': 'Такси больше не нужно',
+            }]
+        }
+        updated = self.client.put(plan_path, json=changed)
+        self.assertEqual(updated.status_code, 200, updated.text)
+        fresh = self.client.get(self.context_path).json()
+        self.assertIn('summary: Гость уже улетел.', fresh['requirements'])
+        self.assertIn('change: Такси больше не нужно', fresh['requirements'])
+        self.assertNotEqual(fresh['brief_revision'], snapshot['brief_revision'])
+        status = self.client.get(f'{self.prefix}/jobs/{task}')
+        self.assertEqual(status.status_code, 200, status.text)
+        self.assertFalse(status.json()['source_current'])
+        self.assertTrue(status.json()['historical_review'])
+        packet = self.worker.get(f'{self.prefix}/service/jobs/{task}/packet/REVIEW-REQ',
+                                 headers=self.svc)
+        self.assertEqual(packet.status_code, 409, packet.text)
+
+    def test_non_ascii_bearer_and_huge_callback_rejected(self):
+        task, _ = self.prepare()
+        bad = self.worker.get(self.prefix+'/service/queue',
+                              headers={'Authorization': 'Bearer ÿ'})
+        self.assertEqual(bad.status_code, 401, bad.text)
+        self.claim(task)
+        packet = self.worker.get(f'{self.prefix}/service/jobs/{task}/packet/REVIEW-REQ',
+                                 headers=self.svc).json()
+        body = {
+            'role':'REVIEW-REQ','task_id':task,'project_id':self.project,
+            'artifact_id':self.series['id'],'artifact_revision':packet['artifact_revision'],
+            'checked_scopes':[], 'scope_results':{'TEXT':'BLOCKED'},
+            'verdict':'BLOCKED','evidence':[],'missing_inputs':['x'*100000],
+            'model_used':packet['model'],'event_id':'huge-test-event',
+            'execution_id':'offline-qa-execution'
+        }
+        attempt = self.worker.post(f'{self.prefix}/service/jobs/{task}/verdict',
+                                   json=body,headers=self.svc)
+        self.assertEqual(attempt.status_code, 413, attempt.text)
+        with main.connect() as db:
+            self.assertEqual(db.execute('SELECT COUNT(*) FROM qa_text_verdicts').fetchone()[0],0)
+
     def test_auth_remote_and_paid_fields_fail_closed(self):
         task, _ = self.prepare()
         r = self.worker.get(self.prefix + '/service/queue')
