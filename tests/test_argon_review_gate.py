@@ -251,6 +251,24 @@ class PacketTest(GateTestCase):
         self.assertEqual(packets.packet_digest(packet),
                          __import__("hashlib").sha256(payload.encode("utf-8")).hexdigest())
 
+    def test_the_packet_carries_the_project_context(self):
+        """Argon sees a diff with no history; it needs to know what the project is."""
+        self.change()
+        packet = packets.build_packet(self.repo, self.base_sha, "HEAD", pr_url=PR_URL,
+                                      task_id="T", scope="scope", summary="summary")
+        payload = packets.packet_user_payload(packet)
+        self.assertIn("project_context", packet)
+        self.assertTrue(packet["project_context"].strip())
+        self.assertIn("project_context", payload)
+        self.assertIn("GremoVOD", payload)
+
+    def test_a_custom_project_context_replaces_the_default(self):
+        self.change()
+        packet = packets.build_packet(self.repo, self.base_sha, "HEAD", pr_url=PR_URL,
+                                      task_id="T", scope="scope", summary="summary",
+                                      project_context="Custom background for this repo.")
+        self.assertEqual(packet["project_context"], "Custom background for this repo.")
+
     def test_oversized_packet_is_refused(self):
         self.change()
         with self.assertRaises(packets.PacketError) as ctx:
@@ -319,11 +337,14 @@ class LimitTest(GateTestCase):
         self.change()
         provider = FakeProvider()
         approval = self.approval("HEAD")
-        policy = live_policy(max_calls_per_pr=5, max_calls_per_day=5, max_kie_credits_per_day=11.0,
-                             max_kie_credits_per_call=10.0)
+        policy = live_policy(max_kie_credits_per_day=11.0, max_kie_credits_per_call=10.0)
         first = self.run_gate(provider=provider, approval_path=approval, policy=policy)
         self.assertEqual(first["status"], review_gate.STATUS_PASS)
-        second = self.run_gate(provider=provider, approval_path=approval, policy=policy)
+        # A second PR on purpose: the per-PR cap is 1 and cannot be raised, so
+        # only a different PR can reach the daily credit ceiling.
+        other_pr = PR_URL + "-second-pr"
+        second = self.run_gate(provider=provider, pr_url=other_pr, policy=policy,
+                               approval_path=self.approval("HEAD", pr=other_pr, name="approval2.json"))
         self.assertEqual(second["status"], review_gate.STATUS_BLOCKED)
         self.assertIn("credit ceiling", second["reason"])
         self.assertEqual(provider.call_count, 1)
@@ -441,13 +462,14 @@ class LimitTest(GateTestCase):
     def test_the_daily_ceiling_works_when_the_provider_omits_the_spend(self):
         self.change()
         provider = FakeProvider(credits=None)
-        policy = live_policy(max_calls_per_pr=5, max_calls_per_day=5, max_kie_credits_per_day=11.0,
-                             max_kie_credits_per_call=10.0)
+        policy = live_policy(max_kie_credits_per_day=11.0, max_kie_credits_per_call=10.0)
         first = self.run_gate(provider=provider, approval_path=self.approval("HEAD"), policy=policy,
                               credits_reader=FakeCredits(100.0, 95.0))
         self.assertEqual(first["status"], review_gate.STATUS_PASS)
         self.assertEqual(first["credits"]["credits_consumed"], 5.0)
-        second = self.run_gate(provider=provider, approval_path=self.approval("HEAD"), policy=policy,
+        other_pr = PR_URL + "-second-pr"
+        second = self.run_gate(provider=provider, pr_url=other_pr, policy=policy,
+                               approval_path=self.approval("HEAD", pr=other_pr, name="approval2.json"),
                                credits_reader=FakeCredits(95.0, 90.0))
         self.assertEqual(second["status"], review_gate.STATUS_BLOCKED)
         self.assertIn("credit ceiling", second["reason"])
@@ -496,6 +518,82 @@ class LimitTest(GateTestCase):
         with self.assertRaises(review_gate.GateError) as ctx:
             review_gate.Policy.from_env({"ARGON_RETRY_COUNT": "2"})
         self.assertEqual(ctx.exception.reason, "retry_not_allowed")
+
+    def test_the_environment_cannot_raise_a_limit_above_the_ceiling(self):
+        """An agent that exports a bigger budget must still get the ceiling."""
+        policy = review_gate.Policy.from_env({
+            "ARGON_MAX_CALLS_PER_PR": "50",
+            "ARGON_MAX_CALLS_PER_DAY": "500",
+            "ARGON_MAX_CALLS_PER_WEEK": "999",
+            "ARGON_MAX_CONCURRENT": "8",
+            "ARGON_MAX_PACKET_BYTES": "999999",
+            "ARGON_MAX_PACKET_FILES": "80",
+        })
+        self.assertEqual(policy.max_calls_per_pr, review_gate.HARD_MAX_CALLS_PER_PR)
+        self.assertEqual(policy.max_calls_per_day, review_gate.HARD_MAX_CALLS_PER_DAY)
+        self.assertEqual(policy.max_calls_per_week, review_gate.HARD_MAX_CALLS_PER_WEEK)
+        self.assertEqual(policy.max_concurrent, review_gate.HARD_MAX_CONCURRENT)
+        self.assertEqual(policy.max_packet_bytes, review_gate.HARD_MAX_PACKET_BYTES)
+        self.assertEqual(policy.max_packet_files, review_gate.HARD_MAX_PACKET_FILES)
+        self.assertIn("max_calls_per_day", policy.clamped)
+        self.assertEqual(policy.clamped["max_calls_per_day"]["requested"], 500)
+
+    def test_the_environment_may_tighten_a_limit(self):
+        policy = review_gate.Policy.from_env({"ARGON_MAX_CALLS_PER_DAY": "1"})
+        self.assertEqual(policy.max_calls_per_day, 1)
+        self.assertEqual(policy.clamped, {})
+
+    def test_a_policy_built_in_python_cannot_buy_a_bigger_budget(self):
+        """The ceiling is enforced where the call happens, not only where the
+        policy is configured. A hand-built Policy must not raise the caps."""
+        self.change()
+        provider = FakeProvider()
+        outcome = self.run_gate(provider=provider, approval_path=self.approval("HEAD"),
+                                policy=live_policy(max_calls_per_pr=10, max_calls_per_day=99,
+                                                    max_calls_per_week=99, max_concurrent=8,
+                                                    max_packet_bytes=999999))
+        self.assertEqual(outcome["limits"]["max_calls_per_pr"], 1)
+        self.assertEqual(outcome["limits"]["max_calls_per_day"], 2)
+        self.assertEqual(outcome["limits"]["max_calls_per_week"], 5)
+        self.assertEqual(outcome["limits"]["max_packet_bytes"], 6144)
+        self.assertEqual(outcome["limits"]["retry_count"], 0)
+        self.assertIn("max_calls_per_day", outcome["clamped"])
+
+    def test_the_report_shows_the_limits_that_were_in_force(self):
+        self.change()
+        provider = FakeProvider()
+        outcome = self.run_gate(provider=provider, approval_path=self.approval("HEAD"),
+                                credits_reader=FakeCredits(100.0, 98.5))
+        report = review_gate.render_report(outcome)
+        self.assertIn("## Limits in force", report)
+        self.assertIn("max_calls_per_day: `2`", report)
+        self.assertIn("max_calls_per_pr: `1`", report)
+        self.assertIn("max_calls_per_week: `5`", report)
+
+    def test_the_ledger_refuses_a_duplicate_reservation_under_parallel_use(self):
+        """The ledger itself deduplicates, independently of the concurrency guard."""
+        ledger = review_gate.Ledger(self.state / "ledger.json")
+        policy = live_policy()
+        record = {
+            "id": "a", "ts_utc": self.now.isoformat(timespec="seconds"),
+            "repo": "gremoled77-droid/gremovod", "pr": PR_URL,
+            "head_sha": "a" * 40, "payload_sha256": "b" * 64,
+        }
+        results = []
+        barrier = threading.Barrier(4)
+
+        def worker():
+            barrier.wait()
+            results.append(ledger.reserve(dict(record), policy, self.now))
+
+        threads = [threading.Thread(target=worker) for _ in range(4)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join(timeout=30)
+
+        self.assertEqual(len([r for r in results if r[0]]), 1)
+        self.assertEqual(len(ledger.entries()), 1)
 
     def test_missing_key_budget_or_approval_makes_no_network_call(self):
         self.change()
@@ -796,6 +894,127 @@ class LegacyContractTest(unittest.TestCase):
         self.assertTrue(argon_review.has_binary_patch("GIT binary patch\nliteral 7z\n"))
         self.assertFalse(argon_review.has_binary_patch("+Binary files a/x and b/x differ\n"))
         self.assertFalse(argon_review.has_binary_patch(" context mentioning GIT binary patch\n"))
+
+
+class SelfReviewTest(unittest.TestCase):
+    """The bridge must be able to review its own repository.
+
+    A credential-shaped literal in the sources makes the secret guard reject the
+    repository's OWN diff. The tool then refuses to review the very code that
+    implements it, with a confusing "Potential secret in diff" message.
+    """
+
+    def test_the_repository_sources_do_not_trip_the_secret_guard(self):
+        root = ROOT
+        offenders = []
+        for path in sorted(root.rglob("*.py")):
+            parts = set(path.parts)
+            if ".git" in parts or "node_modules" in parts or "__pycache__" in parts:
+                continue
+            try:
+                text = path.read_text(encoding="utf-8", errors="replace")
+            except OSError:
+                continue
+            match = argon_review.SECRET.search(text)
+            if match:
+                offenders.append(f"{path.relative_to(root)}: {match.group(0)[:40]}")
+        self.assertEqual(offenders, [], "credential-shaped literals in sources:\n" + "\n".join(offenders))
+
+    def test_a_secret_literal_written_in_one_piece_is_detected(self):
+        """The guard still catches a real secret; the sources only avoid writing one."""
+        one_piece = "sk-" + "abcdefghijklmno123456"
+        repo_diff = '+key = "%s"\n' % one_piece
+        self.assertTrue(argon_review.SECRET.search(repo_diff))
+        split = '+FAKE_SECRET = "sk-" + "abcdefghijklmno123456"\n'
+        self.assertIsNone(argon_review.SECRET.search(split))
+
+
+# --------------------------------------------------------------------------- single money path
+
+
+class StandaloneScriptTest(GateTestCase):
+    """argon_review.py --live must spend through the gate, not around it.
+
+    A second money path would let a caller spend outside the per-PR, daily,
+    weekly and credit limits, and without the owner's approval file.
+    """
+
+    def _argv(self, live=False, **extra):
+        args = ["--repo", str(self.repo), "--base", self.base_sha, "--head", "HEAD",
+                "--scope", "scope", "--out", str(self.state / "standalone.md")]
+        if live:
+            args.append("--live")
+        for key, value in extra.items():
+            args += [f"--{key.replace('_', '-')}", str(value)]
+        return args
+
+    def _confirm(self):
+        _files, _diff, digest = argon_review.snapshot(self.repo, self.base_sha, "HEAD")
+        return f"REVIEW {digest[:12]}"
+
+    def test_the_standalone_live_path_makes_no_call_without_a_budget_policy(self):
+        self.change()
+        provider = FakeProvider()
+        with mock.patch.dict(os.environ, {"KIE_API_KEY": FAKE_KEY}, clear=False), \
+             mock.patch.object(argon_review, "ask_argon_detailed", provider), \
+             mock.patch.object(argon_review, "fetch_credits", FakeCredits()), \
+             mock.patch("builtins.input", return_value=self._confirm()):
+            code = argon_review.main(self._argv(live=True, state_dir=self.state))
+        self.assertEqual(code, 2)
+        self.assertEqual(provider.call_count, 0)
+        report = (self.state / "standalone.md").read_text(encoding="utf-8")
+        self.assertNotIn("Status: **PASS**", report)
+        self.assertEqual(self.ledger_entries(), [])
+
+    def test_the_standalone_live_path_spends_only_through_the_gate(self):
+        """With an approval and a budget, the standalone path now reaches the
+        provider - and the ledger records it exactly like any other call."""
+        self.change()
+        provider = FakeProvider()
+        approval = self.approval("HEAD")
+        env = {
+            "KIE_API_KEY": FAKE_KEY,
+            "ARGON_MAX_KIE_CREDITS_PER_DAY": "100",
+            "ARGON_MAX_KIE_CREDITS_PER_CALL": "10",
+            "ARGON_MIN_KIE_BALANCE": "5",
+        }
+        with mock.patch.dict(os.environ, env, clear=False), \
+             mock.patch.object(argon_review, "ask_argon_detailed", provider), \
+             mock.patch.object(argon_review, "fetch_credits", FakeCredits()), \
+             mock.patch("builtins.input", return_value=self._confirm()):
+            code = argon_review.main(self._argv(live=True, state_dir=self.state, pr_url=PR_URL,
+                                                approval=approval))
+        self.assertEqual(code, 0)
+        self.assertEqual(provider.call_count, 1)
+        entries = self.ledger_entries()
+        self.assertEqual(len(entries), 1)
+        self.assertEqual(entries[0]["pr"], PR_URL)
+        report = (self.state / "standalone.md").read_text(encoding="utf-8")
+        self.assertIn("Status: **PASS**", report)
+        self.assertIn("## Limits in force", report)
+
+    def test_the_standalone_live_path_refuses_a_second_call_on_the_same_pr(self):
+        self.change()
+        provider = FakeProvider()
+        approval = self.approval("HEAD")
+        env = {
+            "KIE_API_KEY": FAKE_KEY,
+            "ARGON_MAX_KIE_CREDITS_PER_DAY": "100",
+            "ARGON_MAX_KIE_CREDITS_PER_CALL": "10",
+            "ARGON_MIN_KIE_BALANCE": "5",
+        }
+        with mock.patch.dict(os.environ, env, clear=False), \
+             mock.patch.object(argon_review, "ask_argon_detailed", provider), \
+             mock.patch.object(argon_review, "fetch_credits", FakeCredits()), \
+             mock.patch("builtins.input", return_value=self._confirm()):
+            first = argon_review.main(self._argv(live=True, state_dir=self.state, pr_url=PR_URL,
+                                                 approval=approval))
+            second = argon_review.main(self._argv(live=True, state_dir=self.state, pr_url=PR_URL,
+                                                  approval=approval))
+        self.assertEqual(first, 0)
+        self.assertEqual(second, 2)
+        self.assertEqual(provider.call_count, 1)
+        self.assertEqual(len(self.ledger_entries()), 1)
 
 
 if __name__ == "__main__":

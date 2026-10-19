@@ -24,8 +24,19 @@ MAX_PACKET_BYTES = 6144
 MAX_PACKET_FILES = 4
 MAX_SUMMARY_CHARS = 1000
 MAX_SCOPE_CHARS = 600
+MAX_PROJECT_CONTEXT_CHARS = 500
 MAX_CANDIDATE_HUNKS = 400
 HUNK_HEADER = re.compile(r"^@@ -\d+(?:,\d+)? \+\d+(?:,\d+)? @@")
+
+# What GremoVOD is, in a couple of sentences. Argon sees a diff without any
+# history, so without this it cannot tell a deliberate studio decision from a
+# mistake. This is static background, not a claim about the change.
+DEFAULT_PROJECT_CONTEXT = (
+    "GremoVOD — локальная AI-студия для производства серий: генерация сценария, "
+    "раскадровки, кадров, звука и видео. Backend — Python (FastAPI), frontend — React. "
+    "Деньги, лимиты генераций и capability-проверки — критичные зоны; изменения "
+    "не должны ослаблять серверную авторизацию, бюджетные лимиты и обработку ошибок."
+)
 
 # Paths that usually carry the money/safety critical part of a change.
 CRITICAL_PATH_TOKENS = (
@@ -143,7 +154,8 @@ def _truncate(text: str, limit: int) -> str:
 
 
 def build_packet(repo: Path, base: str, head: str, *, pr_url: str, task_id: str, scope: str,
-                  summary: str = "", tests: list[dict] | None = None, links: list[str] | None = None,
+                  summary: str = "", project_context: str = DEFAULT_PROJECT_CONTEXT,
+                  tests: list[dict] | None = None, links: list[str] | None = None,
                   max_files: int = MAX_PACKET_FILES, max_payload_bytes: int = MAX_PACKET_BYTES) -> dict:
     """Build the frozen evidence packet. Raises PacketError instead of degrading silently."""
     repo = Path(repo).resolve()
@@ -180,6 +192,7 @@ def build_packet(repo: Path, base: str, head: str, *, pr_url: str, task_id: str,
         "base_sha": base_sha,
         "head_sha": head_sha,
         "diff_sha256": diff_sha256,
+        "project_context": _truncate(project_context, MAX_PROJECT_CONTEXT_CHARS),
         "scope": _truncate(scope, MAX_SCOPE_CHARS),
         "summary_untrusted": _truncate(summary, MAX_SUMMARY_CHARS),
         "tests": tests or [],
@@ -245,6 +258,7 @@ def render_user_payload(meta: dict, hunks: list[dict], changed_files: list[str])
         "base_sha": meta["base_sha"],
         "head_sha": meta["head_sha"],
         "diff_sha256": meta["diff_sha256"],
+        "project_context": meta["project_context"],
         "scope": meta["scope"],
         "summary_untrusted": meta["summary_untrusted"],
         "tests": meta["tests"],
@@ -287,6 +301,8 @@ def main(argv=None) -> int:
     p.add_argument("--task-id", default="TASK")
     p.add_argument("--scope", default="")
     p.add_argument("--summary", default="")
+    p.add_argument("--project-context", default=DEFAULT_PROJECT_CONTEXT,
+                   help="Short project background; empty string removes it")
     p.add_argument("--test", action="append", default=[])
     p.add_argument("--link", action="append", default=[])
     p.add_argument("--out", type=Path, required=True)
@@ -298,7 +314,8 @@ def main(argv=None) -> int:
     try:
         packet = build_packet(
             args.repo, args.base, args.head, pr_url=args.pr_url, task_id=args.task_id,
-            scope=args.scope, summary=args.summary, tests=tests, links=args.link,
+            scope=args.scope, summary=args.summary, project_context=args.project_context,
+            tests=tests, links=args.link,
             max_files=args.max_files, max_payload_bytes=args.max_payload_bytes,
         )
     except (PacketError, argon_review.ReviewError) as ex:

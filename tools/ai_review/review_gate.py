@@ -56,6 +56,31 @@ BEARER = re.compile(r"Bearer\s+[A-Za-z0-9._\-]{8,}", re.I)
 LEDGER_SCHEMA = "gremovod/argon-ledger/1"
 _PROCESS_LOCK = threading.RLock()
 
+# --------------------------------------------------------------------------- ceilings
+#
+# Hard ceilings. These are the numbers the owner agreed to in advance. They are
+# part of the code, not of the configuration: an environment variable may TIGHTEN
+# a limit, but nothing may raise one past these values. Without this, the very
+# agent that is supposed to stay inside the budget could simply export
+# ARGON_MAX_CALLS_PER_DAY=500 and spend whatever it likes.
+#
+# Raising a ceiling is a deliberate act by the owner in a separate review, not a
+# runtime decision.
+HARD_MAX_CALLS_PER_PR = 1
+HARD_MAX_CALLS_PER_DAY = 2
+HARD_MAX_CALLS_PER_WEEK = 5
+HARD_MAX_CONCURRENT = 1
+HARD_MAX_PACKET_BYTES = 6144
+HARD_MAX_PACKET_FILES = 4
+CEILING_FIELDS = {
+    "max_calls_per_pr": HARD_MAX_CALLS_PER_PR,
+    "max_calls_per_day": HARD_MAX_CALLS_PER_DAY,
+    "max_calls_per_week": HARD_MAX_CALLS_PER_WEEK,
+    "max_concurrent": HARD_MAX_CONCURRENT,
+    "max_packet_bytes": HARD_MAX_PACKET_BYTES,
+    "max_packet_files": HARD_MAX_PACKET_FILES,
+}
+
 
 class GateError(Exception):
     """The gate refused to continue. Always ends in a named status."""
@@ -83,6 +108,36 @@ class Policy:
     credit_delta_tolerance: float = 1.0
     stale_call_seconds: int = 900
     env_source: dict = field(default_factory=dict)
+    clamped: dict = field(default_factory=dict)
+
+    def enforce_ceilings(self) -> "Policy":
+        """Pull every limit back to the hard ceiling and record what was pulled.
+
+        The owner may tighten a limit. Nobody may raise one past the ceiling
+        that was agreed in advance. The clamp is recorded so the report can
+        show that a limit was reduced rather than silently applied.
+        """
+        for field_name, ceiling in CEILING_FIELDS.items():
+            current = getattr(self, field_name)
+            if current > ceiling:
+                self.clamped.setdefault(field_name, {"requested": current, "applied": ceiling})
+                setattr(self, field_name, ceiling)
+        if self.retry_count != 0:
+            self.clamped.setdefault("retry_count", {"requested": self.retry_count, "applied": 0})
+            self.retry_count = 0
+        return self
+
+    def limits(self) -> dict:
+        """The limits actually in force. This is what the report shows."""
+        return {
+            "max_calls_per_pr": self.max_calls_per_pr,
+            "max_calls_per_day": self.max_calls_per_day,
+            "max_calls_per_week": self.max_calls_per_week,
+            "max_concurrent": self.max_concurrent,
+            "max_packet_bytes": self.max_packet_bytes,
+            "max_packet_files": self.max_packet_files,
+            "retry_count": self.retry_count,
+        }
 
     @classmethod
     def from_env(cls, env=None) -> "Policy":
@@ -117,7 +172,7 @@ class Policy:
         if retry != 0:
             raise GateError("Retries are not allowed: ARGON_RETRY_COUNT must stay 0", reason="retry_not_allowed")
         tolerance = as_float("ARGON_CREDIT_DELTA_TOLERANCE")
-        return cls(
+        policy = cls(
             max_calls_per_pr=as_int("ARGON_MAX_CALLS_PER_PR", 1),
             max_calls_per_day=as_int("ARGON_MAX_CALLS_PER_DAY", 2),
             max_calls_per_week=as_int("ARGON_MAX_CALLS_PER_WEEK", 5),
@@ -131,6 +186,11 @@ class Policy:
             credit_delta_tolerance=1.0 if tolerance is None else tolerance,
             env_source=source,
         )
+        # The environment may tighten a limit. It may never raise one.
+        policy.enforce_ceilings()
+        if policy.clamped:
+            source["_clamped_to_ceiling"] = dict(policy.clamped)
+        return policy
 
 
 def _verdict_text(parsed: dict, content: str) -> str:
@@ -527,6 +587,17 @@ def render_report(outcome: dict) -> str:
                          f"`{redact_free_text(item.get('lines', '?'))}` — "
                          f"{redact_free_text(item.get('reason', ''))}")
         lines.append("")
+    limits = outcome.get("limits") or {}
+    if limits:
+        lines += ["## Limits in force", ""]
+        for name, value in limits.items():
+            lines.append(f"- {name}: `{value}`")
+        clamped = outcome.get("clamped") or {}
+        if clamped:
+            lines += ["", "A requested limit was above the hard ceiling and was pulled back:", ""]
+            for name, change in clamped.items():
+                lines.append(f"- {name}: requested `{change.get('requested')}`, applied `{change.get('applied')}`")
+        lines.append("")
     credits = outcome.get("credits") or {}
     lines += [
         "## Spend accounting",
@@ -601,11 +672,14 @@ def _new_outcome(repo: Path, pr_url: str, mode: str, now: dt.datetime, policy: P
         "credits": {"credits_before": None, "credits_after": None, "credits_consumed": None,
                     "usd_amount": None, "accounting": "NOT_APPLICABLE"},
         "tests": tests or [],
+        "limits": policy.limits(),
+        "clamped": dict(policy.clamped),
     }
 
 
 def run(*, repo: Path, base: str, head: str, pr_url: str, task_id: str, scope: str,
-        summary: str = "", tests: list[dict] | None = None, links: list[str] | None = None,
+        summary: str = "", project_context: str | None = None, tests: list[dict] | None = None,
+        links: list[str] | None = None,
         mode: str = "offline", policy: Policy | None = None, state_dir: Path | None = None,
         approval_path: Path | None = None, expected_head_sha: str | None = None,
         provider=None, credits_reader=None, api_key: str | None = None,
@@ -621,7 +695,8 @@ def run(*, repo: Path, base: str, head: str, pr_url: str, task_id: str, scope: s
     try:
         policy = policy or Policy.from_env()
         outcome = _run(repo=repo, base=base, head=head, pr_url=pr_url, task_id=task_id, scope=scope,
-                       summary=summary, tests=tests, links=links, mode=mode, policy=policy,
+                       summary=summary, project_context=project_context, tests=tests, links=links,
+                       mode=mode, policy=policy,
                        state_dir=state_dir, approval_path=approval_path,
                        expected_head_sha=expected_head_sha, provider=provider,
                        credits_reader=credits_reader, api_key=api_key, now=now)
@@ -635,7 +710,8 @@ def run(*, repo: Path, base: str, head: str, pr_url: str, task_id: str, scope: s
 
 
 def _run(*, repo: Path, base: str, head: str, pr_url: str, task_id: str, scope: str,
-         summary: str = "", tests: list[dict] | None = None, links: list[str] | None = None,
+         summary: str = "", project_context: str | None = None, tests: list[dict] | None = None,
+         links: list[str] | None = None,
          mode: str = "offline", policy: Policy | None = None, state_dir: Path | None = None,
          approval_path: Path | None = None, expected_head_sha: str | None = None,
          provider=None, credits_reader=None, api_key: str | None = None,
@@ -643,6 +719,9 @@ def _run(*, repo: Path, base: str, head: str, pr_url: str, task_id: str, scope: 
     now = now or _now()
     state_dir = Path(state_dir) if state_dir else _default_state_dir()
     policy = policy or Policy.from_env()
+    # The hard ceiling is enforced at the point of use, not only where the
+    # policy is configured. A Policy built in Python cannot buy a bigger budget.
+    policy = policy.enforce_ceilings()
     provider = provider or argon_review.ask_argon_detailed
     credits_reader = credits_reader or argon_review.fetch_credits
     api_key = api_key if api_key is not None else os.environ.get("KIE_API_KEY", "").strip()
@@ -665,6 +744,8 @@ def _run(*, repo: Path, base: str, head: str, pr_url: str, task_id: str, scope: 
     try:
         packet = packets.build_packet(
             repo, base, head, pr_url=pr_url, task_id=task_id, scope=scope, summary=summary,
+            project_context=project_context if project_context is not None
+            else packets.DEFAULT_PROJECT_CONTEXT,
             tests=tests or [], links=links or [],
             max_files=policy.max_packet_files, max_payload_bytes=policy.max_packet_bytes,
         )
@@ -962,6 +1043,8 @@ def main(argv=None) -> int:
     p.add_argument("--task-id", default="TASK")
     p.add_argument("--scope", default="")
     p.add_argument("--summary", default="")
+    p.add_argument("--project-context", default=packets.DEFAULT_PROJECT_CONTEXT,
+                   help="Short project background for Argon; empty string removes it")
     p.add_argument("--test", action="append", default=[])
     p.add_argument("--link", action="append", default=[])
     p.add_argument("--mode", choices=("offline", "live"), default="offline")
@@ -980,7 +1063,8 @@ def main(argv=None) -> int:
 
     outcome = run(
         repo=args.repo, base=args.base, head=args.head, pr_url=args.pr_url, task_id=args.task_id,
-        scope=args.scope, summary=args.summary, tests=tests, links=args.link, mode=args.mode,
+        scope=args.scope, summary=args.summary, project_context=args.project_context,
+        tests=tests, links=args.link, mode=args.mode,
         policy=policy, state_dir=args.state_dir, approval_path=args.approval,
         expected_head_sha=args.expected_head_sha,
     )
