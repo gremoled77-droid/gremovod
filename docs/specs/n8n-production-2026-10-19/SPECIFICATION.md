@@ -204,3 +204,19 @@ N42 выбирает ближайший корневой этап по evidence.
 - **Ветвления:** native речь не исключает музыку/SFX и не даёт фактический тайминг до N30; lip-sync — отдельный оплачиваемый job с повторным N28 preflight; reference_candidate возвращается на утверждение в N12; монтаж ждёт полного frozen slot manifest.
 - **Релиз:** N34 — техническая проверка, N36–N38 — три независимые содержательные проверки одного полного snapshot, N39 отбрасывает дубли/устаревшие решения; N41 перепроверяет состояние и доверенное решение владельца. Без реально доступных VIDEO/AUDIO evidence => BLOCKED.
 - **Границы:** изменение текста/spec/JSON не подтверждает навыки провайдера, актуальные цены, наличие файла или безопасный облачный канал. До реального MP4 и интеграционного теста соответствующие статусы остаются NOT_IMPLEMENTED/BLOCKED.
+
+## 15. Реализация в семи модульных workflow, старт после 19.10.2026
+
+Владелец разрешил автоматическое продвижение между этапами разработки без дополнительных промежуточных сообщений; **все вопросы с риском расходов, изменения рабочей SQLite, публикации или канона фиксируются** в `docs/CODEX_DECISIONS.md` для Codex. Отсутствие подтверждённого runtime owner budget/session не отменяется таким поручением.
+
+**Ровно семь рабочих физических модулей**, а номера N01–N43/S01–S09 остаются логическими IDs: `WF_00_Core_Infra`, `WF_01_Writers_Room`, `WF_02_Canon_And_Images`, `WF_03_Audio_Factory`, `WF_04_Video_And_LipSync`, `WF_05_Assembly_And_Critics`, `WF_06_Repair_Router`. Реестр имён/IDs n8n и результат бесплатного исполнения #39 — `integrations/n8n/WF_00_WF_06_MANIFEST.json`. Старые отдельные test-workflows — не производственные модули и не входят в эти семь.
+
+**Пилотный звук:** в N20 фиксируется `speech_strategy=external_tts` (на mock — `external_tts_mock`). Обязательные независимые дорожки `voice/sfx/music`, ambience — отдельная опция. Фактическая длительность voice измеряется `ffprobe`, только затем N26 получает реальный тайминг. `native_audio=false` до отдельного исследования Codex. В N29 → N30 video-generation и последующий lip-sync всегда **разные** jobs, другой budget grant и hash; провал lip-sync не запускает повторный исходный video generation.
+
+**БД:** реальная `backend/main.py` уже имеет legacy таблицу `jobs`; используется дополнительная `db/schema.sql` с пятью prefixed `p0_*` таблицами. Нет миграции на рабочем ПК в рамках GitHub PR, нет изменения `backend/main.py` и HTTP routes до архитектурного ревью Codex. Тесты в CI проверяют временную SQLite и аварии, а локальный инструмент `scripts/p0_migrate.py` по умолчанию делает сухой просмотр и требует `--apply` + новую backup path для записи.
+
+**Физическая FFmpeg-проверка:** `tools/mock_media_pilot.py` генерирует 3 синтетических кадра/3 звука в пустом временном каталоге, сцепляет MP4 и повторно собирает master после ремонта только `shot_02`. N34 проверяет потоки, FPS, длительность, decoding, checksum без LLM. Synthetic assets **не утверждают реальную video/audio QA**: N35 STT, N36/37/38 и owner READY остаются BLOCKED.
+
+**Бесплатное управление 7 WF:** n8n execution #39 отработал физическую цепочку `WF_00→WF_01→WF_02→WF_03→WF_04→WF_05→WF_06` через Execute Sub-workflow с нулём API/LLM calls. Поскольку пока передаются `mock://` ссылки, это validation of orchestration only; actual real media manifest у WF_05 остаётся blocked.
+
+**Боевые API:** `backend/p0_provider_dispatch.py` предоставляет только disabled adapter profiles TTS/image/video_generation/lip_sync и mock mode. До успешного соединения с защищённой Studio-сессией и проверенного расчёта стоимости реальные submit-функции не реализованы.
