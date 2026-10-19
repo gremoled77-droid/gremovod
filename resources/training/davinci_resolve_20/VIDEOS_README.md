@@ -67,3 +67,38 @@ GremoVOD/
 - Для публикации в GitHub предназначены **только Python-скрипт и текстовый каталог ссылок**; исходные ZIP/видео остаются на диске и защищены `.gitignore`.
 - Скрипт ничего не удаляет из прежних `Fairlight_Archives`, `Fairlight_Audio` или `PDF` (они загружались другим скриптом).
 - Эти ссылки были сверены с официальной страницей. Проверка содержимого ZIP и фактическая загрузка потребуют запуска на твоём Windows-ПК.
+
+
+## Проверить вес ZIP до скачивания
+
+Скрипт запрашивает **только HTTP-заголовки** (HEAD); тело ZIP не скачивается:
+
+```powershell
+py -3 resources\training\davinci_resolve_20\download_videos.py --sizes
+```
+
+Проверка только Fairlight:
+
+```powershell
+py -3 resources\training\davinci_resolve_20\download_videos.py --section Fairlight --sizes
+```
+
+Если сервер не возвращает `Content-Length`, для архива отобразится `размер не предоставлен сервером`, а итоговый объём останется неизвестным — скрипт не придумывает вес.
+
+## Выбор нескольких конкретных видео вместо всех 20
+
+Можно фильтровать по словам в названии. Например, скачать сначала три урока по звуку:
+
+```powershell
+py -3 resources\training\davinci_resolve_20\download_videos.py --section Fairlight --match "Sound Design" --match "Mixing" --match "Recording VO"
+```
+
+Или проверить только их вес, добавив `--sizes`. `--match` допускает несколько повторений, в этом случае берётся объединение совпадений. Чтобы предварительно проверить набор, добавь `--list`.
+
+### Практическая ценность для GremoVOD
+
+- В первую очередь: Introduction to Sound Design, Introduction to Mixing, Recording VO and ADR, Introduction to Editing (Part 1/2), Visual Effects in the Edit Page.
+- Во вторую очередь: Basic Compositing, Introduction to Fusion, Color Management и Delivering Content.
+- Отложить: DaVinci Resolve Mini Panel (специализированное физическое устройство), Multicam Editing (многокамерная съёмка), Dolby Atmos Integration (требовательный объемный звук), Channel Mapping and Linked Groups (редкие задачи).
+
+Одни лишь скачанные видео **не обучают** AI-агентов. Чтобы пополнить скиллы проекта, нужно распознать речь, извлечь скриншоты важных UI-сцен, сформулировать конкретные методы и проверить их на наших материалах.
