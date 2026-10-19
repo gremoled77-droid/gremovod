@@ -53,3 +53,11 @@
 - Нет записи статусов в Web/FastAPI, нет отдельного сохранения history/round в production database.
 - Нет экспертизы видео/аудио, только ожидание media inspector.
 - Нет webhook-триггера, отсутствует возможность запустить с веб-сайта.
+
+## Evidence scopes — обновление 19.10.2026
+
+Тот же draft workflow `nh3ARcl4XPW6RHqs` обновлён без добавления внешних узлов: `Проверка входа` требует `requested_scopes` и `artifact_scope`, допускает TEXT QA без отсутствующего для текстовой задачи визуального `bar.md`; каждый из 3 независимых шлюзов возвращает `checked_scopes=[]`, `scope_results` c BLOCKED и не делает ложных утверждений о просмотре. Агрегатор требует проверяемого evidence type/source и trusted evidence confirmation перед PASS/FAIL; отсутствие доказательства → BLOCKED. **Это проверка структуры, не настоящая рецензия.**
+
+Офлайн execution IDs 9, 10, 11, 12 — все technical success, `all_passed=false`: (9) только TEXT, (10) поддельный approved_expert_model, псевдоURL рендера и VIDEO, (11) IMAGE только по текстовому описанию, (12) повтор текстового теста после усиления проверки. Без LLM/API/Opus. Источник: [QA_EVIDENCE_POLICY.md](QA_EVIDENCE_POLICY.md), JSON контракт: [qa-reviewer-output-v1.schema.json](contracts/qa-reviewer-output-v1.schema.json).
+
+Не включать реальный reviewer output в агрегатор без независимого серверного evidence verifier и authenticated/approved context, иначе поле `evidence_verified_by_backend` в сырых данных модели может быть подделано.
