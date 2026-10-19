@@ -54,3 +54,11 @@ docs/*.jpg
 *.sqlite3-wal
 *.sqlite3-shm
 *.sqlite3-journal
+
+# The Argon review tooling under tools/ai_review is source code and must stay
+# tracked. The blanket tools/ rule above would silently ignore it; these
+# entries re-open only that folder and keep the local binaries ignored.
+!tools/
+tools/downloads/
+tools/ffmpeg/
+!tools/ai_review/

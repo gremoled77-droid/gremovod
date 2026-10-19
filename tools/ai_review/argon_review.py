@@ -17,6 +17,7 @@ import urllib.error
 import urllib.request
 
 ENDPOINT = "https://api.kie.ai/gemini-4-argon-openai/v1/chat/completions"
+CREDITS_ENDPOINT = "https://api.kie.ai/api/v1/chat/credit"
 MAX_DIFF_BYTES = 45_000
 MAX_CHANGED_FILES = 12
 BLOCKED_SUFFIXES = {".pem", ".key", ".p12", ".pfx", ".pdf", ".png", ".jpg", ".mp4", ".mp3", ".zip", ".sqlite", ".db"}
@@ -27,6 +28,20 @@ REF = re.compile(r"^[A-Za-z0-9_.\-/~^]+$")
 
 class ReviewError(Exception):
     pass
+
+
+class ProviderError(ReviewError):
+    """Provider-side failure with a machine-readable kind.
+
+    `kind` lets the budget gate distinguish a rate limit from a rejected key
+    without re-parsing prose. There is never an automatic retry: the caller
+    decides, the caller pays.
+    """
+
+    def __init__(self, message: str, kind: str = "unknown", status: int | None = None):
+        super().__init__(message)
+        self.kind = kind
+        self.status = status
 
 
 def run_git(repo: Path, *args: str) -> bytes:
@@ -43,6 +58,22 @@ def validate_ref(ref: str) -> str:
 
 
 def snapshot(repo: Path, base: str, head: str):
+    return _snapshot(repo, base, head, MAX_DIFF_BYTES, MAX_CHANGED_FILES)
+
+
+def snapshot_wide(repo: Path, base: str, head: str, max_diff_bytes: int | None = None,
+                  max_changed_files: int | None = None):
+    """Same safety checks as snapshot(), but without the size ceilings.
+
+    The narrow review packet ships only a few KiB of a much larger diff, so it
+    must not inherit the whole-diff budget. Every other guard (blocked files,
+    sensitive directories, binary patches, secrets) is identical, and the
+    returned digest is still sha256 of the exact frozen diff bytes.
+    """
+    return _snapshot(repo, base, head, max_diff_bytes, max_changed_files)
+
+
+def _snapshot(repo: Path, base: str, head: str, max_diff_bytes: int | None, max_changed_files: int | None):
     repo = repo.resolve()
     run_git(repo, "rev-parse", "--is-inside-work-tree")
     base, head = validate_ref(base), validate_ref(head)
@@ -50,8 +81,8 @@ def snapshot(repo: Path, base: str, head: str):
         run_git(repo, "rev-parse", "--verify", f"{ref}^{{commit}}")
     path_bytes = run_git(repo, "diff", "--no-ext-diff", "--no-textconv", "--name-only", "-z", base, head, "--")
     files = [p.decode("utf-8", errors="replace") for p in path_bytes.split(b"\0") if p]
-    if len(files) > MAX_CHANGED_FILES:
-        raise ReviewError(f"Too many changed files ({len(files)} > {MAX_CHANGED_FILES})")
+    if max_changed_files is not None and len(files) > max_changed_files:
+        raise ReviewError(f"Too many changed files ({len(files)} > {max_changed_files})")
     for f in files:
         path = Path(f)
         if path.name.lower() in BLOCKED_FILES or path.suffix.lower() in BLOCKED_SUFFIXES:
@@ -59,8 +90,8 @@ def snapshot(repo: Path, base: str, head: str):
         if any(part.lower() in {".git", "secrets", "private"} for part in path.parts):
             raise ReviewError(f"Sensitive directory in diff: {f}")
     data = run_git(repo, "diff", "--no-ext-diff", "--no-textconv", "--no-color", "--unified=3", base, head, "--")
-    if len(data) > MAX_DIFF_BYTES:
-        raise ReviewError(f"Diff exceeds {MAX_DIFF_BYTES} bytes; select smaller commits")
+    if max_diff_bytes is not None and len(data) > max_diff_bytes:
+        raise ReviewError(f"Diff exceeds {max_diff_bytes} bytes; select smaller commits")
     diff = data.decode("utf-8", errors="replace")
     if "Binary files " in diff or "GIT binary patch" in diff:
         raise ReviewError("Binary changes are excluded from AI review")
@@ -83,8 +114,12 @@ def make_prompt(scope: str, files: list[str], diff: str) -> list[dict]:
     return [{"role": "system", "content": system}, {"role": "user", "content": user}]
 
 
-def ask_argon(messages: list[dict], key: str) -> tuple[str, object]:
-    # Endpoint is fixed and HTTPS. No model selection or tool calling is needed for this KIE route.
+def _post_chat(messages: list[dict], key: str, timeout: int = 90) -> tuple[dict, int]:
+    """Single POST to the fixed KIE Argon chat route. No model field, no tools.
+
+    Returns (parsed_json, http_status). Raises ProviderError on every failure
+    path; there is no retry logic here on purpose.
+    """
     body = json.dumps({"messages": messages, "stream": False}, ensure_ascii=False).encode("utf-8")
     request = urllib.request.Request(ENDPOINT, data=body, method="POST", headers={
         "Authorization": f"Bearer {key}", "Content-Type": "application/json", "Accept": "application/json"
@@ -94,19 +129,95 @@ def ask_argon(messages: list[dict], key: str) -> tuple[str, object]:
             return None
     opener = urllib.request.build_opener(NoRedirect)
     try:
-        with opener.open(request, timeout=90) as response:
-            payload = json.load(response)
-    except (urllib.error.URLError, TimeoutError, ValueError) as ex:
-        raise ReviewError(f"Provider request failed ({type(ex).__name__}); no automatic retry") from None
-    if not isinstance(payload, dict) or ("code" in payload and payload["code"] not in (0, 200, "200")):
-        raise ReviewError("Provider returned an error; no automatic retry")
+        with opener.open(request, timeout=timeout) as response:
+            raw = response.read()
+            status = getattr(response, "status", None) or 200
+    except urllib.error.HTTPError as ex:
+        status = ex.code
+        if status == 429:
+            kind = "rate_limited"
+        elif status in (401, 403):
+            kind = "auth_failed"
+        elif status >= 500:
+            kind = "server_error"
+        else:
+            kind = "http_error"
+        raise ProviderError(f"Provider HTTP error {status}; no automatic retry", kind=kind, status=status) from None
+    except urllib.error.URLError as ex:
+        reason = getattr(ex, "reason", None)
+        kind = "timeout" if isinstance(reason, TimeoutError) else "network"
+        raise ProviderError(f"Provider request failed ({type(ex).__name__}); no automatic retry", kind=kind) from None
+    except (TimeoutError, OSError) as ex:
+        raise ProviderError(f"Provider request failed ({type(ex).__name__}); no automatic retry", kind="network") from None
+    try:
+        payload = json.loads(raw.decode("utf-8"))
+    except (ValueError, UnicodeDecodeError):
+        raise ProviderError("Provider returned a non-JSON response; no automatic retry", kind="malformed", status=status) from None
+    if not isinstance(payload, dict):
+        raise ProviderError("Unexpected provider response format", kind="malformed", status=status)
+    return payload, status
+
+
+def ask_argon_detailed(messages: list[dict], key: str, timeout: int = 90) -> dict:
+    """Same call as ask_argon, but returns the raw provider payload as well.
+
+    The budget gate needs `credits_consumed` and `usage` to account for spend
+    and to classify failures, so the transport is shared instead of duplicated.
+    """
+    payload, status = _post_chat(messages, key, timeout)
+    if "code" in payload and payload["code"] not in (0, 200, "200"):
+        raise ProviderError("Provider returned an error; no automatic retry", kind="provider_error", status=status)
     choices = payload.get("choices")
     if not isinstance(choices, list) or not choices or not isinstance(choices[0].get("message"), dict):
-        raise ReviewError("Unexpected provider response format")
+        raise ProviderError("Unexpected provider response format", kind="malformed", status=status)
     content = choices[0]["message"].get("content")
     if not isinstance(content, str) or not content.strip():
-        raise ReviewError("Provider returned empty/non-text review")
-    return content.strip(), payload.get("credits_consumed", "not provided")
+        raise ProviderError("Provider returned empty/non-text review", kind="empty_response", status=status)
+    return {
+        "content": content.strip(),
+        "credits_consumed": payload.get("credits_consumed"),
+        "usage": payload.get("usage"),
+        "http_status": status,
+        "provider_code": payload.get("code"),
+        "raw": payload,
+    }
+
+
+def fetch_credits(key: str, timeout: int = 20) -> float | None:
+    """Read the KIE credit balance. Returns None when it cannot be read.
+
+    Credits are not USD: the value is kept as an opaque number and is never
+    converted to money without a confirmed tariff from the owner.
+    """
+    request = urllib.request.Request(CREDITS_ENDPOINT, method="GET", headers={
+        "Authorization": f"Bearer {key}", "Accept": "application/json"
+    })
+    class NoRedirect(urllib.request.HTTPRedirectHandler):
+        def redirect_request(self, req, fp, code, msg, headers, newurl):
+            return None
+    opener = urllib.request.build_opener(NoRedirect)
+    try:
+        with opener.open(request, timeout=timeout) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError, OSError, ValueError, UnicodeDecodeError):
+        return None
+    if not isinstance(payload, dict):
+        return None
+    for key_name in ("data", "credits", "balance", "amount"):
+        value = payload.get(key_name)
+        if isinstance(value, dict):
+            for inner in ("credits", "balance", "amount", "remaining", "total"):
+                if isinstance(value.get(inner), (int, float)):
+                    return float(value[inner])
+        elif isinstance(value, (int, float)):
+            return float(value)
+    return None
+
+
+def ask_argon(messages: list[dict], key: str) -> tuple[str, object]:
+    # Endpoint is fixed and HTTPS. No model selection or tool calling is needed for this KIE route.
+    result = ask_argon_detailed(messages, key)
+    return result["content"], result["raw"].get("credits_consumed", "not provided")
 
 
 def write_report(output: Path, files: list[str], digest: str, scope: str, mode: str, verdict: str, credits: object):
