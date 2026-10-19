@@ -84,6 +84,13 @@ def download(url: str, target: Path, force: bool = False) -> str:
         partial.replace(target)
         print(f"  Готовый ZIP восстановлен из .part: {target.name}")
         return "recovered"
+    if partial.is_file():
+        with partial.open("rb") as f:
+            prefix = f.read(120).lower()
+        if b"<html" in prefix or b"<!doctype" in prefix:
+            diagnostic = partial.with_name(partial.name + ".bad-html")
+            partial.replace(diagnostic)
+            print(f"  Вместо ZIP обнаружен HTML. Сохранён для диагностики: {diagnostic.name}")
     curl = shutil.which("curl.exe") or shutil.which("curl")
     if not curl:
         raise RuntimeError("Не найден curl.exe (поставляется с Windows 10/11).")
