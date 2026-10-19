@@ -206,6 +206,52 @@ def show_sizes(entries: list[dict]) -> int:
     return 0
 
 
+def import_from_browser(entries: list[dict], download_directory: Path) -> int:
+    """Organize archives downloaded in a browser without any network requests."""
+    if not download_directory.is_dir():
+        print(f"Папка загрузок не найдена: {download_directory}", file=sys.stderr)
+        return 2
+    print(f"Ищу ZIP в папке: {download_directory}\nБез сетевых запросов.")
+    copied = 0
+    existing = 0
+    missing = 0
+    failed = 0
+    for item in entries:
+        target = DEST / item["section"] / item["filename"]
+        candidate = download_directory / item["filename"]
+        if is_valid_zip(target):
+            existing += 1
+            print(f"[УЖЕ В ПРОЕКТЕ] {item['title']}")
+            continue
+        if not candidate.is_file():
+            missing += 1
+            print(f"[ЕЩЁ НЕ СКАЧАН] {item['title']}")
+            continue
+        if not is_valid_zip(candidate):
+            failed += 1
+            print(f"[НЕ ZIP / НЕ ЗАВЕРШЁН] {candidate.name} — оставлен в Загрузках")
+            continue
+        target.parent.mkdir(parents=True, exist_ok=True)
+        if target.exists():
+            i = 0
+            while True:
+                backup = target.with_name(target.name + f".invalid-{i}")
+                if not backup.exists():
+                    target.rename(backup)
+                    break
+                i += 1
+        try:
+            shutil.move(str(candidate), str(target))
+            copied += 1
+            print(f"[ПЕРЕМЕЩЕНО] {item['title']} → {target}")
+        except OSError as error:
+            failed += 1
+            print(f"[ОШИБКА] {candidate.name}: {error}", file=sys.stderr)
+    print(f"\nПеремещено: {copied}; уже на месте: {existing}; ещё не скачано: {missing}; ошибок: {failed}")
+    print(f"Папка назначения: {DEST}")
+    return 1 if failed else 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--section", choices=SECTIONS, action="append",
@@ -214,6 +260,8 @@ def main() -> int:
     parser.add_argument("--sizes", action="store_true", help="Проверить вес архивов без загрузки данных (HEAD)")
     parser.add_argument("--priority-eight", action="store_true", help="Только 8 приоритетных уроков GremoVOD")
     parser.add_argument("--verify-only", action="store_true", help="Проверить ранее скачанные ZIP/.part без сетевых запросов")
+    parser.add_argument("--import-downloads", action="store_true", help="Переместить скачанные браузером ZIP из папки Windows Загрузки (без интернета)")
+    parser.add_argument("--downloads-dir", type=Path, default=Path.home() / "Downloads", help="Папка, куда браузер сохраняет скачанные ZIP")
     parser.add_argument("--stop-on-error", action="store_true", help="Остановиться после первой ошибки вместо скачивания всех архивов")
     parser.add_argument("--match", action="append", metavar="TEXT", help="Скачать лишь видео, где название содержит TEXT; можно повторить")
     parser.add_argument("--extract", action="store_true", help="Дополнительно извлечь видеофайлы из ZIP")
@@ -241,6 +289,9 @@ def main() -> int:
 
     if args.verify_only:
         return check_existing(entries)
+
+    if args.import_downloads:
+        return import_from_browser(entries, args.downloads_dir)
 
     results = []
     errors = []
