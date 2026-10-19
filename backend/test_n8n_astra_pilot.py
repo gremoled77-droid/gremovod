@@ -100,6 +100,23 @@ class PilotStateTests(unittest.TestCase):
         g=self.db.execute("SELECT reserved_cents FROM grants WHERE grant_id='g1'").fetchone()
         self.assertEqual(g["reserved_cents"],20)
 
+    def test_snapshot_changed_after_reservation_blocks_submit(self):
+        self.op();self.reserve()
+        rev=s.claim(self.db,operation_id="o1",owner="worker",expected_revision=self.row()["state_revision"])
+        s.update_snapshot(self.db,run_id="r1",expected_snapshot="snap1",
+                          new_snapshot="snap2",new_source_revision="v2")
+        with self.assertRaises(s.Conflict):
+            s.mark_submitting(self.db,operation_id="o1",owner="worker",expected_revision=rev)
+        self.assertEqual(self.row()["status"],"AUTHORIZED")
+
+    def test_grant_expired_between_reservation_and_submit(self):
+        self.op();self.reserve()
+        rev=s.claim(self.db,operation_id="o1",owner="worker",expected_revision=self.row()["state_revision"])
+        self.db.execute("UPDATE grants SET expires_at=? WHERE grant_id='g1'",(time.time()-1,))
+        with self.assertRaises(s.Blocked):
+            s.mark_submitting(self.db,operation_id="o1",owner="worker",expected_revision=rev)
+        self.assertEqual(self.row()["status"],"AUTHORIZED")
+
     def test_normal_submit_acknowledged_once(self):
         self.op();self.reserve()
         rev=s.claim(self.db,operation_id="o1",owner="w",expected_revision=self.row()["state_revision"])
@@ -165,6 +182,22 @@ class PilotStateTests(unittest.TestCase):
             master_checksum="sha:master",reviewers=self.reviewers(),required_evidence=True,
             media_capabilities_verified=True,expected_slots=[],delivered_slots=[],
             trusted_backend_verifier=True)
+
+    def test_duplicate_expected_slot_blocks_mount(self):
+        duplicate=[{"slot_id":"shot1","required":True,"revision":"v1","checksum":"h"},
+                   {"slot_id":"shot1","required":True,"revision":"v1","checksum":"h"}]
+        supplied=[{"slot_id":"shot1","revision":"v1","checksum":"h","status":"FULFILLED"}]
+        self.assertFalse(s.complete_manifest(duplicate,supplied))
+
+    def test_trusted_round_cannot_be_replaced_with_new_master(self):
+        self.trusted_round()
+        with self.assertRaises(s.Conflict):
+            s.record_trusted_final_round(
+                self.db,run_id="r1",frozen_snapshot="snap1",active_snapshot="snap1",
+                master_checksum="sha:DIFFERENT",
+                reviewers=[{**x,"master_checksum":"sha:DIFFERENT"} for x in self.reviewers()],
+                required_evidence=True,media_capabilities_verified=True,
+                expected_slots=[],delivered_slots=[],trusted_backend_verifier=True)
 
     def test_owner_ready_without_persisted_media_gate_blocked(self):
         with self.assertRaises(s.Blocked):
