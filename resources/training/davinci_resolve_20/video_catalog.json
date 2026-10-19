@@ -1,0 +1,127 @@
+{
+  "source": "https://www.blackmagicdesign.com/products/davinciresolve/training",
+  "inspected_on": "2026-10-19",
+  "notes": "Training video download links on the current official page point to DaVinci Resolve 17 ZIP packages, even though books feature Resolve 20 and the top site navigation shows Resolve 21. Video ZIP downloads are separate from Fairlight Audio Guide lesson files Parts 1-4.",
+  "videos": [
+    {
+      "section": "Edit",
+      "title": "Introduction to Editing — Part 1",
+      "filename": "DaVinci-Resolve-17-Edit-IntroductiontoEditingPart1.zip",
+      "url": "https://downloads.blackmagicdesign.com/products/davinciresolve/training/videos/DR17/video-downloads/20250923-xtr312/DaVinci-Resolve-17-Edit-IntroductiontoEditingPart1.zip"
+    },
+    {
+      "section": "Edit",
+      "title": "Introduction to Editing — Part 2",
+      "filename": "DaVinci-Resolve-17-Edit-IntroductiontoEditingPart2.zip",
+      "url": "https://downloads.blackmagicdesign.com/products/davinciresolve/training/videos/DR17/video-downloads/20211222-xtr312/DaVinci-Resolve-17-Edit-IntroductiontoEditingPart2.zip"
+    },
+    {
+      "section": "Edit",
+      "title": "Multicam Editing",
+      "filename": "DaVinci-Resolve-17-Edit-MulticamEditing.zip",
+      "url": "https://downloads.blackmagicdesign.com/products/davinciresolve/training/videos/DR17/video-downloads/20211222-xtr312/DaVinci-Resolve-17-Edit-MulticamEditing.zip"
+    },
+    {
+      "section": "Edit",
+      "title": "Visual Effects in the Edit Page",
+      "filename": "DaVinci-Resolve-17-Edit-VisualEffectsintheEditPage.zip",
+      "url": "https://downloads.blackmagicdesign.com/products/davinciresolve/training/videos/DR17/video-downloads/20211222-xtr312/DaVinci-Resolve-17-Edit-VisualEffectsintheEditPage.zip"
+    },
+    {
+      "section": "Color",
+      "title": "Introduction to Color",
+      "filename": "DaVinci-Resolve-17-Color-IntroductiontoColor.zip",
+      "url": "https://downloads.blackmagicdesign.com/products/davinciresolve/training/videos/DR17/video-downloads/20220210-xtr313/DaVinci-Resolve-17-Color-IntroductiontoColor.zip"
+    },
+    {
+      "section": "Color",
+      "title": "Advanced Color",
+      "filename": "DaVinci-Resolve-17-Color-AdvancedColor.zip",
+      "url": "https://downloads.blackmagicdesign.com/products/davinciresolve/training/videos/DR17/video-downloads/20220210-xtr313/DaVinci-Resolve-17-Color-AdvancedColor.zip"
+    },
+    {
+      "section": "Color",
+      "title": "DaVinci Resolve Mini Panel",
+      "filename": "DaVinci-Resolve-17-Color-DaVinciResolveMiniPanel.zip",
+      "url": "https://downloads.blackmagicdesign.com/products/davinciresolve/training/videos/DR17/video-downloads/20220210-xtr313/DaVinci-Resolve-17-Color-DaVinciResolveMiniPanel.zip"
+    },
+    {
+      "section": "Color",
+      "title": "Delivering Content",
+      "filename": "DaVinci-Resolve-17-Color-DeliveringContent.zip",
+      "url": "https://downloads.blackmagicdesign.com/products/davinciresolve/training/videos/DR17/video-downloads/20220210-xtr313/DaVinci-Resolve-17-Color-DeliveringContent.zip"
+    },
+    {
+      "section": "Color",
+      "title": "Color Management",
+      "filename": "DaVinci-Resolve-17-Color-ColorManagement.zip",
+      "url": "https://downloads.blackmagicdesign.com/products/davinciresolve/training/videos/DR17/video-downloads/20220210-xtr313/DaVinci-Resolve-17-Color-ColorManagement.zip"
+    },
+    {
+      "section": "Fairlight",
+      "title": "Introduction to Audio",
+      "filename": "DaVinci-Resolve-17-Fairlight-IntroductiontoAudio.zip",
+      "url": "https://downloads.blackmagicdesign.com/products/davinciresolve/training/videos/DR17/video-downloads/20211222-xtr312/DaVinci-Resolve-17-Fairlight-IntroductiontoAudio.zip"
+    },
+    {
+      "section": "Fairlight",
+      "title": "Introduction to Sound Design",
+      "filename": "DaVinci-Resolve-17-Fairlight-IntroductiontoSoundDesign.zip",
+      "url": "https://downloads.blackmagicdesign.com/products/davinciresolve/training/videos/DR17/video-downloads/20211222-xtr312/DaVinci-Resolve-17-Fairlight-IntroductiontoSoundDesign.zip"
+    },
+    {
+      "section": "Fairlight",
+      "title": "Introduction to Mixing",
+      "filename": "DaVinci-Resolve-17-Fairlight-IntroductiontoMixing.zip",
+      "url": "https://downloads.blackmagicdesign.com/products/davinciresolve/training/videos/DR17/video-downloads/20211222-xtr312/DaVinci-Resolve-17-Fairlight-IntroductiontoMixing.zip"
+    },
+    {
+      "section": "Fairlight",
+      "title": "Recording VO and ADR",
+      "filename": "DaVinci-Resolve-17-Fairlight-RecordingVOandADR.zip",
+      "url": "https://downloads.blackmagicdesign.com/products/davinciresolve/training/videos/DR17/video-downloads/20211222-xtr312/DaVinci-Resolve-17-Fairlight-RecordingVOandADR.zip"
+    },
+    {
+      "section": "Fairlight",
+      "title": "Working with Audio Track Layers",
+      "filename": "DaVinci-Resolve-17-Fairlight-WorkingwithAudioTrackLayers.zip",
+      "url": "https://downloads.blackmagicdesign.com/products/davinciresolve/training/videos/DR17/video-downloads/20211222-xtr312/DaVinci-Resolve-17-Fairlight-WorkingwithAudioTrackLayers.zip"
+    },
+    {
+      "section": "Fairlight",
+      "title": "Channel Mapping and Linked Groups",
+      "filename": "DaVinci-Resolve-17-Fairlight-ChannelMappingandLinkedGroups.zip",
+      "url": "https://downloads.blackmagicdesign.com/products/davinciresolve/training/videos/DR17/video-downloads/20211222-xtr312/DaVinci-Resolve-17-Fairlight-ChannelMappingandLinkedGroups.zip"
+    },
+    {
+      "section": "Fairlight",
+      "title": "Dolby Atmos Integration",
+      "filename": "DaVinci-Resolve-17-Fairlight-DolbyAtmosIntegration.zip",
+      "url": "https://downloads.blackmagicdesign.com/products/davinciresolve/training/videos/DR17/video-downloads/20211222-xtr312/DaVinci-Resolve-17-Fairlight-DolbyAtmosIntegration.zip"
+    },
+    {
+      "section": "Fusion",
+      "title": "Introduction to Fusion",
+      "filename": "DaVinci-Resolve-17-Fusion-IntroductiontoFusion.zip",
+      "url": "https://downloads.blackmagicdesign.com/products/davinciresolve/training/videos/DR17/video-downloads/20211222-xtr312/DaVinci-Resolve-17-Fusion-IntroductiontoFusion.zip"
+    },
+    {
+      "section": "Fusion",
+      "title": "Basic Compositing",
+      "filename": "DaVinci-Resolve-17-Fusion-BasicCompositing.zip",
+      "url": "https://downloads.blackmagicdesign.com/products/davinciresolve/training/videos/DR17/video-downloads/20211222-xtr312/DaVinci-Resolve-17-Fusion-BasicCompositing.zip"
+    },
+    {
+      "section": "Fusion",
+      "title": "Motion Graphics in Fusion",
+      "filename": "DaVinci-Resolve-17-Fusion-MotionGraphicsinFusion.zip",
+      "url": "https://downloads.blackmagicdesign.com/products/davinciresolve/training/videos/DR17/video-downloads/20211222-xtr312/DaVinci-Resolve-17-Fusion-MotionGraphicsinFusion.zip"
+    },
+    {
+      "section": "Fusion",
+      "title": "3D Compositing in Fusion",
+      "filename": "DaVinci-Resolve-17-Fusion-3DCompositinginFusion.zip",
+      "url": "https://downloads.blackmagicdesign.com/products/davinciresolve/training/videos/DR17/video-downloads/20211222-xtr312/DaVinci-Resolve-17-Fusion-3DCompositinginFusion.zip"
+    }
+  ]
+}
