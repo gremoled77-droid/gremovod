@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "1.1",
+  "schemaVersion": "1.2",
   "snapshotDate": "2026-10-19",
   "purpose": "Read-only inventory of n8n resources and skill assignments; not a deployment mechanism.",
   "security": "No API keys, credential IDs, tokens, or user files committed. Resource IDs are identifiers, not authorization.",
@@ -13,6 +13,8 @@
       "name": "GremoVOD A0 — Продюсер и координатор",
       "model": "anthropic/claude-haiku-5-5",
       "published": false,
+      "memoryEnabled": false,
+      "reasoning": "low",
       "toolsConnected": 0,
       "skills": [
         {
@@ -32,37 +34,61 @@
           "n8nSkillId": "skill_T6jzjEOaGStnvbyU",
           "source": "https://github.com/anthropics/skills/tree/main/skills/xlsx",
           "references": []
+        },
+        {
+          "name": "gremovod-qa-producer-loop",
+          "n8nSkillId": "skill_ts9eUVFpBQ8kuCri",
+          "source": "https://github.com/gremoled77-droid/gremovod/blob/integration/n8n/skills/gremovod-qa-producer-loop/SKILL.md",
+          "references": []
         }
       ],
-      "reasoning": "low",
       "subAgents": {
         "maxChildren": 1,
         "agents": [
           {
             "agentId": "z3v7YE2uNrWxy7CY",
+            "enabled": true,
             "useWhen": "A1: этапы «Идея», «Сценарий», «Мир»; сценарная структура, диалоги, юмор, мотивы, сцены и проверка канона, без утверждения новых правил."
           },
           {
             "agentId": "uLxJzQ142zYRfmBl",
+            "enabled": true,
             "useWhen": "A2: этап «Раскадровка»; функция шотов, расстановка, камера, свет, монтажные реакции; сложные композиционные решения для «Кадров»."
           },
           {
             "agentId": "LtxRZ0cK8LI1vyRL",
+            "enabled": true,
             "useWhen": "A3: этапы «Кадры» и «Видео»; перевод утверждённого решения в промпт выбранной image/video модели с валидными параметрами и референсами; генерации не запускать."
           },
           {
             "agentId": "ylW6J9muCXXELT12",
+            "enabled": true,
             "useWhen": "A4: изучение доступных текстов/исследований; извлечение фактов, цитат, сравнение источников. Не утверждать, что агент сам прочёл недоступный PDF или использовал отсутствующие инструменты."
           },
           {
             "agentId": "ubHXs6DSwFrxSh8X",
+            "enabled": true,
             "useWhen": "A5: этапы «Звук», «Монтаж», «Выпуск»; монтажный и звуковой лист, передача в CapCut, контроль файлов; без генерации, рендера и публикации."
+          },
+          {
+            "agentId": "nkmWNxBdJcFEXSMF",
+            "enabled": false,
+            "useWhen": "FINISH REVIEW ONLY, DISABLED UNTIL SECURE WEB API: A6 проверяет ТЗ, полноту результата, обязательные требования. Получает отдельный чистый контекст."
+          },
+          {
+            "agentId": "NRWXr5AY2MXAFhcH",
+            "enabled": false,
+            "useWhen": "FINISH REVIEW ONLY, DISABLED UNTIL CANON API: A7 проверяет только утверждённый канон/дизайн-систему; отдельный контекст, не знает выводов других."
+          },
+          {
+            "agentId": "s7IIGiioapxre90t",
+            "enabled": false,
+            "useWhen": "FINISH REVIEW ONLY, DISABLED UNTIL TRUSTED EXPERT APPROVAL: A8 Opus оценивает только реально отрендеренный артефакт против утвержденного bar.md. НИКОГДА без лимита и approve."
           }
         ],
         "modelsByDifficulty": {
           "low": "anthropic/claude-haiku-5-5",
-          "medium": "anthropic/claude-sonnet-5-5",
-          "high": "anthropic/claude-opus-5-5"
+          "medium": "anthropic/claude-sonnet-5-5"
         }
       }
     },
@@ -416,7 +442,126 @@
         }
       ],
       "reasoning": "low"
+    },
+    {
+      "key": "A6",
+      "id": "nkmWNxBdJcFEXSMF",
+      "name": "GremoVOD A6 — Независимый критик ТЗ",
+      "model": "anthropic/claude-haiku-5-5",
+      "published": false,
+      "memoryEnabled": false,
+      "reasoning": "low",
+      "toolsConnected": 0,
+      "skills": [
+        {
+          "name": "gremovod-review-requirements",
+          "n8nSkillId": "skill_cxHObvclEezFzLJN",
+          "source": "https://github.com/gremoled77-droid/gremovod/blob/integration/n8n/skills/gremovod-review-requirements/SKILL.md",
+          "references": []
+        },
+        {
+          "name": "gremovod-stage-release",
+          "n8nSkillId": "skill_EBxluu4URoD5ZchX",
+          "source": "https://github.com/gremoled77-droid/gremovod/blob/integration/n8n/skills/gremovod-stage-release/SKILL.md",
+          "sourceBlobSha": "16a5010df0878e77556e4876bfde164973feffb6",
+          "references": []
+        }
+      ]
+    },
+    {
+      "key": "A7",
+      "id": "NRWXr5AY2MXAFhcH",
+      "name": "GremoVOD A7 — Независимый критик системы и канона",
+      "model": "anthropic/claude-sonnet-5-5",
+      "published": false,
+      "memoryEnabled": false,
+      "reasoning": "medium",
+      "toolsConnected": 0,
+      "skills": [
+        {
+          "name": "gremovod-review-system",
+          "n8nSkillId": "skill_7xdvzWypSUA9qeQ1",
+          "source": "https://github.com/gremoled77-droid/gremovod/blob/integration/n8n/skills/gremovod-review-system/SKILL.md",
+          "references": []
+        },
+        {
+          "name": "gremovod-stage-world",
+          "n8nSkillId": "skill_ibtPvKDGM3YXRgs6",
+          "source": "https://github.com/gremoled77-droid/gremovod/blob/integration/n8n/skills/gremovod-stage-world/SKILL.md",
+          "sourceBlobSha": "3029f7bf1de4546eea39d76632172cc134ff6fc0",
+          "references": []
+        },
+        {
+          "name": "gremovod-character-dramaturgy",
+          "n8nSkillId": "skill_opfx7KrDQfn6bseY",
+          "source": "https://github.com/gremoled77-droid/gremovod/blob/integration/n8n/skills/gremovod-character-dramaturgy/SKILL.md",
+          "sourceBlobSha": "f1737a21eb69a535fce9f60688b229713b776d90",
+          "references": [
+            "references/mckee-character.md"
+          ]
+        },
+        {
+          "name": "cinema-image-system",
+          "n8nSkillId": "skill_gYIew8aR8265xMiE",
+          "source": "https://github.com/gremoled77-droid/gremovod/blob/integration/n8n/skills/cinema-image-system/SKILL.md",
+          "sourceBlobSha": "0e72899d884c87f18e6a49a14955ebb739835551",
+          "references": []
+        }
+      ]
+    },
+    {
+      "key": "A8",
+      "id": "s7IIGiioapxre90t",
+      "name": "GremoVOD A8 — Независимый критик ремесла",
+      "model": "anthropic/claude-opus-5-5",
+      "published": false,
+      "memoryEnabled": false,
+      "reasoning": "high",
+      "toolsConnected": 0,
+      "skills": [
+        {
+          "name": "gremovod-review-craft",
+          "n8nSkillId": "skill_otEKGeMAKLxM4BCm",
+          "source": "https://github.com/gremoled77-droid/gremovod/blob/integration/n8n/skills/gremovod-review-craft/SKILL.md",
+          "references": []
+        },
+        {
+          "name": "cinema-shot-design",
+          "n8nSkillId": "skill_VgLDtlFK6AMHFcmQ",
+          "source": "https://github.com/gremoled77-droid/gremovod/blob/integration/n8n/skills/cinema-shot-design/SKILL.md",
+          "sourceBlobSha": "0273f59c6fb5363928bf5eb8ff7b9985b07a7f53",
+          "references": []
+        },
+        {
+          "name": "cinema-visual-structure",
+          "n8nSkillId": "skill_f8UYXLtIvwU2g4ES",
+          "source": "https://github.com/gremoled77-droid/gremovod/blob/integration/n8n/skills/cinema-visual-structure/SKILL.md",
+          "sourceBlobSha": "37ed1140ac6dca3c35a41e763a501e762844062c",
+          "references": []
+        },
+        {
+          "name": "cinema-editing",
+          "n8nSkillId": "skill_OjudmhXsGa2anKRA",
+          "source": "https://github.com/gremoled77-droid/gremovod/blob/integration/n8n/skills/cinema-editing/SKILL.md",
+          "sourceBlobSha": "6877a2daeca795928667fa6b214a882fee360f24",
+          "references": []
+        },
+        {
+          "name": "gremovod-comedy-staging",
+          "n8nSkillId": "skill_jk9ANYX1WWVRU6yq",
+          "source": "https://github.com/gremoled77-droid/gremovod/blob/integration/n8n/skills/gremovod-comedy-staging/SKILL.md",
+          "sourceBlobSha": "7cb65721ddd19f0ad1a579182b978d5a3f97e830",
+          "references": []
+        },
+        {
+          "name": "cinema-sound-design",
+          "n8nSkillId": "skill_K5rLc4JK1BuH6GCV",
+          "source": "https://github.com/gremoled77-droid/gremovod/blob/integration/n8n/skills/cinema-sound-design/SKILL.md",
+          "sourceBlobSha": "d66cda3b6c96c7168bd7d1a87d98f000b5438b35",
+          "references": []
+        }
+      ]
     }
   ],
-  "syncStatus": "manual-copy-no-auto-sync; model routing draft validated; no paid tests"
+  "syncStatus": "manual-copy; QA critics draft, disabled in A0, no paid tests"
 }
