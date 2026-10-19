@@ -39,3 +39,10 @@
 ### Runtime N34–N41: правило экономии и мультимодальные входы
 
 [Матрица моделей и контрактов финальной приёмки](N34_N41_RUNTIME_MODEL_MATRIX.md) · [машинные схемы JSON](contracts/final-runtime-v1_2.schema.json). Технический N34 работает без LLM через локальный media worker; N35 готовит доказательства и отдельно бюджетируемый STT; только N36–N38 используют обоснованные мультимодальные модели. N39–N41 — строго backend и решение владельца, без LLM. n8n Cloud **не** исполняет локальные ffprobe/FFmpeg команды. Все медиапути пока BLOCKED_NO_REAL_MP4.
+
+
+### Сценарный цех N01–N11 до первого видеотеста
+
+[Скиллы и маршруты N01–N11](SCENARIO_SKILLS_N01_N11.md) · [реестр скиллов/этапов](contracts/scenario-skills-routing-v1.json) · [входные JSON-схемы](contracts/scenario-preprod-v1.schema.json). Для работы берём шесть реально существующих навыков GremoVOD, а `generate-fresh-ideas` / `get-more-perspectives` / `grem` / `match-my-writing-style` считаем **предложенными** стилями работы, а не подключёнными скиллами.
+
+Создан отдельный [бесплатный n8n MOCK N01–N11](https://gremovod.app.n8n.cloud/workflow/GVIVMLP7566MqU3Q) — execution #38, ручной, 0 LLM/API. Все 11 стадий возвращают диагностические статусы; N05 блокирует реальное написание концептов без доверенного Owner+Canon source. Изменения не переходят в канон и не запускают генерацию.
