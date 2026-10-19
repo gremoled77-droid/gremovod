@@ -31,3 +31,11 @@ jobs:
           KIE_API_KEY: ''
           ELEVENLABS_API_KEY: ''
         run: python -m unittest backend.test_qa_text_precheck backend.test_qa_text_app_integration -v
+      - name: Existing Studio integration regressions
+        env:
+          STUDIO_QA_SANDBOX_TOKEN: ''
+          STUDIO_QA_SANDBOX_PROJECT_ID: ''
+          PIAPI_API_KEY: ''
+          KIE_API_KEY: ''
+          ELEVENLABS_API_KEY: ''
+        run: python -m unittest backend.test_storyboard backend.test_story_plan backend.test_remote_access -v
