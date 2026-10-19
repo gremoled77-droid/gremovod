@@ -1,0 +1,27 @@
+name: Agent ownership boundaries (new task branches)
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check-agent-scope:
+    if: startsWith(github.head_ref, 'build/claude/') || startsWith(github.head_ref, 'build/argon/') || startsWith(github.head_ref, 'codex/review-') || startsWith(github.head_ref, 'codex/spec-') || startsWith(github.head_ref, 'coordination/')
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Check that PR changes only the owning agent's files
+        env:
+          HEAD_BRANCH: ${{ github.head_ref }}
+          BASE_BRANCH: ${{ github.base_ref }}
+        run: python tools/check_agent_scope.py --branch "$HEAD_BRANCH" --base "$BASE_BRANCH"
