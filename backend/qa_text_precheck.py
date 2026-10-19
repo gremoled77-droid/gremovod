@@ -146,7 +146,7 @@ def context(db, project_id, production_id, series_id):
         nonlocal contains_actual_notes
         notes = (node.get('notes') or '').strip()
         contains_actual_notes |= bool(notes)
-        parts.append(f"{kind} [id={node['id']}] {node.get('title', '')}\\n{notes}".strip())
+        parts.append(f"{kind} [id={node['id']}] {node.get('title', '')}\n{notes}".strip())
 
     append_node('Серия', parent)
     for scene in episodes:
@@ -154,7 +154,7 @@ def context(db, project_id, production_id, series_id):
         for frame in sorted(frames_by_scene.get(scene['id'], []),
                             key=lambda n: (n['number'], n['id'])):
             append_node('Кадр', frame)
-    text = '\\n\\n'.join(parts)
+    text = '\n\n'.join(parts)
     artifact_revision = sha([board_revision, text])
     plan = db.execute('SELECT revision,data FROM story_plans WHERE series_id=?', (series_id,)).fetchone()
     if not contains_actual_notes or not plan:
@@ -172,7 +172,7 @@ def context(db, project_id, production_id, series_id):
     source_kind = str(parsed.get('source_kind') or 'idea')
     requirements = [f'Исходный замысел ({source_kind}): {source}'] if source else []
     for i, card in enumerate(cards, 1):
-        requirements.append('\\n'.join([
+        requirements.append('\n'.join([
             f'Карточка {i} [id={card.id}]: {card.title}',
             f'summary: {card.summary}',
             f'change: {card.change}',
