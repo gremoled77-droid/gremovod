@@ -74,7 +74,7 @@ class FinalReviewRuntimeSpec(unittest.TestCase):
 
     def test_stt_cost_is_separate_from_llm(self):
         content=(ROOT/"N34_N41_RUNTIME_MODEL_MATRIX.md").read_text(encoding="utf-8")
-        self.assertIn("платный",content)
+        self.assertIn("оплачиваемая",content)
         self.assertIn("Whisper",content)
         self.assertIn("n8n Cloud Execute Command",content)
         self.assertIn("1fps",content)
