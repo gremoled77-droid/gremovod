@@ -54,3 +54,6 @@ docs/*.jpg
 *.sqlite3-wal
 *.sqlite3-shm
 *.sqlite3-journal
+
+# --- Aider: локальные конфиги, история чата и кэши ---
+.aider*
