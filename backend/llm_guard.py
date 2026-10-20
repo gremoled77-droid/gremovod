@@ -125,6 +125,7 @@ class TaskResult(TaskIdentity):
     usage: dict[str, Any] = Field(default_factory=dict)
     cost_usd: float
     estimated_usd: float
+    cost_confirmed: bool = True
     result_revision: str
 
 
@@ -293,14 +294,63 @@ def validate_task_result(content, response_format):
     return True, data, None
 
 
-def minimax_actual_cost(model, usage, estimated_usd):
-    price_in, price_out = minimax_price_of(model)
-    tokens_in = usage.get('prompt_tokens')
-    tokens_out = usage.get('completion_tokens')
-    if isinstance(tokens_in, int) and not isinstance(tokens_in, bool) and isinstance(tokens_out, int) and not isinstance(tokens_out, bool):
-        actual = (tokens_in * price_in + tokens_out * price_out) / 1_000_000
-        return round(min(estimated_usd, actual), 6)
-    return estimated_usd
+# Потолок доверия к счётчикам провайдера: за этой границей usage не бывает честным.
+# Такой usage считается повреждённым: деньги не обнуляются, резерв держится до сверки.
+MAX_USAGE_TOKENS = 10_000_000
+
+
+def usage_problem(usage):
+    """Почему usage нельзя считать подтверждённым фактом. None — счётчики достоверны."""
+    if not isinstance(usage, dict):
+        return 'usage отсутствует или это не объект'
+    for name in ('prompt_tokens', 'completion_tokens'):
+        value = usage.get(name)
+        if value is None:
+            return f'нет счётчика {name}'
+        if isinstance(value, bool) or not isinstance(value, int):
+            return f'{name} не целое число'
+        if value < 0:
+            return f'{name} отрицательный'
+        if value > MAX_USAGE_TOKENS:
+            return f'{name} за пределом {MAX_USAGE_TOKENS}'
+    return None
+
+
+def valid_tokens(usage):
+    """Достоверные токены провайдера: (вход, выход). None — счётчикам верить нельзя."""
+    if usage_problem(usage) is not None:
+        return None
+    return usage.get('prompt_tokens'), usage.get('completion_tokens')
+
+
+def actual_cost(price_in, price_out, usage):
+    """Факт по достоверному usage: (usd, tokens_in, tokens_out) либо (None, None, None).
+
+    Сумма пишется целиком: оценка — потолок резерва, а не потолок факта. Перерасход
+    должен быть виден в учёте, а не спрятан под min().
+    """
+    tokens = valid_tokens(usage)
+    if tokens is None:
+        return None, None, None
+    tokens_in, tokens_out = tokens
+    usd = (tokens_in * price_in + tokens_out * price_out) / 1_000_000
+    if not math.isfinite(usd) or usd < 0:
+        return None, None, None
+    return round(usd, 6), tokens_in, tokens_out
+
+
+def settle_from_usage(price_in, price_out, usage, estimate):
+    """Единое решение по деньгам: (status, usd, tokens_in, tokens_out, reason).
+
+    Достоверный usage — подтверждённый факт, сумма полная. Отсутствующий или
+    повреждённый usage не доказывает $0: резерв остаётся в руках под статусом
+    'submission_unknown' с причиной, а сумма не может быть отрицательной.
+    """
+    usd, tokens_in, tokens_out = actual_cost(price_in, price_out, usage)
+    if usd is not None:
+        return 'done', usd, tokens_in, tokens_out, ''
+    return ('submission_unknown', round(estimate, 6), None, None,
+            'провайдер не отдал достоверный usage: ' + usage_problem(usage))
 
 
 def provider_key(authorization, direct):
@@ -369,25 +419,34 @@ async def execute_minimax_task(studio, task_id, body, key):
     provider_body = {'model': llm_wire_model(task.model), 'messages': messages, 'max_tokens': task.max_tokens}
     if task.response_format == 'json':
         provider_body['response_format'] = {'type': 'json_object'}
+    value = None
     try:
         value = await studio.provider_chat(spec['provider'], key, provider_body, spend=('llm_call', call_id, row['model']))
         content = studio.chat_text(value)
         if not isinstance(content, str):
             raise ValueError('Провайдер вернул результат не строкой')
-    except Exception:
+    except Exception as exc:
+        # Деньги освобождаются только доказательством «провайдер ничего не списал»:
+        # отказ до исполнения (4xx) или явное нулевое потребление. Таймаут, обрыв и
+        # неразбор ответа не доказывают отсутствие оплаты — резерв остаётся в руках
+        # (submission_unknown) до ручной сверки.
+        refused = isinstance(exc, HTTPException) and getattr(exc, 'status_code', 500) < 500
         with studio.connect() as db:
-            db.execute("UPDATE llm_calls SET status='failed',usd=0 WHERE id=?", (call_id,))
+            if refused:
+                db.execute("UPDATE llm_calls SET status='failed',usd=0,note=? WHERE id=?",
+                           (f'отказ провайдера: {exc.detail}', call_id))
+            elif value is not None and _not_charged(value):
+                db.execute("UPDATE llm_calls SET status='failed',usd=0,note=? WHERE id=?",
+                           ('провайдер сообщил нулевое потребление', call_id))
+            else:
+                db.execute("UPDATE llm_calls SET status='submission_unknown',note=? WHERE id=?",
+                           (f'исход неизвестен: {exc}', call_id))
             db.execute("UPDATE llm_tasks SET status='failed' WHERE id=?", (task_id,))
         raise
     usage = value.get('usage') if isinstance(value, dict) and isinstance(value.get('usage'), dict) else {}
-    tokens_in = usage.get('prompt_tokens')
-    tokens_out = usage.get('completion_tokens')
-    if not isinstance(tokens_in, int) or isinstance(tokens_in, bool):
-        tokens_in = None
-    if not isinstance(tokens_out, int) or isinstance(tokens_out, bool):
-        tokens_out = None
     estimated_usd = float(row['estimated_usd'])
-    actual_usd = minimax_actual_cost(task.model, usage, estimated_usd)
+    price_in, price_out = minimax_price_of(task.model)
+    status, actual_usd, tokens_in, tokens_out, reason = settle_from_usage(price_in, price_out, usage, estimated_usd)
     valid, data, validation_error = validate_task_result(content, task.response_format)
     result_revision = hashlib.sha256(canonical_json({'content': content, 'data': data, 'valid': valid}).encode()).hexdigest()
     result = TaskResult(
@@ -402,11 +461,17 @@ async def execute_minimax_task(studio, task_id, body, key):
         usage=usage,
         cost_usd=actual_usd,
         estimated_usd=estimated_usd,
+        cost_confirmed=status == 'done',
         result_revision=result_revision,
     )
     with studio.connect() as db:
-        db.execute("UPDATE llm_calls SET status='done',usd=?,input_tokens=?,output_tokens=? WHERE id=?",
-                   (actual_usd, tokens_in, tokens_out, call_id))
+        if status == 'done':
+            db.execute("UPDATE llm_calls SET status='done',usd=?,input_tokens=?,output_tokens=? WHERE id=?",
+                       (actual_usd, tokens_in, tokens_out, call_id))
+        else:
+            # Достоверного usage нет: подтверждать нечего. Резерв держится до сверки.
+            db.execute("UPDATE llm_calls SET status='submission_unknown',usd=?,note=? WHERE id=?",
+                       (actual_usd, reason, call_id))
         db.execute("UPDATE llm_tasks SET status='done',result=?,valid=? WHERE id=?",
                    (canonical_json(result.model_dump(mode='json')), 1 if valid else 0, task_id))
     return result
@@ -574,9 +639,8 @@ def _not_charged(value):
     total = usage.get('total_tokens')
     if isinstance(total, int) and not isinstance(total, bool) and total == 0:
         return True
-    prompt, completion = usage.get('prompt_tokens'), usage.get('completion_tokens')
-    return (isinstance(prompt, int) and not isinstance(prompt, bool) and prompt == 0
-            and isinstance(completion, int) and not isinstance(completion, bool) and completion == 0)
+    tokens = valid_tokens(usage)
+    return tokens is not None and tokens == (0, 0)
 
 
 def settle_call(studio, call_id, status, usd, note=None, tokens=None):
@@ -666,16 +730,16 @@ async def guarded_chat(studio, body, key):
         raise
     usage = value.get('usage') if isinstance(value, dict) and isinstance(value.get('usage'), dict) else {}
     price_in, price_out = price_of(body.model)
-    tokens_in, tokens_out = usage.get('prompt_tokens'), usage.get('completion_tokens')
-    actual = cost
-    over_estimate = False
-    if isinstance(tokens_in, int) and isinstance(tokens_out, int):
-        # Факт писытся полностью: оценка не потолок, превышение должно быть видно, а не спрятано под min().
-        actual = round((tokens_in * price_in + tokens_out * price_out) / 1_000_000, 6)
-        over_estimate = actual > cost
-    with studio.connect() as db:
-        db.execute("UPDATE llm_calls SET status='done',usd=?,input_tokens=?,output_tokens=? WHERE id=?",
-                   (actual, tokens_in if isinstance(tokens_in, int) else None, tokens_out if isinstance(tokens_out, int) else None, call_id))
+    # Факт пишется полностью: оценка не потолок, превышение должно быть видно, а не спрятано под min().
+    status, actual, tokens_in, tokens_out, reason = settle_from_usage(price_in, price_out, usage, cost)
+    if status == 'done':
+        settle_call(studio, call_id, 'done', actual, None, tokens=(tokens_in, tokens_out))
+    else:
+        # Достоверного usage нет: подтверждать нечего. Резерв держится до ручной сверки,
+        # нулевая цена не выдумывается.
+        settle_call(studio, call_id, 'submission_unknown', actual, reason)
+    over_estimate = actual > cost
     return {'choices': [{'message': {'role': 'assistant', 'content': text}}], 'usage': usage, 'provider': provider, 'model': body.model,
-            'cost_usd': actual, 'estimated_usd': cost, 'status': 'done', 'over_estimate': over_estimate,
-            'over_estimate_usd': round(actual - cost, 6) if over_estimate else 0.0}
+            'cost_usd': actual, 'estimated_usd': cost, 'status': status, 'over_estimate': over_estimate,
+            'over_estimate_usd': round(actual - cost, 6) if over_estimate else 0.0,
+            'cost_confirmed': status == 'done', 'cost_note': reason}
