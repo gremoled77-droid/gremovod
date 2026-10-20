@@ -25,13 +25,16 @@ from typing import Annotated, Literal
 from fastapi import Header, HTTPException
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
-from backend import idea_background, llm_guard, security
-from backend.model_catalog import llm_spec
+from backend import connections, idea_background, llm_guard, security
+from backend.model_catalog import LLM_MODELS, llm_spec
 from backend.prompt_rules import RULES_VERSION
 
 STAGE_ID = 'producer.structure'
 MOCK_PROVIDER = 'mock'
 MOCK_MODEL = 'mock-producer'
+# Область реестра, из которой этап берёт модели. «task» — это задания
+# /api/llm/tasks с проводными именами моделей, они обслуживают другой путь.
+PRODUCER_SCOPE = 'idea'
 
 # Лимиты того, что уходит в LLM. Смысл: сценарная структура помещается в один
 # разумный пакет, а не в выгрузку проекта.
@@ -372,6 +375,39 @@ def mock_model_info():
 
 
 def register(app, studio):
+    @app.get('/api/producer/options')
+    def options():
+        """Проверенный каталог для выбора: провайдеры, их доступность и модели реестра.
+
+        Провайдер без настроенного ключа возвращается как недоступный, а не
+        выбрасывается: пользователь должен видеть, что платный запуск невозможен,
+        вместо обещания, которое не выполнится. Модели берутся из реестра, список
+        для провайдера — из области этапа, а не из кода клиента.
+        """
+        models = [{'id': MOCK_MODEL, 'label': 'Локальный MOCK (без обращения к провайдеру)',
+                   'provider': MOCK_PROVIDER, 'price_in': 0.0, 'price_out': 0.0,
+                   'scopes': [PRODUCER_SCOPE]}]
+        models += [{'id': key, 'label': spec['label'], 'provider': spec['provider'],
+                    'price_in': spec['price_in'], 'price_out': spec['price_out'],
+                    'scopes': list(spec['scopes'])}
+                   for key, spec in sorted(LLM_MODELS.items())
+                   if PRODUCER_SCOPE in spec['scopes']]
+        providers = [{'id': MOCK_PROVIDER, 'name': 'Локальный MOCK', 'available': True,
+                      'status': 'available',
+                      'message': 'Локальная детерминированная структура: сети нет, расходов нет, ключ не нужен',
+                      'models': [MOCK_MODEL]}]
+        for info in connections.list_connections():
+            served = [item['id'] for item in models if item['provider'] == info['id']]
+            if not served:
+                continue
+            providers.append({'id': info['id'], 'name': info['name'],
+                               'available': bool(info.get('configured')),
+                               'status': info.get('status', 'unknown'),
+                               'message': info.get('message', ''),
+                               'models': served})
+        return {'providers': providers, 'models': models,
+                'default': {'provider': MOCK_PROVIDER, 'model': MOCK_MODEL}}
+
     @app.post('/api/producer/estimate')
     def estimate(body: ProducerRequest):
         """Оценка платного запуска этапа. Для MOCK стоимость нулевая."""

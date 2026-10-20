@@ -31,3 +31,29 @@ test('character replacement is preserved when only the brief changed locally', (
   assert.deepEqual(result.conflicts, []);
   assert.equal(result.value.characters[0].working_asset_id, 'new');
 });
+test('выбор модели этапа сохраняется в состоянии проекта и не конфликтует с чужой правкой', () => {
+  const base = {brief: 'Original', producer: {provider: 'mock', model: 'mock-producer'}};
+  const local = {...base, producer: {provider: 'piapi', model: 'gpt-5.6-luna'}};
+  const remote = {...base, brief: 'Remote edit'};
+  const result = mergeProject(base, local, remote);
+  assert.deepEqual(result.conflicts, []);
+  assert.deepEqual(result.value.producer, {provider: 'piapi', model: 'gpt-5.6-luna'});
+  assert.equal(result.value.brief, 'Remote edit');
+});
+test('разный выбор модели в двух окнах — конфликт, локальный выбор остаётся', () => {
+  const base = {producer: {provider: 'mock', model: 'mock-producer'}};
+  const local = {...base, producer: {provider: 'piapi', model: 'gpt-5.6-luna'}};
+  const remote = {...base, producer: {provider: 'piapi', model: 'gpt-5.6-terra'}};
+  const result = mergeProject(base, local, remote);
+  // Провайдер выбрали одинаково — конфликтует только модель.
+  assert.deepEqual(result.conflicts, ['producer.model']);
+  assert.deepEqual(result.value.producer, {provider: 'piapi', model: 'gpt-5.6-luna'});
+});
+test('разный провайдер в двух окнах — конфликт по обоим полям', () => {
+  const base = {producer: {provider: 'mock', model: 'mock-producer'}};
+  const local = {...base, producer: {provider: 'piapi', model: 'gpt-5.6-luna'}};
+  const remote = {...base, producer: {provider: 'openai', model: 'gpt-4.1-mini'}};
+  const result = mergeProject(base, local, remote);
+  assert.deepEqual(result.conflicts, ['producer.provider', 'producer.model']);
+  assert.deepEqual(result.value.producer, {provider: 'piapi', model: 'gpt-5.6-luna'});
+});

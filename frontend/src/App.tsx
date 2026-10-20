@@ -55,6 +55,7 @@ import {readLocal, writeLocal, clearLocal} from './localDrafts';
 import Dock, {countActive} from './Dock';
 import useActivity from './useActivity';
 import AgentPanel from './AgentPanel';
+import {DEFAULT_CHOICE} from './producerModel';
 import IdeaBrief from './IdeaBrief';
 import IdeaRefs from './IdeaRefs';
 import {lazy, Suspense, useCallback, useEffect, useRef, useState} from 'react';
@@ -140,6 +141,7 @@ type Studio = {
   videoReference: string;
   motionBrief?: string;
   videoAssetId?: string;
+  producer?: {provider: string; model: string};
   nodes: Node[];
   edges: Edge[];
 };
@@ -1808,6 +1810,8 @@ function App() {
                   brief={state.brief}
                   character={character}
                   style={state.style}
+                  choice={state.producer ?? DEFAULT_CHOICE}
+                  onChoice={choice => change({producer: choice})}
                   onApply={prompt => {
                     change({brief: prompt});
                     setMode('studio');

@@ -1,5 +1,16 @@
 import {apiFetch, PAID_LLM_ENABLED} from './api';
-import {useState} from 'react';
+import {useEffect, useState} from 'react';
+import ProducerPanel, {errorText} from './ProducerPanel';
+import {
+  ProducerCatalog,
+  ProducerChoice,
+  choiceForProvider,
+  defaultsFor,
+  modelLabel,
+  modelsForProvider,
+  parseCatalog,
+  providerLabel,
+} from './producerModel';
 
 type AgentResult = {
   id: string;
@@ -15,16 +26,61 @@ type Props = {
   character: any;
   style: Record<string, string>;
   onApply: (prompt: string) => void;
+  choice: ProducerChoice;
+  onChoice: (choice: ProducerChoice) => void;
 };
 const options = ['seedream-5-pro', 'seedream-5-lite', 'nano-banana-2.1', 'seedance-2.5'];
-export default function AgentPanel({projectId, brief, character, style, onApply}: Props) {
-  const [provider, setProvider] = useState('piapi');
-  const [model, setModel] = useState('gpt-5.6-luna');
+export default function AgentPanel({
+  projectId,
+  brief,
+  character,
+  style,
+  onApply,
+  choice,
+  onChoice,
+}: Props) {
+  const [catalog, setCatalog] = useState<ProducerCatalog | null>(null);
+  const [catalogError, setCatalogError] = useState('');
   const [styleNotes, setStyleNotes] = useState('');
   const [targets, setTargets] = useState<string[]>(['seedream-5-pro', 'seedance-2.5']);
   const [result, setResult] = useState<AgentResult | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    let alive = true;
+    apiFetch('/api/producer/options')
+      .then(async response => {
+        const data = await response.json();
+        if (!response.ok) throw Error(errorText(data));
+        return parseCatalog(data);
+      })
+      .then(value => {
+        if (alive) setCatalog(value);
+      })
+      .catch(e => {
+        if (alive) setCatalogError(String(e.message || e));
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  // Сохранённый выбор сверяется с каталогом: провайдера или модели могло не быть.
+  useEffect(() => {
+    if (!catalog) return;
+    const models = modelsForProvider(catalog, choice.provider);
+    if (!models.length) {
+      const fallback = defaultsFor(catalog);
+      if (fallback.provider !== choice.provider || fallback.model !== choice.model) onChoice(fallback);
+      return;
+    }
+    if (!models.some(m => m.id === choice.model)) {
+      const next = choiceForProvider(catalog, choice.provider, choice.model);
+      if (next.model !== choice.model) onChoice(next);
+    }
+  }, [catalog]);
+
   const run = async () => {
     setBusy(true);
     setError('');
@@ -35,8 +91,8 @@ export default function AgentPanel({projectId, brief, character, style, onApply}
         body: JSON.stringify({
           project_id: projectId || null,
           brief,
-          provider,
-          model,
+          provider: choice.provider,
+          model: choice.model,
           character: character || {},
           style: {...style, agent_notes: styleNotes},
           target_models: targets,
@@ -65,6 +121,7 @@ export default function AgentPanel({projectId, brief, character, style, onApply}
       </div>
     </div>
   );
+  const models = catalog ? modelsForProvider(catalog, choice.provider) : [];
   return (
     <section className="sc">
       <div className="ag-state" role="status">
@@ -78,27 +135,58 @@ export default function AgentPanel({projectId, brief, character, style, onApply}
         Три специалиста последовательно подготовят план, проверят консистентность и составят промпты под
         выбранные модели. Генерация картинок и видео автоматически не запускается.
       </p>
+      {catalogError && (
+        <div className="alert" role="alert">
+          Каталог моделей недоступен: {catalogError}
+        </div>
+      )}
       <article className="sc-step">
-        {stepHead(1, 'Провайдер и модель', 'Ключ берётся из серверных подключений')}
+        {stepHead(1, 'Провайдер и модель', 'Выбор из проверенного каталога; ключ берётся из серверных подключений')}
         <div className="param-grid">
           <label>
             Провайдер
             <select
-              value={provider}
+              value={choice.provider}
+              disabled={!catalog}
               onChange={e => {
-                setProvider(e.target.value);
-                setModel('gpt-5.6-luna');
+                if (!catalog) return;
+                onChoice(choiceForProvider(catalog, e.target.value, choice.model));
               }}
             >
-              <option value="piapi">PiAPI</option>
+              {(catalog?.providers ?? []).map(p => (
+                <option key={p.id} value={p.id}>
+                  {providerLabel(catalog!, p.id)}
+                </option>
+              ))}
             </select>
           </label>
           <label>
             Модель
-            <input value={model} onChange={e => setModel(e.target.value)} />
+            <select
+              value={choice.model}
+              disabled={!catalog || !models.length}
+              onChange={e => onChoice({...choice, model: e.target.value})}
+            >
+              {models.length === 0 && <option value="">— моделей у провайдера нет —</option>}
+              {models.map(m => (
+                <option key={m.id} value={m.id}>
+                  {modelLabel(m)}
+                </option>
+              ))}
+            </select>
           </label>
         </div>
       </article>
+      {catalog && (
+        <ProducerPanel
+          projectId={projectId}
+          idea={brief}
+          characterIds={character?.id ? [character.id] : []}
+          catalog={catalog}
+          choice={choice}
+          onChoice={onChoice}
+        />
+      )}
       <article className="sc-step">
         {stepHead(2, 'Мир проекта', 'Канон берётся из проекта; здесь можно добавить замечания')}
         <textarea
@@ -135,6 +223,11 @@ export default function AgentPanel({projectId, brief, character, style, onApply}
           </button>
         </div>
         {!brief.trim() && <small className="muted">Сначала напиши задание ролика на экране «Идея».</small>}
+        {choice.provider === 'mock' && (
+          <small className="muted">
+            MOCK-режим локальный и бесплатный, но платных агентов A6–A8 он не обслуживает.
+          </small>
+        )}
         {error && (
           <div className="alert">
             {error.includes('1010')
