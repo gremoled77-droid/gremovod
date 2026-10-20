@@ -3,6 +3,8 @@
 Проверки бесплатные: ни одного сетевого вызова, ни одного платного API.
 """
 import json
+import posixpath
+import re
 import tempfile
 import unittest
 from pathlib import Path
@@ -219,6 +221,51 @@ class SkillContextS02(unittest.TestCase):
             with self.assertRaises(HTTPException) as caught:
                 native_chat.chat_rules(NativeChatRules.Studio(), NativeChatRules.body('prompt', 'seedance-2.5'), {})
         self.assertEqual(caught.exception.status_code, 409)
+
+
+class SkillSyncCompatibility(unittest.TestCase):
+    """Совместимость с scripts/n8n_skill_sync.py: пакет = `skills/<имя>/SKILL.md`, без вложенности.
+
+    Правила взяты из инструмента синка: имя по regex `[a-z0-9][a-z0-9-]{0,99}`, frontmatter
+    только однострочные `name`/`description`, `name` совпадает с каталогом, а каждая
+    относительная md-ссылка должна разрешаться в существующий файл.
+    """
+
+    def test_production_skills_are_flat_in_skills_dir(self):
+        for name in IDS:
+            self.assertTrue((ROOT / 'skills' / name / 'SKILL.md').is_file(), name)
+
+    def test_registry_points_to_repo_skills_root(self):
+        self.assertEqual(production_skills.SKILLS_ROOT, ROOT / 'skills')
+
+    def test_skill_names_match_sync_regex(self):
+        for name in IDS:
+            self.assertRegex(name, r'^[a-z0-9][a-z0-9-]{0,99}$')
+
+    def test_frontmatter_is_single_line_name_and_description(self):
+        for name in IDS:
+            body = (ROOT / 'skills' / name / 'SKILL.md').read_text(encoding='utf-8')
+            match = re.match(r'\A---\n(.*?)\n---\n', body, re.S)
+            self.assertIsNotNone(match, name)
+            fields = {}
+            for line in match.group(1).splitlines():
+                key, sep, value = line.partition(':')
+                self.assertIn(key, {'name', 'description'}, name)
+                self.assertTrue(sep, name)
+                self.assertTrue(value.strip(), name)
+                self.assertNotIn(value.strip()[0], '|>', name)
+                fields[key] = value.strip().strip('"\'')
+            self.assertEqual(fields.get('name'), name)
+            self.assertTrue(fields.get('description'))
+
+    def test_relative_links_resolve_inside_package(self):
+        for name in IDS:
+            body = (ROOT / 'skills' / name / 'SKILL.md').read_text(encoding='utf-8')
+            for link in re.findall(r'\]\(([^)]+)\)', body):
+                if '://' in link or link.startswith('#'):
+                    continue
+                target = posixpath.normpath(posixpath.join(name, link.split('#')[0]))
+                self.assertTrue((ROOT / 'skills' / target).is_file(), target)
 
 
 if __name__ == '__main__':

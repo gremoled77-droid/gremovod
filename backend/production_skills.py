@@ -10,8 +10,12 @@ import json
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
-SKILLS_ROOT = ROOT / 'skills' / 'production'
-REGISTRY_PATH = SKILLS_ROOT / 'registry.json'
+REPO_ROOT = ROOT.parent
+# Канонические тексты скиллов лежат в общем каталоге репозитория `skills/` — там же, откуда
+# их забирает синк в n8n (`scripts/n8n_skill_sync.py` собирает пакет из `skills/<имя>/SKILL.md`).
+SKILLS_ROOT = REPO_ROOT / 'skills'
+# Реестр — артефакт бэкенда: он перечисляет скиллы, стадии, роли и хэши, но не хранит тексты.
+REGISTRY_PATH = ROOT / 'skills' / 'production' / 'registry.json'
 
 _cache = {}
 

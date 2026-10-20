@@ -14,6 +14,7 @@ COPY backend/requirements.lock.txt backend/requirements.lock.txt
 RUN pip install --no-cache-dir -r backend/requirements.lock.txt
 COPY backend/ backend/
 COPY docs/ docs/
+COPY skills/ skills/
 COPY --from=web /app/frontend/dist frontend/dist
 ENV STUDIO_DATA_DIR=/data
 VOLUME /data

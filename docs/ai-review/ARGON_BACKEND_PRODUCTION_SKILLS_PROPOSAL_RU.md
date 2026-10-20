@@ -49,13 +49,21 @@ KIE/PiAPI/OpenAI.
 ## 3. Целевая схема
 
 ```
-backend/skills/production/                     # тексты, которые backend подмешивает в промпт
-├── registry.json                              # машинный реестр: единственный источник правды
+skills/                                        # канонический каталог скиллов, плоско и без вложенности
 ├── skill-strict-json-output/SKILL.md
 ├── skill-canon-lock/SKILL.md
 ├── skill-video-prompt-crafter/SKILL.md
 └── skill-cheap-gatekeeper/SKILL.md
+backend/skills/production/registry.json        # реестр бэкенда: версии, хэши, стадии, роли
 ```
+
+**Почему тексты лежат в `skills/`, а реестр — в `backend/`.** Синк скиллов в n8n
+(`scripts/n8n_skill_sync.py`) собирает пакет только из `skills/<имя>/SKILL.md` и
+`skills/<имя>/references/**`, а дерево сканирует лишь по `skills` и `docs`. Вложенность и папки
+вне `skills/` в n8n не попадают ни при каком манифесте. Поэтому канонический текст лежит в общем
+каталоге скиллов (один текст на backend и n8n), а реестр — рядом с кодом, который его читает.
+`Dockerfile` получает строку `COPY skills/ skills/`, иначе в образе каталога не будет, а загрузчик
+упадёт fail-closed.
 
 **Правила схемы.**
 
@@ -226,14 +234,15 @@ M1–M4 выполнены в этой ветке. M5–M7 — отдельны�
 
 | Файл | Действие |
 |---|---|
-| `backend/skills/production/*/SKILL.md` (4) | добавлены: тексты владельца + front-matter + раздел применения |
+| `skills/skill-*/SKILL.md` (4) | добавлены: тексты владельца + front-matter + раздел применения; плоская раскладка ради синка в n8n |
 | `backend/skills/production/registry.json` | добавлен: реестр с хэшами, стадиями, ролями, контрактами |
 | `backend/production_skills.py` | добавлен: загрузчик с проверкой целостности |
-| `backend/test_production_skills.py` | добавлен: 19 тестов |
+| `backend/test_production_skills.py` | добавлен: 29 тестов, включая совместимость с sync-инструментом |
 | `backend/story_plan.py` | изменено: `SYSTEM` собирается через загрузчик |
 | `backend/native_chat.py` | изменено: `chat_rules()` + подключение скиллов в `rules` |
 | `docs/specs/.../scenario-skills-routing-v1.json` | изменено: 4 записи, `spec_version` 1.1 |
 | `prompts/README.md` | изменено: разграничение двух реестров |
+| `Dockerfile` | изменено: `COPY skills/ skills/` — иначе каталог скиллов не попадёт в образ |
 
 **Проверки.**
 

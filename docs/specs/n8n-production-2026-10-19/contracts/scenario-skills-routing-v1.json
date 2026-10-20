@@ -76,7 +76,7 @@
     },
     {
       "id": "skill-strict-json-output",
-      "repository_path": "backend/skills/production/skill-strict-json-output/SKILL.md",
+      "repository_path": "skills/skill-strict-json-output/SKILL.md",
       "used_by": [
         "N03",
         "N04",
@@ -91,7 +91,7 @@
     },
     {
       "id": "skill-canon-lock",
-      "repository_path": "backend/skills/production/skill-canon-lock/SKILL.md",
+      "repository_path": "skills/skill-canon-lock/SKILL.md",
       "used_by": [
         "N03",
         "N06",
@@ -104,7 +104,7 @@
     },
     {
       "id": "skill-video-prompt-crafter",
-      "repository_path": "backend/skills/production/skill-video-prompt-crafter/SKILL.md",
+      "repository_path": "skills/skill-video-prompt-crafter/SKILL.md",
       "used_by": [
         "N11",
         "N42"
@@ -114,7 +114,7 @@
     },
     {
       "id": "skill-cheap-gatekeeper",
-      "repository_path": "backend/skills/production/skill-cheap-gatekeeper/SKILL.md",
+      "repository_path": "skills/skill-cheap-gatekeeper/SKILL.md",
       "used_by": [
         "N07",
         "N10"
