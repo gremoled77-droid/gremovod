@@ -1007,4 +1007,6 @@ from backend import story_plan
 story_plan.register(app,sys.modules[__name__])
 from backend import producer_stage
 producer_stage.register(app,sys.modules[__name__])
+from backend import n8n_spend
+n8n_spend.register(app,sys.modules[__name__])
 remote_access.mount_frontend(app,ROOT.parent)

@@ -1,0 +1,69 @@
+{
+  "meta": {
+    "name": "GremoVOD — расходный шлюз n8n",
+    "purpose": "Reference fragment: a paid step of an n8n agent must take a money permit from Studio before the step and report the fact after it. Not a deployed workflow.",
+    "studioEndpoints": {
+      "reserve": "/api/n8n/spend/reserve",
+      "settle": "/api/n8n/spend/settle",
+      "status": "/api/n8n/spend/{permit_id}"
+    },
+    "auth": {
+      "header": "Authorization: Bearer <STUDIO_SERVICE_TOKENS token>",
+      "zone": "The token must include the project in its zone, otherwise the reserve is refused with 403.",
+      "credentialName": "GremoVOD Studio Spend Token"
+    },
+    "wiring": "Trigger → Резерв расхода → [платный узел агента] → Отчёт о расходе. The reserve node is the hard stop: on 400 the workflow must not continue to the agent.",
+    "notes": [
+      "request_id must be stable for one attempt of the step: a repeated request_id returns the same permit and books the money once.",
+      "The reserve amount is decided by Studio (the owner's cap for the role). The agent does not send an amount.",
+      "Without a report the reserve keeps holding the money and blocks new spend until the owner reconciles it.",
+      "status=done requires the actual usd; status=failed releases the reserve; status=unknown keeps it held."
+    ]
+  },
+  "nodes": [
+    {
+      "name": "Резерв расхода",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [-200, 0],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.studio_base }}/api/n8n/spend/reserve",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpTemplatedCustomAuth",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ { project_id: $json.project_id, request_id: $json.request_id, role: $json.role, stage: $json.stage, model: $json.model } }}",
+        "options": {"timeout": 20000}
+      },
+      "onError": "stopWorkflow",
+      "credentials": {"httpTemplatedCustomAuth": {"name": "GremoVOD Studio Spend Token"}},
+      "notes": "400 — потолок роли не задан или не влезает в бюджет: платный шаг не запускается. 403 — токен не видит проект. 409 — этот request_id уже закрыт."
+    },
+    {
+      "name": "Отчёт о расходе",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [220, 0],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.studio_base }}/api/n8n/spend/settle",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpTemplatedCustomAuth",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ { permit_id: $('Резерв расхода').item.json.permit_id, status: 'done', usd: $json.actual_usd } }}",
+        "options": {"timeout": 20000}
+      },
+      "onError": "continueErrorOutput",
+      "credentials": {"httpTemplatedCustomAuth": {"name": "GremoVOD Studio Spend Token"}},
+      "notes": "Если отчёт не ушёл, резерв остаётся в бюджете и блокирует новые траты до ручной сверки. Это осознанно: лучше переоценка, чем незамеченная трата."
+    }
+  ],
+  "connections": {
+    "Резерв расхода": {"main": [[{"node": "Отчёт о расходе", "type": "main", "index": 0}]]},
+    "Отчёт о расходе": {"main": [[]]}
+  }
+}

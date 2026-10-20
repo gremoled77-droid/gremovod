@@ -90,6 +90,28 @@ def llm_reservations(db):
     return [{"project_id": r["project_id"], "usd": r["usd"], "created_at": r["created_at"]} for r in rows]
 
 
+def n8n_counted_usd(status, reserved_usd, usd):
+    """Сколько денег держит расход n8n-агента.
+
+    Правило одно на оба контура: резерв держит потолок шага, подтверждённый факт —
+    сам факт (он может быть больше потолка, и тогда перерасход виден в счётчике),
+    отказ — ноль, неопределённый исход — по-прежнему держит потолок.
+    """
+    if status == 'done':
+        return float(usd or 0.0)
+    if status == 'failed':
+        return 0.0
+    return float(reserved_usd or 0.0)
+
+
+def n8n_reservations(db):
+    """Расходы n8n-агентов, которые держат или уже потратили деньги."""
+    rows = _rows(db, "SELECT project_id,role,reserved_usd,usd,status,created_at FROM n8n_spend")
+    return [{"project_id": r["project_id"], "role": r["role"],
+             "usd": n8n_counted_usd(r["status"], r["reserved_usd"], r["usd"]),
+             "created_at": r["created_at"]} for r in rows]
+
+
 def p0_obligations(db):
     """Money the provider took beyond the owner's ceiling.
 
@@ -125,21 +147,24 @@ def _day(value) -> str:
 def state(db, project_id: str) -> dict:
     """Combined view of everything that already holds or spent money.
 
-    One counter for the whole Studio: legacy media approvals, paid LLM calls, P0
-    envelopes and the excess a provider charged beyond the owner's ceiling. Every
-    paid path is checked against this total, so no layer can spend what another
-    layer still allows.
+    One counter for the whole Studio: legacy media approvals, paid LLM calls, spend of
+    n8n agents, P0 envelopes and the excess a provider charged beyond the owner's
+    ceiling. Every paid path is checked against this total, so no layer can spend what
+    another layer still allows.
     """
     config = limits(db)
     today = datetime.now(MOSCOW).date().isoformat()
     legacy = legacy_reservations(db)
     p0 = p0_reservations(db)
     llm = llm_reservations(db)
+    n8n = n8n_reservations(db)
 
     legacy_project = sum(r["estimated_usd"] for r in legacy if r["project_id"] == project_id)
     legacy_daily = sum(r["estimated_usd"] for r in legacy if _day(r["created_at"]) == today)
     llm_project = sum(r["usd"] for r in llm if r["project_id"] == project_id)
     llm_daily = sum(r["usd"] for r in llm if _day(r["created_at"]) == today)
+    n8n_project = sum(r["usd"] for r in n8n if r["project_id"] == project_id)
+    n8n_daily = sum(r["usd"] for r in n8n if _day(r["created_at"]) == today)
     p0_project = sum((r["reserved_cents"] + r["spent_cents"]) / 100
                       for r in p0 if r["project_id"] == project_id)
     p0_daily = sum((r["reserved_cents"] + r["spent_cents"]) / 100
@@ -152,10 +177,11 @@ def state(db, project_id: str) -> dict:
     return {
         "project_limit_usd": config["project_usd"],
         "daily_limit_usd": config["daily_usd"],
-        "project_reserved_usd": round(legacy_project + llm_project + p0_project + overrun_project, 6),
-        "daily_reserved_usd": round(legacy_daily + llm_daily + p0_daily + overrun_daily, 6),
+        "project_reserved_usd": round(legacy_project + llm_project + n8n_project + p0_project + overrun_project, 6),
+        "daily_reserved_usd": round(legacy_daily + llm_daily + n8n_daily + p0_daily + overrun_daily, 6),
         "media_reserved_usd": round(legacy_project, 6),
         "llm_reserved_usd": round(llm_project, 6),
+        "n8n_reserved_usd": round(n8n_project, 6),
         "legacy_reserved_usd": round(legacy_project, 6),
         "p0_reserved_usd": round(p0_project, 6),
         "overrun_reserved_usd": round(overrun_project, 6),
