@@ -72,6 +72,20 @@ def p0_reservations(db):
              "created_at_ms": r["created_at_ms"]} for r in rows]
 
 
+def p0_obligations(db):
+    """Money the provider took beyond the owner's ceiling.
+
+    The envelope keeps `reserved_cents + spent_cents <= cap_cents`, so an
+    excess charge has nowhere to live there. It is booked here instead: the
+    money is really gone and the combined ledger must show it.
+    """
+    rows = _rows(db, "SELECT project_id,overrun_cents,created_at_ms "
+                     "FROM p0_spend_obligations")
+    return [{"project_id": r["project_id"],
+             "overrun_cents": r["overrun_cents"],
+             "created_at_ms": r["created_at_ms"]} for r in rows]
+
+
 def limits(db):
     """Configured project and daily caps in USD. Missing table = no money allowed."""
     row = _rows(db, "SELECT project_usd,daily_usd FROM spending_limits WHERE id=1")
@@ -99,13 +113,19 @@ def state(db, project_id: str) -> dict:
                       for r in p0 if r["project_id"] == project_id)
     p0_daily = sum((r["reserved_cents"] + r["spent_cents"]) / 100
                    for r in p0 if _day(r["created_at_ms"]) == today)
+    obligations = p0_obligations(db)
+    overrun_project = sum(r["overrun_cents"] / 100
+                           for r in obligations if r["project_id"] == project_id)
+    overrun_daily = sum(r["overrun_cents"] / 100
+                        for r in obligations if _day(r["created_at_ms"]) == today)
     return {
         "project_limit_usd": config["project_usd"],
         "daily_limit_usd": config["daily_usd"],
-        "project_reserved_usd": round(legacy_project + p0_project, 6),
-        "daily_reserved_usd": round(legacy_daily + p0_daily, 6),
+        "project_reserved_usd": round(legacy_project + p0_project + overrun_project, 6),
+        "daily_reserved_usd": round(legacy_daily + p0_daily + overrun_daily, 6),
         "legacy_reserved_usd": round(legacy_project, 6),
         "p0_reserved_usd": round(p0_project, 6),
+        "overrun_reserved_usd": round(overrun_project, 6),
         "day_moscow": today,
     }
 

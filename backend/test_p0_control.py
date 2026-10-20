@@ -10,6 +10,7 @@ from backend import p0_control as p
 
 class P0SafetyTests(unittest.TestCase):
     def setUp(self):
+        p0_authz.allow_ephemeral_key()
         self.temp=tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.path=Path(self.temp.name)/"studio.sqlite3"
@@ -52,7 +53,7 @@ class P0SafetyTests(unittest.TestCase):
     def test_exact_five_new_tables_and_legacy_jobs_untouched(self):
         names={r[0] for r in self.db.execute("SELECT name FROM sqlite_master WHERE type='table'")}
         expected={"p0_runs","p0_budget_envelopes","p0_jobs","p0_scene_manifest","p0_review_snapshots"}
-        self.assertEqual({n for n in names if n.startswith("p0_")},expected)
+        self.assertEqual({n for n in names if n.startswith("p0_")},expected | {"p0_spend_obligations"})
         self.assertEqual(self.row("jobs","id","legacy-1")["request"],"important-original")
         p.install_schema(self.db)  # migration is repeatable
         self.assertEqual(self.row("jobs","id","legacy-1")["status"],"done")
@@ -157,29 +158,89 @@ class P0SafetyTests(unittest.TestCase):
     def test_provider_success_charges_once_and_no_duplicate_callbacks(self):
         self.intent();self.auth();self.submit()
         p.accept_provider_id(self.db,job_id="j1",provider_job_id="provider123")
+        verified=lambda body:{"provider_job_id":"provider123","charged_cents":180,"success":True}
         self.assertTrue(p.finish_verified(self.db,job_id="j1",event_id="event01",
-                                         event_body={"status":"done"},charged_cents=180,
-                                         provider_success=True,verify_evidence=lambda body: True))
+                                           event_body={"status":"done"},
+                                           verify_evidence=verified))
         self.assertFalse(p.finish_verified(self.db,job_id="j1",event_id="event01",
-                                          event_body={"status":"done"},charged_cents=180,
-                                          provider_success=True,verify_evidence=lambda body: True))
+                                            event_body={"status":"done"},
+                                            verify_evidence=verified))
         with self.assertRaises(p.Conflict):
             p.finish_verified(self.db,job_id="j1",event_id="event01",
-                              event_body={"status":"tampered"},charged_cents=180,
-                              provider_success=True,verify_evidence=lambda body: True)
+                              event_body={"status":"tampered"},verify_evidence=verified)
         envelope=self.row("p0_budget_envelopes","envelope_id","env")
-        self.assertEqual((envelope["spent_cents"],envelope["reserved_cents"]),(180,0))
+        self.assertEqual((envelope["spent_cents"], envelope["reserved_cents"]),(180,0))
 
-    def test_unverified_provider_report_or_overbilling_cannot_release(self):
+    def test_caller_cannot_state_the_cost_or_the_success(self):
+        """The amount and the success flag come from the verified evidence only."""
         self.intent();self.auth();self.submit()
         p.accept_provider_id(self.db,job_id="j1",provider_job_id="provider123")
+        verified=lambda body:{"provider_job_id":"provider123","charged_cents":180,"success":True}
+        for fake in ({"charged_cents":0},{"provider_success":False},{"provider_job_id":"other"}):
+            with self.assertRaises(p.Blocked):
+                p.finish_verified(self.db,job_id="j1",event_id="event1",
+                                  event_body={"status":"done"},verify_evidence=verified,**fake)
         with self.assertRaises(p.Blocked):
-            p.finish_verified(self.db,job_id="j1",event_id="event1",event_body={},
-                              charged_cents=10,provider_success=True,verify_evidence=lambda body: False)
-        with self.assertRaises(p.Blocked):
-            p.finish_verified(self.db,job_id="j1",event_id="event2",event_body={},
-                              charged_cents=999,provider_success=True,verify_evidence=lambda body: True)
+            p.finish_verified(self.db,job_id="j1",event_id="event1",
+                              event_body={"status":"done"},verify_evidence=lambda body: True)
         self.assertEqual(self.row("p0_budget_envelopes","envelope_id","env")["reserved_cents"],250)
+
+    def test_overbilling_is_booked_as_an_obligation_and_blocks_new_spend(self):
+        """The provider took more than the owner authorised: record it, do not hide it."""
+        from backend import spend_ledger
+        self.intent();self.auth();self.submit()
+        p.accept_provider_id(self.db,job_id="j1",provider_job_id="provider123")
+        verified=lambda body:{"provider_job_id":"provider123","charged_cents":999,"success":True}
+        self.assertTrue(p.finish_verified(self.db,job_id="j1",event_id="event1",
+                                           event_body={"status":"done"},verify_evidence=verified))
+        envelope=self.row("p0_budget_envelopes","envelope_id","env")
+        self.assertEqual((envelope["spent_cents"], envelope["reserved_cents"]),(250,0))
+        obligation=self.db.execute(
+            "SELECT * FROM p0_spend_obligations WHERE job_id='j1'").fetchone()
+        self.assertIsNotNone(obligation)
+        self.assertEqual(obligation["overrun_cents"],999-250)
+        self.assertEqual(obligation["status"],"OPEN")
+        self.assertEqual(self.row("p0_jobs","job_id","j1")["spent_cents"],999)
+        state=spend_ledger.state(self.db,"proj")
+        self.assertAlmostEqual(state["overrun_reserved_usd"],(999-250)/100,places=6)
+        self.intent(id="j2",slot="shot_02",request="requestB")
+        with self.assertRaises(p.Blocked):
+            self.auth(id="j2",cents=10,request="requestB")
+        obligation_id=obligation["obligation_id"]
+        self.assertTrue(p.acknowledge_obligation(
+            self.db,obligation_id=obligation_id,
+            reconcile_capability=p0_authz.mint_reconcile_capability(
+                "j1",obligation_id=obligation_id)))
+        self.auth(id="j2",cents=10,request="requestB")
+        self.assertEqual(self.row("p0_jobs","job_id","j2")["state"],"AUTHORIZED")
+
+    def test_unknown_job_can_be_settled_by_evidence(self):
+        """A lost acknowledgement is recoverable: three outcomes, never a re-submit."""
+        self.intent();self.auth();self.submit()
+        p.mark_unknown(self.db,job_id="j1")
+        self.assertEqual(self.row("p0_jobs","job_id","j1")["state"],"UNKNOWN")
+        with self.assertRaises(p.Conflict):
+            p.finish_verified(self.db,job_id="j1",event_id="event1",event_body={},
+                              verify_evidence=lambda body:{"provider_job_id":"provider123",
+                                                          "charged_cents":10,"success":True})
+        self.assertTrue(p.settle_unknown(
+            self.db,job_id="j1",event_id="event1",event_body={"status":"failed"},
+            outcome="not_charged",
+            verify_evidence=lambda body:{"provider_job_id":"provider123",
+                                          "charged_cents":0,"success":False}))
+        envelope=self.row("p0_budget_envelopes","envelope_id","env")
+        self.assertEqual((envelope["spent_cents"], envelope["reserved_cents"]),(0,0))
+        self.assertEqual(self.row("p0_jobs","job_id","j1")["state"],"FAILED")
+        self.assertEqual(self.row("p0_jobs","job_id","j1")["possible_charge"],0)
+
+    def test_unknown_stays_blocked_without_a_reconcile_capability(self):
+        self.intent();self.auth();self.submit()
+        p.mark_unknown(self.db,job_id="j1")
+        with self.assertRaises(p.Blocked):
+            p.settle_unknown(self.db,job_id="j1",event_id="event1",event_body={},
+                             outcome="still_unknown")
+        self.assertEqual(self.row("p0_budget_envelopes","envelope_id","env")["reserved_cents"],250)
+        self.assertEqual(self.row("p0_jobs","job_id","j1")["state"],"UNKNOWN")
 
     def test_manifest_needs_all_required_slots_and_current_assets(self):
         p.freeze_manifest(self.db,run_id="r1",expected_source_revision="v1",slots=[

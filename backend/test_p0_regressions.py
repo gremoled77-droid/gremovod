@@ -14,6 +14,7 @@ from scripts.p0_migrate import migrate
 
 class DraftAcceptanceRegressions(unittest.TestCase):
     def setUp(self):
+        p0_authz.allow_ephemeral_key()
         self.fixture = fixtures.P0SafetyTests()
         self.fixture.setUp()
         self.addCleanup(self.fixture.doCleanups)
@@ -97,7 +98,8 @@ class DraftAcceptanceRegressions(unittest.TestCase):
         self.fixture.submit()
         p.accept_provider_id(self.db,job_id="j1",provider_job_id="provider-1")
         p.finish_verified(self.db,job_id="j1",event_id="failed-1",event_body={"status":"failed"},
-                          charged_cents=0,provider_success=False,verify_evidence=lambda body: True)
+                          verify_evidence=lambda body: {"provider_job_id": "provider-1", "charged_cents": 0,
+                                                     "success": False})
         self.fixture.intent("j2", "shot_01", attempt=2)
         self.fixture.auth("j2", cents=100)
         self.fixture.submit("j2")
