@@ -119,22 +119,43 @@ class TaskRequest(BaseModel):
 def get_key(header:str|None):
     return credential('piapi',header,PIAPI_KEY_FILE)[0]
 
-def up_error(response:httpx.Response):
-    if response.status_code==403 and ('1010' in response.text or 'browser_signature_banned' in response.text):
-        raise HTTPException(403,{'code':'PIAPI_CLOUDFLARE_1010','message':'Cloudflare PiAPI блокирует клиент. Обратись в поддержку PiAPI. Автоматических повторов нет.'})
-    raise HTTPException(response.status_code,{'message':f'PiAPI вернул HTTP {response.status_code}. Проверь доступ и параметры; повторный запуск требует проверки очереди.'})
+class ProviderCallFailed(HTTPException):
+    """Отказ провайдера. Несёт вид сбоя (error_kind) и признак «списания не было»
+    (charged_possible=False) либо «списание возможно» (charged_possible=True).
+    Формулировка сообщения значения не имеет: решение о деньгах принимается по этим признакам."""
 
-async def request_piapi(method:str,path:str,key:str,payload:dict|None=None):
+    def __init__(self,status_code,detail,error_kind,charged_possible):
+        super().__init__(status_code,detail)
+        self.error_kind=error_kind
+        self.charged_possible=charged_possible
+
+
+def up_error(response:httpx.Response):
+    status=response.status_code
+    message={'message':f'PiAPI вернул HTTP {status}. Проверь доступ и параметры; повторный запуск требует проверки очереди.'}
+    if status==403 and ('1010' in response.text or 'browser_signature_banned' in response.text):
+        raise ProviderCallFailed(403,{'code':'PIAPI_CLOUDFLARE_1010','message':'Cloudflare PiAPI блокирует клиент. Обратись в поддержку PiAPI. Автоматических повторов нет.'},'cloudflare_1010',True)
+    if status==401: raise ProviderCallFailed(401,message,'http_401',False)
+    if status==429: raise ProviderCallFailed(429,message,'http_429',True)
+    if status>=500: raise ProviderCallFailed(status,message,'http_5xx',True)
+    raise ProviderCallFailed(status,message,'bad_body',False)
+
+async def request_piapi(method:str,path:str,key:str,payload:dict|None=None,client:httpx.AsyncClient|None=None):
     try:
-        async with httpx.AsyncClient(timeout=120.0) as client:
-            headers={'Authorization':'Bearer '+key,'Content-Type':'application/json'} if path.startswith('/v1/') else {'X-API-KEY':key,'Content-Type':'application/json'}  # LLM-эндпоинт PiAPI принимает только Bearer
+        headers={'Authorization':'Bearer '+key,'Content-Type':'application/json'} if path.startswith('/v1/') else {'X-API-KEY':key,'Content-Type':'application/json'}  # LLM-эндпоинт PiAPI принимает только Bearer
+        if client is not None:
             r=await client.request(method,BASE+path,headers=headers,json=payload)
-    except httpx.RequestError as e: raise HTTPException(502,f'Не удалось соединиться с PiAPI: {type(e).__name__}')
+        else:
+            async with httpx.AsyncClient(timeout=120.0) as own:
+                r=await own.request(method,BASE+path,headers=headers,json=payload)
+    except httpx.RequestError as e:
+        # соединение не установилось — запрос провайдеру не дошёл; таймаут — запрос ушёл, ответа нет
+        raise ProviderCallFailed(502,f'Не удалось соединиться с PiAPI: {type(e).__name__}','timeout',type(e).__name__!='ConnectError')
     if r.is_error: up_error(r)
     try: value=r.json()
-    except ValueError: raise HTTPException(502,'PiAPI вернул не-JSON ответ')
-    if isinstance(value,dict) and upstream_error(value): raise HTTPException(502,'PiAPI вернул ошибку: '+upstream_error(value))
-    if not isinstance(value,dict) or ('choices' not in value and value.get('code',200) not in (0,200)): raise HTTPException(502,'PiAPI вернул неожиданный ответ; проверь историю задач перед повторной оплатой')
+    except ValueError: raise ProviderCallFailed(502,'PiAPI вернул не-JSON ответ','bad_body',True)
+    if isinstance(value,dict) and upstream_error(value): raise ProviderCallFailed(502,'PiAPI вернул ошибку: '+upstream_error(value),'bad_body',False)
+    if not isinstance(value,dict) or ('choices' not in value and value.get('code',200) not in (0,200)): raise ProviderCallFailed(502,'PiAPI вернул неожиданный ответ; проверь историю задач перед повторной оплатой','no_usage',True)
     return value
 
 class UnifiedChatRequest(BaseModel):
@@ -147,13 +168,17 @@ class UnifiedChatRequest(BaseModel):
     quote_token:str|None=None
     max_cost_usd:float|None=Field(default=None,ge=0,le=100,allow_inf_nan=False)
     request_id:str|None=Field(default=None,min_length=8,max_length=100,pattern=r'^[a-zA-Z0-9_-]+$')
+    route_mode:str='manual'
+    task:str|None=None
+    allow_free:bool=False
+    tools:list[dict[str,Any]]=Field(default_factory=list)
+    settings:dict[str,Any]=Field(default_factory=dict)
 
 @app.post('/api/llm/chat')
 async def unified_chat(body:UnifiedChatRequest, x_api_key:str|None=Header(default=None)):
-    if body.provider!='piapi': raise HTTPException(400,'Платный LLM доступен только через PiAPI')
-    key=get_key(x_api_key)
-    if not key or not key.isascii() or any(c.isspace() for c in key):
-        raise HTTPException(400,'Введи корректный API-ключ PiAPI')
+    # маршрут выбирает шлюз (backend/llm_guard.py): провайдера больше не диктует тело запроса
+    try:key=get_key(x_api_key)
+    except HTTPException:key=None
     from backend import llm_guard
     return await llm_guard.guarded_chat(sys.modules[__name__],body,key)
 

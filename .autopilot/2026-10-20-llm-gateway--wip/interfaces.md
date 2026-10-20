@@ -31,9 +31,18 @@ class Route:
     protocol: str
     role: str                # 'simple' | 'editorial' | 'coding' | 'backup' | 'extra'
     base_url: str
-    path_prefix: str = ''    # префикс пути, задаётся реестром (у Kie: 'codex', 'anthropic')
     free: bool               # маршрут подтверждённо бесплатный
     opt_in: bool             # требует явного разрешения владельца
+    enabled: bool = True
+    verified_at: str | None = None
+    capabilities: Capabilities = Capabilities()
+    max_input_tokens: int | None = None
+    cached_input_per_mtok: float | None = None
+    rate_limit: str | None = None
+    upstream_version: str | None = None
+    path_prefix: str = ''    # префикс пути, задаётся реестром (у Kie: 'codex', 'anthropic')
+    source: str = ''
+    as_of: str = ''
 
 @dataclass(frozen=True)
 class ReferenceQuote:
@@ -93,13 +102,17 @@ class ModelEntry:
 
 @dataclass(frozen=True)
 class Registry:
-    entries: list[ModelEntry]
-    reference_providers: list[str]
-    default_baseline: ModelEntry | None
-    alternative_baseline: ModelEntry | None
-    precision: int
-    source: str            # путь к файлу конфигурации
-    # + методы: entry(provider, model), baseline(name)
+    schema_version: int
+    as_of: str
+    currency: str
+    unit: str
+    status: str
+    entries: tuple[ModelEntry, ...]
+    comparison: dict = field(default_factory=dict)
+    sample_limits: dict = field(default_factory=dict)
+    source_path: str = ''
+    # + свойства: rates, reference_providers, precision, baseline(name), entry(provider, model)
+    # + метод записи: entry.route()
 
 def load_registry(path: str | None = None) -> Registry
 def reference_quote(registry: Registry, route: Route, usage: Usage | None = None) -> ReferenceQuote
@@ -129,8 +142,10 @@ def summarize_spend(db, project_ids: list[str]) -> dict   # actual_cost_usd / re
 
 **Файлы конфигурации реестра:**
 
-- `config/llm_gateway.prices.json` — **реальный** конфиг владельца. В `.gitignore`, в Git не попадает. Если файла нет — шлюз читает пример.
+- `config/llm_gateway.prices.json` — **реальный** конфиг владельца. В `.gitignore` (строка 63), в Git не попадает. Если файла нет — шлюз читает пример.
 - `config/llm_gateway.prices.example.json` — приложенный пример: все маршруты `enabled: false`, `verified_at: null`, тарифы minimax/deepseek/openrouter частично `null` (их заполняет владелец после живой проверки).
+
+**Модель в подписи** — это её `model` из реестра (`gpt-6-luna`, `MiniMax-M3.1-Flash`). Политика отображения приводит пример «Ценовой ориентир Kie GPT-6 Luna» — с читаемым именем. Имя для показа **придумывает фронтенд** (`llmDisplay.ts`), бэкенд отдаёт точный идентификатор.
 
 **Прячет:** разбор JSON конфигурации, выбор базовой линии ориентира, SQL по `llm_calls`, округление до 6 знаков.
 
@@ -186,6 +201,19 @@ async def complete(route: Route, messages: list[dict], max_tokens: int, *,
 
 **Ключи новых провайдеров** — по образцу `PIAPI_API_KEY`/`KIE_API_KEY`: `MINIMAX_API_KEY`, `DEEPSEEK_API_KEY`, `OPENROUTER_API_KEY`; файл `*_API_KEY.txt` в корне репозитория; `configured` в `GET /api/connections`. В SQLite не пишутся, в ответы и логи не попадают. В `.env.example` — имена с пустыми значениями.
 
+**Структурный шов отказа (задача таска 03).** Отказ транспорта несёт вид сбоя и признак «списания не было» структурно, а не в тексте сообщения:
+
+```python
+class ProviderCallFailed(HTTPException):
+    status: int
+    detail: str
+    error_kind: str        # http_401 | http_403 | http_429 | http_5xx | cloudflare_1010 | bad_body | timeout | no_usage
+    charged_possible: bool # False — запрос не обработан, списания не было
+```
+
+`error_kind` и `charged_possible` совпадают с видами сбоя адаптера. Классифицировать по тексту сообщения нельзя: смена формулировки молча уводит исход в `unknown`. Тесты обязаны держаться на признаках, а не на тексте.
+
+
 
 ## 3. `backend/llm_guard.py` — существующий, меняется
 
@@ -223,6 +251,8 @@ async def complete(route: Route, messages: list[dict], max_tokens: int, *,
 
 Колонка `usd` **сохраняет прежний смысл** (оценка при `reserved`, факт при `done`, 0 при `failed`) — обратная совместимость. Позиционный `INSERT INTO llm_calls VALUES(...)` **переводится на именованные колонки**.
 
+**Уточнение после ревью таска 03:** у платного маршрута, который ответил **без usage**, факт неизвестен — и такая строка **не пишет ноль под `done`**. В ней `usd` = оценка (та же величина, что резерв), `actual_cost_usd` = NULL, `actual_status` = `unknown`, резерв удерживается, строка не попадает в «Фактически потрачено», но попадает в «Неизвестные списания». Итог: `usd` = оценка при `reserved`; факт при `done` **с подтверждённым usage**; оценка при `done` **без usage**; 0 при `failed`.
+
 **Как журнал трактует `actual_status`** (задано решением по дозапросу таска 02, применяется в таске 03):
 
 | `actual_status` | Фактическое списание | Резерв | Попадает в «Фактически потрачено» | Попадает в «Неизвестные списания» |
@@ -234,6 +264,13 @@ async def complete(route: Route, messages: list[dict], max_tokens: int, *,
 | `not_charged` | 0 | **снят** | нет | нет |
 
 `not_charged` ставится, когда провайдер точно отказал и списания не было (`ProviderResult.charged_possible = False`, например 401). Такой вызов не создаёт шума в сверке, но и не прячется: у него ненулевой `reserved_usd` в момент резервирования, который снимается освобождением.
+
+**Агентский путь (`codex_chat`) — под тем же учётом.** Сейчас `backend/native_chat.py` пишет в `prompt_versions` захардкоженные модель `gpt-6.1-sol` и пустой расход `'{}'`, а `backend/economics.py` и `backend/series_economics.py` считают `codex_chat` внешним и исключают из бюджета. Правило:
+
+- вызов агента, который студия поручила (операции `prompt`, `generate`, `edit`), пишется в **тот же журнал вызовов**, что и вызовы через шлюз;
+- провайдер и модель берутся из отчёта агента, а не из константы; если агент их не назвал — записывается как неизвестные;
+- расход, который агент сообщил, считается по тарифу реестра; **если агент расход не сообщил — `actual_status='unknown'`, а не ноль**: работа агента стоила денег, но сколько — неизвестно;
+- `codex_chat` перестаёт быть исключением из «Фактически потрачено».
 
 
 **Прячет:** SQL резервирования, формирование подписи, проверку лимитов.
@@ -249,6 +286,8 @@ def verify_quote(token: str, project_id: str, payload: dict, cost: float, extra:
 
 Правило совместимости: токен **без** `extra` принимается как прежний (это старые подписи); токен **с** `extra` отклоняется при любом несовпадении `extra`. В `extra` для LLM входят: `provider`, `model`, `price_version`, `fallback`, `max_payment_usd`, `tools_hash`.
 
+Форма возврата зафиксирована таском 03: `verify_quote` возвращает `(True, 'ok')` при успехе, а при несовпадении **поднимает `HTTPException(400)`** — на это опираются вызывающие вне зоны таска (`backend/character_voice.py`, `backend/story_plan.py`). Менять это на возврат кортежа нельзя.
+
 **Прячет:** устройство HMAC, формат конверта.
 
 ## 5. `backend/connections.py` — ключи
@@ -260,6 +299,8 @@ def verify_quote(token: str, project_id: str, payload: dict, cost: float, extra:
 ## 6. `backend/economics.py` и `backend/series_economics.py` — итоги
 
 **Владеют:** агрегацией расходов. В `/api/economics` появляется блок LLM с четырьмя раздельными величинами: `actual_cost_usd`, `reserved_usd`, `unknown_cost_usd`, `reference_cost_usd` (явно помечен как неденежный). Имена совпадают с колонками `llm_calls`, чтобы бюджет и карточка не расходились. Старые поля ответа не удаляются. В серии — та же структура.
+
+**Важно для таска 04:** `llm_guard.summary()['usd']` означает **экспозицию** — фактическое списание плюс удерживаемые резервы плюс неизвестные списания, а не только потраченное. Старые экраны читают это поле как «расход», поэтому «Фактически потрачено» надо собирать из `actual_cost_usd` (подтверждённое) и `free` — **не** из `summary()['usd']`. Это правило владельца: «в разделе Бюджет суммируем только фактические расходы».
 
 **Прячет:** разбор `attempts` по источникам.
 

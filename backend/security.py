@@ -17,22 +17,34 @@ ORIGINS = {'http://127.0.0.1:5173', 'http://localhost:5173', 'http://127.0.0.1:8
 MOSCOW = timezone(timedelta(hours=3))
 
 
-def quote(project_id, payload, cost):
-    data = json.dumps({'project_id':project_id, 'payload':payload, 'cost':cost, 'expires':int(time.time())+600}, sort_keys=True, separators=(',', ':'))
+def quote(project_id, payload, cost, extra=None):
+    """Подписанная оценка. extra — необязательная привязка (провайдер, модель, версия цены, запасной маршрут,
+    максимум платежа, хеш tools). Без extra подпись выглядит как прежняя — старые токены остаются годными."""
+    body = {'project_id':project_id, 'payload':payload, 'cost':cost, 'expires':int(time.time())+600}
+    if extra is not None:
+        body['extra'] = extra
+    data = json.dumps(body, sort_keys=True, separators=(',', ':'))
     return data + '.' + hmac.new(SIGNING_KEY, data.encode(), hashlib.sha256).hexdigest()
 
 
-def verify_quote(token, project_id, payload, cost):
+def verify_quote(token, project_id, payload, cost, extra=None):
+    """Проверка подписи оценки. Возвращает (True, 'ok') или поднимает HTTPException(400) — как раньше.
+
+    Токен без extra принимается как прежняя подпись; токен с extra отклоняется при любом несовпадении.
+    """
     try:
         data, signature = token.rsplit('.', 1)
         expected = hmac.new(SIGNING_KEY, data.encode(), hashlib.sha256).hexdigest()
         value = json.loads(data)
         valid = hmac.compare_digest(signature, expected) and value['expires'] >= time.time()
         valid = valid and value['project_id'] == project_id and value['payload'] == payload and value['cost'] == cost
+        # привязка extra: в токене без extra поле отсутствует, в проверке ожидается None
+        valid = valid and value.get('extra') == extra
     except (ValueError, TypeError, KeyError, AttributeError):
         valid = False
     if not valid:
         raise HTTPException(400, 'Оценка отсутствует, устарела или параметры изменены. Получи новую оценку и подтверди запуск.')
+    return True, 'ok'
 
 
 class BudgetLimits(BaseModel):
