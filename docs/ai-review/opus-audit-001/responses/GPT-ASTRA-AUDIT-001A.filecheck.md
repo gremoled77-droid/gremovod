@@ -1,0 +1,4 @@
+- Документ: `TEST_RESULTS`
+- Число тестов PR #29: **345** (полный прогон backend, T3).
+- Подтверждение: `TEST_RESULTS`, §3, «T3 / T4 — PR #29 @ c082829b11b968965600bdaf87c137b1485a0fa2»: «345 passed, 39 warnings, 26 subtests passed in 86.78s (0:01:26) EXITCODE=0». Номера строк в предоставленном тексте отсутствуют.
+- Прочитаны ли все четыре вложения: **да** — видел предоставленные тексты `PROJECT_CONTEXT`, `ARCHITECTURE_MAP`, `P0_EVIDENCE`, `TEST_RESULTS`.
