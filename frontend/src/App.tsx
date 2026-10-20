@@ -32,6 +32,8 @@ import RefinePanel, {EMPTY_REFINE, type RefineDraft} from './RefinePanel';
 import ChatGPTPanel from './ChatGPTPanel';
 import WorldFromBrief from './WorldFromBrief';
 import {passportText} from './worldBible';
+import ProducerPanel from './ProducerPanel';
+import {type ProducerScenario, withScenario} from './producerStage';
 import AttachmentMenu, {AttachmentStrip} from './AttachmentMenu';
 import CharactersScreen from './CharactersScreen';
 import SoundScreen from './SoundScreen';
@@ -132,6 +134,7 @@ type Studio = {
   ideaModel?: string;
   ideaRefs?: string[];
   worldDraft?: Partial<StyleBible>;
+  scenario?: ProducerScenario;
   prompts: Record<string, string>;
   parameters: Record<string, Record<string, string | number>>;
   characters: Character[];
@@ -356,12 +359,15 @@ function App() {
     conflicts: string[];
   } | null>(null);
   const [projectDraftSaved, setProjectDraftSaved] = useState(true);
-  const persistProject = async () => {
+  const persistProject = async (override?: Studio) => {
     if (saving.current) throw Error('Сохранение уже выполняется. Дождись завершения.');
     const epoch = loadingEpoch.current,
       initial = {title: projectName.trim(), state};
     if (!initial.title) throw Error('Укажи название проекта');
-    let local = initial,
+    // `initial.state` — база слияния (состояние на момент вызова), `local.state` — то,
+    // что уходит на сервер. Переопределение меняет только второе: результат этапа
+    // сохраняется сразу, а не после следующего сохранения.
+    let local = override ? {title: initial.title, state: override} : initial,
       base = baseProject.current;
     if (projectId && base?.id !== projectId) throw Error('Перезагрузи проект перед сохранением.');
     saving.current = true;
@@ -2029,6 +2035,25 @@ function App() {
                         world={[state.style.look, state.style.rules].filter(Boolean).join('. ')}
                         onNext={() => setMode('styles')}
                         onScene={() => setMode('scene')}
+                      />
+                      <ProducerPanel
+                        projectId={projectId}
+                        brief={state.brief}
+                        style={state.style}
+                        characters={state.characters}
+                        scenario={state.scenario}
+                        onScenario={(value: ProducerScenario) => {
+                          change({scenario: value});
+                          void persistProject(withScenario(state, value))
+                            .then(() => setNotice('Сценарная структура сохранена в проекте'))
+                            .catch(e =>
+                              setNotice(
+                                'Сценарная структура готова, но сохранение не прошло: ' +
+                                  (e instanceof Error ? e.message : String(e))
+                              )
+                            );
+                        }}
+                        ensureProject={ensureProject}
                       />
                       <section className="panel photo-setup" aria-label="Фото">
                         <h2>Фото · постановка и промпт</h2>

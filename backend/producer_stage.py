@@ -40,9 +40,9 @@ MAX_CHARACTERS = 8
 MAX_REFERENCES = 8
 MAX_REFERENCE_NOTE_CHARS = 120
 MAX_IDENTITY_CHARS = 300
-MAX_WORLD_KEYS = 8
+MAX_WORLD_KEYS = 12
 MAX_WORLD_VALUE_CHARS = 300
-MAX_WORLD_CHARS = 1500
+MAX_WORLD_CHARS = 2400
 MAX_CONSTRAINTS = 8
 MAX_CONSTRAINT_CHARS = 200
 MAX_PROMPT_CHARS = 24000
@@ -76,7 +76,11 @@ STAGE_INSTRUCTION = """Ты продюсер сценарного этапа Gre
 
 
 class ProducerRequest(BaseModel):
-    """Вход этапа. Только выбранные автором данные."""
+    """Вход этапа. Только выбранные автором данные.
+
+    `provider` пустой — провайдера выбирает реестр по модели; `mock` — локальный
+    режим без обращения к провайдеру.
+    """
 
     model_config = ConfigDict(extra='forbid')
     project_id: str = Field(min_length=1, max_length=100)
@@ -87,7 +91,7 @@ class ProducerRequest(BaseModel):
     duration_seconds: int = Field(default=60, ge=5, le=3600)
     language: str = Field(default='ru', min_length=2, max_length=16)
     constraints: list[str] = Field(default_factory=list, max_length=MAX_CONSTRAINTS)
-    provider: str = Field(default=MOCK_PROVIDER, min_length=1, max_length=40)
+    provider: str = Field(default='', max_length=40)
     model: str = Field(default=MOCK_MODEL, min_length=1, max_length=100)
 
 
@@ -371,6 +375,27 @@ def mock_model_info():
                      price_in=0.0, price_out=0.0, paid=False)
 
 
+def resolve_model(body):
+    """Локальный MOCK или запись реестра для платной модели.
+
+    Провайдера выбирает реестр: клиент не прибивает вендора, а пустой `provider`
+    означает «возьми провайдера этой модели из реестра». None — локальный MOCK.
+    """
+    if body.provider == MOCK_PROVIDER or body.model == MOCK_MODEL:
+        if body.model != MOCK_MODEL:
+            raise HTTPException(400, f'Локальный MOCK работает только с моделью {MOCK_MODEL}.')
+        return None
+    if body.provider:
+        spec = llm_spec(body.model, body.provider)
+        if spec is None:
+            raise HTTPException(400, f'Модель {body.model} не найдена в реестре или её не обслуживает провайдер {body.provider}.')
+        return spec
+    spec = llm_spec(body.model)
+    if spec is None:
+        raise HTTPException(400, f'Модель {body.model} не найдена в реестре.')
+    return spec
+
+
 def register(app, studio):
     @app.post('/api/producer/estimate')
     def estimate(body: ProducerRequest):
@@ -378,12 +403,10 @@ def register(app, studio):
         payload, summary = build_payload(studio, body)
         messages, background = build_messages(payload)
         version = prompt_version(messages, background)
-        if body.provider == MOCK_PROVIDER:
+        spec = resolve_model(body)
+        if spec is None:
             return {'mode': 'mock', 'estimated_usd': 0.0, 'quote_token': '', 'external_calls': 0,
                     'prompt_version': version.model_dump(), 'payload_summary': summary}
-        spec = llm_spec(body.model, body.provider)
-        if spec is None:
-            raise HTTPException(400, f'Модель {body.model} не найдена в реестре или её не обслуживает провайдер {body.provider}.')
         cost = llm_guard.estimate_usd(body.model, messages, MAX_OUTPUT_TOKENS)
         token = security.quote(body.project_id, llm_guard.payload_of(body.model, messages, MAX_OUTPUT_TOKENS), cost)
         return {'mode': 'paid', 'estimated_usd': cost, 'quote_token': token, 'external_calls': 0,
@@ -400,17 +423,13 @@ def register(app, studio):
         payload, summary = build_payload(studio, body)
         messages, background = build_messages(payload)
         version = prompt_version(messages, background)
-        if body.provider == MOCK_PROVIDER:
-            if body.model != MOCK_MODEL:
-                raise HTTPException(400, f'Локальный MOCK работает только с моделью {MOCK_MODEL}.')
+        spec = resolve_model(body)
+        if spec is None:
             structure = mock_structure(payload)
             check_references(structure, payload)
             return ProducerResult(stage=STAGE_ID, **structure.model_dump(), prompt_version=version,
                                   model=mock_model_info(), cost_usd=0.0, estimated_usd=0.0,
                                   external_calls=0, payload_summary=summary)
-        spec = llm_spec(body.model, body.provider)
-        if spec is None:
-            raise HTTPException(400, f'Модель {body.model} не найдена в реестре или её не обслуживает провайдер {body.provider}.')
         if not body.approved:
             raise HTTPException(400, 'Нужно подтверждение платного LLM-запроса')
         if len(body.request_id) < 8:

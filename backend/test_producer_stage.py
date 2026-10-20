@@ -10,6 +10,7 @@ import uuid
 from unittest.mock import AsyncMock, patch
 
 from backend import main, producer_stage
+from backend import model_catalog
 from backend import test_smoke
 
 VALID_ANSWER = {
@@ -258,6 +259,43 @@ class ProducerStageTests(unittest.TestCase):
         self.make_project()
         response = self.client.post('/api/producer/run', json=self.base_body(idea=''))
         self.assertEqual(response.status_code, 422, response.text)
+
+    def test_full_world_bible_fits_into_the_payload(self):
+        """Паспорт мира из 11 полей должен доходить до пакета целиком, включая rules и avoid."""
+        self.make_project()
+        bible = {'look': 'стилизованная анимация', 'environment': 'Минск, дворики', 'time': 'ночь',
+                 'tech': 'современный', 'textures': 'кедр, бетон', 'palette': 'охра и синь',
+                 'lighting': 'фонари', 'camera': '35 мм', 'mood': 'тревожно',
+                 'rules': 'канон не менять', 'avoid': 'логотипы'}
+        body = producer_stage.ProducerRequest(**self.base_body(world=bible))
+        payload, summary = producer_stage.build_payload(main, body)
+        self.assertEqual(len(summary['world_keys']), 11)
+        self.assertEqual(summary['world_dropped'], [])
+        self.assertEqual(summary['world_truncated'], [])
+        self.assertEqual(payload['world']['rules'], 'канон не менять')
+        self.assertEqual(payload['world']['avoid'], 'логотипы')
+
+    def test_provider_is_resolved_from_the_registry(self):
+        """Пустой provider — это не «PiAPI», а «возьми провайдера модели из реестра»."""
+        self.make_project()
+        body = self.base_body(provider='', model='gpt-5.6-luna')
+        estimate = self.client.post('/api/producer/estimate', json=body)
+        self.assertEqual(estimate.status_code, 200, estimate.text)
+        data = estimate.json()
+        self.assertEqual(data['mode'], 'paid')
+        self.assertGreater(data['estimated_usd'], 0)
+        self.assertEqual(data['model']['id'], 'gpt-5.6-luna')
+        self.assertEqual(data['model']['provider'], model_catalog.LLM_MODELS['gpt-5.6-luna']['provider'])
+
+    def test_mock_is_selected_by_model_id_and_unknown_model_is_rejected(self):
+        self.make_project()
+        mock = self.client.post('/api/producer/estimate', json=self.base_body(provider='', model='mock-producer'))
+        self.assertEqual(mock.status_code, 200, mock.text)
+        self.assertEqual(mock.json()['mode'], 'mock')
+        self.assertEqual(mock.json()['estimated_usd'], 0.0)
+        unknown = self.client.post('/api/producer/estimate', json=self.base_body(provider='', model='gpt-4.1-mini'))
+        self.assertEqual(unknown.status_code, 400, unknown.text)
+        self.assertIn('не найдена в реестре', unknown.json()['detail'])
 
 
 if __name__ == '__main__':

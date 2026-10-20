@@ -431,3 +431,116 @@
   font-size: 12px;
   line-height: 1.5;
 }
+
+/* Этап «Продюсер»: сценарная структура на экране «Идея». */
+.producer .idea-head {
+  margin-bottom: 10px;
+}
+.producer-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-end;
+}
+.producer-controls label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.producer-controls select,
+.producer-controls input {
+  min-width: 120px;
+  height: 34px;
+  padding: 0 8px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--text);
+}
+.producer-constraints {
+  flex: 1 1 220px;
+}
+.producer-constraints textarea {
+  width: 100%;
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--text);
+  font: inherit;
+  resize: vertical;
+}
+.producer-cast {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  margin-top: 10px;
+  font-size: 13px;
+}
+.producer-cast label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.producer-actions {
+  margin-top: 12px;
+}
+.producer-quote {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 13px;
+}
+.producer-result {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.producer-beats {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.producer-beats div {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+}
+.producer-beats small {
+  min-width: 92px;
+  color: var(--muted);
+  text-transform: lowercase;
+}
+.producer-scenes {
+  margin: 12px 0 0;
+  padding-left: 18px;
+}
+.producer-scenes li {
+  margin-bottom: 6px;
+}
+.producer-scenes p {
+  margin: 2px 0 0;
+  color: var(--muted);
+}
+.producer-assumptions {
+  margin-top: 10px;
+  font-size: 13px;
+}
+.producer-assumptions ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  color: var(--muted);
+}
+.producer-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 12px;
+}
