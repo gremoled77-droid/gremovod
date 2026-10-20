@@ -43,7 +43,7 @@ fail-closed проверкой пути — см. `P0_EVIDENCE.md` B-05.
 ### 1.2 Режим удалённого доступа
 
 `backend/remote_access.py` (134 строки) — пароль, cookie-сессия, allowlist.
-Регистрируется в `main.py:832`. `backend/security.py` (114 строк) — CORS, `ORIGINS`.
+Регистрируется в `main.py:832`. `backend/security.py` (137 строк) — CORS, `ORIGINS`.
 Регистрируется в `main.py:790`.
 
 ### 1.3 Связка с n8n
@@ -58,54 +58,66 @@ fail-closed проверкой пути — см. `P0_EVIDENCE.md` B-05.
 
 | Модуль | Строк | Роль | Живой? |
 |---|---:|---|---|
-| `main.py` | 764 | Точка входа, FastAPI, 21 `register()` | entry |
-| `reel_recipes_data.py` | 824 | Статические рецепты рилсов (данные) | импорт. |
-| `production_folders.py` | 355 | Файловая структура производства | `register` |
-| `storyboard.py` | 302 | Раскадровка | `register` |
-| `adapters.py` | 288 | Провайдерские адаптеры: build/cost/submit | импорт. |
-| `sound.py` | 267 | TTS, SFX, музыка | `register` |
-| `native_chat.py` | 248 | Нативный LLM-чат | `register` |
-| `visual_plan.py` | 243 | Визуальный план | `register` |
-| `story_plan.py` | 235 | Сценарный план | `register` |
-| `temp_cleanup.py` | 211 | Уборка временных файлов | startup-hook |
-| `model_catalog.py` | 204 | Каталог моделей и цен | импорт. |
-| `edit_list.py` | 167 | Монтажный лист | `register` |
-| `production_entities.py` | 161 | Сущности производства | `register` |
-| `frame_analysis.py` | 146 | Анализ кадров | `register` |
-| `character_voice.py` | 146 | Голоса персонажей | `register` |
-| `llm_guard.py` | 142 | Ограничители LLM-вызовов | `register` |
-| `external_generation.py` | 138 | Внешняя генерация | импорт. |
-| `remote_access.py` | 134 | Удалённый доступ, пароль, cookie | `register` |
-| `connections.py` | 109 | Соединения между сущностями | импорт. |
-| `production_workspace.py` | 110 | Рабочее пространство | импорт. |
-| `reel_recipes.py` | 106 | API рецептов рилсов | `register` |
-| `motion.py` | 94 | Движение камеры/объектов | `register` |
-| `frame_composition.py` | 90 | Композиция кадра | `register` |
-| `activity.py` | 86 | Лента активности | импорт. |
-| `reference_upload.py` | 85 | Загрузка референсов | `register` |
-| `workflow_import.py` | 84 | Импорт n8n-воркфлоу | `register` |
-| `character_versions.py` | 81 | Версии персонажей | импорт. |
-| `prompt_rules.py` | 74 | Правила промптов | импорт. |
-| `car_staging.py` | 73 | Студийная постановка | импорт. |
-| `image_assets.py` | 72 | Изображения | импорт. |
-| `clip_chain.py` | 61 | Цепочка клипов | `register` |
-| `refinement.py` | 61 | Уточнение/рефайн | импорт. |
-| `send_to_reference.py` | 61 | Отправка в референс | импорт. |
-| `economics.py` | 88 | Экономика | `register` |
-| `series_economics.py` | 60 | Экономика серий | `register` |
-| `camera_movements.py` | 66 | Базовые движения камеры | `register` |
-| `job_delivery.py` | 66 | Доставка результатов задач | импорт. |
-| `character_description.py` | 56 | Описания персонажей | импорт. |
-| `kie.py` | 56 | Клиент KIE | импорт. |
-| `llm_response.py` | 43 | Разбор LLM-ответа | импорт. |
-| `job_recovery.py` | 42 | Восстановление задач | импорт. |
-| `prompt_setup.py` | 27 | Настройка промптов | импорт. |
-| `image_pricing.py` | 21 | Расчёт цены изображений | импорт. |
-| `idea_background.py` | 16 | Фон идеи | `register` |
+| `main.py` | 835 | Точка входа, FastAPI, 21 `register()` | entry |
+| `reel_recipes_data.py` | 829 | Статические рецепты рилсов (данные) | импорт. |
+| `production_folders.py` | 411 | Файловая структура производства | `register` |
+| `storyboard.py` | 337 | Раскадровка | `register` |
+| `adapters.py` | 345 | Провайдерские адаптеры: build/cost/submit | импорт. |
+| `sound.py` | 308 | TTS, SFX, музыка | `register` |
+| `native_chat.py` | 267 | Нативный LLM-чат | `register` |
+| `visual_plan.py` | 282 | Визуальный план | `register` |
+| `story_plan.py` | 269 | Сценарный план | `register` |
+| `temp_cleanup.py` | 240 | Уборка временных файлов | startup-hook |
+| `model_catalog.py` | 224 | Каталог моделей и цен | импорт. |
+| `edit_list.py` | 192 | Монтажный лист | `register` |
+| `production_entities.py` | 178 | Сущности производства | `register` |
+| `frame_analysis.py` | 159 | Анализ кадров | `register` |
+| `character_voice.py` | 162 | Голоса персонажей | `register` |
+| `llm_guard.py` | 166 | Ограничители LLM-вызовов | `register` |
+| `external_generation.py` | 156 | Внешняя генерация | импорт. |
+| `remote_access.py` | 170 | Удалённый доступ, пароль, cookie | `register` |
+| `connections.py` | 117 | Соединения между сущностями | импорт. |
+| `production_workspace.py` | 115 | Рабочее пространство | импорт. |
+| `reel_recipes.py` | 127 | API рецептов рилсов | `register` |
+| `motion.py` | 107 | Движение камеры/объектов | `register` |
+| `frame_composition.py` | 97 | Композиция кадра | `register` |
+| `activity.py` | 99 | Лента активности | импорт. |
+| `reference_upload.py` | 99 | Загрузка референсов | `register` |
+| `workflow_import.py` | 94 | Импорт n8n-воркфлоу | `register` |
+| `character_versions.py` | 85 | Версии персонажей | импорт. |
+| `prompt_rules.py` | 79 | Правила промптов | импорт. |
+| `car_staging.py` | 82 | Студийная постановка | импорт. |
+| `image_assets.py` | 77 | Изображения | импорт. |
+| `clip_chain.py` | 68 | Цепочка клипов | `register` |
+| `refinement.py` | 64 | Уточнение/рефайн | импорт. |
+| `send_to_reference.py` | 67 | Отправка в референс | импорт. |
+| `economics.py` | 96 | Экономика | `register` |
+| `series_economics.py` | 71 | Экономика серий | `register` |
+| `camera_movements.py` | 73 | Базовые движения камеры | `register` |
+| `job_delivery.py` | 75 | Доставка результатов задач | импорт. |
+| `character_description.py` | 61 | Описания персонажей | импорт. |
+| `kie.py` | 69 | Клиент KIE | импорт. |
+| `llm_response.py` | 49 | Разбор LLM-ответа | импорт. |
+| `job_recovery.py` | 47 | Восстановление задач | импорт. |
+| `prompt_setup.py` | 32 | Настройка промптов | импорт. |
+| `image_pricing.py` | 24 | Расчёт цены изображений | импорт. |
+| `idea_background.py` | 21 | Фон идеи | `register` |
 
 **Мёртвых модулей нет.** Проверено: каждый из 45 либо вызывается через
 `register(...)` в `main.py`, либо импортируется другим модулем. Проверка выполнена
 по `import`-выражениям, а не по упоминанию имени в тексте.
+
+### 2.0 О счётчиках строк и ссылках на строки
+
+> ⚠️ **Правка после аудита GPT-6 Astra.** Первая версия этого документа считала
+> **непустые** строки, поэтому `main.py` был указан как 764 строки, хотя реально
+> 835 — из-за чего ссылки на строки 790, 818 и 832 выглядели противоречивыми.
+> Теперь в таблице — **все строки** (пустые включены).
+>
+> **Правило для ссылок:** номер строки действует только для конкретной ревизии.
+> Везде, где цитируется `путь:строка`, ревизия указывается явно
+> (`main` = `82adb2d`, PR #29 = `c082829`). Файл, переехавший между ревизиями,
+> меняет нумерацию строк.
 
 ### 2.1 Ключевые рёбра зависимостей
 
