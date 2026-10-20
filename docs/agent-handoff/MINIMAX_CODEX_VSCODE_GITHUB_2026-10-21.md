@@ -12,7 +12,7 @@
 
 1. `.github/workflows/minimax-codex-review-handoff.yml`: только для **недрафтовых PR** внутри `gremoled77-droid/gremovod` из `minimax/ga-*` в `mavis/work` публикует/обновляет один комментарий с head SHA, ТЗ и планом проверки.
 2. После опубликованного ревью от `chatgpt-codex-connector[bot]` публикует ссылку-уведомление для MiniMax. Сами inline-комментарии остаются в GitHub; копии не исполняются.
-3. `.vscode/tasks.json` добавляет задачу «GremoVOD: Codex feedback → MiniMax (GitHub PR)». По номеру PR читает **GitHub Reviews, inline-замечания и PR Conversation** через установленный `gh`, открывает единый Markdown в VS Code.
+3. `.vscode/tasks.json` добавляет задачу «GremoVOD: Codex feedback → MiniMax (GitHub PR)». Вводится **только числовой номер GitHub PR** (например, `1234`), а не ID задания `GA-01`. Скрипт читает **все страницы** GitHub Reviews, inline-замечаний и PR Conversation через `gh`, открывает единый Markdown в VS Code.
 4. `scripts/agent-handoff/Get-CodexReview.ps1` работает read-only с GitHub. Отчёт записывает в `%TEMP%/gremovod-agent-handoff/PR-N-review.md`, а не в Git. Модельные API не вызываются.
 
 ## ЧТО НЕ АВТОМАТИЗИРОВАНО (важно)
@@ -31,7 +31,7 @@
 3. На Windows в PowerShell проверить `gh --version` и `gh auth status`. Если GitHub CLI отсутствует: `winget install --id GitHub.cli -e`, затем `gh auth login` в интерактивном терминале (не сохранять токен в файлы проекта).
 4. Открыть `C:\AI_Workflow_Studio\.worktrees\minimax` в новом VS Code окне **после** добавления этих файлов в эту worktree. MiniMax должен взять одну задачу: [GA-01](https://github.com/gremoled77-droid/gremovod/blob/audit/global-acceptance-20261021/docs/audits/global-acceptance-2026-10-21/06_MINIMAX_TASK_BACKLOG.md). Не трогать другие PR/ветки.
 5. MiniMax создаёт PR `minimax/ga-01-llm-settlement` → `mavis/work` с тестами и отмечает его Ready for review **после** самостоятельных проверок. GH workflow публикует handoff; Codex Cloud review — при включённой GitHub интеграции.
-6. Когда Codex оставит отзыв: VS Code → Terminal → Run Task → **GremoVOD: Codex feedback → MiniMax (GitHub PR)**; вписать номер PR. Откроется `%TEMP%\gremovod-agent-handoff\PR-<номер>-review.md`.
+6. Когда Codex оставит отзыв: VS Code → Terminal → Run Task → **GremoVOD: Codex feedback → MiniMax (GitHub PR)**; вписать **число GitHub PR** (например `1234`, не `GA-01`). Откроется `%TEMP%\gremovod-agent-handoff\PR-<номер>-review.md`.
 7. В MiniMax Code: «Прочитай открытый отчёт PR-<номер>-review.md. Возьми только замечания по текущей GA-01, перепроверь их по коду, добавь исправления+тесты в ту же ветку и обнови PR. Вне GA-01 ничего не делай». После этого Codex принимает новый head SHA.
 
 ## Однократная локальная команда (вместо VS Code Task)
@@ -49,6 +49,8 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\agent-handoff\
 - [ ] Draft GA-PR не провоцирует автоматический отзыв через handoff action.
 - [ ] Non-draft GA-PR получает не более одного обновляемого системного комментария.
 - [ ] Реальная интеграция Codex GitHub включена, отзыв от пользователя/бота действительно приходит в нужный PR.
+- [ ] Task запрашивает именно целочисленный номер PR; `GA-01` не предлагается в качестве ввода.
+- [ ] На контрольных данных с 101+ элементами в каждой категории GitHub CLI `--paginate --slurp` возвращает все страницы и отчёт не теряет отзывы; требуется Windows smoke после установки в worktree.
 - [ ] Task читает отзыв и не передаёт raw PR контент в shell; никаких комментариев как PowerShell/LLM инструкций с привилегиями.
 - [ ] MiniMax остаётся в своей worktree, Codex независим, ни одна сторона автоматически не сливает код.
 - [ ] После GA-01 провести **один** изолированный smoke: новые комментарии, один раунд feedback → fix → review. До этого состояние: **IMPLEMENTED / NOT VERIFIED**.
