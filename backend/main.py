@@ -796,6 +796,8 @@ from backend import reference_upload
 reference_upload.register(app,sys.modules[__name__])
 from backend import production_folders
 production_folders.register(app,sys.modules[__name__])
+from backend import release_artifacts
+release_artifacts.register(app,sys.modules[__name__])
 from backend import storyboard
 storyboard.register(app,sys.modules[__name__])
 from backend import production_entities

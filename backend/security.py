@@ -35,6 +35,42 @@ def verify_quote(token, project_id, payload, cost):
         raise HTTPException(400, 'Оценка отсутствует, устарела или параметры изменены. Получи новую оценку и подтверди запуск.')
 
 
+def execution_permit(task_id, revision, project_id, model, cost):
+    """Подписывает короткоживущее разрешение на исполнение конкретной ревизии задания."""
+    data = json.dumps({
+        'purpose': 'minimax.text.execute',
+        'task_id': task_id,
+        'revision': revision,
+        'project_id': project_id,
+        'model': model,
+        'cost': cost,
+        'nonce': secrets.token_hex(16),
+        'expires': int(time.time()) + 600,
+    }, sort_keys=True, separators=(',', ':'), ensure_ascii=False)
+    signature = hmac.new(SIGNING_KEY, data.encode(), hashlib.sha256).hexdigest()
+    return data + '.' + signature
+
+
+def verify_execution_permit(token, task_id, revision, project_id, model, cost):
+    """Проверяет подпись, назначение, срок и неизменность параметров разрешения."""
+    try:
+        data, signature = token.rsplit('.', 1)
+        expected = hmac.new(SIGNING_KEY, data.encode(), hashlib.sha256).hexdigest()
+        value = json.loads(data)
+        valid = hmac.compare_digest(signature, expected)
+        valid = valid and value.get('purpose') == 'minimax.text.execute'
+        valid = valid and value.get('task_id') == task_id
+        valid = valid and value.get('revision') == revision
+        valid = valid and value.get('project_id') == project_id
+        valid = valid and value.get('model') == model
+        valid = valid and value.get('cost') == cost
+        valid = valid and value.get('expires', 0) >= time.time()
+    except (ValueError, TypeError, KeyError, AttributeError):
+        valid = False
+    if not valid:
+        raise HTTPException(400, 'Разрешение на исполнение отсутствует, устарело или параметры задания изменены.')
+
+
 class BudgetLimits(BaseModel):
     project_usd: float = Field(default=1, ge=0, le=1000, allow_inf_nan=False)
     daily_usd: float = Field(default=2, ge=0, le=1000, allow_inf_nan=False)

@@ -8,6 +8,13 @@ type Budget = {
   project_reserved_usd: number;
   daily_reserved_usd: number;
 };
+type ReleaseArtifact = {
+  id: string;
+  title: string;
+  project_revision: number;
+  version_id: string | null;
+  file_url: string;
+};
 const money = (v: number | undefined) => '$' + (v ?? 0).toFixed(2);
 
 /** Сколько в библиотеке проекта картинок, клипов и звуковых дорожек. */
@@ -94,6 +101,7 @@ function Gauge({label, used, limit}: {label: string; used?: number; limit?: numb
 /** Шапка «Выпуска»: бюджет проекта и дня, количество результатов. */
 export function ReleaseSummary({projectId}: {projectId: string}) {
   const {images, videos, audio} = useCounts(projectId);
+  const releaseArtifacts = useReleaseArtifacts(projectId);
   const [budget, setBudget] = useState<Budget | null>(null);
   useEffect(() => {
     if (!projectId) return;
@@ -127,8 +135,18 @@ export function ReleaseSummary({projectId}: {projectId: string}) {
           <li>
             <b>{audio}</b> звуковых дорожек
           </li>
+          <li>
+            <b>{releaseArtifacts.length}</b> финальных MP4
+          </li>
         </ul>
       </div>
+      {releaseArtifacts.map(artifact => (
+        <p className="ss-note" key={artifact.id}>
+          <a href={artifact.file_url} download>{artifact.title}</a>
+          {' · ревизия проекта ' + artifact.project_revision}
+          {artifact.version_id ? ' · версия ' + artifact.version_id : ''}
+        </p>
+      ))}
     </section>
   );
 }

@@ -57,3 +57,17 @@ docs/*.jpg
 .aider.tags.cache.v3/
 .aider.chat.history.md
 .aider.input.history
+
+# Additional local media and logs.
+Models/
+Videos/
+Screenshots/
+*.mp4
+*.mkv
+*.avi
+*.mov
+*.webm
+*.m4v
+*.log
+# NOTE: .aiderignore and .aider.model.settings.yml are tracked on purpose.
+# Ignore Aider's local caches precisely instead of the broad ".aider*" glob.
