@@ -126,6 +126,10 @@ def register(app, studio=None):
         _, password = config()
         if valid_cookie(request.cookies.get(COOKIE, ''), password):
             return await call_next(request)
+        # Машинный вызов (n8n Cloud, веб-интеграция): токен в заголовке вместо cookie входа.
+        from backend import service_auth
+        if service_auth.identify(request)[0]:
+            return await call_next(request)
         if path.startswith('/api/'):
             return JSONResponse({'detail': 'Нужен вход в студию'}, status_code=401)
         return RedirectResponse('/login')

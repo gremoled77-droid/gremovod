@@ -121,8 +121,11 @@ def register(app, studio):
             return JSONResponse({'detail':'Запрос с постороннего сайта запрещён'}, status_code=403)
         public = request.url.path in {'/api/health','/api/session','/api/login','/api/logout','/login'} or not (request.url.path.startswith('/api/') or request.url.path in {'/docs','/redoc','/openapi.json','/docs/oauth2-redirect'})
         worker = request.url.path.startswith('/api/chatgpt/worker/')
+        from backend import service_auth
+        machine = service_auth.identify(request)[0]
+        request.state.service_scopes = machine
         supplied = request.headers.get('x-studio-session') or request.cookies.get('studio_session', '')
-        if not public and not worker and not secrets.compare_digest(supplied.encode(), LAUNCH_TOKEN.encode()):
+        if not public and not worker and not machine and not secrets.compare_digest(supplied.encode(), LAUNCH_TOKEN.encode()):
             return JSONResponse({'detail':'Локальная сессия отсутствует. Обнови страницу студии.'}, status_code=401)
         if request.method == 'POST' and request.url.path in {'/api/chat','/api/compose','/api/agents/run'}:
             return JSONResponse({'detail':'Платный LLM-резерв временно отключён: для него ещё нет проверенной серверной оценки и лимита стоимости. Используй основной чат Codex.'}, status_code=503)
