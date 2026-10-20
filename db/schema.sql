@@ -41,6 +41,30 @@ CREATE TABLE IF NOT EXISTS p0_budget_envelopes (
 );
 CREATE INDEX IF NOT EXISTS idx_p0_envelopes_run ON p0_budget_envelopes(run_id);
 
+-- Money the provider took BEYOND the owner's ceiling.
+-- p0_budget_envelopes keeps CHECK(reserved_cents + spent_cents <= cap_cents),
+-- so an excess charge cannot be stored there: reality would break the
+-- constraint. The excess is booked here as a confirmed obligation instead.
+-- It stays counted as spent forever and it blocks NEW spending until a
+-- human acknowledges it with a reconcile capability.
+CREATE TABLE IF NOT EXISTS p0_spend_obligations (
+  obligation_id TEXT PRIMARY KEY,
+  job_id TEXT NOT NULL,
+  envelope_id TEXT NOT NULL,
+  run_id TEXT NOT NULL,
+  project_id TEXT NOT NULL,
+  overrun_cents INTEGER NOT NULL CHECK(overrun_cents > 0),
+  authorized_cents INTEGER NOT NULL CHECK(authorized_cents >= 0),
+  reason TEXT NOT NULL,
+  status TEXT NOT NULL CHECK(status IN ('OPEN','ACKNOWLEDGED')),
+  event_id TEXT NOT NULL,
+  event_sha TEXT NOT NULL,
+  created_at_ms INTEGER NOT NULL,
+  acknowledged_at_ms INTEGER
+);
+CREATE INDEX IF NOT EXISTS idx_p0_obligations_env ON p0_spend_obligations(envelope_id,status);
+CREATE INDEX IF NOT EXISTS idx_p0_obligations_project ON p0_spend_obligations(project_id,status);
+
 CREATE TABLE IF NOT EXISTS p0_jobs (
   job_id TEXT PRIMARY KEY,
   run_id TEXT NOT NULL REFERENCES p0_runs(run_id),

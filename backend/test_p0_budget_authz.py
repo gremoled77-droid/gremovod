@@ -19,6 +19,7 @@ MOSCOW = timezone(timedelta(hours=3))
 
 class P0TrustAndBudgetTests(unittest.TestCase):
     def setUp(self):
+        p0_authz.allow_ephemeral_key()
         self.fixture = fixtures.P0SafetyTests()
         self.fixture.setUp()
         self.addCleanup(self.fixture.doCleanups)
@@ -109,14 +110,13 @@ class P0TrustAndBudgetTests(unittest.TestCase):
     def test_verified_evidence_settles_the_reserve(self):
         self.fixture.intent(); self.fixture.auth(); self.fixture.submit()
         p.accept_provider_id(self.db, job_id="j1", provider_job_id="provider-1")
+        verified = lambda body: {"provider_job_id": "provider-1", "charged_cents": 180,
+                                 "success": True}
         self.assertTrue(p.finish_verified(self.db, job_id="j1", event_id="event1",
-                                          event_body={"status": "done"}, charged_cents=180,
-                                          provider_success=True, verify_evidence=lambda body: True))
+                                          event_body={"status": "done"},
+                                          verify_evidence=verified))
         envelope = self.fixture.row("p0_budget_envelopes", "envelope_id", "env")
         self.assertEqual((envelope["spent_cents"], envelope["reserved_cents"]), (180, 0))
-
-    # ---------------------------------------------------------------- R-04
-
     def _legacy_approval(self, project, usd, status="completed"):
         # The shared fixture keeps a minimal legacy `jobs` table; the Studio
         # budget reads the real one, so the test installs that shape.

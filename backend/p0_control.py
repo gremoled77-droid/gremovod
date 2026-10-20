@@ -237,6 +237,11 @@ def authorize(db, *, job_id, request_sha, profile_revision, upper_cents,
         if (e["expires_at_ms"]<=now_ms() or e["reserved_cents"]+e["spent_cents"]+upper_cents>e["cap_cents"]
             or e["calls_reserved"]>=e["max_calls"]):
             raise Blocked("insufficient budget, calls or expired permission")
+        if db.execute("SELECT 1 FROM p0_spend_obligations WHERE envelope_id=? AND status='OPEN' LIMIT 1",
+                      (j["envelope_id"],)).fetchone():
+            # The provider charged more than the owner authorised. That money
+            # is gone, so the envelope numbers alone no longer block new work.
+            raise Blocked("unsettled spend obligation blocks new spending until reconciliation")
         try:
             spend_ledger.check_cents(db, r["project_id"], upper_cents)
         except spend_ledger.BudgetExceeded as exc:
@@ -328,24 +333,90 @@ def accept_provider_id(db, *, job_id, provider_job_id):
             updated_at_ms=? WHERE job_id=?""",(provider_job_id,now_ms(),job_id))
 
 
-def finish_verified(db, *, job_id, event_id, event_body, charged_cents,
-                    provider_success, verify_evidence=None, **legacy):
-    """Backend checks provider authenticity; duplicated terminal callbacks do not recharge.
+def _verified_evidence(verify_evidence, event_body) -> dict:
+    """Read the settlement facts from the server-side verifier.
 
-    `verify_evidence` is a server-side callable that authenticates the
-    provider event. The ledger never accepts a boolean that says "this event is
-    genuine": a caller could simply set it. Legacy
-    `provider_evidence_verified` is refused.
+    The verifier must return the facts it CHECKED, not a boolean: a boolean
+    says only "this event is genuine" and leaves the amount, the provider job
+    id and the success flag to the caller. A caller that states a charge of
+    zero for a paid generation would otherwise be believed.
+    """
+    if not callable(verify_evidence):
+        raise Blocked("server-side provider evidence verification is required")
+    try:
+        facts = verify_evidence(event_body)
+    except Exception as exc:
+        raise Blocked(f"provider evidence verification failed: {exc}") from None
+    if not isinstance(facts, dict):
+        raise Blocked(
+            "provider evidence verifier must return the verified facts "
+            "(provider_job_id, charged_cents, success), not a boolean"
+        )
+    missing = {"provider_job_id", "charged_cents", "success"} - set(facts)
+    if missing:
+        raise Blocked("verified evidence is incomplete: " + ", ".join(sorted(missing)))
+    if type(facts["charged_cents"]) is not int or facts["charged_cents"] < 0:
+        raise Blocked("verified cost must be integer cents")
+    if not isinstance(facts["success"], bool):
+        raise Blocked("verified success must be boolean")
+    if not facts["provider_job_id"] or not isinstance(facts["provider_job_id"], str):
+        raise Blocked("verified provider job id missing")
+    return facts
+
+
+def _record_overrun(db, j, e, charged_cents, event_id, event_sha, reason):
+    """The provider charged MORE than the owner authorised.
+
+    The envelope cannot hold this money: its own constraint keeps
+    reserved+spent within the cap. The excess is therefore recorded as a
+    confirmed obligation in its own table, and it blocks new spending until a
+    human reconciles it. The truth is recorded; it is not rounded away.
+    """
+    reserve = j["reserve_cents"]
+    overrun = charged_cents - reserve
+    obligation_id = f"{j['job_id']}:{event_id}"
+    project_id = _one(db, "SELECT project_id FROM p0_runs WHERE run_id=?", (j["run_id"],))["project_id"]
+    db.execute("""INSERT INTO p0_spend_obligations(
+        obligation_id,job_id,envelope_id,run_id,project_id,overrun_cents,authorized_cents,
+        reason,status,event_id,event_sha,created_at_ms)
+        VALUES(?,?,?,?,?,?,?,?,'OPEN',?,?,?)""",
+        (obligation_id, j["job_id"], j["envelope_id"], j["run_id"], project_id,
+         overrun, reserve, reason, event_id, event_sha, now_ms()))
+    return obligation_id
+
+
+def _settle_money(db, j, e, charged_cents, event_id, event_sha):
+    """Move the reserve into spent, and book any excess as an obligation."""
+    reserve = j["reserve_cents"]
+    overrun = max(0, charged_cents - reserve)
+    authorized_part = charged_cents - overrun
+    db.execute("""UPDATE p0_budget_envelopes SET reserved_cents=reserved_cents-?,
+          spent_cents=spent_cents+? WHERE envelope_id=?""",
+          (reserve, authorized_part, j["envelope_id"]))
+    if overrun:
+        _record_overrun(db, j, e, charged_cents, event_id, event_sha,
+                        "provider charge exceeded the authorised ceiling")
+    return overrun
+
+
+def finish_verified(db, *, job_id, event_id, event_body, verify_evidence=None, **legacy):
+    """Settle a job from provider evidence. Duplicated terminal callbacks do not recharge.
+
+    The amount, the provider job id and the success flag are read from the
+    verified evidence only. `charged_cents` and `provider_success` from the
+    caller are refused, and the legacy `provider_evidence_verified` boolean is
+    refused as well.
     """
     try:
         p0_authz.reject_legacy_trust(legacy)
+        p0_authz.reject_caller_settlement(legacy)
     except p0_authz.AuthzError as exc:
         raise Blocked(str(exc)) from None
-    if not callable(verify_evidence):
-        raise Blocked("server-side provider evidence verification is required")
-    if verify_evidence(event_body) is not True:
-        raise Blocked("provider evidence not verified by backend")
-    if type(charged_cents) is not int or charged_cents < 0 or not event_id:
+    facts = _verified_evidence(verify_evidence, event_body)
+    charged_cents = facts["charged_cents"]
+    provider_success = facts["success"]
+    provider_job_id = facts["provider_job_id"]
+    if not event_id:
         raise Blocked("invalid confirmed cost/event")
     event_sha=sha256(event_body)
     with atomic(db):
@@ -356,19 +427,106 @@ def finish_verified(db, *, job_id, event_id, event_body, charged_cents,
             return False
         if j["state"]!="SUBMITTED":
             raise Conflict("cannot finish job without provider acknowledgement")
-        if charged_cents>j["reserve_cents"]:
-            raise Blocked("provider cost exceeds reserved ceiling, manual reconciliation")
+        if j["provider_job_id"] and j["provider_job_id"]!=provider_job_id:
+            raise Conflict("verified provider job id differs from the accepted one")
         e=_one(db,"SELECT * FROM p0_budget_envelopes WHERE envelope_id=?",(j["envelope_id"],))
         if e["reserved_cents"]<j["reserve_cents"]:
             raise Conflict("reserve missing")
-        db.execute("""UPDATE p0_budget_envelopes SET reserved_cents=reserved_cents-?,
-              spent_cents=spent_cents+? WHERE envelope_id=?""",
-              (j["reserve_cents"],charged_cents,j["envelope_id"]))
-        db.execute("""UPDATE p0_jobs SET state=?,last_event_id=?,last_event_sha=?,
+        _settle_money(db, j, e, charged_cents, event_id, event_sha)
+        db.execute("""UPDATE p0_jobs SET state=?,provider_job_id=COALESCE(provider_job_id,?),
+              last_event_id=?,last_event_sha=?,
               reserve_cents=0,spent_cents=?,possible_charge=0,
               state_version=state_version+1,updated_at_ms=? WHERE job_id=?""",
               ("COMPLETED" if provider_success else "FAILED",
-               event_id,event_sha,charged_cents,now_ms(),job_id))
+               provider_job_id, event_id,event_sha,charged_cents,now_ms(),job_id))
+        return True
+
+
+def settle_unknown(db, *, job_id, event_id, event_body, outcome, verify_evidence=None,
+                   reconcile_capability=None, **legacy):
+    """Settle a job whose acknowledgement was lost. NEVER re-submits.
+
+    Three evidence-based outcomes:
+      - `not_charged`   the provider proved it took no money: the reserve is
+                        released and the slot is free again;
+      - `charged`       the provider proved a charge: it is booked, an excess
+                        over the ceiling becomes an open obligation;
+      - `still_unknown` nothing was proven: the money stays reserved and the
+                        slot stays blocked. Settling this by hand requires a
+                        reconcile capability.
+    """
+    try:
+        p0_authz.reject_legacy_trust(legacy)
+        p0_authz.reject_caller_settlement(legacy)
+    except p0_authz.AuthzError as exc:
+        raise Blocked(str(exc)) from None
+    if outcome not in ("not_charged", "charged", "still_unknown"):
+        raise Blocked("unknown settlement outcome")
+    if not event_id:
+        raise Blocked("settlement needs an event id")
+    event_sha=sha256(event_body)
+    with atomic(db):
+        j=_one(db,"SELECT * FROM p0_jobs WHERE job_id=?",(job_id,))
+        if j["last_event_id"]==event_id:
+            if j["last_event_sha"]!=event_sha:
+                raise Conflict("event ID reused with changed payload")
+            return False
+        if j["state"]!="UNKNOWN":
+            raise Conflict("only an UNKNOWN job can be settled by reconciliation")
+        e=_one(db,"SELECT * FROM p0_budget_envelopes WHERE envelope_id=?",(j["envelope_id"],))
+        if outcome=="still_unknown":
+            try:
+                p0_authz.verify(reconcile_capability, purpose="reconcile", binding={
+                    "job_id": job_id, "obligation_id": f"{job_id}:{event_id}"})
+            except p0_authz.AuthzError as exc:
+                raise Blocked(str(exc)) from None
+            db.execute("""UPDATE p0_jobs SET last_event_id=?,last_event_sha=?,
+                  state_version=state_version+1,updated_at_ms=? WHERE job_id=?""",
+                  (event_id,event_sha,now_ms(),job_id))
+            return True
+        facts=_verified_evidence(verify_evidence, event_body)
+        charged_cents=facts["charged_cents"]
+        if outcome=="not_charged" and charged_cents!=0:
+            raise Blocked("verified evidence contradicts the not_charged outcome")
+        if outcome=="charged" and charged_cents<=0:
+            raise Blocked("a charged settlement needs a positive verified amount")
+        if j["provider_job_id"] and j["provider_job_id"]!=facts["provider_job_id"]:
+            raise Conflict("verified provider job id differs from the accepted one")
+        if e["reserved_cents"]<j["reserve_cents"]:
+            raise Conflict("reserve missing")
+        if charged_cents:
+            _settle_money(db, j, e, charged_cents, event_id, event_sha)
+        else:
+            db.execute("""UPDATE p0_budget_envelopes SET reserved_cents=reserved_cents-?
+                  WHERE envelope_id=?""",(j["reserve_cents"],j["envelope_id"]))
+        db.execute("""UPDATE p0_jobs SET state=?,
+              provider_job_id=COALESCE(provider_job_id,?),
+              last_event_id=?,last_event_sha=?,
+              reserve_cents=0,spent_cents=?,possible_charge=0,
+              state_version=state_version+1,updated_at_ms=? WHERE job_id=?""",
+              ("COMPLETED" if facts["success"] else "FAILED",
+               facts["provider_job_id"], event_id,event_sha,charged_cents,now_ms(),job_id))
+        return True
+
+
+def acknowledge_obligation(db, *, obligation_id, reconcile_capability=None):
+    """Close one open spend obligation after a manual reconciliation.
+
+    The money stays spent: the owner exceeded the ceiling and the ledger keeps
+    saying so. Only the block on NEW spending is lifted, and only for a
+    capability issued for this exact obligation.
+    """
+    with atomic(db):
+        o=_one(db,"SELECT * FROM p0_spend_obligations WHERE obligation_id=?",(obligation_id,))
+        if o["status"]=="ACKNOWLEDGED":
+            return False
+        try:
+            p0_authz.verify(reconcile_capability, purpose="reconcile", binding={
+                "job_id": o["job_id"], "obligation_id": obligation_id})
+        except p0_authz.AuthzError as exc:
+            raise Blocked(str(exc)) from None
+        db.execute("""UPDATE p0_spend_obligations SET status='ACKNOWLEDGED',
+              acknowledged_at_ms=? WHERE obligation_id=?""",(now_ms(),obligation_id))
         return True
 
 
