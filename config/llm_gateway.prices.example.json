@@ -1,0 +1,101 @@
+{
+  "schema_version": 1,
+  "as_of": "2026-10-20",
+  "currency": "USD",
+  "unit": "USD per 1000000 input or output tokens",
+  "status": "illustrative price snapshot, not verified live; all routes disabled",
+  "rates": [
+    {
+      "provider": "kie",
+      "model": "gpt-6-luna",
+      "input": 0.03,
+      "output": 0.15,
+      "source": "https://kie.ai/gpt-6-sol-and-luna",
+      "protocol": "responses",
+      "enabled": false,
+      "verified_at": null
+    },
+    {
+      "provider": "kie",
+      "model": "claude-haiku-5-5",
+      "input": 0.06,
+      "output": 0.3,
+      "source": "https://kie.ai/claude-haiku-5-5",
+      "protocol": "anthropic_messages",
+      "enabled": false,
+      "verified_at": null
+    },
+    {
+      "provider": "piapi",
+      "model": "gpt-5.6-luna",
+      "input": 0.02,
+      "output": 0.12,
+      "source": "https://piapi.ai/docs/llm-api/completions",
+      "promotion": true,
+      "protocol": "openai_chat",
+      "enabled": false,
+      "verified_at": null
+    },
+    {
+      "provider": "minimax",
+      "model": "MiniMax-M3.1-Flash",
+      "input": 0.15,
+      "output": 0.6,
+      "source": "https://www.minimax.io/blog/minimax-m31f",
+      "enabled": false,
+      "verified_at": null
+    },
+    {
+      "provider": "deepseek",
+      "model": "deepseek-flash",
+      "source": "https://api-docs.deepseek.com/quick_start/pricing/",
+      "input": null,
+      "output": null,
+      "requires_dynamic_tier_check": true,
+      "enabled": false,
+      "verified_at": null
+    },
+    {
+      "provider": "openrouter",
+      "model": "minimax/minimax-m3.1-flash:free",
+      "input": 0,
+      "output": 0,
+      "source": "https://openrouter.ai/minimax/minimax-m3.1-flash:free",
+      "quota_limited": true,
+      "enabled": false,
+      "verified_at": null
+    }
+  ],
+  "comparison_display": {
+    "card_primary": "kie_piapi_reference_cost",
+    "budget_primary": "confirmed_actual_provider_cost",
+    "reference_provider_allowlist": [
+      "kie",
+      "piapi"
+    ],
+    "match_priority": "exact_model_then_named_other_model_baseline",
+    "default_baseline": {
+      "provider": "kie",
+      "model": "gpt-6-luna",
+      "kind": "reference_model"
+    },
+    "alternative_baseline": {
+      "provider": "piapi",
+      "model": "gpt-5.6-luna",
+      "kind": "reference_model"
+    },
+    "explicit_different_model_label_required": true,
+    "show_reference_snapshot_date": true,
+    "free_api_actual_cost_usd": 0,
+    "paid_approval_must_show_actual_estimate": true,
+    "unknown_charge_is_not_zero": true,
+    "pending_and_unknown_reported_separately": true,
+    "small_amount_precision": 6
+  },
+  "sample_limits_only": {
+    "per_call_usd": 0.1,
+    "per_day_usd": 1,
+    "per_month_usd": 10,
+    "do_not_override_existing_owner_limits": true
+  }
+}
