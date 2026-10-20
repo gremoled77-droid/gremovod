@@ -2,7 +2,7 @@
 
 **Требования:** R03, R07, R09, R10, R11, R12, R29, R30, R31, R32, R33, R34, R35, R36, R37, R41, R42, R43, R50, R51, R52, R56, R59
 **Зависит от:** 04, 05
-**Зона:** `frontend/src/Dock.tsx` · `frontend/src/EconomicsPanel.tsx` · `frontend/src/BudgetPanel.tsx` · `frontend/src/SeriesEconomics.tsx` · `docs/LLM_GATEWAY_ARCHITECTURE.md` · `docs/LLM_GATEWAY_PROVIDER_MATRIX.md` · `docs/LLM_GATEWAY_TEST_REPORT.md` · `docs/HANDOFF_MINIMAX_LLM_GATEWAY.md`
+**Зона:** `frontend/src/Dock.tsx` · `frontend/src/EconomicsPanel.tsx` · `frontend/src/BudgetPanel.tsx` · `frontend/src/SeriesEconomics.tsx` · `backend/security.py` · `docs/LLM_GATEWAY_ARCHITECTURE.md` · `docs/LLM_GATEWAY_PROVIDER_MATRIX.md` · `docs/LLM_GATEWAY_TEST_REPORT.md` · `docs/HANDOFF_MINIMAX_LLM_GATEWAY.md`
 **Волна:** 5
 **Ревью:** нет
 **Модель:** обычная
@@ -35,6 +35,7 @@
 ## Критерии приёмки
 
 - [ ] Панель «Очередь и бюджет» показывает фактически потраченное, зарезервированное и неизвестные списания отдельными строками
+- [ ] `/api/budgets/{project_id}` отдаёт четыре раздельные величины LLM рядом с прежними (`llm_project_usd` и прочие не исчезают) — иначе панель бюджета возьмёт экспозицию и покажет её как расход
 - [ ] Панель «Экономика» показывает те же четыре величины, и эквивалент помечен как неденежный
 - [ ] Панель бюджета и панель серии показывают ту же разбивку
 - [ ] Написан архитектурный документ: реестр, ориентир против факта, поток вызова, запасные маршруты, границы денег, пошаговый dry-run для n8n

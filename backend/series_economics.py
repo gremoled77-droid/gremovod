@@ -17,8 +17,10 @@ def check_budget(db,project_id,cost):
     if not limit or limit['limit_usd'] is None:return
     owned=projects(db,parent['parent_id'])
     from backend import security;reserved=sum(r['estimated_usd'] for r in security.reservations(db) if r['project_id'] in owned)
-    from backend import llm_guard
-    reserved+=llm_guard.summary(db,owned)['usd']
+    from backend import llm_gateway
+    spend=llm_gateway.summarize_spend(db,list(owned))
+    # в лимит серии входит всё, что может быть списано: факт, резерв и неизвестные списания
+    reserved+=spend['actual_cost_usd']+spend['reserved_usd']+spend['unknown_cost_usd']
     if reserved+cost>limit['limit_usd']+1e-9:raise HTTPException(400,'Превышен общий бюджет серии. Измени лимит на доске раскадровки.')
 
 
@@ -51,8 +53,9 @@ def register(app,studio):
             recipients={r['id']:json.loads(r['request']).get('context',{}).get('entity',{}).get('node_id') for r in db.execute('SELECT id,request FROM native_chat_jobs')}
             limit=db.execute('SELECT limit_usd FROM production_series_limits WHERE series_id=?',(sid,)).fetchone()
             from backend import security;reserved=sum(r['estimated_usd'] for r in security.reservations(db) if r['project_id'] in owned)
-            from backend import llm_guard
-            llm=llm_guard.summary(db,owned)
+            from backend import llm_gateway, llm_guard
+            # четыре раздельных итога: факт, резерв, неизвестные списания и неденежный ориентир
+            llm={**llm_guard.summary(db,owned),**llm_gateway.summarize_spend(db,list(owned))}
         jobs={}
         for project_id in owned|{common}:
             data=studio.report_economics(project_id)

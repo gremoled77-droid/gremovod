@@ -432,6 +432,70 @@ def actual_quote(registry: Registry, route: Route, usage: Usage | None = None, *
                        billing_source='provider_usage')
 
 
+def _has_tariff(entry: ModelEntry | None) -> bool:
+    """Тариф есть: цены заполнены. Ноль (0/0) — тоже тариф, отсутствие записи — не тариф."""
+    return entry is not None and entry.input_per_mtok is not None and entry.output_per_mtok is not None
+
+
+def agent_has_tariff(registry: Registry, provider: str | None, model: str | None) -> bool:
+    """Есть ли в реестре тариф, по которому считается цена работы агента.
+
+    Нулевой тариф (0/0, подтверждённо бесплатный) — тоже тариф: работа не отклоняется,
+    строка получает actual_status='free'. Отказ возможен только когда тарифа нет вовсе:
+    записи нет либо её цены null.
+    """
+    entry = registry.entry(provider, model)
+    if _has_tariff(entry):
+        return True
+    baseline = registry.baseline('default_baseline')
+    return _has_tariff(baseline)
+
+
+def agent_quote(registry: Registry, provider: str | None, model: str | None,
+                 usage: Usage | None = None) -> ActualQuote:
+    """Фактическое списание вызова агента: по тарифу реестра для названного провайдера и модели.
+
+    Агент назвал расход — сумма подтверждена его usage. Не назвал — списание неизвестно
+    (cost_usd=None, status='unknown'), а не ноль: работа агента стоила денег, но сколько — неизвестно.
+    """
+    entry = registry.entry(provider, model)
+    if entry is None:
+        return ActualQuote(cost_usd=None, status='unknown', provider=provider or 'unknown',
+                           model=model or 'unknown', billing_source='route_tariff')
+    return actual_quote(registry, entry.route(), usage)
+
+
+def agent_reference(registry: Registry, provider: str | None, model: str | None,
+                    usage: Usage | None = None) -> ReferenceQuote | None:
+    """Неденежный ориентир вызова агента по Kie/PiAPI; модели агента в реестре нет — ориентира нет."""
+    entry = registry.entry(provider, model)
+    if entry is None:
+        return None
+    return reference_quote(registry, entry.route(), usage)
+
+
+def agent_estimate_usage(context_text: str, prompt_text: str) -> Usage:
+    """Оценка расхода токенов вызова агента: вход — объём контекста, выход — объём ответа."""
+    return Usage(input_tokens=max(1, len(context_text or '') // 2) + 20,
+                 output_tokens=max(1, len(prompt_text or '') // 2) + 20, estimated=True)
+
+
+def agent_reserve(registry: Registry, provider: str | None, model: str | None, usage: Usage) -> float:
+    """Сумма под риском вызова агента: оценка по тарифу маршрута.
+
+    Модели агента в реестре нет — за оценку берётся базовая линия владельца: иначе неизвестное
+    списание не попало бы ни в один итог и прошло бы мимо лимитов. Подтверждённо бесплатный
+    маршрут (тариф 0/0) даёт нулевой резерв — это тариф, а не его отсутствие.
+    """
+    entry = registry.entry(provider, model)
+    quote = actual_quote(registry, entry.route(), usage) if entry is not None else None
+    if quote is None or quote.cost_usd is None:
+        baseline = registry.baseline('default_baseline')
+        if baseline is not None:
+            quote = actual_quote(registry, baseline.route(), usage)
+    return float(quote.cost_usd or 0.0) if quote is not None else 0.0
+
+
 def _eligible(entry: ModelEntry, allow_free: bool) -> bool:
     """Маршрут можно взять: включён владельцем, тариф известен, бесплатный — только по разрешению."""
     if not entry.enabled:
@@ -499,10 +563,17 @@ def summarize_spend(db, project_ids: list[str] | None = None) -> dict:
         legacy = float(_cell(row, index, 'usd', 0.0) or 0.0)
         if reference is not None:
             summary['reference_cost_usd'] += float(reference)
-        if actual_status in ('unknown', 'estimated'):
-            summary['unknown_cost_usd'] += float(reserved if reserved is not None else legacy)
-        elif actual_status in ('confirmed', 'free'):
+        if actual_status in ('confirmed', 'free'):
             summary['actual_cost_usd'] += float(actual if actual is not None else 0.0)
+        elif actual_status == 'estimated':
+            # резерв в полёте: деньги заняты, но списания ещё нет — это зарезервировано
+            summary['reserved_usd'] += float(reserved if reserved is not None else legacy)
+        elif actual_status == 'unknown':
+            # списание возможно, но не подтверждено: резерв удерживается до сверки
+            summary['unknown_cost_usd'] += float(reserved if reserved is not None else legacy)
+        elif actual_status == 'not_charged':
+            # провайдер прямо отказал: списания не было, резерв снят
+            pass
         elif status == 'done':
             # строка старой схемы: факт списания лежит в usd
             summary['actual_cost_usd'] += legacy

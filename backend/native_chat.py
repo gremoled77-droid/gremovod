@@ -12,7 +12,7 @@ from pathlib import Path
 from fastapi import Header, HTTPException, UploadFile, File, Form
 from pydantic import BaseModel, Field
 from backend.refinement import edit_context, PRESERVE_VISUAL
-from backend import character_description
+from backend import character_description, llm_gateway, llm_guard
 
 THREAD_ID = '01a13e25-939c-7b73-9c0a-669abc8aa6a7'
 CHAT_URL = f'codex://threads/{THREAD_ID}'
@@ -37,11 +37,129 @@ class NativeRequest(BaseModel):
     edit_instruction: str = Field(default='',max_length=4000)
 
 
+class AgentUsage(BaseModel):
+    """Расход токенов, который агент назвал в отчёте о своей работе."""
+    input_tokens: int | None = Field(default=None, ge=0, le=10_000_000)
+    output_tokens: int | None = Field(default=None, ge=0, le=10_000_000)
+    cached_input_tokens: int | None = Field(default=None, ge=0, le=10_000_000)
+    reasoning_tokens: int | None = Field(default=None, ge=0, le=10_000_000)
+
+
 class Progress(BaseModel):
     identity: character_description.Identity | None = None
     status: str
     prompt: str = Field(default='', max_length=20000)
     message: str = Field(default='', max_length=2000)
+    provider: str | None = Field(default=None, max_length=60)
+    model: str | None = Field(default=None, max_length=120)
+    usage: AgentUsage | None = None
+
+
+def agent_report(body: Progress) -> dict:
+    """Отчёт агента о расходе: провайдер, модель и токены — как их назвал агент."""
+    report = {'provider': (body.provider or '').strip() or 'unknown',
+              'model': (body.model or '').strip() or 'unknown'}
+    if body.usage is not None:
+        report['usage'] = {'input_tokens': body.usage.input_tokens, 'output_tokens': body.usage.output_tokens,
+                           'cached_input_tokens': body.usage.cached_input_tokens,
+                           'reasoning_tokens': body.usage.reasoning_tokens}
+    return report
+
+
+def agent_usage(body: Progress):
+    """Расход токенов из отчёта агента; None — агент расход не сообщил."""
+    if body.usage is None:
+        return None
+    return llm_gateway.Usage(input_tokens=body.usage.input_tokens, output_tokens=body.usage.output_tokens,
+                             cached_input_tokens=body.usage.cached_input_tokens,
+                             reasoning_tokens=body.usage.reasoning_tokens)
+
+
+def insert_agent_call(db, values):
+    """Запись вызова агента в журнал вызовов — по именам колонок журнала.
+
+    Одна запись на request_id: повторный отчёт о той же работе денег не удваивает.
+    """
+    if db.execute('SELECT 1 FROM llm_calls WHERE request_id=?', (values['request_id'],)).fetchone():
+        return False
+    columns = ','.join(llm_guard.INSERT_COLUMNS)
+    marks = ','.join('?' * len(llm_guard.INSERT_COLUMNS))
+    db.execute('INSERT INTO llm_calls(' + columns + ') VALUES(' + marks + ')',
+               tuple(values[name] for name in llm_guard.INSERT_COLUMNS))
+    return True
+
+
+def agent_context(item) -> str:
+    """Контекст задания текстом — по его объёму оценивается работа агента."""
+    return json.dumps(json.loads(item['request']).get('context', {}), ensure_ascii=False)
+
+
+def journal_agent_call(studio, db, item, body: Progress, context_text: str, prompt_text: str, status: str = 'done'):
+    """Вызов агента — в тот же журнал вызовов, что и вызовы через шлюз.
+
+    Провайдер и модель — из отчёта агента, а не из константы. Расход, который агент сообщил,
+    считается по тарифу реестра; если агент расход не сообщил — списание неизвестно (не ноль):
+    работа агента стоила денег, но сколько — неизвестно.
+
+    Тариф 0/0 (подтверждённо бесплатный маршрут) — это тариф: строка получает actual_status='free'
+    с фактом 0, отказа нет. Отказ бывает только когда тарифа нет вовсе (записи нет либо цены null) —
+    тогда возвращается текст отказа, запись не делается, и вызывающий код переводит задание
+    в вынимаемое состояние.
+    """
+    registry = llm_guard.current_registry()
+    provider = (body.provider or '').strip() or None
+    model = (body.model or '').strip() or None
+    usage = agent_usage(body)
+    if not llm_gateway.agent_has_tariff(registry, provider, model):
+        return {'refusal': 'Расход агента не посчитан: в реестре нет тарифа.', 'over_limit': False, 'reserve': 0.0}
+    actual = llm_gateway.agent_quote(registry, provider, model, usage)
+    reference = llm_gateway.agent_reference(registry, provider, model, usage)
+    reserve = llm_gateway.agent_reserve(registry, provider, model,
+                                        llm_gateway.agent_estimate_usage(context_text, prompt_text))
+    # лимит при отчёте считается по реальному тарифу модели агента; перерасход не отменяет запись:
+    # деньги уже потрачены — их записывают и показывают в лимите
+    over_limit = False
+    try:
+        llm_guard.check_budget(db, item['project_id'], reserve)
+    except HTTPException:
+        over_limit = True
+    entry = registry.entry(provider, model)
+    request_id = item['id'] + '-agent'
+    confirmed = actual.status in {'confirmed', 'free'}
+    values = {
+        'id': uuid.uuid4().hex,
+        'request_id': request_id,
+        'project_id': item['project_id'],
+        'model': model or 'unknown',
+        'status': status,
+        'usd': actual.cost_usd if confirmed else reserve,
+        'estimated_usd': reserve,
+        'input_tokens': usage.input_tokens if usage else None,
+        'output_tokens': usage.output_tokens if usage else None,
+        'created_at': studio.now(),
+        'execution_provider': actual.provider,
+        'execution_model': actual.model,
+        'actual_cost_usd': actual.cost_usd if confirmed else None,
+        'actual_status': actual.status,
+        'reserved_usd': reserve,
+        'billing_source': actual.billing_source,
+        'reference_provider': reference.provider if reference else None,
+        'reference_model': reference.model if reference else None,
+        'reference_kind': reference.kind if reference else None,
+        'reference_rate_snapshot_id': llm_guard.snapshot_id(reference.provider or '', reference.model or '',
+                                                            reference.rate_as_of or '') if reference else None,
+        'reference_cost_usd': reference.cost_usd if reference else None,
+        'reference_cost_status': reference.status if reference else None,
+        'cached_input_tokens': usage.cached_input_tokens if usage else None,
+        'reasoning_tokens': usage.reasoning_tokens if usage else None,
+        'price_snapshot_id': llm_guard.snapshot_id(entry.provider, entry.model, entry.as_of) if entry else '',
+        'route_mode': 'manual',
+        'fallback_from': None,
+        'error_kind': None,
+        'provider_request_id': None,
+    }
+    insert_agent_call(db, values)
+    return {'refusal': None, 'over_limit': over_limit, 'reserve': reserve}
 
 
 def register(app, studio):
@@ -141,6 +259,13 @@ def register(app, studio):
                 if existing['request'] != request:
                     raise HTTPException(409, 'Этот ID уже принадлежит другому запросу')
                 return public(dict(existing))
+            # работа агента — тоже платный вызов: тариф и лимит проверяются до постановки задания
+            registry = llm_guard.current_registry()
+            if not llm_gateway.agent_has_tariff(registry, None, None):
+                raise HTTPException(400, 'Для работы агента нет тарифа: добавь модель и цены в реестр шлюза')
+            estimate = llm_gateway.agent_reserve(registry, None, None,
+                                                 llm_gateway.agent_estimate_usage(request, ''))
+            llm_guard.check_budget(db, body.project_id, estimate)
             if body.operation=='describe_character':
                 db.execute("UPDATE native_chat_jobs SET status='cancelled',message='Заменено новым набором референсов',updated_at=? WHERE project_id=? AND operation='describe_character' AND status='queued' AND json_extract(request,'$.body.character_id')=?",(studio.now(),body.project_id,body.character_id))
             if db.execute("SELECT 1 FROM native_chat_jobs WHERE project_id=? AND status IN ('queued','preparing','generating')", (body.project_id,)).fetchone():
@@ -177,6 +302,8 @@ def register(app, studio):
     def progress(job_id: str, body: Progress, x_studio_worker: str | None = Header(default=None)):
         authenticate(x_studio_worker)
         with studio.connect() as db:
+            llm_guard.ensure_schema(db)
+        with studio.connect() as db:
             db.execute('BEGIN IMMEDIATE')
             item = db.execute('SELECT * FROM native_chat_jobs WHERE id=?', (job_id,)).fetchone()
             if not item:
@@ -184,8 +311,14 @@ def register(app, studio):
             if item['status'] not in {'preparing', 'generating'}:
                 raise HTTPException(409, 'Задание больше не выполняется')
             final_prompt = body.prompt.strip() or item['prompt']
+            refusal = None
+            over_limit = False
             if body.status == 'failed':
                 state = 'failed'
+                # отчёт о неуспехе журналируется по тем же правилам: потраченные деньги не теряются
+                charge = journal_agent_call(studio, db, item, body, agent_context(item), final_prompt, status='failed')
+                refusal = charge['refusal']
+                over_limit = charge['over_limit']
             elif item['operation']=='describe_character' and item['status']=='preparing' and body.status=='identity_ready' and body.identity is not None:
                 result=character_description.apply(db,studio,item,body.identity)
                 final_prompt=json.dumps(result,ensure_ascii=False);state='completed'
@@ -194,28 +327,44 @@ def register(app, studio):
                 if item['operation']=='edit':final_prompt=PRESERVE_VISUAL+'\n\nREQUESTED CHANGE:\n'+final_prompt
                 studio.validate_prompt(item['target'], final_prompt, len(json.loads(item['request'])['context']['references']))
                 context = json.loads(item['request'])['context']
-                db.execute('INSERT INTO prompt_versions VALUES(?,?,?,?,?,?,?,?,?,?)',
-                           (uuid.uuid4().hex, item['project_id'], item['target'], final_prompt, json.dumps(context, ensure_ascii=False), 'codex_chat', 'gpt-6.1-sol', '{}', studio.RULES_VERSION, studio.now()))
-                if not context.get('entity'):
-                    project = db.execute('SELECT state FROM projects WHERE id=?', (item['project_id'],)).fetchone()
-                    latest = json.loads(project['state'])
-                    if item['operation']!='edit':latest.setdefault('prompts', {})[item['target']] = final_prompt
-                    if json.loads(item['request'])['body'].get('use_scene'):
-                        latest.setdefault('scene', {}).setdefault('prompts', {})[item['target']] = final_prompt
-                    if studio.MODEL_SPECS[item['target']]['kind']=='video':
-                        from backend import camera_movements
-                        snapshot=context.get('camera_movement')
-                        container=latest.setdefault('scene',{}) if json.loads(item['request'])['body'].get('use_scene') else latest
-                        container.setdefault('cameraPromptBasis',{})[item['target']]=camera_movements.basis(snapshot)
-                    elif item['operation']!='edit':
-                        from backend import frame_composition
-                        container=latest.setdefault('scene',{}) if json.loads(item['request'])['body'].get('use_scene') else latest
-                        container.setdefault('compositionPromptBasis',{})[item['target']]=frame_composition.basis(context.get('frame_composition'))
-                    db.execute('UPDATE projects SET state=?,updated_at=? WHERE id=?', (json.dumps(latest, ensure_ascii=False), studio.now(), item['project_id']))
+                # расход агента — в тот же журнал и в той же транзакции: либо запись есть, либо задание не выполнено
+                charge = journal_agent_call(studio, db, item, body, json.dumps(context, ensure_ascii=False), final_prompt)
+                refusal = charge['refusal']
+                over_limit = charge['over_limit']
+                if refusal:
+                    # тарифа нет: работа не засчитывается, но задание переходит в вынимаемое состояние
+                    state = 'failed'
+                else:
+                    report = agent_report(body)
+                    db.execute('INSERT INTO prompt_versions VALUES(?,?,?,?,?,?,?,?,?,?)',
+                               (uuid.uuid4().hex, item['project_id'], item['target'], final_prompt, json.dumps(context, ensure_ascii=False), 'codex_chat', report['model'], json.dumps(report, ensure_ascii=False), studio.RULES_VERSION, studio.now()))
+                    if not context.get('entity'):
+                        project = db.execute('SELECT state FROM projects WHERE id=?', (item['project_id'],)).fetchone()
+                        latest = json.loads(project['state'])
+                        if item['operation']!='edit':latest.setdefault('prompts', {})[item['target']] = final_prompt
+                        if json.loads(item['request'])['body'].get('use_scene'):
+                            latest.setdefault('scene', {}).setdefault('prompts', {})[item['target']] = final_prompt
+                        if studio.MODEL_SPECS[item['target']]['kind']=='video':
+                            from backend import camera_movements
+                            snapshot=context.get('camera_movement')
+                            container=latest.setdefault('scene',{}) if json.loads(item['request'])['body'].get('use_scene') else latest
+                            container.setdefault('cameraPromptBasis',{})[item['target']]=camera_movements.basis(snapshot)
+                        elif item['operation']!='edit':
+                            from backend import frame_composition
+                            container=latest.setdefault('scene',{}) if json.loads(item['request'])['body'].get('use_scene') else latest
+                            container.setdefault('compositionPromptBasis',{})[item['target']]=frame_composition.basis(context.get('frame_composition'))
+                        db.execute('UPDATE projects SET state=?,updated_at=? WHERE id=?', (json.dumps(latest, ensure_ascii=False), studio.now(), item['project_id']))
             else:
                 raise HTTPException(409, 'Недопустимый переход этапа')
-            db.execute('UPDATE native_chat_jobs SET status=?,prompt=?,message=?,updated_at=? WHERE id=?', (state, final_prompt, body.message, studio.now(), job_id))
+            message = body.message
+            if refusal:
+                message = 'Отчёт агента отвергнут: ' + refusal
+            elif over_limit:
+                message = (message + ' ' if message else '') + 'Лимит превышен: расход агента записан и занимает лимит.'
+            db.execute('UPDATE native_chat_jobs SET status=?,prompt=?,message=?,updated_at=? WHERE id=?', (state, final_prompt, message, studio.now(), job_id))
             db.execute('UPDATE native_chat_worker SET seen=?,busy=? WHERE id=1', (time.time(), int(state not in {'failed', 'completed'})))
+        if refusal:
+            raise HTTPException(400, refusal)
         if item['operation']=='describe_character':
             ctx=json.loads(item['request'])['context']
             studio.production_folders.sync_character(studio,ctx['owner_project_id'],ctx['character_id'])

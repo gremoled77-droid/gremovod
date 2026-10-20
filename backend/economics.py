@@ -84,8 +84,10 @@ def register(app,studio):
             bucket=periods.setdefault(key,{'month':key[0],'model':key[1],'attempts':0,'used':0,'actual_usd':0,'unknown_costs':0})
             bucket['attempts']+=1;bucket['used']+=int(x['used']);bucket['actual_usd']+=x['actual_usd'] or 0;bucket['unknown_costs']+=int(x['actual_usd'] is None and not free_provider(x['provider']))
         chat_images=[x for x in attempts if x['api_equivalent']]
-        from backend import llm_guard
-        with studio.connect() as db:llm=llm_guard.summary(db,{project_id})
+        from backend import llm_gateway, llm_guard
+        with studio.connect() as db:
+            # четыре раздельных итога: факт, резерв, неизвестные списания и неденежный ориентир
+            llm={**llm_guard.summary(db,{project_id}),**llm_gateway.summarize_spend(db,[project_id])}
         return {'llm':llm,'project_id':project_id,'actual_usd_known':round(actual,6),'costs_complete':unknown==0,
                 'chat_image_count':len(chat_images),'chat_api_equivalent_usd':round(sum(x['api_equivalent']['usd'] for x in chat_images),6),
                 'unknown_cost_count':unknown,'llm_calls_unpriced':llm_unpriced,'media_costs_complete':media_unknown==0,'unknown_generation_cost_count':media_unknown,'estimated_usd':round(sum(x['estimated_usd'] or 0 for x in attempts),6),
