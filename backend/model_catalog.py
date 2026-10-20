@@ -1,7 +1,29 @@
 """Каталог моделей и допустимых LLM. Вынесено из main.py без изменения содержимого."""
 
-# gpt-6-astra дорогая: только для сценария и промптов (Идея, Настройки), пока не появится GPT-6.1 Sol. В узлах Воркфлоу её нет.
-ALLOWED_CHAT={'gpt-5.6-luna','gpt-5.6-terra','gpt-5.6-sol','gpt-6-astra'}
+# Единый реестр LLM: подпись, цена, провайдер, область и имя модели у провайдера.
+# Источник истины для backend. Фронтенд (frontend/src/llmPricing.ts) хранит копию
+# для синхронного рендера; расхождение ловит backend/test_llm_registry.py.
+#   scopes: 'workflow' — узлы Воркфлоу, 'idea' — экран «Идея» и Настройки,
+#           'task' — задания /api/llm/tasks (MiniMax).
+LLM_MODELS={
+ 'gpt-5.6-luna':{'label':'GPT-5.6 Luna','provider':'piapi','price_in':0.02,'price_out':0.12,'scopes':('workflow','idea')},
+ 'gpt-5.6-terra':{'label':'GPT-5.6 Terra','provider':'piapi','price_in':0.2,'price_out':1.2,'scopes':('workflow','idea')},
+ 'gpt-5.6-sol':{'label':'GPT-5.6 Sol','provider':'piapi','price_in':0.5,'price_out':3.0,'scopes':('workflow','idea')},
+ # gpt-6-astra дорогая: только для сценария и промптов (Идея, Настройки), пока не появится GPT-6.1 Sol. В узлах Воркфлоу её нет.
+ 'gpt-6-astra':{'label':'GPT-6 Astra','provider':'piapi','price_in':2.0,'price_out':10.0,'scopes':('idea',)},
+ 'minimax-m2':{'label':'MiniMax M2','provider':'piapi','price_in':0.3,'price_out':1.2,'scopes':('task',)},
+ 'minimax-m2.1':{'label':'MiniMax M2.1','provider':'piapi','price_in':0.3,'price_out':1.2,'scopes':('task',)},
+ 'minimax-m2.5':{'label':'MiniMax M2.5','provider':'piapi','price_in':0.3,'price_out':1.2,'scopes':('task',)},
+ 'minimax-m3.1-flash':{'label':'MiniMax M3.1 Flash','provider':'piapi','price_in':0.3,'price_out':1.2,'scopes':('task',),'provider_model':'MiniMax-M3.1-Flash'},
+ 'minimax-text-01':{'label':'MiniMax Text-01','provider':'piapi','price_in':0.3,'price_out':1.2,'scopes':('task',)},
+}
+
+def llm_scope(scope):
+    """Идентификаторы LLM, доступные в области."""
+    return {key for key,spec in LLM_MODELS.items() if scope in spec['scopes']}
+
+# Доступны в чате и в агентах: workflow + idea.
+ALLOWED_CHAT=llm_scope('workflow')|llm_scope('idea')
 IMAGE_TASKS={'seedream-5-pro','seedream-5-lite','gpt-image-2','nano-banana-2','qwen-image-2.1'}
 VIDEO_MODELS={'seedance','kling','wan','veo','sora','hailuo'}
 

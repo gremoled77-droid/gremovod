@@ -12,18 +12,16 @@ from typing import Any, Literal
 from fastapi import Header, HTTPException
 from pydantic import BaseModel, Field
 
-# USD за 1 млн токенов (piapi.ai/docs/llm-api/completions, акционные цены на 2026-10-16). GPT-6 Astra дорогая: её предлагает только экран «Идея», в узлах Воркфлоу её нет.
-PRICES = {'gpt-5.6-luna': (0.02, 0.12), 'gpt-5.6-terra': (0.2, 1.2), 'gpt-5.6-sol': (0.5, 3.0), 'gpt-6-astra': (2.0, 10.0)}
-MINIMAX_PRICES = {
-    'minimax-m2': (0.3, 1.2),
-    'minimax-m2.1': (0.3, 1.2),
-    'minimax-m2.5': (0.3, 1.2),
-    'minimax-m3.1-flash': (0.3, 1.2),
-    'minimax-text-01': (0.3, 1.2),
-}
-MINIMAX_PROVIDER_MODELS = {
-    'minimax-m3.1-flash': 'MiniMax-M3.1-Flash',
-}
+from backend.model_catalog import LLM_MODELS
+
+# USD за 1 млн токенов (piapi.ai/docs/llm-api/completions, акционные цены на 2026-10-16).
+# Цены не дублируются: они берутся из единого реестра backend/model_catalog.py::LLM_MODELS.
+def _prices(scopes):
+    return {key:(spec['price_in'],spec['price_out']) for key,spec in LLM_MODELS.items() if set(scopes)&set(spec['scopes'])}
+
+PRICES = _prices(('workflow','idea'))
+MINIMAX_PRICES = _prices(('task',))
+MINIMAX_PROVIDER_MODELS = {key:spec['provider_model'] for key,spec in LLM_MODELS.items() if spec.get('provider_model')}
 MAX_OUTPUT_TOKENS = 2000
 MAX_INPUT_CHARS = 30000
 ROLES = {'system', 'user', 'assistant'}
@@ -334,7 +332,7 @@ async def execute_minimax_task(studio, task_id, body, key):
     if task.response_format == 'json':
         provider_body['response_format'] = {'type': 'json_object'}
     try:
-        value = await studio.request_piapi('POST', '/v1/chat/completions', key, provider_body)
+        value = await studio.request_piapi('POST', '/v1/chat/completions', key, provider_body, spend=('llm_call', call_id))
         content = studio.chat_text(value)
         if not isinstance(content, str):
             raise ValueError('Провайдер вернул результат не строкой')
@@ -517,7 +515,7 @@ async def guarded_chat(studio, body, key):
         db.execute('INSERT INTO llm_calls VALUES(?,?,?,?,?,?,?,?,?,?)',
                    (call_id, request_id, body.project_id, body.model, 'reserved', cost, cost, None, None, studio.now()))
     try:
-        value = await studio.request_piapi('POST', '/v1/chat/completions', key, {'model': body.model, 'messages': messages, 'max_tokens': body.max_tokens})
+        value = await studio.request_piapi('POST', '/v1/chat/completions', key, {'model': body.model, 'messages': messages, 'max_tokens': body.max_tokens}, spend=('llm', request_id))
         text = studio.chat_text(value)
     except Exception:
         with studio.connect() as db:

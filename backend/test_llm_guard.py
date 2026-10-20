@@ -87,8 +87,12 @@ class LlmGuardTests(unittest.TestCase):
             self.assertEqual(llm_guard.spent(db, self.pid), (0.0, 0.0))
 
     def test_other_paid_llm_routes_stay_closed(self):
-        for endpoint in ('/api/chat', '/api/compose', '/api/agents/run'):
+        for endpoint in ('/api/compose', '/api/agents/run'):
             self.assertEqual(self.client.post(endpoint, json={'approved': True}).status_code, 503)
+        # Прямой чат закрыт: провайдер не вызывается, ответ ведёт на защищённый маршрут.
+        closed = self.client.post('/api/chat', json={'model': 'gpt-5.6-luna', 'messages': [{'role': 'user', 'content': 'x'}]})
+        self.assertEqual(closed.status_code, 410)
+        self.assertIn('/api/llm/chat', closed.json()['detail'])
 
 
 class LlmEconomicsTests(unittest.TestCase):

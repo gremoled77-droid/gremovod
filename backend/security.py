@@ -120,6 +120,30 @@ def check_budget(db, project_id, cost):
         raise HTTPException(400, 'Превышен дневной серверный бюджет. Измени лимит в разделе «Экономика».')
 
 
+def spend_reserved(db, kind, ref, model=None):
+    """Есть ли в журнале расходов резерв, оплачивающий конкретный платный вызов.
+
+    Единственное основание для обращения к платному провайдеру: маршрут, который не
+    оставил резерва, не может оплатить вызов — даже если его забыли закрыть.
+    kind: 'llm' (по request_id), 'llm_call' (по id вызова), 'job' (по заданию).
+    """
+    try:
+        if kind in ('llm','llm_call'):
+            column = 'request_id' if kind == 'llm' else 'id'
+            row = db.execute(f'SELECT model,status FROM llm_calls WHERE {column}=?', (ref,)).fetchone()
+            if row is None or row['status'] != 'reserved':
+                return False
+            return model is None or row['model'] == model
+        if kind == 'job':
+            job = db.execute('SELECT status FROM jobs WHERE id=?', (ref,)).fetchone()
+            if job is None or job['status'] not in ('submitting','submitted'):
+                return False
+            return db.execute('SELECT 1 FROM generation_approvals WHERE job_id=?', (ref,)).fetchone() is not None
+    except Exception:
+        return False
+    return False
+
+
 def register(app, studio):
     @app.middleware('http')
     async def local_session(request: Request, call_next):
@@ -139,7 +163,10 @@ def register(app, studio):
         supplied = request.headers.get('x-studio-session') or request.cookies.get('studio_session', '')
         if not public and not worker and not secrets.compare_digest(supplied.encode(), LAUNCH_TOKEN.encode()):
             return JSONResponse({'detail':'Локальная сессия отсутствует. Обнови страницу студии.'}, status_code=401)
-        if request.method == 'POST' and request.url.path in {'/api/chat','/api/compose','/api/agents/run'}:
+        # Заморозка платного LLM-резерва на старых составных маршрутах. Это не граница
+        # оплаты: настоящая граница — резерв в журнале расходов, который проверяется
+        # в точке выхода к провайдеру (backend/main.py::require_spend_reservation).
+        if request.method == 'POST' and request.url.path in {'/api/compose','/api/agents/run'}:
             return JSONResponse({'detail':'Платный LLM-резерв временно отключён: для него ещё нет проверенной серверной оценки и лимита стоимости. Используй основной чат Codex.'}, status_code=503)
         return await call_next(request)
 

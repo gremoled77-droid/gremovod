@@ -14,7 +14,14 @@ SUBMIT_PATH = '/api/v1/jobs/createTask'
 STATUS = {'waiting': 'pending', 'queuing': 'pending', 'generating': 'processing', 'success': 'completed', 'fail': 'failed'}
 
 
-async def request(method, path, key, payload=None):
+async def request(method, path, key, payload=None, spend=None):
+    """Единая точка выхода к KIE.
+
+    POST — платный вызов: допускается только с резервом в журнале расходов
+    (spend=('job', ref)). Проверку резерва делает вызывающий (backend/main.py).
+    """
+    if method.upper()=='POST' and not spend:
+        raise HTTPException(403,'Платный вызов без резерва в журнале расходов запрещён. Сначала оценка цены и подтверждение.')
     try:
         async with httpx.AsyncClient(timeout=120.0, follow_redirects=False) as client:
             r = await client.request(method, BASE + path, headers={'Authorization': 'Bearer ' + key}, json=payload)
@@ -61,8 +68,9 @@ def status(value):
     return {'code': 200, 'message': value.get('msg', ''), 'data': task}
 
 
-async def submit(key, body):
-    return submitted(await request('POST', SUBMIT_PATH, key, body))
+async def submit(key, body, spend=None):
+    """Отправка задания. Платный POST — только с резервом в журнале расходов."""
+    return submitted(await request('POST', SUBMIT_PATH, key, body, spend=spend))
 
 
 async def fetch(key, task_id):

@@ -124,7 +124,29 @@ def up_error(response:httpx.Response):
         raise HTTPException(403,{'code':'PIAPI_CLOUDFLARE_1010','message':'Cloudflare PiAPI блокирует клиент. Обратись в поддержку PiAPI. Автоматических повторов нет.'})
     raise HTTPException(response.status_code,{'message':f'PiAPI вернул HTTP {response.status_code}. Проверь доступ и параметры; повторный запуск требует проверки очереди.'})
 
-async def request_piapi(method:str,path:str,key:str,payload:dict|None=None):
+def require_spend_reservation(spend,payload=None):
+    """Проверка резерва перед платным вызовом провайдера.
+
+    Резерв в журнале расходов — единственное основание платить. Маршрут, который
+    его не создал, получает 403 и до провайдера не доходит.
+    """
+    if not spend or len(spend)<2:
+        raise HTTPException(403,'Платный вызов без резерва в журнале расходов запрещён. Сначала оценка цены и подтверждение.')
+    model=payload.get('model') if isinstance(payload,dict) else None
+    with connect() as db:
+        reserved=security.spend_reserved(db,spend[0],spend[1],model)
+    if not reserved:
+        raise HTTPException(403,'Резерв в журнале расходов не найден или уже использован — платный вызов отклонён.')
+
+async def request_piapi(method:str,path:str,key:str,payload:dict|None=None,spend:tuple|None=None):
+    """Единая точка выхода к PiAPI.
+
+    POST — платный вызов: допускается только при резерве в журнале расходов
+    (spend=('llm'|'llm_call'|'job', ref)). Эта граница не зависит от того, закрыт
+    ли маршрут: без резерва оплата невозможна. GET — бесплатное чтение статуса.
+    """
+    if method.upper()=='POST':
+        require_spend_reservation(spend,payload)
     try:
         async with httpx.AsyncClient(timeout=120.0) as client:
             headers={'Authorization':'Bearer '+key,'Content-Type':'application/json'} if path.startswith('/v1/') else {'X-API-KEY':key,'Content-Type':'application/json'}  # LLM-эндпоинт PiAPI принимает только Bearer
@@ -169,9 +191,13 @@ def diagnostics():
 
 @app.post('/api/chat')
 async def chat(body:ChatRequest,x_api_key:str|None=Header(default=None)):
-    if body.model not in ALLOWED_CHAT: raise HTTPException(400,'Неизвестная модель GPT')
-    if not body.messages or len(body.messages)>50: raise HTTPException(400,'Ожидалось 1–50 сообщений')
-    return await request_piapi('POST','/v1/chat/completions',get_key(x_api_key),body.model_dump())
+    """Прямой чат отключён.
+
+    Здесь не было ни оценки, ни подтверждения, ни лимита бюджета, поэтому вызов
+    не должен уходить к провайдеру ни при каком состоянии флагов. Рабочий путь —
+    /api/llm/chat: оценка цены, подтверждение, лимит и запись в журнал расходов.
+    """
+    raise HTTPException(410,'Прямой чат отключён. Используй /api/llm/chat: оценка цены, подтверждение и лимит бюджета.')
 
 @app.post('/api/tasks')
 async def create_task(req:TaskRequest,x_api_key:str|None=Header(default=None)):
@@ -468,8 +494,10 @@ async def model_job(body:ModelJobRequest,x_api_key:str|None=Header(default=None)
             db.execute('INSERT INTO generation_approvals VALUES(?,?,?,?,?)',(jid,cost,body.max_cost_usd,now(),'documentation_estimate'))
         except sqlite3.IntegrityError: raise HTTPException(409,'Заявка уже отправляется; обнови очередь')
     try:
-        if spec['provider']=='kie': result=await kie.submit(key,adapters.wire_body(spec,payload))
-        else: result=await request_piapi('POST',adapters.submit_path(spec),key,adapters.wire_body(spec,payload))
+        if spec['provider']=='kie':
+            require_spend_reservation(('job',jid))
+            result=await kie.submit(key,adapters.wire_body(spec,payload),spend=('job',jid))
+        else: result=await request_piapi('POST',adapters.submit_path(spec),key,adapters.wire_body(spec,payload),spend=('job',jid))
         if isinstance(result,dict) and not result.get('data') and result.get('task_id'): result={'code':200,'data':result,'message':'success'}  # async GPT-эндпоинт отвечает без обёртки data
         task=result.get('data') or {}
         if not isinstance(task,dict) or not task.get('task_id'):
@@ -625,32 +653,27 @@ AGENT_ROLES = {
 class AgentRunRequest(BaseModel):
     project_id: str|None = None
     brief: str = Field(min_length=3,max_length=12000)
-    provider: str = 'openai'
-    model: str = 'gpt-4.1-mini'
+    provider: str = 'piapi'
+    model: str = 'gpt-5.6-luna'
     character: dict[str,Any] = Field(default_factory=dict)
     style: dict[str,Any] = Field(default_factory=dict)
     target_models: list[str] = Field(default_factory=lambda:['seedream-5-pro','seedance-2.5'])
 
 @app.get('/api/agents/config')
 def agent_config():
-    return {'roles':list(AGENT_ROLES),'providers':['openai','piapi'],'note':'Only LLM planning is executed. Generation requires separate approval. No API keys are saved.'}
+    return {'roles':list(AGENT_ROLES),'providers':['piapi'],'note':'Only LLM planning is executed. Generation requires separate approval. No API keys are saved.'}
 
-async def agent_completion(provider:str,model:str,key:str,system:str,prompt:str):
-    if provider=='openai':
-        if not model.startswith(('gpt-','o')): raise HTTPException(400,'Unknown OpenAI model')
-        try:
-            async with httpx.AsyncClient(timeout=90) as client:
-                response=await client.post('https://api.openai.com/v1/responses',headers={'Authorization':'Bearer '+key,'Content-Type':'application/json'},json={'model':model,'instructions':system,'input':prompt,'max_output_tokens':1400})
-        except httpx.RequestError as e: raise HTTPException(502,'OpenAI connection failed: '+type(e).__name__)
-        if response.is_error: raise HTTPException(response.status_code,{'provider':'openai','error':response.text[:1200]})
-        value=response.json()
-        fragments=[c.get('text','') for item in value.get('output',[]) if item.get('type')=='message' for c in item.get('content',[]) if c.get('type')=='output_text']
-        return '\n'.join(fragments).strip(),value.get('usage',{})
-    if provider=='piapi':
-        if model not in ALLOWED_CHAT: raise HTTPException(400,'Unknown PiAPI LLM model')
-        value=await request_piapi('POST','/v1/chat/completions',key,{'model':model,'messages':[{'role':'system','content':system},{'role':'user','content':prompt}]})
-        return chat_text(value),value.get('usage',{})
-    raise HTTPException(400,'Unknown provider')
+async def agent_completion(provider:str,model:str,key:str,system:str,prompt:str,spend:tuple|None=None):
+    """Платный вызов агента: только PiAPI и только по резерву в журнале расходов.
+
+    Второй провайдер (OpenAI) убран: у него не было ни оценки, ни лимита, ни записи
+    в журнале расходов, поэтому цена такого вызова была неучтённой.
+    """
+    if provider!='piapi':
+        raise HTTPException(400,'Платный LLM доступен только через PiAPI')
+    if model not in ALLOWED_CHAT: raise HTTPException(400,'Unknown PiAPI LLM model')
+    value=await request_piapi('POST','/v1/chat/completions',key,{'model':model,'messages':[{'role':'system','content':system},{'role':'user','content':prompt}]},spend=spend)
+    return chat_text(value),value.get('usage',{})
 
 @app.post('/api/agents/run')
 async def run_agents(body:AgentRunRequest,x_api_key:str|None=Header(default=None)):

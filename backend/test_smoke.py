@@ -280,8 +280,12 @@ class StudioSmokeTests(unittest.TestCase):
             self.assertEqual(stranger.get('/api/projects').status_code,200)
 
     def test_paid_llm_routes_fail_closed_without_verified_prices(self):
-        for endpoint in ('/api/chat','/api/compose','/api/agents/run'):
+        for endpoint in ('/api/compose','/api/agents/run'):
             self.assertEqual(self.client.post(endpoint,json={'approved':True}).status_code,503)
+        # Прямой чат закрыт и отправляет на маршрут, где есть оценка, подтверждение и лимит.
+        closed=self.client.post('/api/chat',json={'model':'gpt-5.6-luna','messages':[{'role':'user','content':'x'}]})
+        self.assertEqual(closed.status_code,410)
+        self.assertIn('/api/llm/chat',closed.json()['detail'])
         main.request_piapi.assert_not_awaited()
         main.agent_completion.assert_not_awaited()
 
@@ -684,7 +688,7 @@ class StudioSmokeTests(unittest.TestCase):
 
     def test_image_submit_is_idempotent_and_saved_before_upstream(self):
         body=self.image_request()
-        async def upstream(*args):
+        async def upstream(*args, **kwargs):
             with main.connect() as db:
                 self.assertEqual(db.execute('SELECT status FROM jobs WHERE id=?',(body['request_id'],)).fetchone()['status'],'submitting')
             return {'data':{'task_id':'provider-task','status':'completed','output':{'image_urls':['https://cdn.example.test/a.png']}}}

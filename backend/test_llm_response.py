@@ -55,8 +55,8 @@ class AuthHeaderTests(unittest.IsolatedAsyncioTestCase):
             seen.append((url, headers))
             return httpx.Response(200, json={'code': 200, 'data': {}, 'choices': [{'message': {'content': 'ok'}}]})
 
-        with patch.object(httpx.AsyncClient, 'request', fake):
-            await main.request_piapi('POST', '/v1/chat/completions', 'secret-key', {'model': 'm'})
+        with patch.object(httpx.AsyncClient, 'request', fake), patch.object(main, 'require_spend_reservation', lambda spend, payload=None: None):
+            await main.request_piapi('POST', '/v1/chat/completions', 'secret-key', {'model': 'm'}, spend=('llm', 'req-1'))
             await main.request_piapi('GET', '/api/v1/task/1', 'secret-key')
         self.assertEqual(seen[0][1].get('Authorization'), 'Bearer secret-key')
         self.assertNotIn('X-API-KEY', seen[0][1])
