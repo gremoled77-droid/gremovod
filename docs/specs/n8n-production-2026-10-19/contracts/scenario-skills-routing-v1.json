@@ -1,5 +1,5 @@
 {
-  "spec_version": "1.0-scenario-preproduction-draft",
+  "spec_version": "1.1-scenario-preproduction-draft",
   "status": "SPECIFIED_NOT_INTEGRATED",
   "scenario_priority": "N01-N11_before_UI",
   "runtime_provider": "NONE_FOR_MOCK",
@@ -73,6 +73,54 @@
       ],
       "kind": "repo_existing",
       "instruction": "Addressed changes preserve source text and untouched scenes"
+    },
+    {
+      "id": "skill-strict-json-output",
+      "repository_path": "backend/skills/production/skill-strict-json-output/SKILL.md",
+      "used_by": [
+        "N03",
+        "N04",
+        "N06",
+        "N07",
+        "N09",
+        "N10",
+        "N11"
+      ],
+      "kind": "repo_existing",
+      "instruction": "Machine-readable answer only: clean JSON per schema, no code fences, BLOCKED_INVALID_INPUT when input is insufficient"
+    },
+    {
+      "id": "skill-canon-lock",
+      "repository_path": "backend/skills/production/skill-canon-lock/SKILL.md",
+      "used_by": [
+        "N03",
+        "N06",
+        "N07",
+        "N09",
+        "N10"
+      ],
+      "kind": "repo_existing",
+      "instruction": "Canon revision is fixed: no new characters, wardrobe, age, palette, features or locations; visual anchors repeated in every shot"
+    },
+    {
+      "id": "skill-video-prompt-crafter",
+      "repository_path": "backend/skills/production/skill-video-prompt-crafter/SKILL.md",
+      "used_by": [
+        "N11",
+        "N42"
+      ],
+      "kind": "repo_existing",
+      "instruction": "Artistic description becomes a dry technical prompt of fixed structure; found_footage markers only when prompt_style asks for them"
+    },
+    {
+      "id": "skill-cheap-gatekeeper",
+      "repository_path": "backend/skills/production/skill-cheap-gatekeeper/SKILL.md",
+      "used_by": [
+        "N07",
+        "N10"
+      ],
+      "kind": "repo_existing",
+      "instruction": "Cheap pre-check before A6/A7/A8: required scenes, timing, revision_id; REJECTED_PRECHECK stops the paid call"
     }
   ],
   "optional_proposed_techniques": [

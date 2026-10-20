@@ -1,0 +1,120 @@
+"""Производственные скиллы бэкенда: реестр, проверка целостности, сборка системного промпта.
+
+Реестр (`backend/skills/production/registry.json`) — единственный источник правды о том,
+какие тексты и в какие вызовы попадают. Хэш файла сверяется с реестром: расхождение — это
+не «работает по-старому», а расхождение версий, поэтому запрос не должен уйти с непроверенным
+промптом. Неизвестный скилл, отсутствующий файл и дрейф хэша дают SkillError.
+"""
+import hashlib
+import json
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent
+SKILLS_ROOT = ROOT / 'skills' / 'production'
+REGISTRY_PATH = SKILLS_ROOT / 'registry.json'
+
+_cache = {}
+
+
+class SkillError(RuntimeError):
+    """Реестр или файл скилла недоступны: запрос не должен уйти с непроверенным промптом."""
+
+
+def _normalise(text):
+    return text.replace('\r\n', '\n').replace('\r', '\n')
+
+
+def digest(text):
+    """Хэш текста с нормализованными переводами строк: CRLF и LF дают одно значение."""
+    return hashlib.sha256(_normalise(text).encode('utf-8')).hexdigest()
+
+
+def registry():
+    """Разобранный реестр. Кэш: файл реестра меняется только вместе с коммитом."""
+    if 'registry' not in _cache:
+        try:
+            data = json.loads(REGISTRY_PATH.read_text(encoding='utf-8'))
+        except (OSError, ValueError) as exc:
+            raise SkillError(f'Реестр производственных скиллов недоступен: {exc}') from exc
+        skills = data.get('skills')
+        if not isinstance(skills, list) or not skills:
+            raise SkillError('В реестре нет ни одного скилла')
+        for item in skills:
+            if not isinstance(item, dict):
+                raise SkillError('Запись реестра не является объектом')
+            for field in ('id', 'file', 'sha256', 'version'):
+                if not isinstance(item.get(field), str) or not item[field]:
+                    raise SkillError(f'Запись реестра без поля {field}')
+        _cache['registry'] = data
+    return _cache['registry']
+
+
+def _item(name):
+    for item in registry()['skills']:
+        if item['id'] == name:
+            return item
+    raise SkillError(f'Неизвестный производственный скилл: {name}')
+
+
+def available():
+    """Идентификаторы скиллов в порядке реестра."""
+    return [item['id'] for item in registry()['skills']]
+
+
+def text(name):
+    """Текст скилла. Хэш файла сверяется с реестром: дрейф — отказ, а не предупреждение."""
+    item = _item(name)
+    path = SKILLS_ROOT / item['file']
+    try:
+        body = path.read_text(encoding='utf-8')
+    except OSError as exc:
+        raise SkillError(f'Файл скилла {name} недоступен: {exc}') from exc
+    if digest(body) != item['sha256']:
+        raise SkillError(f'Хэш скилла {name} не совпадает с реестром; обнови реестр вместе с файлом')
+    return body.strip()
+
+
+def bundle(names):
+    """Скиллы в порядке реестра, без повторов."""
+    wanted = set(names or ())
+    unknown = wanted - set(available())
+    if unknown:
+        raise SkillError('Неизвестные производственные скиллы: ' + ', '.join(sorted(unknown)))
+    return [item['id'] for item in registry()['skills'] if item['id'] in wanted]
+
+
+def system_prompt(base, names):
+    """Базовый системный промпт плюс тексты скиллов. Без скиллов база не меняется."""
+    parts = [text(name) for name in bundle(names)]
+    if not parts:
+        return base
+    head = (base or '').strip()
+    return '\n\n'.join([head, *parts]) if head else '\n\n'.join(parts)
+
+
+def bundle_hash(names):
+    """Хэш комплекта: один и тот же набор даёт одно значение для журнала и проверки версий."""
+    source = '\n'.join(f'{name}\n{text(name)}' for name in bundle(names))
+    return hashlib.sha256(source.encode('utf-8')).hexdigest()
+
+
+def for_stage(stage_id):
+    """Скиллы, объявленные для стадии сценария."""
+    return [item['id'] for item in registry()['skills'] if stage_id in item.get('stages', [])]
+
+
+def for_native_chat(operation, target_kind, has_canon=False):
+    """Скиллы для задания владельческого чата (`backend/native_chat.py`).
+
+    Описание персонажа — всегда под замком канона. Промпт для видео-генератора — с правилом
+    технического промпта. Маркеры found_footage добавляются только по `prompt_style`, поэтому
+    сам скилл подключается безусловно для видео-цели.
+    """
+    names = []
+    if operation == 'describe_character':
+        names.append('skill-canon-lock')
+    if target_kind == 'video' and operation in {'prompt', 'generate'}:
+        names.append('skill-video-prompt-crafter')
+    if has_canon and 'skill-canon-lock' not in names:
+        names.append('skill-canon-lock')
+    return bundle(names)

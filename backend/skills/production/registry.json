@@ -1,0 +1,62 @@
+{
+  "registry_version": "1.0",
+  "description": "Производственные скиллы бэкенда GremoVOD: тексты, которые backend подтягивает в системный промпт. Хэш считается по тексту с нормализованными переводами строк (CRLF/LF дают одно значение).",
+  "skills": [
+    {
+      "id": "skill-strict-json-output",
+      "file": "skill-strict-json-output/SKILL.md",
+      "sha256": "679d353ad85fd9015cc78859a20850147009300d298c607688d94156205c8d9e",
+      "version": "1.0",
+      "scope": "every_llm_system_prompt",
+      "stages": ["N03", "N04", "N06", "N07", "N09", "N10", "N11"],
+      "roles": ["A0", "A4", "A1", "A6", "A7", "A8", "A2"],
+      "output_contract": "json_only",
+      "requires_canon": false,
+      "budget_role": "worker",
+      "instruction": "Только чистый JSON по схеме, без markdown и вступлений; при нехватке входа — BLOCKED_INVALID_INPUT",
+      "wired_in": ["backend/story_plan.py"]
+    },
+    {
+      "id": "skill-canon-lock",
+      "file": "skill-canon-lock/SKILL.md",
+      "sha256": "6cfe7b8b07700f9bf5bad7550fffe57f97098fb5769f23068ec1bb7c251ac31f",
+      "version": "1.0",
+      "scope": "canon_bearing_calls",
+      "stages": ["N03", "N06", "N07", "N09", "N10"],
+      "roles": ["A0", "A1", "A6", "A7"],
+      "output_contract": "json_only",
+      "requires_canon": true,
+      "budget_role": "worker",
+      "instruction": "Замок канона и непрерывности персонажей: правка утверждённого не допускается, визуальные якоря дублируются в каждом шоте",
+      "wired_in": ["backend/native_chat.py"]
+    },
+    {
+      "id": "skill-video-prompt-crafter",
+      "file": "skill-video-prompt-crafter/SKILL.md",
+      "sha256": "3705bf904ef518e8154f734551afafa19db71938070f3d0ebebf84c03b158562",
+      "version": "1.0",
+      "scope": "visual_prompt_preparation",
+      "stages": ["N11", "N42"],
+      "roles": ["A2"],
+      "output_contract": "free_prompt_text",
+      "requires_canon": false,
+      "budget_role": "worker",
+      "instruction": "Художественное описание превращается в сухой технический промпт фиксированной структуры; found_footage — только по prompt_style",
+      "wired_in": ["backend/native_chat.py"]
+    },
+    {
+      "id": "skill-cheap-gatekeeper",
+      "file": "skill-cheap-gatekeeper/SKILL.md",
+      "sha256": "63f917c9672d152351f30e196b978bc26f6ddc208ed06aa64bf1190ff702b3ad",
+      "version": "1.0",
+      "scope": "pre_critic_gate",
+      "stages": ["N07", "N10"],
+      "roles": ["A6", "A7", "A8"],
+      "output_contract": "status_plus_defect_address",
+      "requires_canon": false,
+      "budget_role": "worker",
+      "instruction": "Дешёвая проверка артефакта до вызова A6/A7/A8; при нарушении — REJECTED_PRECHECK без платного вызова",
+      "wired_in": []
+    }
+  ]
+}

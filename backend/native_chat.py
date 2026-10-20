@@ -12,7 +12,7 @@ from pathlib import Path
 from fastapi import Header, HTTPException, UploadFile, File, Form
 from pydantic import BaseModel, Field
 from backend.refinement import edit_context, PRESERVE_VISUAL
-from backend import character_description
+from backend import character_description, production_skills
 
 THREAD_ID = '01a13e25-939c-7b73-9c0a-669abc8aa6a7'
 CHAT_URL = f'codex://threads/{THREAD_ID}'
@@ -42,6 +42,18 @@ class Progress(BaseModel):
     status: str
     prompt: str = Field(default='', max_length=20000)
     message: str = Field(default='', max_length=2000)
+
+
+def chat_rules(studio, body, context):
+    """Правила задания для чата: базовые правила модели плюс производственные скиллы.
+
+    Замок канона подключается для описания персонажа и для продакшн-карточки с сущностью,
+    правило технического промпта — для видео-генератора. Тексты берутся из реестра,
+    хэш файла сверяется с реестром: расхождение версий останавливает задание.
+    """
+    base = character_description.RULES if body.operation == 'describe_character' else studio.system_rules(studio.MODEL_SPECS[body.target])
+    names = production_skills.for_native_chat(body.operation, studio.MODEL_SPECS[body.target].get('kind'), bool(context.get('entity')))
+    return production_skills.system_prompt(base, names)
 
 
 def register(app, studio):
@@ -130,8 +142,11 @@ def register(app, studio):
             else:
                 context = studio.compose_context(studio.ComposeRequest(project_id=body.project_id, target=body.target,use_scene=body.use_scene,provider='codex_chat'))
         if body.target not in studio.MODEL_SPECS:raise HTTPException(400,'Неизвестная целевая модель')
+        # Производственные скиллы: замок канона для описания персонажа и для продакшн-карточки,
+        # правило технического промпта для видео-генератора. Тексты берутся из реестра,
+        # хэш файла сверяется с реестром: расхождение останавливает задание.
         request = json.dumps({'body': body.model_dump(), 'context': context,
-                              'rules': character_description.RULES if body.operation=='describe_character' else studio.system_rules(studio.MODEL_SPECS[body.target]),
+                              'rules': chat_rules(studio, body, context),
                               'quality_request': 'Highest available native quality. For edits keep source dimensions and aspect ratio where supported. Do not upscale or claim an unexposed model/size setting.',
                               'execution':{'intent':body.operation,'prompt_only':body.operation=='prompt','instructions':character_description.RULES if body.operation=='describe_character' else ('PROMPT ONLY. Read the supplied context and structured prompt_base choices. Prepare one coherent finished prompt for the selected model. Preserve reference roles and all explicit framing, lighting and seating constraints. Return it with prompt-ready. Do not call imagegen, generate media, upload images or invoke a paid API. Stop after the prompt is saved.' if body.operation=='prompt' else 'For edit: view each supplied local_path, then call built-in imagegen as an EDIT with referenced_image_paths in the given order. Image 1 is the target; Image 2 is only a detail reference. Follow preservation_contract. Do not recreate from text alone.')}}, ensure_ascii=False, sort_keys=True)
         with studio.connect() as db:
