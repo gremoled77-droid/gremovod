@@ -2,6 +2,7 @@
 import hashlib
 import hmac
 import json
+import os
 import secrets
 import time
 from datetime import datetime, timezone, timedelta
@@ -13,6 +14,9 @@ from urllib.parse import urlsplit
 
 LAUNCH_TOKEN = secrets.token_urlsafe(32)
 SIGNING_KEY = secrets.token_bytes(32)
+# Ключ подписи измерений мастера: с перезапуском студии отчёт перестаёт проверяться,
+# если ключ не задан в окружении (GREMOVOD_QC_SIGNING_KEY).
+QC_SIGNING_KEY = os.environ.get('GREMOVOD_QC_SIGNING_KEY', '').strip().encode() or SIGNING_KEY
 ORIGINS = {'http://127.0.0.1:5173', 'http://localhost:5173', 'http://127.0.0.1:8000', 'http://localhost:8000'}
 MOSCOW = timezone(timedelta(hours=3))
 
@@ -69,6 +73,24 @@ def verify_execution_permit(token, task_id, revision, project_id, model, cost):
         valid = False
     if not valid:
         raise HTTPException(400, 'Разрешение на исполнение отсутствует, устарело или параметры задания изменены.')
+
+
+def qc_sign(payload) -> str:
+    """Подпись измерений мастера (N34).
+
+    Ключ берётся из окружения, чтобы отчёт воркера можно было проверить после
+    перезапуска студии; без переменной ключ живёт только до перезапуска.
+    """
+    data = json.dumps(payload, sort_keys=True, separators=(',', ':'), ensure_ascii=False)
+    return hmac.new(QC_SIGNING_KEY, data.encode(), hashlib.sha256).hexdigest()
+
+
+def qc_verify(payload, signature) -> bool:
+    """Проверка подписи измерений. Подделанный или изменённый отчёт не проходит."""
+    try:
+        return hmac.compare_digest(qc_sign(payload), str(signature or '').strip())
+    except (TypeError, ValueError):
+        return False
 
 
 class BudgetLimits(BaseModel):
