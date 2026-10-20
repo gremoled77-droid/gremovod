@@ -1,0 +1,6 @@
+Edit ONLY tools/agent_smoke/minimax_aider_smoke/calc.py.
+The function total_with_tax(amount_cents, tax_percent) is intentionally wrong.
+Fix it to return the non-negative amount plus an integer percentage tax,
+rounding down fractional cents. Keep the current ValueError behavior.
+Do NOT edit tests, .gitignore, configs, docs, or unrelated files.
+Do not make a commit. Output a short explanation after the edit.
