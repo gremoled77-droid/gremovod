@@ -40,12 +40,14 @@ Workflow в n8n Cloud: `GremoVOD — приёмка через студию (ч�
 
 ## Настройка в n8n (одно действие)
 
-1. Создать credential типа **Header Auth / Templated Custom Auth** с именем
-   `GremoVOD Studio QA Token`:
+1. Создать credential типа **Header Auth** с именем `GremoVOD Studio QA Token`:
    - имя заголовка `Authorization`,
    - значение `Bearer <машинный токен студии>`.
 2. Выбрать его в шести HTTP-узлах: «Создать ревью», «Пакет: критик ТЗ», «Отправить вердикт ТЗ»,
    «Пакет: критик системы», «Отправить вердикт системы», «Итог ревью».
+   Узлы настроены на тип `httpHeaderAuth`, так что в их списке Credentials показывается именно
+   обычный Header Auth. С типом `httpTemplatedCustom Auth` кред не находился — поэтому узлы
+   переведены на `httpHeaderAuth`.
 3. Прогнать вручную: вердикты будут `BLOCKED` (критики не подключены) — это ожидаемо.
 
 Токен в workflow не попадает: он живёт только в credential.
@@ -86,6 +88,9 @@ id `df5b9eda-c6a8-49c2-ac05-7bf3344a56a1`, DNS-запись `studio.grem.win` у
 1. **Header Auth «GremoVOD Studio QA Token»** — `Authorization: Bearer <машинный токен студии>`.
    Назначить шести HTTP-узлам: «Создать ревью», «Пакет: критик ТЗ», «Отправить вердикт ТЗ»,
    «Пакет: критик системы», «Отправить вердикт системы», «Итог ревью».
+   Узлы уже настроены на тип `httpHeaderAuth` (раньше был `httpTemplatedCustomAuth`, и в списке
+   Credentials показывались только Templated Custom Auth — кредит не находился). Создайте обычный
+   **Header Auth**, и он появится в выпадающем списке этих узлов.
 2. **Кред MiniMax для n8n.** Управляемый «Gateway credits» платформы для узла `lmChatMinimax`
    не поддерживает эту операцию: n8n отвечает
    `400 Gateway credits don't currently support this operation. Switch to using your own credential to continue.`

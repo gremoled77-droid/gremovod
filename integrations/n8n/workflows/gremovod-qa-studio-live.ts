@@ -78,14 +78,14 @@ const createReview = node({
       method: 'POST',
       url: expr('{{ $json.base }}/api/qa/reviews'),
       authentication: 'genericCredentialType',
-      genericAuthType: 'httpTemplatedCustomAuth',
+      genericAuthType: 'httpHeaderAuth',
       sendBody: true,
       contentType: 'json',
       specifyBody: 'json',
       jsonBody: expr('{{ $json.body }}'),
       options: { timeout: 30000 },
     },
-    credentials: { httpTemplatedCustomAuth: newCredential('GremoVOD Studio QA Token') },
+    credentials: { httpHeaderAuth: newCredential('GremoVOD Studio QA Token') },
   },
 });
 
@@ -98,10 +98,10 @@ const packetReq = node({
       method: 'GET',
       url: expr("{{ $('Собрать запрос ревью').item.json.base }}/api/qa/reviews/{{ $('Создать ревью').item.json.review.review_id }}/packet/REVIEW-REQ"),
       authentication: 'genericCredentialType',
-      genericAuthType: 'httpTemplatedCustomAuth',
+      genericAuthType: 'httpHeaderAuth',
       options: { timeout: 30000 },
     },
-    credentials: { httpTemplatedCustomAuth: newCredential('GremoVOD Studio QA Token') },
+    credentials: { httpHeaderAuth: newCredential('GremoVOD Studio QA Token') },
   },
 });
 
@@ -114,10 +114,10 @@ const packetSys = node({
       method: 'GET',
       url: expr("{{ $('Собрать запрос ревью').item.json.base }}/api/qa/reviews/{{ $('Создать ревью').item.json.review.review_id }}/packet/REVIEW-SYSTEM"),
       authentication: 'genericCredentialType',
-      genericAuthType: 'httpTemplatedCustomAuth',
+      genericAuthType: 'httpHeaderAuth',
       options: { timeout: 30000 },
     },
-    credentials: { httpTemplatedCustomAuth: newCredential('GremoVOD Studio QA Token') },
+    credentials: { httpHeaderAuth: newCredential('GremoVOD Studio QA Token') },
   },
 });
 
@@ -256,14 +256,14 @@ const submitReq = node({
       method: 'POST',
       url: expr("{{ $('Собрать запрос ревью').item.json.base }}/api/qa/reviews/{{ $('Создать ревью').item.json.review.review_id }}/verdicts"),
       authentication: 'genericCredentialType',
-      genericAuthType: 'httpTemplatedCustomAuth',
+      genericAuthType: 'httpHeaderAuth',
       sendBody: true,
       contentType: 'json',
       specifyBody: 'json',
       jsonBody: expr('{{ $json }}'),
       options: { timeout: 30000 },
     },
-    credentials: { httpTemplatedCustomAuth: newCredential('GremoVOD Studio QA Token') },
+    credentials: { httpHeaderAuth: newCredential('GremoVOD Studio QA Token') },
   },
 });
 
@@ -276,14 +276,14 @@ const submitSys = node({
       method: 'POST',
       url: expr("{{ $('Собрать запрос ревью').item.json.base }}/api/qa/reviews/{{ $('Создать ревью').item.json.review.review_id }}/verdicts"),
       authentication: 'genericCredentialType',
-      genericAuthType: 'httpTemplatedCustomAuth',
+      genericAuthType: 'httpHeaderAuth',
       sendBody: true,
       contentType: 'json',
       specifyBody: 'json',
       jsonBody: expr('{{ $json }}'),
       options: { timeout: 30000 },
     },
-    credentials: { httpTemplatedCustomAuth: newCredential('GremoVOD Studio QA Token') },
+    credentials: { httpHeaderAuth: newCredential('GremoVOD Studio QA Token') },
   },
 });
 
@@ -296,10 +296,10 @@ const finalState = node({
       method: 'GET',
       url: expr("{{ $('Собрать запрос ревью').item.json.base }}/api/qa/reviews/{{ $('Создать ревью').item.json.review.review_id }}"),
       authentication: 'genericCredentialType',
-      genericAuthType: 'httpTemplatedCustomAuth',
+      genericAuthType: 'httpHeaderAuth',
       options: { timeout: 30000 },
     },
-    credentials: { httpTemplatedCustomAuth: newCredential('GremoVOD Studio QA Token') },
+    credentials: { httpHeaderAuth: newCredential('GremoVOD Studio QA Token') },
   },
 });
 
