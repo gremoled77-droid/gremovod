@@ -53,6 +53,10 @@ def chat_rules(studio, body, context):
     """
     base = character_description.RULES if body.operation == 'describe_character' else studio.system_rules(studio.MODEL_SPECS[body.target])
     names = production_skills.for_native_chat(body.operation, studio.MODEL_SPECS[body.target].get('kind'), bool(context.get('entity')))
+    packed = production_skills.context(names, getattr(body, 'entity_revision', None))
+    overlap = [item for item in packed['conflicts'] if item['kind'] == 'scope_overlap']
+    if overlap:
+        raise HTTPException(409, 'Производственные скиллы конфликтуют: ' + '; '.join(item['detail'] for item in overlap))
     return production_skills.system_prompt(base, names)
 
 

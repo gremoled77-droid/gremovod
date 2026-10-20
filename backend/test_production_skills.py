@@ -169,5 +169,57 @@ class NativeChatRules(unittest.TestCase):
         self.assertIn('Canon & Character Continuity Lock', rules)
 
 
+class SkillContextS02(unittest.TestCase):
+    """Форма S02: skill_context + skills_manifest + выявленные конфликты."""
+
+    def test_context_returns_s02_shape(self):
+        packed = production_skills.context(['skill-strict-json-output'])
+        self.assertIn('skill_context', packed)
+        self.assertIn('skills_manifest', packed)
+        self.assertEqual(len(packed['skills_manifest']), 1)
+        entry = packed['skills_manifest'][0]
+        self.assertEqual(entry['id'], 'skill-strict-json-output')
+        raw = (production_skills.SKILLS_ROOT / entry['file']).read_text(encoding='utf-8')
+        self.assertEqual(entry['sha256'], production_skills.digest(raw))
+        self.assertIn('Strict Schema & Zero Chatter', packed['skill_context'])
+
+    def test_manifest_lists_only_requested_skills(self):
+        packed = production_skills.context(['skill-canon-lock'])
+        self.assertEqual([entry['id'] for entry in packed['skills_manifest']], ['skill-canon-lock'])
+
+    def test_missing_canon_revision_is_reported_not_fatal(self):
+        problems = production_skills.detect_conflicts(['skill-canon-lock'])
+        self.assertEqual([item['kind'] for item in problems], ['missing_canon_revision'])
+        self.assertEqual(production_skills.detect_conflicts(['skill-canon-lock'], 'rev-1'), [])
+
+    def test_scope_overlap_is_detected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            entries = []
+            for name in ('skill-a', 'skill-b'):
+                (root / name).mkdir()
+                body = f'текст {name}'
+                (root / name / 'SKILL.md').write_text(body, encoding='utf-8')
+                entries.append({'id': name, 'file': f'{name}/SKILL.md',
+                                'sha256': production_skills.digest(body), 'version': '1.0',
+                                'scope': 'every_llm_system_prompt'})
+            (root / 'registry.json').write_text(json.dumps({'skills': entries}), encoding='utf-8')
+            with mock.patch.object(production_skills, 'SKILLS_ROOT', root), \
+                 mock.patch.object(production_skills, 'REGISTRY_PATH', root / 'registry.json'), \
+                 mock.patch.dict(production_skills._cache, {}, clear=True):
+                problems = production_skills.detect_conflicts(['skill-a', 'skill-b'])
+                self.assertEqual([item['kind'] for item in problems], ['scope_overlap'])
+
+    def test_chat_rules_blocks_scope_overlap(self):
+        from fastapi import HTTPException
+        from backend import native_chat
+        conflict = {'skill_context': '', 'skills_manifest': [],
+                    'conflicts': [{'kind': 'scope_overlap', 'skills': ['a', 'b'], 'detail': 'один scope'}]}
+        with mock.patch.object(production_skills, 'context', return_value=conflict):
+            with self.assertRaises(HTTPException) as caught:
+                native_chat.chat_rules(NativeChatRules.Studio(), NativeChatRules.body('prompt', 'seedance-2.5'), {})
+        self.assertEqual(caught.exception.status_code, 409)
+
+
 if __name__ == '__main__':
     unittest.main()

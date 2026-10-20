@@ -71,6 +71,13 @@ backend/skills/production/                     # тексты, которые ba
 5. **Пустой бандл — no-op.** Базовый системный промпт не меняется, если скиллы не запрошены.
 6. **Канон — только утверждённый.** Блок `[CANON]` и `canon_revision_id` берутся из `canon/**`
    и snapshot'а владельца, а не из ответа модели.
+7. **Форма выхода — как в S02.** `production_skills.context()` возвращает `skill_context`
+   (то, что реально уходит в контекст вызова), `skills_manifest` (версия, хэш, файл, область,
+   стадии, роли) и `conflicts`. S02 требует выявлять конфликты до вызова: одинаковая область
+   у двух скиллов (`scope_overlap`) — ошибка настройки и `HTTP 409`; скилл канона без
+   `canon_revision_id` (`missing_canon_revision`) — информационное предупреждение, вызов не блокируется.
+8. **Имя скилла ≠ его применение** (формулировка S02): подключение фиксируется составом бандла
+   и манифестом, а не наличием папки в каталоге.
 
 **Два реестра не смешивать.** `prompts/` — ролевые промпты A0–A8 (писатель, режиссёр, критики),
 их пишет и утверждает Codex. `backend/skills/production/` — тексты, которые **backend** подмешивает
@@ -121,13 +128,17 @@ MiniMax с этими четырьмя скиллами штампует стр�
 **Подключено в этой ветке.**
 
 - `backend/production_skills.py` — загрузчик: `registry()`, `text()`, `bundle()`,
-  `system_prompt()`, `bundle_hash()`, `for_stage()`, `for_native_chat()`.
+  `system_prompt()`, `bundle_hash()`, `for_stage()`, `for_native_chat()`, `context()`,
+  `detect_conflicts()`. Форма выхода S02: `skill_context` + `skills_manifest` + `conflicts`.
 - `backend/story_plan.py` — `SYSTEM` собирается как `system_prompt(SYSTEM_BASE, ['skill-strict-json-output'])`.
   Это единственный реальный платный LLM-вызов, который уже отдаёт JSON наружу.
 - `backend/native_chat.py` — новая функция `chat_rules(studio, body, context)`: к базовым правилам
   модели добавляется `skill-canon-lock` (описание персонажа, продакшн-карточка с сущностью) и
   `skill-video-prompt-crafter` (операция `prompt`/`generate` для видео-цели). Правила уходят в
   задание чата в поле `rules` — тот же путь, что использует `scripts/native_chat_worker.py`.
+  Состав бандла проверяется на конфликты: общая область у двух скиллов → `409`, конфликт
+  канона без ревизии → предупреждение в манифесте. Формат задания не меняется, поэтому
+  идемпотентность `request_id` не затрагивается.
 - `docs/specs/.../scenario-skills-routing-v1.json` — четыре записи `repo_existing` с реальными
   путями и `used_by`; `spec_version` поднят с `1.0` до `1.1`.
 - `prompts/README.md` — таблица «два разных реестра», чтобы A0–A8 и runtime-скиллы не смешивали.

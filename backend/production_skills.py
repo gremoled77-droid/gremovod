@@ -25,7 +25,11 @@ def _normalise(text):
 
 
 def digest(text):
-    """Хэш текста с нормализованными переводами строк: CRLF и LF дают одно значение."""
+    """Хэш содержимого файла с нормализованными переводами строк: CRLF и LF дают одно значение.
+
+    Хэш считается по файлу целиком, а `text()` отдаёт текст без внешних пробелов,
+    поэтому хэш `text()` и хэш файла различаются на последнем переводе строки.
+    """
     return hashlib.sha256(_normalise(text).encode('utf-8')).hexdigest()
 
 
@@ -118,3 +122,46 @@ def for_native_chat(operation, target_kind, has_canon=False):
     if has_canon and 'skill-canon-lock' not in names:
         names.append('skill-canon-lock')
     return bundle(names)
+
+
+def detect_conflicts(names, canon_revision=None):
+    """Конфликты комплекта по приёмке S02: общий scope и скилл канона без ревизии.
+
+    S02 требует выявлять конфликты до вызова, поэтому проверка возвращает список,
+    а не бросает исключение: решение об остановке принимает вызывающий.
+    `scope_overlap` — ошибка настройки (два скилла претендуют на одну область);
+    `missing_canon_revision` — скилл канона подключён без ревизии.
+    """
+    problems = []
+    scopes = {}
+    for name in bundle(names):
+        item = _item(name)
+        scope = item.get('scope') or ''
+        if scope and scope in scopes:
+            problems.append({'kind': 'scope_overlap', 'skills': [scopes[scope], name],
+                             'detail': f'оба скилла объявляют scope «{scope}»'})
+        elif scope:
+            scopes[scope] = name
+        if item.get('requires_canon') and not canon_revision:
+            problems.append({'kind': 'missing_canon_revision', 'skills': [name],
+                             'detail': 'скилл канона подключён без canon_revision_id'})
+    return problems
+
+
+def context(names, canon_revision=None):
+    """Форма S02: skill_context + skills_manifest.
+
+    skill_context — то, что реально уходит в контекст вызова; skills_manifest — версии,
+    хэши и роли подключённых скиллов; conflicts — найденные противоречия комплекта.
+    """
+    ids = bundle(names)
+    manifest = []
+    for name in ids:
+        item = _item(name)
+        manifest.append({'id': name, 'version': item['version'], 'sha256': item['sha256'],
+                         'file': item['file'], 'scope': item.get('scope', ''),
+                         'stages': item.get('stages', []), 'roles': item.get('roles', []),
+                         'requires_canon': bool(item.get('requires_canon'))})
+    return {'skill_context': '\n\n'.join(text(name) for name in ids),
+            'skills_manifest': manifest,
+            'conflicts': detect_conflicts(ids, canon_revision)}
