@@ -11,9 +11,9 @@ window.STATE =
   "memoryFile": "CLAUDE.md",
   "memoryOwner": "user",
   "skillDir": "C:/Users/BLOWKA/.minimax/skills/autopilot",
-  "baseCommit": null,
+  "baseCommit": "df1e1a3",
   "startedAt": "2026-10-20T13:38:10+03:00",
-  "updatedAt": "2026-10-20T14:25:31+03:00",
+  "updatedAt": "2026-10-20T15:27:31+03:00",
   "finishedAt": null,
   "stages": [
     {
@@ -42,12 +42,14 @@ window.STATE =
     },
     {
       "id": "plan",
-      "status": "active",
-      "startedAt": "2026-10-20T14:25:30+03:00"
+      "status": "done",
+      "startedAt": "2026-10-20T14:25:30+03:00",
+      "finishedAt": "2026-10-20T14:27:40+03:00"
     },
     {
       "id": "build",
-      "status": "pending"
+      "status": "active",
+      "startedAt": "2026-10-20T14:27:40+03:00"
     },
     {
       "id": "review",
@@ -103,9 +105,14 @@ window.STATE =
       ],
       "review": "да — фундамент",
       "model": "сильная",
-      "status": "pending",
+      "status": "repair",
       "retries": 0,
-      "repairs": 0
+      "repairs": 2,
+      "startedAt": "2026-10-20T14:27:41+03:00",
+      "repairFindings": [
+        "reference_quote падает TypeError на записи реестра с незаполненным тарифом",
+        "ориентир не доходит до alternative_baseline, если у default_baseline не заполнен тариф"
+      ]
     },
     {
       "id": "02",
@@ -278,7 +285,9 @@ window.STATE =
   ],
   "tests": null,
   "debt": {
-    "placeholders": [],
+    "placeholders": [
+      "Тарифы, capabilities и base_url маршрутов minimax/deepseek/openrouter в config/llm_gateway.prices.example.json — иллюстративные (capabilities=false, часть тарифов null, verified_at=null, enabled=false). Заполняет владелец после живой проверки; до этого маршруты не включаются."
+    ],
     "assumptions": [],
     "emptyEnv": []
   },
@@ -300,9 +309,16 @@ window.STATE =
     "2026-10-20T14:18:28+03:00",
     "2026-10-20T14:25:29+03:00",
     "2026-10-20T14:25:30+03:00",
-    "2026-10-20T14:25:31+03:00"
+    "2026-10-20T14:25:31+03:00",
+    "2026-10-20T14:26:46+03:00",
+    "2026-10-20T14:27:40+03:00",
+    "2026-10-20T14:27:41+03:00",
+    "2026-10-20T14:59:18+03:00",
+    "2026-10-20T15:08:14+03:00",
+    "2026-10-20T15:08:15+03:00",
+    "2026-10-20T15:27:31+03:00"
   ],
-  "rev": 12,
+  "rev": 19,
   "waiting": null,
   "waits": [
     {
@@ -384,6 +400,52 @@ window.STATE =
       "g": "G3",
       "ok": true,
       "problems": 0
+    },
+    {
+      "t": "2026-10-20T14:27:40+03:00",
+      "k": "stage",
+      "id": "build",
+      "act": "start"
+    },
+    {
+      "t": "2026-10-20T14:27:41+03:00",
+      "k": "ticket",
+      "ids": [
+        "01"
+      ],
+      "act": "start"
+    },
+    {
+      "t": "2026-10-20T14:59:18+03:00",
+      "k": "ticket",
+      "ids": [
+        "01"
+      ],
+      "act": "review"
+    },
+    {
+      "t": "2026-10-20T15:08:14+03:00",
+      "k": "ticket",
+      "ids": [
+        "01"
+      ],
+      "act": "repair",
+      "note": "reference_quote падает TypeError на записи реестра с незаполненным тарифом"
+    },
+    {
+      "t": "2026-10-20T15:08:15+03:00",
+      "k": "add",
+      "key": "debt.placeholders",
+      "n": 1
+    },
+    {
+      "t": "2026-10-20T15:27:31+03:00",
+      "k": "ticket",
+      "ids": [
+        "01"
+      ],
+      "act": "repair",
+      "note": "ориентир не доходит до alternative_baseline, если у default_baseline не заполнен тариф"
     }
   ],
   "reqList": [

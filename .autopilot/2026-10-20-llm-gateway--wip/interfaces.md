@@ -60,13 +60,72 @@ class Usage:
     output_tokens: int | None
     cached_input_tokens: int | None = None
     reasoning_tokens: int | None = None
+    estimated: bool = False   # True — расход предвызовный (оценка), False — подтверждённый провайдером
+
+@dataclass(frozen=True)
+class Capabilities:
+    tools: bool = False
+    streaming: bool = False
+    reasoning: bool = False
+
+@dataclass(frozen=True)
+class ModelEntry:
+    provider: str
+    model: str
+    model_id: str
+    input_per_mtok: float | None
+    output_per_mtok: float | None
+    cached_input_per_mtok: float | None
+    source: str
+    as_of: str
+    protocol: str
+    enabled: bool
+    verified_at: str | None
+    quota_limited: bool
+    promotion: bool
+    role: str
+    free: bool
+    opt_in: bool
+    base_url: str
+    capabilities: Capabilities
+
+@dataclass(frozen=True)
+class Registry:
+    entries: list[ModelEntry]
+    reference_providers: list[str]
+    default_baseline: ModelEntry | None
+    alternative_baseline: ModelEntry | None
+    precision: int
+    source: str            # путь к файлу конфигурации
+    # + методы: entry(provider, model), baseline(name)
 
 def load_registry(path: str | None = None) -> Registry
-def reference_quote(registry: Registry, route: Route, usage: Usage) -> ReferenceQuote
-def actual_quote(registry: Registry, route: Route, usage: Usage, *, charge_possible: bool = True) -> ActualQuote
+def reference_quote(registry: Registry, route: Route, usage: Usage | None = None) -> ReferenceQuote
+def actual_quote(registry: Registry, route: Route, usage: Usage | None = None, *, charge_possible: bool = True) -> ActualQuote
 def select_route(registry: Registry, task: str, mode: str, *, allow_free: bool = False) -> Route | None
 def summarize_spend(db, project_ids: list[str]) -> dict   # actual_cost_usd / reserved_usd / unknown_cost_usd / reference_cost_usd / calls
 ```
+
+**Поведение, зафиксированное таском 01:**
+
+- `reference_quote` на записи реестра с **незаполненным тарифом** (`input`/`output` = null) не падает, а отдаёт `kind='unavailable'`, `cost_usd=None`, `status='unavailable'`, label «Тариф не подтверждён». Ноль не подставляется никогда.
+- **Ветка `unavailable` заполняет `provider`, `model`, `rate_source`, `rate_as_of` записью без тарифа.** Это НЕ значит «ориентир есть»: ориентир есть только при `kind` = `exact_model` или `reference_model`. Проверять наличие ориентира — по `kind`, а не по `provider is not None`.
+- **Правило выбора тарифа-ориентира** — берётся **первый кандидат с заполненным тарифом**, в таком порядке:
+  1. записи «та же модель» у провайдеров из списка ориентиров (`kie`, `piapi`) — если модель маршрута у них есть, берётся запись с тарифом, `kind='exact_model'`; если такие записи есть, но тариф не заполнен ни у одной — `unavailable`: цену другой модели для этой же модели подставлять нельзя;
+  2. если записей «та же модель» нет вовсе — обход базовых линий конфигурации: `default_baseline`, затем `alternative_baseline`; берётся первая с заполненным тарифом, `kind='reference_model'`; если тариф не заполнен ни у одной — `unavailable` без числа.
+
+  Альтернативная линия — именно запасная: у владельца в первом рабочем состоянии конфигурации подтверждён будет один тариф, а не два, и карточка обязана показать число по заполненной линии, а не «Тариф не подтверждён».
+- `actual_quote` на том же входе отдаёт `status='unknown'`, `cost_usd=None`.
+- Статусы `reference`: `exact_model` / `reference_model` / `unavailable`. Статусы `actual`: `confirmed` / `free` / `unknown` / `estimated`.
+- `Usage.estimated=True` — расход предвызовный; `status` тогда `estimated`, а не `confirmed`.
+- `allow_free=True` открывает и маршруты с `free`, и маршруты с `opt_in`.
+- Старые записи журнала со статусом `failed` считаются как 0 — старая схема их уже обнуляла, восстановить факт нельзя.
+- Цены в реестре — USD за 1 000 000 токенов, точность `small_amount_precision` (6).
+
+**Файлы конфигурации реестра:**
+
+- `config/llm_gateway.prices.json` — **реальный** конфиг владельца. В `.gitignore`, в Git не попадает. Если файла нет — шлюз читает пример.
+- `config/llm_gateway.prices.example.json` — приложенный пример: все маршруты `enabled: false`, `verified_at: null`, тарифы minimax/deepseek/openrouter частично `null` (их заполняет владелец после живой проверки).
 
 **Прячет:** разбор JSON конфигурации, выбор базовой линии ориентира, SQL по `llm_calls`, округление до 6 знаков.
 

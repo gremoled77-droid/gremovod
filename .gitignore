@@ -58,3 +58,6 @@ docs/*.jpg
 .aider.chat.history.md
 .aider.input.history
 .autopilot/serve.*
+
+# Реальный конфиг шлюза: тарифы владельца, ключей не содержит, но остаётся локально.
+/config/llm_gateway.prices.json
