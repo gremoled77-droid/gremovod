@@ -80,6 +80,38 @@ class R2StorageTests(unittest.TestCase):
         missing = FakeTransport(status=404, body=b'not found')
         self.assertIsNone(r2_storage.head(CFG, 'x.png', transport=missing))
 
+    def test_public_get_reads_without_keys(self):
+        calls = []
+
+        class Transport:
+            def __call__(self, method, url, headers, payload):
+                calls.append((method, url))
+                return type('Resp', (), {'status_code': 200, 'content': b'public-bytes'})()
+
+        cfg = dict(CFG, access_key_id='', secret_access_key='')
+        data = r2_storage.public_get(cfg, 'site/web/hero main.webp', transport=Transport())
+        self.assertEqual(data, b'public-bytes')
+        self.assertEqual(calls[0][1], 'https://assets.grem.win/site/web/hero%20main.webp')
+
+    def test_public_get_without_public_base_is_a_clear_error(self):
+        cfg = dict(CFG, public_base_url='')
+        with self.assertRaises(r2_storage.R2Error) as ctx:
+            r2_storage.public_get(cfg, 'site/web/hero.webp')
+        self.assertIn('R2_PUBLIC_BASE_URL', str(ctx.exception))
+
+    def test_public_get_reports_missing_object(self):
+        class Transport:
+            def __call__(self, method, url, headers, payload):
+                return type('Resp', (), {'status_code': 404, 'content': b''})()
+
+        with self.assertRaises(r2_storage.R2Error):
+            r2_storage.public_get(CFG, 'site/nope.webp', transport=Transport())
+
+    def test_readable_is_true_with_public_base_only(self):
+        self.assertTrue(r2_storage.readable(dict(CFG, access_key_id='', secret_access_key='')))
+        self.assertFalse(r2_storage.readable(dict(CFG, access_key_id='', secret_access_key='', public_base_url='')))
+        self.assertTrue(r2_storage.readable(CFG))
+
     def test_error_carries_status(self):
         transport = FakeTransport(status=403, body=b'forbidden')
         with self.assertRaises(r2_storage.R2Error) as ctx:
@@ -104,7 +136,6 @@ class R2StorageTests(unittest.TestCase):
 
 class ManifestTests(unittest.TestCase):
     def test_manifest_lists_key_size_and_hash(self):
-        from scripts import r2_upload
         import hashlib as _h
         data = b'payload'
         item = {'key': 'images/a.png', 'bytes': len(data), 'sha256': _h.sha256(data).hexdigest(),

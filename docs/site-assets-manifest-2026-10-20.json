@@ -1,0 +1,359 @@
+{
+  "bucket": "gremovod",
+  "prefix": "site",
+  "public_base_url": "https://assets.grem.win",
+  "object_count": 50,
+  "total_bytes": 70292903,
+  "objects": [
+    {
+      "key": "site/images/gremovod-action-scene.png",
+      "bytes": 6193733,
+      "sha256": "a2def2d4a59bdc03826dac039df4d62bd538428dd76bca9b940fd56dbf2b4d7b",
+      "content_type": "image/png",
+      "source": "images/gremovod-action-scene.png"
+    },
+    {
+      "key": "site/images/gremovod-city-night.png",
+      "bytes": 6115881,
+      "sha256": "b0dccad8c8e9f575a8ededb16340f5c4dcb8ffa6e15fd987cb1494c943e82b7e",
+      "content_type": "image/png",
+      "source": "images/gremovod-city-night.png"
+    },
+    {
+      "key": "site/images/gremovod-closeup-face.png",
+      "bytes": 5575391,
+      "sha256": "b503a017cc991211e5a85aa56d499192b1b0eb078c6fb2982fcd4f381d2a9d04",
+      "content_type": "image/png",
+      "source": "images/gremovod-closeup-face.png"
+    },
+    {
+      "key": "site/images/gremovod-duo-hood.png",
+      "bytes": 6458408,
+      "sha256": "50ed21818135934c864dfaecfa8c928f0c35d3bf3991b868cecb912fe8d0d6ac",
+      "content_type": "image/png",
+      "source": "images/gremovod-duo-hood.png"
+    },
+    {
+      "key": "site/images/gremovod-hero-main.png",
+      "bytes": 6051769,
+      "sha256": "135d0d240a7075a9ca59171f2b24c5373d5bc142b6d97febf0e738c171302102",
+      "content_type": "image/png",
+      "source": "images/gremovod-hero-main.png"
+    },
+    {
+      "key": "site/images/gremovod-hero-night.png",
+      "bytes": 6135432,
+      "sha256": "e2299e4903a3b409e13a309ee2ecc9615f24346eaddf3d095743db067cad5947",
+      "content_type": "image/png",
+      "source": "images/gremovod-hero-night.png"
+    },
+    {
+      "key": "site/images/gremovod-interior-driving.png",
+      "bytes": 6242071,
+      "sha256": "87b704e72d72a94e64bda63331f7a317d89901fb8591223bb5e85135efeb8fe1",
+      "content_type": "image/png",
+      "source": "images/gremovod-interior-driving.png"
+    },
+    {
+      "key": "site/images/gremovod-logo-lockup.jpg",
+      "bytes": 1699933,
+      "sha256": "2216d2d5ef8ea802a6a05755e6515196fa5d447f1cba045f37a74d6ebd934485",
+      "content_type": "image/jpeg",
+      "source": "images/gremovod-logo-lockup.jpg"
+    },
+    {
+      "key": "site/images/gremovod-poster-gremo.jpg",
+      "bytes": 1903986,
+      "sha256": "290f1162975c6455aad7b3eb8d366c2d4bc7062769d574bf626ec8e7067b59d9",
+      "content_type": "image/jpeg",
+      "source": "images/gremovod-poster-gremo.jpg"
+    },
+    {
+      "key": "site/images/gremovod-poster-taxi.png",
+      "bytes": 5639365,
+      "sha256": "f4f553a9dad0a1e63480dcd1c33281d959d94aa64ee279fc90640761ea3e4b6f",
+      "content_type": "image/png",
+      "source": "images/gremovod-poster-taxi.png"
+    },
+    {
+      "key": "site/images/gremovod-station-day.png",
+      "bytes": 5772158,
+      "sha256": "11e88aad0b46f09633db3894a0c4a48444a737ac29a735817e6fd559f78b739c",
+      "content_type": "image/png",
+      "source": "images/gremovod-station-day.png"
+    },
+    {
+      "key": "site/images/gremovod-vertical-promo-alt.png",
+      "bytes": 6019338,
+      "sha256": "913de3d051cd9bf5d8f8308a99078cb9c093fad7321e28714d0933d19c20e32b",
+      "content_type": "image/png",
+      "source": "images/gremovod-vertical-promo-alt.png"
+    },
+    {
+      "key": "site/index.html",
+      "bytes": 10947,
+      "sha256": "6764cef5d1f8ce9ddc4163c80ad917270d513f695a41a76d0f94d35e9bb892f1",
+      "content_type": "text/html",
+      "source": "index.html"
+    },
+    {
+      "key": "site/README.md",
+      "bytes": 3939,
+      "sha256": "cd4ffde3936793524065578920d7a67e071c9ce1528f27ea996f994e003e414c",
+      "content_type": "text/markdown",
+      "source": "README.md"
+    },
+    {
+      "key": "site/web/gremovod-action-scene.webp",
+      "bytes": 304918,
+      "sha256": "29e1291358ea0e2ee8385e81791731094a11a2db185e9bd94e0f97cbdb9d7a74",
+      "content_type": "image/webp",
+      "source": "web/gremovod-action-scene.webp"
+    },
+    {
+      "key": "site/web/gremovod-action-scene@1600.webp",
+      "bytes": 170082,
+      "sha256": "0e17e3959cdd696bfc11f070fbed3dc2dce2d1049fba5dbe1fc4f506ad73f88e",
+      "content_type": "image/webp",
+      "source": "web/gremovod-action-scene@1600.webp"
+    },
+    {
+      "key": "site/web/gremovod-action-scene@900.webp",
+      "bytes": 67784,
+      "sha256": "c2cdfe5739dca24780cc71437bbed36fafd0b17116b7d77d04ad3a05994d8f30",
+      "content_type": "image/webp",
+      "source": "web/gremovod-action-scene@900.webp"
+    },
+    {
+      "key": "site/web/gremovod-city-night.webp",
+      "bytes": 266772,
+      "sha256": "662129f2cb844e3ae50a6ae43717cc2cd16235958dbad53dc4272e570f7895fb",
+      "content_type": "image/webp",
+      "source": "web/gremovod-city-night.webp"
+    },
+    {
+      "key": "site/web/gremovod-city-night@1600.webp",
+      "bytes": 139138,
+      "sha256": "3267c7b1dfcbbfe29600038296f8027a05c6ba9431f656093a05782dc69703bd",
+      "content_type": "image/webp",
+      "source": "web/gremovod-city-night@1600.webp"
+    },
+    {
+      "key": "site/web/gremovod-city-night@900.webp",
+      "bytes": 51002,
+      "sha256": "c2b88f90ea4b2c11e4e04e7967626b68c6372a57f3fc5d140b70d123c154a60a",
+      "content_type": "image/webp",
+      "source": "web/gremovod-city-night@900.webp"
+    },
+    {
+      "key": "site/web/gremovod-closeup-face.webp",
+      "bytes": 310728,
+      "sha256": "3136aa9baf77e6cf55ab2851a38b7d82312de0b58524072f4c39f00ce700bb6d",
+      "content_type": "image/webp",
+      "source": "web/gremovod-closeup-face.webp"
+    },
+    {
+      "key": "site/web/gremovod-closeup-face@1600.webp",
+      "bytes": 210680,
+      "sha256": "192ad8e596d94ade1897cf56f3a0e15dae0b04f0bab7232b50c68cafbbd92901",
+      "content_type": "image/webp",
+      "source": "web/gremovod-closeup-face@1600.webp"
+    },
+    {
+      "key": "site/web/gremovod-closeup-face@900.webp",
+      "bytes": 70140,
+      "sha256": "49184ec2f34866031a8108cb0e046a4b389c7a479d569d9a30f784d29833f2ad",
+      "content_type": "image/webp",
+      "source": "web/gremovod-closeup-face@900.webp"
+    },
+    {
+      "key": "site/web/gremovod-duo-hood.webp",
+      "bytes": 311862,
+      "sha256": "0c21ee290c2fec2c29a3fd915304f8f6d6a46c68a6a3dbc62a40d2483cee5936",
+      "content_type": "image/webp",
+      "source": "web/gremovod-duo-hood.webp"
+    },
+    {
+      "key": "site/web/gremovod-duo-hood@1600.webp",
+      "bytes": 262030,
+      "sha256": "07e25d03aacee841b5918456cc354ccc40559acfbc94eb20cb76a14d83b5991c",
+      "content_type": "image/webp",
+      "source": "web/gremovod-duo-hood@1600.webp"
+    },
+    {
+      "key": "site/web/gremovod-duo-hood@900.webp",
+      "bytes": 106150,
+      "sha256": "34d3abac8e1f6a5bc350d97b87130401a2f350b787a7199ef092851e791e5a6b",
+      "content_type": "image/webp",
+      "source": "web/gremovod-duo-hood@900.webp"
+    },
+    {
+      "key": "site/web/gremovod-hero-main.webp",
+      "bytes": 368824,
+      "sha256": "3c4dfefc484102faa497b6ece1b3cf7e9e9fb4d9aa7de7f50877af981125616b",
+      "content_type": "image/webp",
+      "source": "web/gremovod-hero-main.webp"
+    },
+    {
+      "key": "site/web/gremovod-hero-main@1600.webp",
+      "bytes": 220112,
+      "sha256": "7ab8850f0a94e2aba10ec862c1ec99f412201fd8b85b9439a4640b977e561df1",
+      "content_type": "image/webp",
+      "source": "web/gremovod-hero-main@1600.webp"
+    },
+    {
+      "key": "site/web/gremovod-hero-main@900.webp",
+      "bytes": 93202,
+      "sha256": "9216ef6c1ccda7b1207b8a21de7a7c01acb49802b9cac080db7ad457192647c7",
+      "content_type": "image/webp",
+      "source": "web/gremovod-hero-main@900.webp"
+    },
+    {
+      "key": "site/web/gremovod-hero-night.webp",
+      "bytes": 252842,
+      "sha256": "082f288617d8a775cfb94d477ef4bb0d16d07c08f3404d1f4b855fe76d5dc0d7",
+      "content_type": "image/webp",
+      "source": "web/gremovod-hero-night.webp"
+    },
+    {
+      "key": "site/web/gremovod-hero-night@1600.webp",
+      "bytes": 143220,
+      "sha256": "630bbdb5e808c25b1060bd0a5279664b7198bf367d1317d888e48dc6682533b0",
+      "content_type": "image/webp",
+      "source": "web/gremovod-hero-night@1600.webp"
+    },
+    {
+      "key": "site/web/gremovod-hero-night@900.webp",
+      "bytes": 55906,
+      "sha256": "30f1161365c804396d6bdd5a21a3ae05aab4e32377b122649428d7d68fa4ebdb",
+      "content_type": "image/webp",
+      "source": "web/gremovod-hero-night@900.webp"
+    },
+    {
+      "key": "site/web/gremovod-interior-driving.webp",
+      "bytes": 304950,
+      "sha256": "c932cff49f6d68e26b7ea7ddeec8c88e00e8609a359386535aadd8545b04bb31",
+      "content_type": "image/webp",
+      "source": "web/gremovod-interior-driving.webp"
+    },
+    {
+      "key": "site/web/gremovod-interior-driving@1600.webp",
+      "bytes": 166872,
+      "sha256": "670ac00b005d4ada78678c61367a55e7e28ae93d0373e48d64a7d53baea2da3c",
+      "content_type": "image/webp",
+      "source": "web/gremovod-interior-driving@1600.webp"
+    },
+    {
+      "key": "site/web/gremovod-interior-driving@900.webp",
+      "bytes": 62624,
+      "sha256": "9e69831aab6835b66eca90d860f74e5134bbad5ad28334a38475b0a1930870a3",
+      "content_type": "image/webp",
+      "source": "web/gremovod-interior-driving@900.webp"
+    },
+    {
+      "key": "site/web/gremovod-logo-lockup.webp",
+      "bytes": 88886,
+      "sha256": "dbdb6a9fcdd4fd6bc094aadd8fff306fa04eab4751ea6987a774a6b5017a22a1",
+      "content_type": "image/webp",
+      "source": "web/gremovod-logo-lockup.webp"
+    },
+    {
+      "key": "site/web/gremovod-logo-lockup@1600.webp",
+      "bytes": 54116,
+      "sha256": "117e7b89604f9f59f0769736042c310de4657f9eacb43727de1bae8c3cb44b2b",
+      "content_type": "image/webp",
+      "source": "web/gremovod-logo-lockup@1600.webp"
+    },
+    {
+      "key": "site/web/gremovod-logo-lockup@900.webp",
+      "bytes": 24268,
+      "sha256": "a2da02b73d3893d04aeeb63913db64587cac4fcb4db2867e42fd8f7f27123d18",
+      "content_type": "image/webp",
+      "source": "web/gremovod-logo-lockup@900.webp"
+    },
+    {
+      "key": "site/web/gremovod-poster-gremo.webp",
+      "bytes": 137090,
+      "sha256": "d3fd75b0c1c2b28128642dfaedc1dd0e7b1aa7a422995351f0fea87ccf152db9",
+      "content_type": "image/webp",
+      "source": "web/gremovod-poster-gremo.webp"
+    },
+    {
+      "key": "site/web/gremovod-poster-gremo@1600.webp",
+      "bytes": 105838,
+      "sha256": "19a8a77aa1a442d14237f2360285f8368de74da4682d88f2ff813989dc4542ba",
+      "content_type": "image/webp",
+      "source": "web/gremovod-poster-gremo@1600.webp"
+    },
+    {
+      "key": "site/web/gremovod-poster-gremo@900.webp",
+      "bytes": 31334,
+      "sha256": "48dd46ca000ef1c7fc8ffc0862b3146faf05afae019dbe9ce39fc22b9312b43a",
+      "content_type": "image/webp",
+      "source": "web/gremovod-poster-gremo@900.webp"
+    },
+    {
+      "key": "site/web/gremovod-poster-taxi.webp",
+      "bytes": 332334,
+      "sha256": "e9c93cb41a21f62327c4f6751813e84edd89942bb6646795bcf95f71ac83c559",
+      "content_type": "image/webp",
+      "source": "web/gremovod-poster-taxi.webp"
+    },
+    {
+      "key": "site/web/gremovod-poster-taxi@1600.webp",
+      "bytes": 275116,
+      "sha256": "718a0bba6f12ff9b80400a53f8dda8d216b2693c9d6e47117b436df9cc9c2ec3",
+      "content_type": "image/webp",
+      "source": "web/gremovod-poster-taxi@1600.webp"
+    },
+    {
+      "key": "site/web/gremovod-poster-taxi@900.webp",
+      "bytes": 109828,
+      "sha256": "c46d12832f0548d92ea847775d1d8b3d2eb6ccc377af3a9a6cc5a4ed5f7f2be5",
+      "content_type": "image/webp",
+      "source": "web/gremovod-poster-taxi@900.webp"
+    },
+    {
+      "key": "site/web/gremovod-station-day.webp",
+      "bytes": 276930,
+      "sha256": "b0b98d47a68d9cf77d2d5760677e5b8774a0712b96d312aea61891138c2f9735",
+      "content_type": "image/webp",
+      "source": "web/gremovod-station-day.webp"
+    },
+    {
+      "key": "site/web/gremovod-station-day@1600.webp",
+      "bytes": 167704,
+      "sha256": "1cf8a3dad6b9be36b8bb315d5b1c885946c2a18c7edc3facb393a2b98939655f",
+      "content_type": "image/webp",
+      "source": "web/gremovod-station-day@1600.webp"
+    },
+    {
+      "key": "site/web/gremovod-station-day@900.webp",
+      "bytes": 69540,
+      "sha256": "9cab8dcb7080daab18e70f2946dffb1437b662a9cd87e680adef9c48bbaa7f2c",
+      "content_type": "image/webp",
+      "source": "web/gremovod-station-day@900.webp"
+    },
+    {
+      "key": "site/web/gremovod-vertical-promo-v2.webp",
+      "bytes": 362760,
+      "sha256": "7a5376f44bb33d5b5b958450db48fe3d3c8988d986f7f5aff46c9b7db55dc78f",
+      "content_type": "image/webp",
+      "source": "web/gremovod-vertical-promo-v2.webp"
+    },
+    {
+      "key": "site/web/gremovod-vertical-promo-v2@1600.webp",
+      "bytes": 362760,
+      "sha256": "7a5376f44bb33d5b5b958450db48fe3d3c8988d986f7f5aff46c9b7db55dc78f",
+      "content_type": "image/webp",
+      "source": "web/gremovod-vertical-promo-v2@1600.webp"
+    },
+    {
+      "key": "site/web/gremovod-vertical-promo-v2@900.webp",
+      "bytes": 132210,
+      "sha256": "5eb1818384aa3a0a4742c793a1723e263b689176ee2739aa74b3f509ae205ecf",
+      "content_type": "image/webp",
+      "source": "web/gremovod-vertical-promo-v2@900.webp"
+    }
+  ]
+}

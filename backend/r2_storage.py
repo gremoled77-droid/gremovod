@@ -21,7 +21,7 @@ import hashlib
 import hmac
 import mimetypes
 import os
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import httpx
@@ -52,6 +52,12 @@ def enabled(cfg=None):
     return bool(cfg['endpoint'] and cfg['bucket'] and cfg['access_key_id'] and cfg['secret_access_key'])
 
 
+def readable(cfg=None):
+    """Читать можно и без ключей: если у бакета есть публичный домен, объекты видны без подписи."""
+    cfg = cfg or config()
+    return enabled(cfg) or bool(cfg.get('public_base_url'))
+
+
 def _sign(key, message):
     return hmac.new(key, message.encode('utf-8'), hashlib.sha256).digest()
 
@@ -79,7 +85,7 @@ def sign_request(method, url, headers, payload_hash, access_key_id, secret_acces
     """Подписывает запрос SigV4 и возвращает заголовки с Authorization.
 
     payload_hash — sha256 тела (или UNSIGNED_PAYLOAD)."""
-    now = now or datetime.now(timezone.utc)
+    now = now or datetime.now(UTC)
     amz_date = now.strftime('%Y%m%dT%H%M%SZ')
     date_stamp = now.strftime('%Y%m%d')
     parsed = httpx.URL(url)
@@ -97,14 +103,7 @@ def sign_request(method, url, headers, payload_hash, access_key_id, secret_acces
     encoded_path = raw_path.decode('ascii') if isinstance(raw_path, bytes) else raw_path
     query = parsed.query.decode('ascii') if isinstance(parsed.query, bytes) else parsed.query
 
-    canonical_request = '\n'.join([
-        method.upper(),
-        encoded_path,
-        query,
-        canonical_headers,
-        signed_headers,
-        payload_hash,
-    ])
+    canonical_request = f"{method.upper()}\n{encoded_path}\n{query}\n{canonical_headers}\n{signed_headers}\n{payload_hash}"
     scope = f'{date_stamp}/{region}/{service}/aws4_request'
     string_to_sign = '\n'.join([ALGORITHM, amz_date, scope, _sha256(canonical_request.encode('utf-8'))])
     signature = hmac.new(signing_key(secret_access_key, date_stamp, region, service),
@@ -173,6 +172,25 @@ def head(cfg, key, transport=None):
 
 def get_bytes(cfg, key, transport=None):
     response = _request('GET', cfg, key, transport=transport)
+    return response.content
+
+
+def public_get(cfg, key, transport=None):
+    """Чтение публичного объекта без ключей.
+
+    S3-API R2 отвечает 400 на неподписанный запрос даже для открытого бакета, поэтому
+    публичные объекты читаются через домен бакета (R2_PUBLIC_BASE_URL), а не через S3-эндпоинт."""
+    base = (cfg.get('public_base_url') or '').strip().rstrip('/')
+    if not base:
+        raise R2Error('Нет публичного адреса бакета: задай R2_PUBLIC_BASE_URL или подпиши запрос ключами')
+    url = f"{base}/{canonical_uri(key).lstrip('/')}"
+    if transport is not None:
+        response = transport('GET', url, {}, b'')
+    else:
+        with httpx.Client(timeout=120) as client:
+            response = client.get(url)
+    if response.status_code >= 400:
+        raise R2Error(f'Публичный объект недоступен: {response.status_code}')
     return response.content
 
 
