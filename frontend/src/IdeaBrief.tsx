@@ -143,7 +143,7 @@ export default function IdeaBrief({
           method: 'POST',
           headers: {'Content-Type': 'application/json'},
           body: JSON.stringify({
-            provider: 'piapi',
+            provider: '',
             project_id: projectId,
             model,
             max_tokens: LLM_MAX_TOKENS,

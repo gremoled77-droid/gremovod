@@ -1,5 +1,6 @@
 import {useEffect, useState} from 'react';
 import {apiFetch, PAID_LLM_ENABLED} from './api';
+import {newRequestId, paidBody} from './paidProtocol';
 export type PromptRequest = {project_id: string; target: string; provider: string; model: string};
 export default function PromptComposer({
   request,
@@ -10,9 +11,12 @@ export default function PromptComposer({
   onClose: () => void;
   onComposed: (prompt: string) => void;
 }) {
-  const [preview, setPreview] = useState<{context: Record<string, unknown>; system_rules: string} | null>(
-    null
-  );
+  const [preview, setPreview] = useState<{
+    context: Record<string, unknown>;
+    system_rules: string;
+    estimated_usd?: number;
+    quote_token?: string;
+  } | null>(null);
   const [approved, setApproved] = useState(false);
   const [busy, setBusy] = useState(false);
   const [attempted, setAttempted] = useState(false);
@@ -45,7 +49,13 @@ export default function PromptComposer({
       const r = await apiFetch('/api/compose', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({...request, approved: true}),
+        body: JSON.stringify({
+          ...request,
+          ...paidBody(
+            {usd: preview?.estimated_usd || 0, token: preview?.quote_token || ''},
+            newRequestId()
+          ),
+        }),
       });
       const d = await r.json();
       if (!r.ok) throw Error(typeof d.detail === 'string' ? d.detail : JSON.stringify(d.detail));
@@ -67,10 +77,11 @@ export default function PromptComposer({
         aria-labelledby="compose-title"
       >
         <h2 id="compose-title">Подготовка промпта через API</h2>
-        <p className="notice">
-          API-резерв временно отключён до настройки оценки стоимости. Контекст можно просмотреть, а промпт
-          подготовить в основном чате Codex.
-        </p>
+        {preview && (
+          <p className="notice">
+            Контекст запроса собран на сервере. Стоимость оценена, запускать можно только с подтверждением.
+          </p>
+        )}
         <p>
           {request.provider} · {request.model} → {request.target}
         </p>
@@ -92,8 +103,8 @@ export default function PromptComposer({
           </>
         )}
         <p className="muted">
-          Один платный LLM-запрос, ответ до 1400 токенов. Точная стоимость зависит от тарифа выбранной модели
-          и длины контекста; долларовая оценка пока недоступна. Видео автоматически не запускается. Промпт и
+          Один платный LLM-запрос, ответ до 1400 токенов. Оценка: ≈ $
+          {(preview?.estimated_usd ?? 0).toFixed(4)}. Видео автоматически не запускается. Промпт и
           фактический usage сохраняются в истории проекта.
         </p>
         <label className="inline-checkbox">

@@ -1,4 +1,5 @@
 import {apiFetch, PAID_LLM_ENABLED} from './api';
+import {newRequestId, paidBody} from './paidProtocol';
 import {useState} from 'react';
 
 type AgentResult = {
@@ -18,14 +19,42 @@ type Props = {
 };
 const options = ['seedream-5-pro', 'seedream-5-lite', 'nano-banana-2.1', 'seedance-2.5'];
 export default function AgentPanel({projectId, brief, character, style, onApply}: Props) {
-  const [provider, setProvider] = useState('piapi');
   const [model, setModel] = useState('gpt-5.6-luna');
   const [styleNotes, setStyleNotes] = useState('');
   const [targets, setTargets] = useState<string[]>(['seedream-5-pro', 'seedance-2.5']);
   const [result, setResult] = useState<AgentResult | null>(null);
+  const [quote, setQuote] = useState<{usd: number; token: string} | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const request = () => ({
+    project_id: projectId || null,
+    brief,
+    provider: '',
+    model,
+    character: character || {},
+    style: {...style, agent_notes: styleNotes},
+    target_models: targets,
+  });
+  const estimate = async () => {
+    setBusy(true);
+    setError('');
+    try {
+      const response = await apiFetch('/api/agents/estimate', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(request()),
+      });
+      const data = await response.json();
+      if (!response.ok) throw Error(typeof data.detail === 'string' ? data.detail : JSON.stringify(data.detail || data));
+      setQuote({usd: Number(data.estimated_usd) || 0, token: data.quote_token});
+    } catch (e: any) {
+      setError(String(e.message || e));
+    } finally {
+      setBusy(false);
+    }
+  };
   const run = async () => {
+    if (!quote) return;
     setBusy(true);
     setError('');
     try {
@@ -33,18 +62,14 @@ export default function AgentPanel({projectId, brief, character, style, onApply}
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({
-          project_id: projectId || null,
-          brief,
-          provider,
-          model,
-          character: character || {},
-          style: {...style, agent_notes: styleNotes},
-          target_models: targets,
+          ...request(),
+          ...paidBody(quote, newRequestId()),
         }),
       });
       const data = await response.json();
-      if (!response.ok) throw Error(JSON.stringify(data.detail || data));
+      if (!response.ok) throw Error(typeof data.detail === 'string' ? data.detail : JSON.stringify(data.detail || data));
       setResult(data);
+      setQuote(null);
     } catch (e: any) {
       setError(String(e.message || e));
     } finally {
@@ -67,32 +92,13 @@ export default function AgentPanel({projectId, brief, character, style, onApply}
   );
   return (
     <section className="sc">
-      <div className="ag-state" role="status">
-        <b>Платные API-агенты выключены</b>
-        <span>
-          Пока для них нет оценки стоимости и лимита. Основной чат Codex доступен в студии, а форма ниже
-          показывает, как будет работать команда.
-        </span>
-      </div>
       <p className="muted sc-lede">
         Три специалиста последовательно подготовят план, проверят консистентность и составят промпты под
         выбранные модели. Генерация картинок и видео автоматически не запускается.
       </p>
       <article className="sc-step">
-        {stepHead(1, 'Провайдер и модель', 'Ключ берётся из серверных подключений')}
+        {stepHead(1, 'Модель', 'Провайдера выбирает реестр по модели; ключ берётся из серверных подключений')}
         <div className="param-grid">
-          <label>
-            Провайдер
-            <select
-              value={provider}
-              onChange={e => {
-                setProvider(e.target.value);
-                setModel('gpt-5.6-luna');
-              }}
-            >
-              <option value="piapi">PiAPI</option>
-            </select>
-          </label>
           <label>
             Модель
             <input value={model} onChange={e => setModel(e.target.value)} />
@@ -126,20 +132,29 @@ export default function AgentPanel({projectId, brief, character, style, onApply}
       <article className="sc-step">
         {stepHead(4, 'Запуск', 'Задание берётся из «Идеи». Один запуск — 3 вызова LLM')}
         <div className="rf-actions">
-          <button
-            className="primary"
-            disabled={!PAID_LLM_ENABLED || busy || !brief.trim() || targets.length === 0}
-            onClick={run}
-          >
-            {busy ? 'Агенты работают…' : '▶ Создать план и промпты'}
-          </button>
+          {quote ? (
+            <>
+              <span className="muted">≈ ${quote.usd.toFixed(4)} за 3 вызова</span>
+              <button className="primary" disabled={busy} onClick={() => void run()}>
+                {busy ? 'Агенты работают…' : 'Запустить'}
+              </button>
+              <button disabled={busy} onClick={() => setQuote(null)}>
+                Отмена
+              </button>
+            </>
+          ) : (
+            <button
+              className="primary"
+              disabled={!PAID_LLM_ENABLED || busy || !brief.trim() || targets.length === 0}
+              onClick={() => void estimate()}
+            >
+              {busy ? 'Считаю цену…' : 'Оценить и создать план'}
+            </button>
+          )}
         </div>
         {!brief.trim() && <small className="muted">Сначала напиши задание ролика на экране «Идея».</small>}
         {error && (
           <div className="alert">
-            {error.includes('1010')
-              ? 'PiAPI заблокировал клиент (Cloudflare 1010). Можно выбрать OpenAI напрямую. '
-              : ''}
             {error}
           </div>
         )}

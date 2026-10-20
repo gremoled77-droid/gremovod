@@ -34,6 +34,8 @@ import WorldFromBrief from './WorldFromBrief';
 import {passportText} from './worldBible';
 import ProducerPanel from './ProducerPanel';
 import {type ProducerScenario, withScenario} from './producerStage';
+import {LLM_MAX_TOKENS} from './llmPricing';
+import {newRequestId, paidBody} from './paidProtocol';
 import AttachmentMenu, {AttachmentStrip} from './AttachmentMenu';
 import CharactersScreen from './CharactersScreen';
 import SoundScreen from './SoundScreen';
@@ -88,8 +90,7 @@ type Character = {
   working_asset_id?: string;
   version_history?: string[];
   id: string;
-  name: string;
-  identity: {
+  name: string;  identity: {
     species: string;
     face: string;
     hair: string;
@@ -202,6 +203,8 @@ const json = async (r: Response) => {
   return d;
 };
 const url = '/api';
+// Сколько последних сообщений чата уходит в LLM: длинная история дорогая и не нужна.
+const CHAT_HISTORY = 20;
 function App() {
   const [productionTarget, setProductionTarget] = useState<{
     productionId: string;
@@ -233,7 +236,6 @@ function App() {
   const [denoise, setDenoise] = useState(true);
   const [audioConsent, setAudioConsent] = useState(false);
   const [audioResult, setAudioResult] = useState('');
-  const [provider, setProvider] = useState<'openai' | 'piapi'>('piapi');
   const [diagnostics, setDiagnostics] = useState<any>(null);
   const [assetList, setAssetList] = useState<any[]>([]);
   const [assetCategory, setAssetCategory] = useState('real_references');
@@ -723,37 +725,57 @@ function App() {
       await applyProjectChange(pendingProjectChange);
       setPendingProjectChange(null);
     });
-  const sendChat = () =>
+  const [chatQuote, setChatQuote] = useState<{usd: number; token: string; payload: any[]} | null>(null);
+  const chatSystem =
+    'Ты режиссёр AI-видеостудии. Помогай создавать точные сцены и промпты; сохраняй внешность персонажей.';
+  const estimateChat = () =>
     work('chat', async () => {
       if (!chatText.trim()) return;
-      const next = [...messages, {role: 'user', content: chatText}];
+      if (!projectId) throw Error('Сначала сохрани проект: без него расход не записать');
+      const next = [...messages, {role: 'user', content: chatText.trim()}];
       setMessages(next);
       setChatText('');
+      // В провайдер уходит только хвост истории: длинный контекст дорогой и не нужен.
+      const payload = [{role: 'system', content: chatSystem}, ...next.slice(-CHAT_HISTORY)];
+      const q = await json(
+        await apiFetch(url + '/llm/estimate', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            project_id: projectId,
+            model: llm,
+            messages: payload,
+            max_tokens: LLM_MAX_TOKENS,
+          }),
+        })
+      );
+      setChatQuote({usd: Number(q.estimated_usd) || 0, token: q.quote_token, payload});
+    });
+  const sendChat = () =>
+    work('chat', async () => {
+      const quote = chatQuote;
+      if (!quote) return;
       const d = await json(
         await apiFetch(url + '/llm/chat', {
           method: 'POST',
           headers,
           body: JSON.stringify({
-            provider,
+            provider: '',
             model: llm,
-            messages: [
-              {
-                role: 'system',
-                content:
-                  'Ты режиссёр AI-видеостудии. Помогай создавать точные сцены и промпты; сохраняй внешность персонажей.',
-              },
-              ...next,
-            ],
+            messages: quote.payload,
+            project_id: projectId,
+            ...paidBody(quote, newRequestId()),
           }),
         })
       );
       setMessages([
-        ...next,
+        ...messages,
         {
           role: 'assistant',
           content: d.choices?.[0]?.message?.content || 'Нет ответа',
         },
       ]);
+      setChatQuote(null);
     });
   const draft = (model: string) =>
     work('draft', async () => {
@@ -794,7 +816,7 @@ function App() {
     work('compose-preview', async () => {
       const id = await persistProject();
       void refresh();
-      setPromptRequest({project_id: id, target: model, provider, model: llm});
+      setPromptRequest({project_id: id, target: model, provider: '', model: llm});
     });
   const submit = (model: string, kind: string) =>
     work('review', async () => {
@@ -1715,14 +1737,9 @@ function App() {
                     />
                   }
                   onProjectsChanged={() => void refresh()}
-                  provider={provider}
                   model={llm}
                   busy={!!busy}
                   diagnostics={diagnostics}
-                  onProvider={value => {
-                    setProvider(value);
-                    setLlm('gpt-5.6-luna');
-                  }}
                   onModel={setLlm}
                   onConnections={() => setMode('connections')}
                   onDiagnose={() =>
@@ -1764,12 +1781,28 @@ function App() {
                         <input
                           value={chatText}
                           onChange={e => setChatText(e.target.value)}
-                          onKeyDown={e => e.key === 'Enter' && !e.shiftKey && sendChat()}
+                          onKeyDown={e => e.key === 'Enter' && !e.shiftKey && estimateChat()}
                           placeholder="Спроси GPT о сцене или промпте…"
                         />
-                        <button className="primary" disabled={!PAID_LLM_ENABLED || !!busy} onClick={sendChat}>
-                          Отправить
-                        </button>
+                        {chatQuote ? (
+                          <>
+                            <span className="muted">≈ ${chatQuote.usd.toFixed(4)}</span>
+                            <button className="primary" disabled={!!busy} onClick={sendChat}>
+                              Отправить
+                            </button>
+                            <button disabled={!!busy} onClick={() => setChatQuote(null)}>
+                              Отмена
+                            </button>
+                          </>
+                        ) : (
+                          <button
+                            className="primary"
+                            disabled={!PAID_LLM_ENABLED || !!busy || !chatText.trim()}
+                            onClick={estimateChat}
+                          >
+                            Оценить
+                          </button>
+                        )}
                       </div>
                     </section>
                     {modelPanel('image')}

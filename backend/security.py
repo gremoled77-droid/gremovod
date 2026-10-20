@@ -209,11 +209,11 @@ def register(app, studio):
         supplied = request.headers.get('x-studio-session') or request.cookies.get('studio_session', '')
         if not public and not worker and not machine and not secrets.compare_digest(supplied.encode(), LAUNCH_TOKEN.encode()):
             return JSONResponse({'detail':'Локальная сессия отсутствует. Обнови страницу студии.'}, status_code=401)
-        # Заморозка платного LLM-резерва на старых составных маршрутах. Это не граница
-        # оплаты: настоящая граница — резерв в журнале расходов, который проверяется
-        # в точке выхода к провайдеру (backend/main.py::require_spend_reservation).
-        if request.method == 'POST' and request.url.path in {'/api/compose','/api/agents/run'}:
-            return JSONResponse({'detail':'Платный LLM-резерв временно отключён: для него ещё нет проверенной серверной оценки и лимита стоимости. Используй основной чат Codex.'}, status_code=503)
+        # Платные маршруты /api/compose и /api/agents/run больше не заморожены:
+        # у них появились серверная оценка, подпись, лимит бюджета и запись в
+        # журнал расходов — тот же протокол, что у /api/llm/chat. Граница оплаты
+        # не в этом списке, а в точке выхода к провайдеру
+        # (backend/main.py::require_spend_reservation).
         return await call_next(request)
 
 

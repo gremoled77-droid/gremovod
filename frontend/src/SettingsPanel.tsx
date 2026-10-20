@@ -6,11 +6,9 @@ import ChatLinkSetting from './ChatLinkSetting';
 type Props = {
   children?: ReactNode;
   projectHeader?: ReactNode;
-  provider: 'openai' | 'piapi';
   model: string;
   busy: boolean;
   diagnostics: unknown;
-  onProvider: (provider: 'openai' | 'piapi') => void;
   onModel: (model: string) => void;
   onConnections: () => void;
   onDiagnose: () => void;
@@ -19,11 +17,9 @@ type Props = {
 
 export default function SettingsPanel({
   projectHeader,
-  provider,
   model,
   busy,
   diagnostics,
-  onProvider,
   onModel,
   onConnections,
   onDiagnose,
@@ -57,17 +53,8 @@ export default function SettingsPanel({
             студии.
           </p>
         )}
+        <p className="muted">Провайдера выбирает реестр по модели — вручную он не задаётся.</p>
         <div className="param-grid">
-          <label>
-            LLM-провайдер
-            <select
-              value={provider}
-              disabled={busy}
-              onChange={e => onProvider(e.target.value as 'openai' | 'piapi')}
-            >
-              <option value="piapi">PiAPI</option>
-            </select>
-          </label>
           <label>
             LLM
             <select value={model} disabled={busy} onChange={e => onModel(e.target.value)}>

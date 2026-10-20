@@ -2,6 +2,7 @@ import {useState} from 'react';
 import {Clapperboard} from 'lucide-react';
 import {apiFetch, PAID_LLM_ENABLED} from './api';
 import {responseJson} from './ChatGPTPanel';
+import {newRequestId, paidBody} from './paidProtocol';
 import {
   parseScenario,
   producerRequest,
@@ -93,10 +94,7 @@ export default function ProducerStage({
           '/api/producer/run',
           post({
             ...request(quote.pid),
-            approved: true,
-            quote_token: quote.token,
-            max_cost_usd: quote.usd,
-            request_id: crypto.randomUUID(),
+            ...paidBody(quote, newRequestId()),
           })
         )
       );

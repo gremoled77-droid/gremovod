@@ -20,7 +20,8 @@ class CameraTests(unittest.TestCase):
     def test_camera_reaches_video_and_scene_but_not_still_images(self):
         pid=self.make_project()
         for scene in [False,True]:
-            r=self.client.post('/api/compose/preview',json={'project_id':pid,'target':'seedance-2.5','provider':'codex_chat','use_scene':scene});self.assertEqual(r.status_code,200,r.text)
+            # Провайдера не задаём: его выбирает реестр по модели.
+            r=self.client.post('/api/compose/preview',json={'project_id':pid,'target':'seedance-2.5','provider':'','use_scene':scene});self.assertEqual(r.status_code,200,r.text)
             camera=r.json()['context']['camera_movement'];self.assertEqual(camera['preset_id'],'dolly-in');self.assertIn('Advance the camera',camera['instruction']);self.assertIn('Finish at the face',camera['instruction'])
             self.assertIn('camera_movement',r.json()['system_rules'])
         photo=self.client.post('/api/compose/preview',json={'project_id':pid,'target':'gpt-image-2.5'}).json()['context']

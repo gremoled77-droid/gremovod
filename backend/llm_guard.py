@@ -576,17 +576,54 @@ def _not_charged(value):
             and isinstance(completion, int) and not isinstance(completion, bool) and completion == 0)
 
 
-def _settle(studio, call_id, status, usd, note=None):
+def settle_call(studio, call_id, status, usd, note=None, tokens=None):
     """Записать судьбу вызова: сколько денег он удерживает и почему."""
     with studio.connect() as db:
-        db.execute('UPDATE llm_calls SET status=?,usd=?,note=COALESCE(?,note) WHERE id=?', (status, usd, note, call_id))
+        if tokens:
+            db.execute('UPDATE llm_calls SET status=?,usd=?,note=COALESCE(?,note),input_tokens=?,output_tokens=? WHERE id=?',
+                       (status, usd, note, tokens[0], tokens[1], call_id))
+        else:
+            db.execute('UPDATE llm_calls SET status=?,usd=?,note=COALESCE(?,note) WHERE id=?', (status, usd, note, call_id))
+
+
+def resolve_provider(model, provider=''):
+    """Провайдера выбирает реестр.
+
+    Пустой `provider` — это «возьми провайдера этой модели», а не «PiAPI»: вендор
+    в коде вызова не прибит. Явный провайдер проверяется на совпадение с реестром.
+    """
+    if provider:
+        spec = llm_spec(model, provider)
+        if spec is None:
+            raise HTTPException(400, f'Модель {model} не найдена в реестре или её не обслуживает провайдер {provider}.')
+        return spec
+    spec = llm_spec(model)
+    if spec is None:
+        raise HTTPException(400, f'Модель {model} не найдена в реестре.')
+    return spec
+
+
+def reserve_call(studio, project_id, model, request_id, cost):
+    """Резерв в журнале расходов до обращения к провайдеру. Возвращает id записи.
+
+    Повтор того же request_id — 409: платный вызов не повторяется автоматически.
+    """
+    call_id = uuid.uuid4().hex
+    with studio.connect() as db:
+        db.execute('BEGIN IMMEDIATE')
+        if db.execute('SELECT 1 FROM llm_calls WHERE request_id=?', (request_id,)).fetchone():
+            raise HTTPException(409, 'Этот запрос уже отправлялся. Проверь результат, повтор платного вызова не выполняется автоматически.')
+        check_budget(db, project_id, cost)
+        db.execute('INSERT INTO llm_calls(id,request_id,project_id,model,status,usd,estimated_usd,input_tokens,output_tokens,created_at) VALUES(?,?,?,?,?,?,?,?,?,?)',
+                   (call_id, request_id, project_id, model, 'reserved', cost, cost, None, None, studio.now()))
+    return call_id
 
 
 async def guarded_chat(studio, body, key):
     """Единственный путь платного LLM-вызова. Резерв в бюджете создаётся до обращения к провайдеру."""
     from backend import security
-    if llm_spec(body.model, body.provider) is None:
-        raise HTTPException(400, f'Модель {body.model} не найдена в реестре или её не обслуживает провайдер {body.provider}.')
+    spec = resolve_provider(body.model, body.provider)
+    provider = spec['provider']
     if not body.project_id:
         raise HTTPException(400, 'Укажи проект для учёта расхода')
     studio.project(body.project_id)
@@ -601,34 +638,28 @@ async def guarded_chat(studio, body, key):
         raise HTTPException(400, 'Лимит стоимости ниже оценки запроса')
     call_id = uuid.uuid4().hex
     request_id = body.request_id or call_id
-    with studio.connect() as db:
-        db.execute('BEGIN IMMEDIATE')
-        if db.execute('SELECT 1 FROM llm_calls WHERE request_id=?', (request_id,)).fetchone():
-            raise HTTPException(409, 'Этот запрос уже отправлялся. Проверь результат, повтор платного вызова не выполняется автоматически.')
-        check_budget(db, body.project_id, cost)
-        db.execute('INSERT INTO llm_calls(id,request_id,project_id,model,status,usd,estimated_usd,input_tokens,output_tokens,created_at) VALUES(?,?,?,?,?,?,?,?,?,?)',
-                   (call_id, request_id, body.project_id, body.model, 'reserved', cost, cost, None, None, studio.now()))
+    call_id = reserve_call(studio, body.project_id, body.model, request_id, cost)
     try:
-        value = await studio.provider_chat(body.provider, key, {'model': llm_wire_model(body.model), 'messages': messages, 'max_tokens': body.max_tokens}, spend=('llm', request_id, body.model))
+        value = await studio.provider_chat(provider, key, {'model': llm_wire_model(body.model), 'messages': messages, 'max_tokens': body.max_tokens}, spend=('llm', request_id, body.model))
     except HTTPException as exc:
         # Отказ 4xx — провайдер не исполнил запрос, деньги не списаны: резерв освобождаем.
         # Всё остальное (5xx, таймаут, обрыв) — исход неизвестен: резерв держим до ручной сверки.
         if getattr(exc, 'status_code', 500) < 500:
-            _settle(studio, call_id, 'failed', 0, f'отказ провайдера: {exc.detail}')
+            settle_call(studio, call_id, 'failed', 0, f'отказ провайдера: {exc.detail}')
         else:
-            _settle(studio, call_id, 'submission_unknown', cost, f'исход неизвестен: {exc.detail}')
+            settle_call(studio, call_id, 'submission_unknown', cost, f'исход неизвестен: {exc.detail}')
         raise
     except Exception as exc:
-        _settle(studio, call_id, 'submission_unknown', cost, f'исход неизвестен: {exc}')
+        settle_call(studio, call_id, 'submission_unknown', cost, f'исход неизвестен: {exc}')
         raise
     try:
         text = studio.chat_text(value)
     except Exception as exc:
         # Ответ получен, но разобрать его не удалось: запрос мог быть исполнен и оплачен.
         if _not_charged(value):
-            _settle(studio, call_id, 'failed', 0, 'провайдер сообщил нулевое потребление')
+            settle_call(studio, call_id, 'failed', 0, 'провайдер сообщил нулевое потребление')
         else:
-            _settle(studio, call_id, 'submission_unknown', cost, f'ответ не разобран: {exc}')
+            settle_call(studio, call_id, 'submission_unknown', cost, f'ответ не разобран: {exc}')
         raise
     usage = value.get('usage') if isinstance(value, dict) and isinstance(value.get('usage'), dict) else {}
     price_in, price_out = price_of(body.model)
@@ -642,6 +673,6 @@ async def guarded_chat(studio, body, key):
     with studio.connect() as db:
         db.execute("UPDATE llm_calls SET status='done',usd=?,input_tokens=?,output_tokens=? WHERE id=?",
                    (actual, tokens_in if isinstance(tokens_in, int) else None, tokens_out if isinstance(tokens_out, int) else None, call_id))
-    return {'choices': [{'message': {'role': 'assistant', 'content': text}}], 'usage': usage, 'provider': 'piapi', 'model': body.model,
+    return {'choices': [{'message': {'role': 'assistant', 'content': text}}], 'usage': usage, 'provider': provider, 'model': body.model,
             'cost_usd': actual, 'estimated_usd': cost, 'status': 'done', 'over_estimate': over_estimate,
             'over_estimate_usd': round(actual - cost, 6) if over_estimate else 0.0}

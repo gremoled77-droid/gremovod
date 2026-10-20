@@ -279,9 +279,14 @@ class StudioSmokeTests(unittest.TestCase):
             self.assertEqual(stranger.get('/api/session').status_code,200)
             self.assertEqual(stranger.get('/api/projects').status_code,200)
 
-    def test_paid_llm_routes_fail_closed_without_verified_prices(self):
-        for endpoint in ('/api/compose','/api/agents/run'):
-            self.assertEqual(self.client.post(endpoint,json={'approved':True}).status_code,503)
+    def test_paid_llm_routes_refuse_without_quote_and_approval(self):
+        # На платных маршрутах теперь есть оценка, подпись и лимит: без них запрос
+        # отклоняется, и провайдер не зовётся.
+        pid=self.client.post('/api/projects',json={'title':'Paid','state':{}}).json()['id']
+        for endpoint,body in (('/api/compose',{'project_id':pid,'target':'seedream-5-pro'}),
+                              ('/api/agents/run',{'project_id':pid,'brief':'Грэм едет ночью'})):
+            r=self.client.post(endpoint,json=body)
+            self.assertIn(r.status_code,(400,404,422),r.text)
         # Прямой чат закрыт и отправляет на маршрут, где есть оценка, подтверждение и лимит.
         closed=self.client.post('/api/chat',json={'model':'gpt-5.6-luna','messages':[{'role':'user','content':'x'}]})
         self.assertEqual(closed.status_code,410)
@@ -851,7 +856,8 @@ class StudioSmokeTests(unittest.TestCase):
         self.assertIn('Seedance 2.5',preview.json()['system_rules'])
         self.assertEqual(preview.json()['context']['references'][0]['label'],'@image1')
         self.assertNotIn('DO_NOT_LEAK_OTHER_PROFILE',preview.text)
-        self.assertEqual(self.client.post('/api/compose',json={**body,'approved':True}).status_code,503)
+        # Без подписи оценки платный вызов не проходит, и провайдер не зовётся.
+        self.assertEqual(self.client.post('/api/compose',json={**body,'approved':True}).status_code,400)
         main.agent_completion.assert_not_awaited()
         main.request_piapi.assert_not_awaited()
 

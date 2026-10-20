@@ -1,3 +1,4 @@
+import json
 import unittest
 from unittest.mock import AsyncMock, patch
 from backend import llm_guard, main, test_production, test_smoke
@@ -97,13 +98,75 @@ class LlmGuardTests(unittest.TestCase):
             # Отказ провайдера до исполнения: резерв освобождается.
             self.assertEqual((row['status'], row['usd']), ('failed', 0))
 
-    def test_other_paid_llm_routes_stay_closed(self):
-        for endpoint in ('/api/compose', '/api/agents/run'):
-            self.assertEqual(self.client.post(endpoint, json={'approved': True}).status_code, 503)
+    def test_paid_llm_routes_share_the_same_protocol(self):
+        """Оценка, подтверждение и лимит теперь есть на всех платных маршрутах.
+
+        Заморозка снята не «на словах»: без подписи и подтверждения запрос
+        отклоняется, а провайдер не зовётся.
+        """
+        self.prepare()
+        for endpoint, body in (('/api/compose', {'project_id': self.pid, 'target': 'seedream-5-pro'}),
+                               ('/api/agents/run', {'project_id': self.pid, 'brief': 'Грэм едет ночью'})):
+            for change in ({'approved': False}, {'quote_token': 'x'}, {'max_cost_usd': 0}):
+                r = self.client.post(endpoint, json={**body, **change})
+                self.assertIn(r.status_code, (400, 404, 422), (endpoint, change, r.text))
         # Прямой чат закрыт: провайдер не вызывается, ответ ведёт на защищённый маршрут.
         closed = self.client.post('/api/chat', json={'model': 'gpt-5.6-luna', 'messages': [{'role': 'user', 'content': 'x'}]})
         self.assertEqual(closed.status_code, 410)
         self.assertIn('/api/llm/chat', closed.json()['detail'])
+
+    def test_compose_estimates_then_runs_and_records_the_cost(self):
+        self.prepare()
+        with main.connect() as db:
+            db.execute("UPDATE projects SET state=? WHERE id=?", (json.dumps({'brief': 'Грэм едет ночью по Минску.'}, ensure_ascii=False), self.pid))
+        body = {'project_id': self.pid, 'target': 'seedream-5-pro', 'model': 'gpt-5.6-luna', 'provider': ''}
+        preview = self.client.post('/api/compose/preview', json=body)
+        self.assertEqual(preview.status_code, 200, preview.text)
+        quote = preview.json()
+        self.assertGreater(quote['estimated_usd'], 0)
+        self.assertTrue(quote['quote_token'])
+        with patch.object(main, 'request_piapi', AsyncMock(return_value=REPLY)) as call:
+            r = self.client.post('/api/compose', json={**body, 'approved': True, 'quote_token': quote['quote_token'],
+                                                      'max_cost_usd': quote['estimated_usd'], 'request_id': 'compose-test-1'})
+            self.assertEqual(r.status_code, 200, r.text)
+            self.assertEqual(call.await_count, 1)
+            again = self.client.post('/api/compose', json={**body, 'approved': True, 'quote_token': quote['quote_token'],
+                                                          'max_cost_usd': quote['estimated_usd'], 'request_id': 'compose-test-1'})
+            self.assertEqual(again.status_code, 409)
+            self.assertEqual(call.await_count, 1)
+        with main.connect() as db:
+            row = db.execute("SELECT status,usd FROM llm_calls WHERE request_id='compose-test-1'").fetchone()
+        self.assertEqual(row['status'], 'done')
+        self.assertGreater(row['usd'], 0)
+
+    def test_agents_estimate_covers_every_role_and_one_reservation_holds_them(self):
+        self.prepare()
+        body = {'project_id': self.pid, 'brief': 'Грэм едет ночью', 'model': 'gpt-5.6-luna', 'provider': '',
+                'target_models': ['seedream-5-pro']}
+        estimate = self.client.post('/api/agents/estimate', json=body)
+        self.assertEqual(estimate.status_code, 200, estimate.text)
+        quote = estimate.json()
+        self.assertEqual(quote['calls'], 3)
+        self.assertGreater(quote['estimated_usd'], 0)
+        with patch.object(main, 'agent_completion', AsyncMock(return_value=('Сцена: Грэм едет ночью.', {'prompt_tokens': 120, 'completion_tokens': 40}))) as call:
+            r = self.client.post('/api/agents/run', json={**body, 'approved': True, 'quote_token': quote['quote_token'],
+                                                        'max_cost_usd': quote['estimated_usd'], 'request_id': 'agents-test-1'})
+            self.assertEqual(r.status_code, 200, r.text)
+            # Три роли — три вызова провайдера, но резерв в журнале один.
+            self.assertEqual(call.await_count, 3)
+        with main.connect() as db:
+            rows = db.execute('SELECT status,usd FROM llm_calls').fetchall()
+        # Три роли — три вызова провайдера, но резерв в журнале один.
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]['status'], 'done')
+
+    def test_agents_run_without_approval_or_quote_never_calls_the_provider(self):
+        self.prepare()
+        body = {'project_id': self.pid, 'brief': 'Грэм едет ночью', 'model': 'gpt-5.6-luna', 'target_models': ['seedream-5-pro']}
+        with patch.object(main, 'request_piapi', AsyncMock(return_value=REPLY)) as call:
+            self.assertEqual(self.client.post('/api/agents/run', json=body).status_code, 400)
+            self.assertEqual(self.client.post('/api/agents/run', json={**body, 'approved': True}).status_code, 400)
+            self.assertEqual(call.await_count, 0)
 
 
 class LlmEconomicsTests(unittest.TestCase):

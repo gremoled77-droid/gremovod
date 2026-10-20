@@ -200,7 +200,7 @@ async def request_piapi(method:str,path:str,key:str,payload:dict|None=None,spend
 LLM_TRANSPORTS['piapi']=lambda key,payload,spend: request_piapi('POST','/v1/chat/completions',key,payload,spend=spend)
 
 class UnifiedChatRequest(BaseModel):
-    provider:str='openai'
+    provider:str=''
     model:str='gpt-4.1-mini'
     messages:list[dict[str,Any]]=Field(min_length=1,max_length=50)
     max_tokens:int|None=Field(default=None,ge=16,le=8000)
@@ -212,13 +212,11 @@ class UnifiedChatRequest(BaseModel):
 
 @app.post('/api/llm/chat')
 async def unified_chat(body:UnifiedChatRequest, x_api_key:str|None=Header(default=None)):
-    spec=llm_spec(body.model, body.provider)
-    if spec is None:
-        raise HTTPException(400, f'Модель {body.model} не найдена в реестре или её не обслуживает провайдер {body.provider}.')
+    from backend import llm_guard
+    spec=llm_guard.resolve_provider(body.model, body.provider)
     key=provider_credential(spec['provider'], x_api_key)
     if not key or not key.isascii() or any(c.isspace() for c in key):
         raise HTTPException(400,'Введи корректный API-ключ провайдера')
-    from backend import llm_guard
     return await llm_guard.guarded_chat(sys.modules[__name__],body,key)
 
 class DiagnosticInfo(BaseModel):
@@ -276,9 +274,12 @@ def model_specs():
 class ComposeRequest(BaseModel):
     project_id:str
     model:str='gpt-5.6-luna'
-    provider:str='piapi'
+    provider:str=''
     target:str
     approved:bool=False
+    quote_token:str=''
+    max_cost_usd:float|None=Field(default=None,ge=0,le=100,allow_inf_nan=False)
+    request_id:str|None=Field(default=None,min_length=8,max_length=100,pattern=r'^[a-zA-Z0-9_-]+$')
     use_scene:bool=False
     scene_override:dict[str,Any]|None=None  # готовая «сцена» вместо сохранённой: промпт и референсы из «Кадров»
 
@@ -371,20 +372,43 @@ def compose_context(body:ComposeRequest):
             'references':references,'scene':{k:scene[k] for k in ('brief','assets') if k in scene},
             'selected_image_metadata':anchor,'capabilities':spec,'rules_version':RULES_VERSION}
 
+def compose_messages(body, context):
+    """Сообщения для LLM: правила модели и собранный контекст проекта."""
+    from backend import llm_guard
+    return llm_guard.clean_messages([
+        {'role':'system','content':system_rules(MODEL_SPECS[body.target])},
+        {'role':'user','content':json.dumps(context,ensure_ascii=False)}])
+
 @app.post('/api/compose/preview')
 def compose_preview(body:ComposeRequest):
+    """Бесплатная часть: контекст, оценка цены и подпись на неё."""
+    from backend import llm_guard
     context=compose_context(body)
-    return {'context':context,'system_rules':system_rules(MODEL_SPECS[body.target]),'external_calls':0}
+    spec=llm_guard.resolve_provider(body.model, body.provider)
+    messages=compose_messages(body, context)
+    cost=llm_guard.estimate_usd(body.model, messages, llm_guard.MAX_OUTPUT_TOKENS)
+    token=security.quote(body.project_id, llm_guard.payload_of(body.model, messages, llm_guard.MAX_OUTPUT_TOKENS), cost)
+    return {'context':context,'system_rules':system_rules(MODEL_SPECS[body.target]),'external_calls':0,
+            'estimated_usd':cost,'quote_token':token,'max_tokens':llm_guard.MAX_OUTPUT_TOKENS,
+            'provider':spec['provider'],'model':body.model}
 
 @app.post('/api/compose')
 async def compose(body:ComposeRequest, x_api_key:str|None=Header(default=None)):
+    """Платный вызов по правилам чата: оценка, подтверждение, лимит и учёт."""
+    from backend import llm_guard
     context=compose_context(body)
-    if not body.approved: raise HTTPException(400,'Нужно подтверждение платного LLM-запроса')
-    if body.model not in ALLOWED_CHAT: raise HTTPException(400,'Недопустимая LLM-модель')
-    if llm_spec(body.model, body.provider) is None:
-        raise HTTPException(400, f'Модель {body.model} не найдена в реестре или её не обслуживает провайдер {body.provider}.')
-    key=provider_credential(body.provider, x_api_key)
-    content,usage=await agent_completion(body.provider,body.model,key,system_rules(MODEL_SPECS[body.target]),json.dumps(context,ensure_ascii=False))
+    spec=llm_guard.resolve_provider(body.model, body.provider)
+    key=provider_credential(spec['provider'], x_api_key)
+    if not key or not key.isascii() or any(c.isspace() for c in key):
+        raise HTTPException(400,'Введи корректный API-ключ провайдера')
+    messages=compose_messages(body, context)
+    request=UnifiedChatRequest(provider=spec['provider'], model=body.model, messages=messages,
+                               max_tokens=llm_guard.MAX_OUTPUT_TOKENS, project_id=body.project_id,
+                               approved=body.approved, quote_token=body.quote_token,
+                               max_cost_usd=body.max_cost_usd, request_id=body.request_id)
+    result=await llm_guard.guarded_chat(sys.modules[__name__], request, key)
+    content=result['choices'][0]['message']['content']
+    usage=result['usage']
     if not content.strip(): raise HTTPException(502,'LLM вернула пустой промпт')
     try: validate_prompt(body.target,content,len(context['references']))
     except HTTPException as exc: raise HTTPException(502,exc.detail)
@@ -393,13 +417,14 @@ async def compose(body:ComposeRequest, x_api_key:str|None=Header(default=None)):
     version_id=uuid.uuid4().hex
     with connect() as db:
         db.execute('BEGIN IMMEDIATE')
-        db.execute('INSERT INTO prompt_versions VALUES(?,?,?,?,?,?,?,?,?,?)',(version_id,body.project_id,body.target,content,json.dumps(context,ensure_ascii=False),body.provider,body.model,json.dumps(usage),RULES_VERSION,now()))
+        db.execute('INSERT INTO prompt_versions VALUES(?,?,?,?,?,?,?,?,?,?)',(version_id,body.project_id,body.target,content,json.dumps(context,ensure_ascii=False),spec['provider'],body.model,json.dumps(usage),RULES_VERSION,now()))
         # Merge into the latest project so unrelated edits are not overwritten by a slow LLM.
         row=db.execute('SELECT state FROM projects WHERE id=?',(body.project_id,)).fetchone()
         current=json.loads(row['state'])
         current.setdefault('prompts',{})[body.target]=content
         db.execute('UPDATE projects SET state=?,updated_at=? WHERE id=?',(json.dumps(current,ensure_ascii=False),now(),body.project_id))
-    return {'prompt':content,'usage':usage,'version_id':version_id,'rules_version':RULES_VERSION,'references':context['references']}
+    return {'prompt':content,'usage':usage,'version_id':version_id,'rules_version':RULES_VERSION,'references':context['references'],
+            'cost_usd':result['cost_usd'],'estimated_usd':result['estimated_usd']}
 
 @app.get('/api/projects/{project_id}/prompt-versions')
 def prompt_versions(project_id:str):
@@ -696,17 +721,60 @@ AGENT_ROLES = {
 class AgentRunRequest(BaseModel):
     project_id: str|None = None
     brief: str = Field(min_length=3,max_length=12000)
-    provider: str = 'piapi'
+    provider: str = ''
     model: str = 'gpt-5.6-luna'
     character: dict[str,Any] = Field(default_factory=dict)
     style: dict[str,Any] = Field(default_factory=dict)
     target_models: list[str] = Field(default_factory=lambda:['seedream-5-pro','seedance-2.5'])
+    approved: bool = False
+    quote_token: str = ''
+    max_cost_usd: float|None = Field(default=None,ge=0,le=100,allow_inf_nan=False)
+    request_id: str|None = Field(default=None,min_length=8,max_length=100,pattern=r'^[a-zA-Z0-9_-]+$')
+
+AGENT_MAX_TOKENS = 2000
+# Каждый следующий специалист видит результаты предыдущих: закладываем запас на их текст.
+AGENT_PREVIOUS_CHARS = 2000
+
+def agent_context(body:AgentRunRequest):
+    """Контекст прогона агентов: задание, канон персонажа, библия мира и целевые модели."""
+    return {'brief':body.brief,'character_identity':body.character.get('identity',{}),
+            'model_profiles':body.character.get('profiles',{}),'project_style_bible':body.style,
+            'target_models':{m:MODEL_SPECS[m] for m in body.target_models}}
+
+def agent_estimate_usd(body:AgentRunRequest, context_chars:int):
+    """Оценка всех ролей: каждая роль — отдельный платный вызов."""
+    from backend import llm_guard
+    total=0.0
+    for index in range(len(AGENT_ROLES)):
+        messages=[{'role':'system','content':''},{'role':'user','content':'x'*(context_chars+index*AGENT_PREVIOUS_CHARS)}]
+        total+=llm_guard.estimate_usd(body.model, messages, AGENT_MAX_TOKENS)
+    return round(total,6)
+
+def agent_quote_payload(body:AgentRunRequest, context_chars:int):
+    """Что подписывается оценкой: вход прогона и его цена."""
+    return {'kind':'agents','model':body.model,'roles':list(AGENT_ROLES),'context_chars':context_chars,
+            'max_tokens':AGENT_MAX_TOKENS,'target_models':list(body.target_models)}
 
 @app.get('/api/agents/config')
 def agent_config():
     return {'roles':list(AGENT_ROLES),'providers':['piapi'],'note':'Only LLM planning is executed. Generation requires separate approval. No API keys are saved.'}
 
-async def agent_completion(provider:str,model:str,key:str,system:str,prompt:str,spend:tuple|None=None):
+@app.post('/api/agents/estimate')
+def agent_estimate(body:AgentRunRequest):
+    """Оценка прогона агентов: сумма ролей и подпись на неё. Провайдера не зовёт."""
+    from backend import llm_guard
+    if not body.project_id: raise HTTPException(400,'Укажи проект для учёта расхода')
+    project(body.project_id)
+    spec=llm_guard.resolve_provider(body.model, body.provider)
+    for target in body.target_models:
+        if target not in MODEL_SPECS: raise HTTPException(400,'No verified API schema for '+target)
+    context_chars=len(json.dumps(agent_context(body),ensure_ascii=False))
+    cost=agent_estimate_usd(body, context_chars)
+    token=security.quote(body.project_id, agent_quote_payload(body, context_chars), cost)
+    return {'estimated_usd':cost,'quote_token':token,'roles':list(AGENT_ROLES),'calls':len(AGENT_ROLES),
+            'provider':spec['provider'],'model':body.model,'external_calls':0}
+
+async def agent_completion(provider:str,model:str,key:str,system:str,prompt:str,spend:tuple|None=None,max_tokens:int|None=None):
     """Платный вызов агента: провайдер из реестра и только по резерву в журнале расходов.
 
     Прямой вызов OpenAI убран: у него не было ни оценки, ни лимита, ни записи
@@ -716,26 +784,58 @@ async def agent_completion(provider:str,model:str,key:str,system:str,prompt:str,
     if llm_spec(model, provider) is None:
         raise HTTPException(400, f'Модель {model} не найдена в реестре или её не обслуживает провайдер {provider}.')
     if model not in ALLOWED_CHAT: raise HTTPException(400, f'Модель {model} недоступна в этом сценарии')
-    value=await provider_chat(provider,key,{'model':llm_wire_model(model),'messages':[{'role':'system','content':system},{'role':'user','content':prompt}]},spend=spend)
+    payload={'model':llm_wire_model(model),'messages':[{'role':'system','content':system},{'role':'user','content':prompt}]}
+    if max_tokens: payload['max_tokens']=max_tokens
+    value=await provider_chat(provider,key,payload,spend=spend)
     return chat_text(value),value.get('usage',{})
 
 @app.post('/api/agents/run')
 async def run_agents(body:AgentRunRequest,x_api_key:str|None=Header(default=None)):
-    key=get_key(x_api_key) if body.provider=='piapi' else provider_key(body.provider,x_api_key)
-    if not key or not key.isascii() or any(x.isspace() for x in key): raise HTTPException(400,'Enter a valid API key (ASCII, no spaces)')
+    """Прогон агентов по правилам чата: оценка, подтверждение, резерв, лимит и учёт.
+
+    Роли идут последовательно и каждая — отдельный платный вызов. Резерв в
+    журнале расходов один на весь прогон, списывается по факту после последней
+    роли; обрыв на середине даёт submission_unknown, потому что часть ролей
+    могла быть оплачена.
+    """
+    from backend import llm_guard
+    if not body.project_id: raise HTTPException(400,'Укажи проект для учёта расхода')
+    project(body.project_id)
+    spec=llm_guard.resolve_provider(body.model, body.provider)
+    provider=spec['provider']
+    if not body.approved: raise HTTPException(400,'Нужно подтверждение платного LLM-запроса')
     if len(body.target_models)>8:raise HTTPException(400,'Limit 8 target models')
     for target in body.target_models:
         if target not in MODEL_SPECS:raise HTTPException(400,'No verified API schema for '+target)
-    context={'brief':body.brief,'character_identity':body.character.get('identity',{}),'model_profiles':body.character.get('profiles',{}),'project_style_bible':body.style,'target_models':{m:MODEL_SPECS[m] for m in body.target_models}}
+    context=agent_context(body)
+    context_chars=len(json.dumps(context,ensure_ascii=False))
+    cost=agent_estimate_usd(body, context_chars)
+    security.verify_quote(body.quote_token or '', body.project_id, agent_quote_payload(body, context_chars), cost)
+    if body.max_cost_usd is None or body.max_cost_usd+1e-9<cost:
+        raise HTTPException(400,'Лимит стоимости ниже оценки прогона')
+    key=provider_credential(provider, x_api_key)
+    if not key or not key.isascii() or any(x.isspace() for x in key): raise HTTPException(400,'Enter a valid API key (ASCII, no spaces)')
+    request_id=body.request_id or uuid.uuid4().hex
+    call_id=llm_guard.reserve_call(sys.modules[__name__], body.project_id, body.model, request_id, cost)
     output={}
-    for role,instructions in AGENT_ROLES.items():
-        previous=json.dumps(output,ensure_ascii=False)
-        prompt=json.dumps(context,ensure_ascii=False)+'\nPREVIOUS SPECIALISTS:\n'+previous
-        if role=='prompt': instructions+=' Respond with labelled sections for each target model, then a short list of required references and parameters.'
-        content,usage=await agent_completion(body.provider,body.model,key,instructions,prompt)
-        output[role]={'content':content,'usage':usage}
+    tokens_in=tokens_out=0
+    try:
+        for role,instructions in AGENT_ROLES.items():
+            previous=json.dumps(output,ensure_ascii=False)
+            prompt=json.dumps(context,ensure_ascii=False)+'\nPREVIOUS SPECIALISTS:\n'+previous
+            if role=='prompt': instructions=instructions+' Respond with labelled sections for each target model, then a short list of required references and parameters.'
+            content,usage=await agent_completion(provider,body.model,key,instructions,prompt,spend=('llm',request_id,body.model),max_tokens=AGENT_MAX_TOKENS)
+            output[role]={'content':content,'usage':usage}
+            tokens_in+=usage.get('prompt_tokens') or 0
+            tokens_out+=usage.get('completion_tokens') or 0
+    except Exception as exc:
+        llm_guard.settle_call(sys.modules[__name__], call_id, 'submission_unknown', cost, f'прервано после ролей: {len(output)}: {exc}')
+        raise
+    price_in,price_out=llm_guard.price_of(body.model)
+    actual=round((tokens_in*price_in+tokens_out*price_out)/1_000_000,6)
+    llm_guard.settle_call(sys.modules[__name__], call_id, 'done', actual, f'ролей: {len(output)}', tokens=(tokens_in,tokens_out))
     run_id=uuid.uuid4().hex
-    record={'id':run_id,'created_at':now(),'provider':body.provider,'model':body.model,'brief':body.brief,'target_models':body.target_models,'output':output,'status':'awaiting_user_approval','generation_started':False}
+    record={'id':run_id,'created_at':now(),'provider':provider,'model':body.model,'brief':body.brief,'target_models':body.target_models,'output':output,'status':'awaiting_user_approval','generation_started':False,'cost_usd':actual,'estimated_usd':cost}
     with connect() as db:
         db.execute('CREATE TABLE IF NOT EXISTS agent_runs(id TEXT PRIMARY KEY,project_id TEXT,created_at TEXT,data TEXT)')
         db.execute('INSERT INTO agent_runs VALUES(?,?,?,?)',(run_id,body.project_id,record['created_at'],json.dumps(record,ensure_ascii=False)))
