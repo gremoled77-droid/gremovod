@@ -37,6 +37,25 @@ function useCounts(projectId: string) {
   return counts;
 }
 
+/** Финальные MP4, загруженные в выпуск. */
+function useReleaseArtifacts(projectId: string) {
+  const [artifacts, setArtifacts] = useState<ReleaseArtifact[]>([]);
+  useEffect(() => {
+    if (!projectId) return;
+    let live = true;
+    void apiFetch('/api/projects/' + encodeURIComponent(projectId) + '/release-artifacts')
+      .then(r => (r.ok ? r.json() : []))
+      .then((list: ReleaseArtifact[]) => {
+        if (live) setArtifacts(list);
+      })
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, [projectId]);
+  return artifacts;
+}
+
 /** Шапка «Монтажа»: что готово к выгрузке в CapCut по этапам. */
 export function MontageSummary({projectId, onMode}: {projectId: string; onMode: (m: Mode) => void}) {
   const {images, videos, audio} = useCounts(projectId);

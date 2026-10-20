@@ -18,8 +18,8 @@ type Props = {
 };
 const options = ['seedream-5-pro', 'seedream-5-lite', 'nano-banana-2.1', 'seedance-2.5'];
 export default function AgentPanel({projectId, brief, character, style, onApply}: Props) {
-  const [provider, setProvider] = useState('openai');
-  const [model, setModel] = useState('gpt-4.1-mini');
+  const [provider, setProvider] = useState('piapi');
+  const [model, setModel] = useState('gpt-5.6-luna');
   const [styleNotes, setStyleNotes] = useState('');
   const [targets, setTargets] = useState<string[]>(['seedream-5-pro', 'seedance-2.5']);
   const [result, setResult] = useState<AgentResult | null>(null);
@@ -86,12 +86,10 @@ export default function AgentPanel({projectId, brief, character, style, onApply}
             <select
               value={provider}
               onChange={e => {
-                const p = e.target.value;
-                setProvider(p);
-                setModel(p === 'openai' ? 'gpt-4.1-mini' : 'gpt-5.6-luna');
+                setProvider(e.target.value);
+                setModel('gpt-5.6-luna');
               }}
             >
-              <option value="openai">OpenAI напрямую</option>
               <option value="piapi">PiAPI</option>
             </select>
           </label>

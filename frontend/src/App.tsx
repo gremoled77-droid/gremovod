@@ -1715,7 +1715,7 @@ function App() {
                   diagnostics={diagnostics}
                   onProvider={value => {
                     setProvider(value);
-                    setLlm(value === 'openai' ? 'gpt-4.1-mini' : 'gpt-5.6-luna');
+                    setLlm('gpt-5.6-luna');
                   }}
                   onModel={setLlm}
                   onConnections={() => setMode('connections')}
