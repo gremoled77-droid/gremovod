@@ -2,7 +2,12 @@ import {useEffect, useRef, useState} from 'react';
 import {Info, Mic, Paperclip, RotateCw, Send, Square, X} from 'lucide-react';
 import {apiFetch} from './api';
 import {responseJson} from './ChatGPTPanel';
-import {IDEA_LLM_MODELS, LLM_MAX_TOKENS, ideaEstimate} from './llmPricing';
+import LlmApprovalDialog from './LlmApprovalDialog';
+import LlmCostCard from './LlmCostCard';
+import {cardOf, estimateLlm, runLlm, type LlmQuote, type Msg} from './llmAsk';
+import type {LlmCard} from './llmDisplay';
+import {IDEA_LLM_MODELS, ideaEstimate} from './llmPricing';
+import {initialLimit} from './spendLimit';
 
 type Asset = {id: string; url: string; thumbnail_url?: string | null; metadata?: {original_name?: string}};
 
@@ -66,6 +71,11 @@ export default function IdeaBrief({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [listening, setListening] = useState(false);
+  const [quote, setQuote] = useState<LlmQuote | null>(null);
+  const [card, setCard] = useState<LlmCard | null>(null);
+  const [approved, setApproved] = useState(false);
+  const [limit, setLimit] = useState('');
+  const [highOk, setHighOk] = useState(false);
   const [assets, setAssets] = useState<Asset[]>([]);
   const [background, setBackground] = useState<Background | null>(null);
   const [useBackground, setUseBackground] = useState(backgroundOn);
@@ -109,7 +119,7 @@ export default function IdeaBrief({
     }
   };
 
-  const messages = () => [
+  const messages = (): Msg[] => [
     {
       role: 'system',
       content:
@@ -123,40 +133,37 @@ export default function IdeaBrief({
   const price = ideaEstimate(model, chars);
   const backgroundCost = background ? ideaEstimate(model, background.chars + 2) - ideaEstimate(model, 2) : 0;
 
-  const send = async () => {
+  /** Шаг 1: оценка с сервера — она же карточка и основа окна подтверждения. */
+  const prepare = async () => {
     setError('');
     if (!brief.trim()) return setError('Сначала напиши задание ролика');
     if (!projectId) return setError('Сначала сохрани проект');
-    if (price > 0.02 && !window.confirm(`Запрос стоит до $${price.toFixed(3)}. Отправить?`)) return;
     setBusy(true);
     try {
-      const msgs = messages();
-      const quote = await responseJson(
-        await apiFetch('/api/llm/estimate', {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({project_id: projectId, model, messages: msgs, max_tokens: LLM_MAX_TOKENS}),
-        })
-      );
-      const answer = await responseJson(
-        await apiFetch('/api/llm/chat', {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({
-            provider: 'piapi',
-            project_id: projectId,
-            model,
-            max_tokens: LLM_MAX_TOKENS,
-            messages: msgs,
-            approved: true,
-            quote_token: quote.quote_token,
-            max_cost_usd: quote.estimated_usd,
-            request_id: crypto.randomUUID(),
-          }),
-        })
-      );
-      const text = String(answer.choices?.[0]?.message?.content || '').trim();
+      const q = await estimateLlm(projectId, model, messages());
+      setQuote(q);
+      setCard(null);
+      setApproved(false);
+      setHighOk(false);
+      setLimit(initialLimit(q.actual.max_cost_usd ?? q.usd));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  /** Шаг 2: запуск после согласия владельца. Итог — карточка от сервера. */
+  const generate = async () => {
+    if (!quote) return;
+    setBusy(true);
+    setError('');
+    try {
+      const result = await runLlm(quote, Number(limit) || undefined);
+      const text = result.text.trim();
       if (!text) throw new Error('LLM вернул пустой ответ');
+      setCard(result.card);
+      setQuote(null);
       onResult(text);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -214,7 +221,7 @@ export default function IdeaBrief({
     <div className="idea-brief-actions">
       {result && <button onClick={() => onBrief(result)}>Принять как задание</button>}
       {result && (
-        <button onClick={() => void send()} disabled={busy} title="Повторный запрос в LLM">
+        <button onClick={() => void prepare()} disabled={busy} title="Повторный запрос в LLM">
           <RotateCw size={14} /> Обновить
         </button>
       )}
@@ -242,7 +249,9 @@ export default function IdeaBrief({
         onChange={e => onBrief(e.target.value)}
       />
       <div className="idea-send">
-        <small className="muted">{brief.trim() ? `≈ до $${price.toFixed(4)}` : ''}</small>
+        <small className="muted">
+          {brief.trim() ? `≈ до $${price.toFixed(4)} (предпросмотр, итог — с сервера)` : ''}
+        </small>
         <label
           className={'idea-bg' + (withBackground ? ' on' : '')}
           title={background ? 'Сценарные правила уходят в LLM скрытым фоном' : 'Сценарный фон недоступен'}
@@ -286,7 +295,7 @@ export default function IdeaBrief({
         >
           {listening ? <Square size={16} /> : <Mic size={18} />}
         </button>
-        <button className="primary idea-go" onClick={() => void send()} disabled={busy}>
+        <button className="primary idea-go" onClick={() => void prepare()} disabled={busy}>
           <Send size={15} /> {busy ? 'Думаю…' : 'Отправить в LLM'}
         </button>
       </div>
@@ -299,7 +308,7 @@ export default function IdeaBrief({
             : `; выключена, добавила бы ≈ $${backgroundCost.toFixed(4)}.`}
         </p>
       )}
-      {error && (
+      {error && !quote && (
         <p className="alert" role="alert">
           {error}
         </p>
@@ -348,10 +357,28 @@ export default function IdeaBrief({
               <small className="muted">Уйдут на «Мир» и «Раскадровку»</small>
             </div>
           )}
+          {card && <LlmCostCard card={card} title="Вызов LLM" />}
           {actions}
         </div>
       ) : (
         actions
+      )}
+      {quote && (
+        <LlmApprovalDialog
+          card={cardOf(quote)}
+          title="Подтверждение платного вызова LLM"
+          total={quote.actual.max_cost_usd ?? quote.usd}
+          limit={limit}
+          onLimit={setLimit}
+          highConfirmed={highOk}
+          onHighConfirmed={setHighOk}
+          approved={approved}
+          onApproved={setApproved}
+          busy={busy}
+          error={error}
+          onConfirm={() => void generate()}
+          onClose={() => setQuote(null)}
+        />
       )}
     </section>
   );

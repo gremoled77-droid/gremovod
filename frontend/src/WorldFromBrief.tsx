@@ -1,17 +1,15 @@
 import {useState} from 'react';
-import {apiFetch} from './api';
-import {responseJson} from './ChatGPTPanel';
-import {LLM_MAX_TOKENS, LLM_MODELS} from './llmPricing';
+import LlmApprovalDialog from './LlmApprovalDialog';
+import LlmCostCard from './LlmCostCard';
+import {cardOf, estimateLlm, runLlm, type LlmQuote, type Msg} from './llmAsk';
+import type {LlmCard} from './llmDisplay';
+import {initialLimit} from './spendLimit';
 import {mergeWorld, parseWorld, WORLD_FIELDS, WORLD_SYSTEM, type World} from './worldBible';
+import {smallUsd} from './usdFormat';
 
 const MODEL = 'gpt-5.6-sol';
-const post = (body: unknown) => ({
-  method: 'POST',
-  headers: {'Content-Type': 'application/json'},
-  body: JSON.stringify(body),
-});
 
-/** Кнопка «Составить мир»: LLM пишет «Библию мира» по заданию ролика. Сначала бесплатная оценка цены, запуск только после подтверждения. */
+/** Кнопка «Составить мир»: LLM пишет «Библию мира» по заданию ролика. Сначала бесплатная оценка цены с сервера, запуск — после подтверждения владельца. */
 export default function WorldFromBrief({
   projectId,
   brief,
@@ -31,11 +29,15 @@ export default function WorldFromBrief({
   onApply: (fields: Partial<World>) => void;
   onDone?: () => void;
 }) {
-  const [quote, setQuote] = useState<{token: string; usd: number; pid: string} | null>(null);
+  const [quote, setQuote] = useState<LlmQuote | null>(null);
+  const [card, setCard] = useState<LlmCard | null>(null);
+  const [approved, setApproved] = useState(false);
+  const [limit, setLimit] = useState('');
+  const [highOk, setHighOk] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [note, setNote] = useState('');
-  const messages = [
+  const messages: Msg[] = [
     {role: 'system', content: WORLD_SYSTEM},
     {role: 'user', content: `Задание ролика:\n${brief.trim()}`},
   ];
@@ -56,43 +58,27 @@ export default function WorldFromBrief({
       if (!brief.trim()) throw Error('Сначала впиши задание ролика');
       const pid = projectId || (ensureProject ? await ensureProject() : '');
       if (!pid) throw Error('Нет проекта для учёта расходов');
-      const q = await responseJson(
-        await apiFetch(
-          '/api/llm/estimate',
-          post({project_id: pid, model: MODEL, messages, max_tokens: LLM_MAX_TOKENS})
-        )
-      );
-      setQuote({token: q.quote_token, usd: q.estimated_usd, pid});
+      const q = await estimateLlm(pid, MODEL, messages);
+      setQuote(q);
+      setCard(null);
+      setApproved(false);
+      setHighOk(false);
+      setLimit(initialLimit(q.actual.max_cost_usd ?? q.usd));
     });
   const generate = () =>
     run(async () => {
       if (!quote) return;
-      const answer = await responseJson(
-        await apiFetch(
-          '/api/llm/chat',
-          post({
-            provider: 'piapi',
-            project_id: quote.pid,
-            model: MODEL,
-            max_tokens: LLM_MAX_TOKENS,
-            messages,
-            approved: true,
-            quote_token: quote.token,
-            max_cost_usd: quote.usd,
-            request_id: crypto.randomUUID(),
-          })
-        )
-      );
+      const answer = await runLlm(quote, Number(limit) || undefined);
       setQuote(null);
-      const world = parseWorld(String(answer.choices?.[0]?.message?.content || ''));
+      setCard(answer.card);
+      const world = parseWorld(answer.text);
       const {fill, conflicts: busyFields} = mergeWorld(style, world);
       if (Object.keys(fill).length) onApply(fill);
       onConflicts(busyFields);
-      const cost = Number(answer.cost_usd);
       setNote(
         `Мир заполнен: ${Object.keys(fill).length} пустых полей` +
           (Object.keys(busyFields).length ? `, ${Object.keys(busyFields).length} занятых ждут решения` : '') +
-          (Number.isFinite(cost) ? ` · списано $${cost.toFixed(4)}` : '')
+          (answer.cost !== null ? ` · списано ${smallUsd(answer.cost)}` : '')
       );
       if (!Object.keys(busyFields).length) onDone?.();
     });
@@ -106,19 +92,29 @@ export default function WorldFromBrief({
         </button>
       ) : (
         <div className="world-llm-quote" role="group" aria-label="Подтверждение платного вызова">
-          <span>
-            {LLM_MODELS[MODEL].label} · до ${quote.usd.toFixed(4)}
-          </span>
-          <button className="primary" disabled={busy} onClick={() => void generate()}>
-            {busy ? 'Пишу мир…' : 'Запустить'}
-          </button>
-          <button disabled={busy} onClick={() => setQuote(null)}>
-            Отмена
-          </button>
+          <span>Оценка с сервера готова — подтвердите запуск</span>
         </div>
       )}
-      {error && <p role="alert">{error}</p>}
+      {card && <LlmCostCard card={card} title="Вызов LLM" />}
+      {error && !quote && <p role="alert">{error}</p>}
       {note && <p className="muted">{note}</p>}
+      {quote && (
+        <LlmApprovalDialog
+          card={cardOf(quote)}
+          title="Подтверждение платного вызова LLM"
+          total={quote.actual.max_cost_usd ?? quote.usd}
+          limit={limit}
+          onLimit={setLimit}
+          highConfirmed={highOk}
+          onHighConfirmed={setHighOk}
+          approved={approved}
+          onApproved={setApproved}
+          busy={busy}
+          error={error}
+          onConfirm={() => void generate()}
+          onClose={() => setQuote(null)}
+        />
+      )}
       {keys.length > 0 && (
         <div className="world-llm-conflicts">
           <b>Эти поля уже заполнены. Заменить новым вариантом?</b>

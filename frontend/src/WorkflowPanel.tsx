@@ -14,6 +14,8 @@ import {
 } from '@xyflow/react';
 import {apiFetch} from './api';
 import LimitPicker from './LimitPicker';
+import LlmCostCard from './LlmCostCard';
+import {cardFrom, type LlmCard} from './llmDisplay';
 import {initialLimit, limitAllowed} from './spendLimit';
 import {useSharedActivity} from './ActivityContext';
 import {
@@ -32,7 +34,8 @@ import {
   VIDEO_MODELS,
 } from './workflowPlan';
 import {useNodePrices} from './workflowPrices';
-import {LLM_MAX_TOKENS, LLM_MODELS, llmEstimate} from './llmPricing';
+import {LLM_MAX_TOKENS, LLM_MODELS} from './llmPricing';
+import {smallUsd} from './usdFormat';
 import {missingAssetIds} from './workflowLibrary';
 
 type Graph = {nodes: Node[]; edges: Edge[]};
@@ -575,6 +578,7 @@ export default function WorkflowPanel({
     steps: Step[];
     llmSteps: LlmStep[];
     estimates: Record<string, number>;
+    cards: Record<string, LlmCard>;
     total: number;
   } | null>(null);
   const [limit, setLimit] = useState('');
@@ -583,6 +587,7 @@ export default function WorkflowPanel({
   const [approved, setApproved] = useState(false);
   const [highOk, setHighOk] = useState(false);
   const [llmState, setLlmState] = useState<Record<string, string>>({});
+  const [llmCards, setLlmCards] = useState<Record<string, LlmCard>>({});
   const [specs, setSpecs] = useState<Record<string, ModelSpecLite>>({});
   useEffect(() => {
     void apiFetch('/api/model-specs')
@@ -688,8 +693,27 @@ export default function WorkflowPanel({
       return setError('Нет узлов «Изображение», «Видео» или «LLM» для запуска');
     try {
       const estimates: Record<string, number> = {};
+      const cards: Record<string, LlmCard> = {};
       for (const s of llmSteps) {
-        estimates[s.nodeId] = llmEstimate(s.model, llmInput(s, nodes, outputs).length + 600);
+        // Оценку LLM-шага считает сервер: клиентская формула — только предпросмотр и итогом не является.
+        const input = llmInput(s, nodes, outputs);
+        const quote = await json(
+          await apiFetch('/api/llm/estimate', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+              project_id: projectId,
+              model: s.model,
+              messages: [
+                {role: 'system', content: s.system},
+                {role: 'user', content: input},
+              ],
+              max_tokens: LLM_MAX_TOKENS,
+            }),
+          })
+        );
+        estimates[s.nodeId] = Number(quote.estimated_usd) || 0;
+        cards[s.nodeId] = cardFrom(quote);
       }
       for (const s of steps) {
         const urls = s.waitFor.length ? [] : await Promise.all(s.refAssetIds.map(cloudUrl));
@@ -697,7 +721,7 @@ export default function WorkflowPanel({
         estimates[s.nodeId] = (await estimate(s, [...urls, ...placeholders])).estimated_usd;
       }
       const total = Object.values(estimates).reduce((a, b) => a + b, 0);
-      setReview({steps, llmSteps, estimates, total});
+      setReview({steps, llmSteps, estimates, cards, total});
       setLimit(initialLimit(total));
       setHighOk(false);
       setApproved(false);
@@ -775,7 +799,9 @@ export default function WorkflowPanel({
           );
           const text = String(answer.choices?.[0]?.message?.content || '').trim();
           if (!text) throw Error('LLM вернул пустой ответ');
-          lastCost = Number(answer.cost_usd);
+          const rawCost = answer.cost_usd;
+          lastCost = rawCost === null || rawCost === undefined ? undefined : Number(rawCost);
+          setLlmCards(v => ({...v, [step.nodeId]: cardFrom(answer)}));
           outs[step.nodeId] = text;
           patch(step.nodeId, {output: text});
           setLlmState(v => ({...v, [step.nodeId]: 'done'}));
@@ -1156,6 +1182,17 @@ export default function WorkflowPanel({
               )}
             </div>
           )}
+          {Object.keys(llmCards).length > 0 && (
+            <div className="wf-llm-cards" style={{display: 'grid', gap: 8, marginBottom: 14}}>
+              {Object.entries(llmCards).map(([id, card]) => (
+                <LlmCostCard
+                  key={id}
+                  card={card}
+                  title={`Вызов LLM: ${String(nodes.find(n => n.id === id)?.data.title || id)}`}
+                />
+              ))}
+            </div>
+          )}
           <div className="wf-canvas">
             <ReactFlow
               nodes={nodes}
@@ -1227,8 +1264,11 @@ export default function WorkflowPanel({
               <ol>
                 {review.llmSteps.map(s => (
                   <li key={s.nodeId}>
-                    LLM {LLM_MODELS[s.model]?.label || s.model} · текст · до $
-                    {review.estimates[s.nodeId].toFixed(4)}
+                    LLM {LLM_MODELS[s.model]?.label || s.model} · текст · ожидаемый платёж{' '}
+                    {smallUsd(review.estimates[s.nodeId])}
+                    <div style={{marginTop: 6}}>
+                      <LlmCostCard card={review.cards[s.nodeId]} title="Оценка вызова" />
+                    </div>
                   </li>
                 ))}
                 {review.steps.map(s => (

@@ -323,6 +323,30 @@ export function actualLine(card: LlmCard): string         // «Реальный 
 export function budgetLines(summary: BudgetSummary): string[]  // четыре итога раздельными строками
 ```
 
+**Реализовано таском 05 — фактические имена:**
+
+```ts
+// frontend/src/llmDisplay.ts — чистый модуль, без DOM и без сети
+export function cardFrom(answer: unknown): LlmCard          // нормализует ответ сервера
+export function providerTitle(provider: string): string       // «kie» → «Kie.ai», «piapi» → «PiAPI»
+export function modelLabel(model: string): string            // «gpt-6-luna» → «GPT-6 Luna», нечитаемое — как есть
+export function referenceLine(card: LlmCard): string          // «По тарифу Kie.ai — GPT-6 Luna: ≈ $0.000300 (тариф от 2026-10-20)»
+export function referenceNote(card: LlmCard): string         // «(другая модель, сравнение по объёму токенов)»
+export function executionLine(card: LlmCard): string          // «Исполняет: OpenRouter — MiniMax M3.1 Flash Free»
+export function statusLine(card: LlmCard): string             // «Бесплатный API» / «Платный» / «Неизвестное списание»
+export function actualLine(card: LlmCard): string             // фактический платёж; для неизвестного — без «$0»
+export function cardLines(card: LlmCard): string[]            // порядок строк зафиксирован тестом: тариф → исполнитель → статус → платёж
+export function expectedPaymentLine(card: LlmCard): string   // ожидаемый реальный платёж в окне подтверждения
+export function maxApprovedLine(card: LlmCard): string        // максимальный одобренный расход в окне подтверждения
+export function budgetLines(summary: BudgetSummary): string[]
+```
+
+`frontend/src/llmAsk.ts`: `LlmQuote` дополнен полями `reference` / `execution` / `actual`; `runLlm(quote, maxCostUsd?)` возвращает `{text, cost, card}`; прежняя сигнатура и прежние поля `estimateLlm` сохранены. `cost: null` больше не превращается в `0`.
+
+**Карточка** — `frontend/src/LlmCostCard.tsx`; **окно подтверждения** — `frontend/src/LlmApprovalDialog.tsx` (ориентир первым, затем ожидаемый реальный платёж и максимальный одобренный расход, и только потом согласие; оформление по образцу `GenerationReview.tsx`).
+
+**Карточка стоит в четырёх окнах:** Идея, Мир, Узлы (`WorkflowPanel`), диалог сценария (`OutlineDialog`). Оценка LLM-шага в Узлах берётся с сервера — клиентская формула больше не показывается как итог. В «Идее» клиентская оценка осталась превью с пометкой «(предпросмотр, итог — с сервера)».
+
 **Шов для тестов:** чистые функции — `node --experimental-strip-types --test` на `frontend/src/llmDisplay.test.mjs`, без DOM и без сети.
 
 ## 8. `frontend/src/LlmCostCard.tsx` — карточка (новая)

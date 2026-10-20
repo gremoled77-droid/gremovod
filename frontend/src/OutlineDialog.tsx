@@ -2,8 +2,12 @@ import {useRef, useState} from 'react';
 import {apiFetch} from './api';
 import {responseJson} from './ChatGPTPanel';
 import {moveItem} from './boardOrder';
-import {estimateLlm, runLlm, type LlmQuote, type Msg} from './llmAsk';
-import {LLM_MODELS} from './llmPricing';
+import LlmApprovalDialog from './LlmApprovalDialog';
+import LlmCostCard from './LlmCostCard';
+import {cardOf, estimateLlm, runLlm, type LlmQuote, type Msg} from './llmAsk';
+import type {LlmCard} from './llmDisplay';
+import {initialLimit} from './spendLimit';
+import {smallUsd} from './usdFormat';
 import {outlineBody, outlineSystem, outlineUser, parseOutline, type Outline} from './outlinePlan';
 
 const MODEL = 'gpt-5.6-sol';
@@ -30,6 +34,10 @@ export default function OutlineDialog({
     [scenes, setScenes] = useState(1),
     [pasted, setPasted] = useState(''),
     [quote, setQuote] = useState<LlmQuote | null>(null),
+    [card, setCard] = useState<LlmCard | null>(null),
+    [approved, setApproved] = useState(false),
+    [limit, setLimit] = useState(''),
+    [highOk, setHighOk] = useState(false),
     [plan, setPlan] = useState<Outline | null>(null),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(''),
@@ -54,15 +62,21 @@ export default function OutlineDialog({
   const estimate = () =>
     run(async () => {
       if (!context.brief.trim()) throw Error('Сначала впиши задание ролика на экране «Идея»');
-      setQuote(await estimateLlm(context.projectId, MODEL, messages()));
+      const q = await estimateLlm(context.projectId, MODEL, messages());
+      setQuote(q);
+      setCard(null);
+      setApproved(false);
+      setHighOk(false);
+      setLimit(initialLimit(q.actual.max_cost_usd ?? q.usd));
     });
   const generate = () =>
     run(async () => {
       if (!quote) return;
-      const {text, cost} = await runLlm(quote);
+      const {text, cost, card: called} = await runLlm(quote, Number(limit) || undefined);
       setQuote(null);
+      setCard(called);
       setPlan(parseOutline(text));
-      setNote(cost === null ? 'План готов.' : `План готов · списано $${cost.toFixed(4)}`);
+      setNote(cost === null ? 'План готов.' : `План готов · списано ${smallUsd(cost)}`);
     });
   const parsePasted = () => run(async () => setPlan(parseOutline(pasted)));
   const copyPrompt = () =>
@@ -130,15 +144,7 @@ export default function OutlineDialog({
                 </button>
               ) : (
                 <div className="chips" role="group" aria-label="Подтверждение платного вызова">
-                  <span>
-                    {LLM_MODELS[MODEL].label} · до ${quote.usd.toFixed(4)}
-                  </span>
-                  <button className="primary" disabled={busy} onClick={() => void generate()}>
-                    {busy ? 'Пишу план…' : 'Запустить'}
-                  </button>
-                  <button disabled={busy} onClick={() => setQuote(null)}>
-                    Отмена
-                  </button>
+                  <span>Оценка с сервера готова — подтвердите запуск в окне подтверждения</span>
                 </div>
               )
             ) : (
@@ -224,8 +230,9 @@ export default function OutlineDialog({
             </div>
           </div>
         )}
-        {error && <p role="alert">{error}</p>}
+        {error && !quote && <p role="alert">{error}</p>}
         {note && <p className="muted">{note}</p>}
+        {card && <LlmCostCard card={card} title="Вызов LLM" />}
         {!plan && (
           <div className="chips">
             <button onClick={onClose}>Закрыть</button>
@@ -235,6 +242,23 @@ export default function OutlineDialog({
           <button onClick={onClose} className="ol-close">
             Закрыть без добавления
           </button>
+        )}
+        {quote && (
+          <LlmApprovalDialog
+            card={cardOf(quote)}
+            title="Подтверждение платного вызова LLM"
+            total={quote.actual.max_cost_usd ?? quote.usd}
+            limit={limit}
+            onLimit={setLimit}
+            highConfirmed={highOk}
+            onHighConfirmed={setHighOk}
+            approved={approved}
+            onApproved={setApproved}
+            busy={busy}
+            error={error}
+            onConfirm={() => void generate()}
+            onClose={() => setQuote(null)}
+          />
         )}
       </section>
     </div>

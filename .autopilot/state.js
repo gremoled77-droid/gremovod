@@ -13,7 +13,7 @@ window.STATE =
   "skillDir": "C:/Users/BLOWKA/.minimax/skills/autopilot",
   "baseCommit": "df1e1a3",
   "startedAt": "2026-10-20T13:38:10+03:00",
-  "updatedAt": "2026-10-20T19:32:31+03:00",
+  "updatedAt": "2026-10-20T19:32:34+03:00",
   "finishedAt": null,
   "stages": [
     {
@@ -62,8 +62,8 @@ window.STATE =
   ],
   "requirements": {
     "total": 60,
-    "done": 19,
-    "inTicket": 41,
+    "done": 29,
+    "inTicket": 31,
     "inSpec": 0,
     "placeholder": 0,
     "deferred": 0,
@@ -187,14 +187,20 @@ window.STATE =
       ],
       "review": "да — риск",
       "model": "сильная",
-      "status": "repair",
+      "status": "done",
       "retries": 0,
       "repairs": 2,
       "startedAt": "2026-10-20T17:10:19+03:00",
       "repairFindings": [
         "платный маршрут без usage пишет usd=0 под done; legacy-путь не отличает подтверждённый отказ от 5xx",
         "HTTP 200 без пригодного текста выходит мимо классификатора: платный вызов показан как 0 потраченного, резерв висит фантомом"
-      ]
+      ],
+      "finishedAt": "2026-10-20T19:32:32+03:00",
+      "tests": {
+        "passed": 327,
+        "failed": 0
+      },
+      "commit": "e087879"
     },
     {
       "id": "04",
@@ -219,9 +225,10 @@ window.STATE =
       ],
       "review": "да — риск",
       "model": "обычная",
-      "status": "pending",
+      "status": "in-progress",
       "retries": 0,
-      "repairs": 0
+      "repairs": 0,
+      "startedAt": "2026-10-20T19:32:33+03:00"
     },
     {
       "id": "05",
@@ -250,9 +257,10 @@ window.STATE =
       ],
       "review": "нет",
       "model": "обычная",
-      "status": "pending",
+      "status": "in-progress",
       "retries": 0,
-      "repairs": 0
+      "repairs": 0,
+      "startedAt": "2026-10-20T19:32:34+03:00"
     },
     {
       "id": "06",
@@ -305,7 +313,7 @@ window.STATE =
     }
   ],
   "tests": {
-    "passed": 299,
+    "passed": 327,
     "failed": 0
   },
   "debt": {
@@ -365,9 +373,12 @@ window.STATE =
     "2026-10-20T18:39:29+03:00",
     "2026-10-20T18:51:25+03:00",
     "2026-10-20T19:09:53+03:00",
-    "2026-10-20T19:32:31+03:00"
+    "2026-10-20T19:32:31+03:00",
+    "2026-10-20T19:32:32+03:00",
+    "2026-10-20T19:32:33+03:00",
+    "2026-10-20T19:32:34+03:00"
   ],
-  "rev": 34,
+  "rev": 37,
   "waiting": null,
   "waits": [
     {
@@ -610,6 +621,34 @@ window.STATE =
       "k": "add",
       "key": "concerns",
       "n": 2
+    },
+    {
+      "t": "2026-10-20T19:32:32+03:00",
+      "k": "ticket",
+      "ids": [
+        "03"
+      ],
+      "act": "done",
+      "tests": {
+        "passed": 327,
+        "failed": 0
+      }
+    },
+    {
+      "t": "2026-10-20T19:32:33+03:00",
+      "k": "ticket",
+      "ids": [
+        "04"
+      ],
+      "act": "start"
+    },
+    {
+      "t": "2026-10-20T19:32:34+03:00",
+      "k": "ticket",
+      "ids": [
+        "05"
+      ],
+      "act": "start"
     }
   ],
   "reqList": [
@@ -641,7 +680,7 @@ window.STATE =
     {
       "id": "R06",
       "text": "«Сохрани существующие бюджетные ограничения»",
-      "status": "in-ticket"
+      "status": "done"
     },
     {
       "id": "R07",
@@ -686,22 +725,22 @@ window.STATE =
     {
       "id": "R15",
       "text": "«Действующие API и signed quote сохранить обратно совместимыми; подпись связывает проект, provider, model, версию цены, hash сообщений/настроек/tools, max_tokens, выбор fallback и допустимый максимум платежа.»",
-      "status": "in-ticket"
+      "status": "done"
     },
     {
       "id": "R16",
       "text": "«До любых платных вызовов — оценка реальной стоимости, атомарная резервация бюджета, проверка лимитов проекта/дня/серии, подтверждение владельца.»",
-      "status": "in-ticket"
+      "status": "done"
     },
     {
       "id": "R17",
       "text": "«Бесплатный маршрут тоже журналировать; запрещено резервировать ориентир как реальную оплату.»",
-      "status": "in-ticket"
+      "status": "done"
     },
     {
       "id": "R18",
       "text": "«Защитить идемпотентность по request_id, race condition, timeout с возможным списанием, Cloudflare 1010/401/403, 429/5xx; нельзя бесконечно пробовать fallback и списывать по несколько раз.»",
-      "status": "in-ticket"
+      "status": "done"
     },
     {
       "id": "R19",
@@ -716,7 +755,7 @@ window.STATE =
     {
       "id": "R21",
       "text": "«Автопереключение только если соответствует разрешенному ограниченному бюджету, функциям и политикам владельца.»",
-      "status": "in-ticket"
+      "status": "done"
     },
     {
       "id": "R22",
@@ -751,7 +790,7 @@ window.STATE =
     {
       "id": "R28",
       "text": "«B. MVP: Kie Luna, Kie Haiku, PiAPI backward compatibility; эталон Kie/PiAPI + реальный ledger; MockTransport тесты.»",
-      "status": "in-ticket"
+      "status": "done"
     },
     {
       "id": "R29",
@@ -806,7 +845,7 @@ window.STATE =
     {
       "id": "R39",
       "text": "«Нет утечки ключей, неправильно подписанных quote, двойных платежей, изменения старых image/video вызовов или потери исторических llm_calls.»",
-      "status": "in-ticket"
+      "status": "done"
     },
     {
       "id": "R40",
@@ -876,7 +915,7 @@ window.STATE =
     {
       "id": "R53",
       "text": "«До вызова ориентир показывать как приблизительную оценку количества токенов, после вызова по возможности пересчитывать по фактическому usage.»",
-      "status": "in-ticket"
+      "status": "done"
     },
     {
       "id": "R54",
@@ -901,7 +940,7 @@ window.STATE =
     {
       "id": "R58",
       "text": "«Только аддитивные миграции, не удалять старую историю.»",
-      "status": "in-ticket"
+      "status": "done"
     },
     {
       "id": "R59",
