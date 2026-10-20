@@ -2,6 +2,7 @@ import {useState} from 'react';
 import {apiFetch} from './api';
 import {responseJson} from './ChatGPTPanel';
 import {LLM_MAX_TOKENS, LLM_MODELS} from './llmPricing';
+import {newRequestId, paidBody} from './paidProtocol';
 import {mergeWorld, parseWorld, WORLD_FIELDS, WORLD_SYSTEM, type World} from './worldBible';
 
 const MODEL = 'gpt-5.6-sol';
@@ -71,15 +72,12 @@ export default function WorldFromBrief({
         await apiFetch(
           '/api/llm/chat',
           post({
-            provider: 'piapi',
+            provider: '',
             project_id: quote.pid,
             model: MODEL,
             max_tokens: LLM_MAX_TOKENS,
             messages,
-            approved: true,
-            quote_token: quote.token,
-            max_cost_usd: quote.usd,
-            request_id: crypto.randomUUID(),
+            ...paidBody(quote, newRequestId()),
           })
         )
       );

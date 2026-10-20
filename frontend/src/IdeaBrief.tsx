@@ -3,6 +3,7 @@ import {Info, Mic, Paperclip, RotateCw, Send, Square, X} from 'lucide-react';
 import {apiFetch} from './api';
 import {responseJson} from './ChatGPTPanel';
 import {IDEA_LLM_MODELS, LLM_MAX_TOKENS, ideaEstimate} from './llmPricing';
+import {newRequestId, paidBody} from './paidProtocol';
 
 type Asset = {id: string; url: string; thumbnail_url?: string | null; metadata?: {original_name?: string}};
 
@@ -148,10 +149,7 @@ export default function IdeaBrief({
             model,
             max_tokens: LLM_MAX_TOKENS,
             messages: msgs,
-            approved: true,
-            quote_token: quote.quote_token,
-            max_cost_usd: quote.estimated_usd,
-            request_id: crypto.randomUUID(),
+            ...paidBody({usd: quote.estimated_usd, token: quote.quote_token}, newRequestId()),
           }),
         })
       );
