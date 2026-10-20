@@ -1,5 +1,22 @@
 # Пожелания и задачи AI Workflow Studio
 
+## GremoVOD Web ↔ n8n и GitHub Skill Sync — 19.10.2026
+
+**Приоритет: P0 архитектурный контракт до разработки веб-интеграции.** Полное ТЗ/чек-лист: [docs/TODO_N8N_WEB_SKILL_SYNC_2026-10-19.md](docs/TODO_N8N_WEB_SKILL_SYNC_2026-10-19.md). Новые задачи; реализации пока нет.
+
+- [ ] **Единый источник истины:** FastAPI/БД GremoVOD владеет сценариями, каноном, сценами, кадрами, библиотекой, бюджетом и утверждением; n8n — оркестратор, не пишет напрямую в БД приложения.
+- [ ] **API v1 и события:** договориться об ID проекта/сцены/кадра/задания, `base_revision`, idempotency key/`request_id`, асинхронных задачах, callback/webhook, журнале/повторах и конфликте 409. Сначала контракт, затем UI.
+- [ ] **Безопасность и миграция в веб:** service-to-service auth, подписанные callbacks, бюджеты и ручное approval, отдельное media storage; постепенный переход SQLite → PostgreSQL без двух writable БД.
+- [ ] **GremoVOD Skill Sync:** GitHub `skills/*/SKILL.md` и `references/**` → назначенные n8n Agents, сопоставление agent_id/skill_id, commit SHA/hash, diffs, проверка и обновление черновиков без дубликатов; публикация — только после согласования.
+- [x] **Компоновка агентов:** все 35 собственных Skills распределены по A0–A5, справки references перенесены (если были); 42 назначения, все 6 validate_agent успешны. См. [STAGE_SKILL_MAP](integrations/n8n/STAGE_SKILL_MAP.md).
+- [x] **Черновая маршрутизация LLM через Kie:** A0/A3/A4/A5 → Haiku 5.5, A1/A2 → Sonnet 5.5; в A0 включены low/medium = Haiku/Sonnet, маршрут high→Opus удалён до серверного approval. Подробнее: [MODEL_ROUTING](integrations/n8n/MODEL_ROUTING.md).
+- [x] **Три критика в n8n:** созданы A6 (ТЗ/Haiku), A7 (канон/Sonnet), A8 (ремесло/Opus); Skills подключены, memory disabled. A6/A7 включены как saved subAgents A0, A8 остаётся отключённым. Схема: [THREE_CRITICS_LOOP](integrations/n8n/THREE_CRITICS_LOOP.md).
+- [x] **QA Orchestrator, безопасный черновик:** workflow `nh3ARcl4XPW6RHqs` (7 узлов, manual trigger) готовит 3 изолированных пакета, ветви BLOCKED, проверяет комплектность/ревизии и собирает вердикты. Два офлайн-теста успешны, 0 платных вызовов; [отчёт](integrations/n8n/QA_ORCHESTRATOR_IMPLEMENTATION.md).
+- [x] **Независимый ручной Preview QA:** A7/Sonnet проверил синтетический текст, выдал обоснованный FAIL по 2 нарушениям канона; A6/Haiku одна попытка завершилась internal AI API error после 3 внутренних retries — исправление/повторное тестирование открыто. Предварительные guardrails включены A6–A8, но их нельзя считать защитой биллинга Kie. ТЗ для Codex: [QA_FASTAPI_CONNECTION_HANDOFF](integrations/n8n/QA_FASTAPI_CONNECTION_HANDOFF.md).
+- [ ] **Живая петля проверок через Web/FastAPI:** API Codex пока только sandbox A2/stub; требуется отдельный авторизованный QA job, проверка cost cap, утверждённый канон/bar.md, media inspector A8 и поддерживаемый n8n способ вызова saved Agents из workflow. Без этого QA Orchestrator остаётся BLOCKED. Не активировать.
+- [ ] **До публикации:** защитить маршрут Opus доверенным approval из FastAPI и бюджетными лимитами; обеспечить учёт выбранной модели и стоимости каждого вызова. Модели и Workflow пока остаются черновиками.
+- [ ] **Интеграционный тест:** одна сцена от веб-интерфейса до результата n8n с сохранением ID/версий/референсов, без платных медиа-запусков, с проверкой повторной доставки и восстановления статуса.
+
 ## Видеомодели: навыки и адаптер Seedance 2.5 — 17.10.2026
 
 Сводка: docs/VIDEO_MODELS_PROMPTING_2026-10-17.md, правила моделей: skills/video-*, пять столпов: skills/cinema-five-pillars.
@@ -417,3 +434,9 @@
 ## Подпись под результатом генерации (идея владельца, 17.10.2026)
 
 - [ ] Под каждой картинкой результата (или полупрозрачным текстом поверх неё) показывать: модель, разрешение и 3 главных параметра установки кадра из промпта (например, размытый фон, мягкий свет, кинематографичный кадр), чтобы было видно, что дало основной эффект. Места: «Кадры» (список результатов), Лайтбокс, «Раскадровка». Разрешение брать из файла, модель и параметры из задания; 3 параметра выбирать по словарю приёмов (`skills/cinema-lens-language/references/lens-techniques.md`, `cinema-composition`): оптика, глубина резкости/фокус, свет, размещение. Поле для ручной правки подписи. Не проверено, как вынимать параметры из длинного промпта автоматически (сначала правила по словарю, ИИ только по запросу).
+
+- [x] **QA: текст не равен визуальному доказательству.** Правило зафиксировано в [QA_EVIDENCE_POLICY](integrations/n8n/QA_EVIDENCE_POLICY.md), четырёх Skills (A0/A6/A7/A8) в GitHub и копиях в n8n, а также в 7-узловом QA Orchestrator. Синтетическая жёлтая/красная машина — тест, не реальный канон. Офлайн-тесты 9–12 показали `IMAGE/VIDEO:BLOCKED` без media-inspection.
+- [ ] **Реализовать в FastAPI** `requested_scopes/checked_scopes/scope_results/evidence_type`, проверку server-side источников/ревизий/canon approvals и [QA reviewer JSON Schema](integrations/n8n/contracts/qa-reviewer-output-v1.schema.json). Ни один флаг из текста агента не доказывает фактический просмотр или разрешение на Opus.
+
+- [x] **Две стадии независимой QA:** `TEXT_PRECHECK` до рендера требует только A6/A7 и не запускает A8; `FINAL_MEDIA` требует всех троих и подтверждённый media inspector. Safe-draft n8n workflow `nh3ARcl4XPW6RHqs` обновлён, тесты 13–17 успешны технически, все вердикты BLOCKED; [схема и контракт](integrations/n8n/QA_TEXT_PREFLIGHT.md). Никаких медиа/LLM вызовов.
+- [ ] **Codex: server-side QA stage gate:** определить в FastAPI стадию QA, получить реальный текст и утверждённый канон, проверить evidence receipts/revisions и изолированные A6/A7, затем разрешить только переход к следующему этапу. `TEXT_PRECHECK:PASS` не даёт `FINAL_MEDIA:PASS` и не публикует ролик. A8 и платные операции — только после отдельного approval.
