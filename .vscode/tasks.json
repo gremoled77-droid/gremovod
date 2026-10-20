@@ -22,6 +22,26 @@
         "panel": "dedicated"
       },
       "problemMatcher": []
+    },
+    {
+      "label": "GremoVOD: Watch Codex → MiniMax (safe)",
+      "type": "shell",
+      "command": "python",
+      "args": [
+        "${workspaceFolder}/scripts/agent-handoff/dispatcher.py",
+        "--pr",
+        "${input:gremovodGaPr}",
+        "--watch"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      },
+      "isBackground": true,
+      "problemMatcher": []
     }
   ],
   "inputs": [
