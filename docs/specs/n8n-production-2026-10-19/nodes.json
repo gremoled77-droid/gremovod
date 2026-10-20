@@ -1,0 +1,1298 @@
+{
+  "spec_version": "1.1-astra-contract-hardening",
+  "date": "2026-10-19",
+  "status": "SPECIFIED_NOT_EXECUTED",
+  "node_count": 52,
+  "status_legend": {
+    "NEW": "Новая операция, не подтверждённая в существующих workflow",
+    "ROLE_ONLY": "Роль/инструкции уже существуют; эта операция и интеграция не подтверждены",
+    "PARTIAL": "Есть отдельные навыки/демо/проверки; полного сервиса нет"
+  },
+  "nodes": [
+    {
+      "id": "N01",
+      "name": "Идея автора",
+      "executor": "автор / вход",
+      "inputs": "Идея, задача, при наличии файлы и ограничения.",
+      "task": "Принять исходную формулировку без переписывания; присвоить project_id/task_id/run_id; зарегистрировать файлы и ожидаемый формат выпуска.",
+      "outputs": "idea.original + assets_manifest",
+      "acceptance": "Оригинал сохранён, типы файлов определены; секреты не попали в промпт.",
+      "on_pass": [
+        "N02"
+      ],
+      "on_fail": "N43",
+      "on_blocked": "N43",
+      "stage": "input",
+      "implementation_status": "NEW"
+    },
+    {
+      "id": "N02",
+      "name": "Проверка входов",
+      "executor": "код",
+      "inputs": "N01, права доступа, доступность файлов.",
+      "task": "Проверить проект, доступ, размер, целостность и возможность чтения; отделить пожелания от утверждённых фактов. Не требовать готовый сценарий на входе идеи.",
+      "outputs": "intake.validated / missing_inputs",
+      "acceptance": "Всё необходимое для разработки идеи доступно; медиа-пути доступны именно исполнителю.",
+      "on_pass": [
+        "N03"
+      ],
+      "on_fail": "N43",
+      "on_blocked": "N43",
+      "stage": "input",
+      "implementation_status": "NEW"
+    },
+    {
+      "id": "N03",
+      "name": "A0: производственный бриф",
+      "executor": "A0",
+      "inputs": "Идея, ограничения автора, доступный канон, бюджетные условия.",
+      "task": "Зафиксировать замысел, аудиторию, формат/длительность, обязательные события, запреты, свободу разработки и критерии успеха. Спросить только критически недостающее; сформировать понятный план.",
+      "outputs": "brief.candidate + requirements + research_tasks + stage_plan",
+      "acceptance": "Требования прослеживаются к исходной идее; не добавлен новый канон без пометки; неопределённости видны.",
+      "on_pass": [
+        "N04"
+      ],
+      "on_fail": "N42",
+      "on_blocked": "N43",
+      "stage": "idea",
+      "implementation_status": "ROLE_ONLY"
+    },
+    {
+      "id": "N04",
+      "name": "A4: исследование по необходимости",
+      "executor": "A4 + инструменты источников",
+      "inputs": "Конкретные исследовательские вопросы из N03.",
+      "task": "Если вопросов нет — SKIPPED с причиной. Иначе прочитать реальные доступные источники, вернуть факты/ссылки/пределы знания; не выдавать реконструкцию за факт мира.",
+      "outputs": "research.report / SKIPPED",
+      "acceptance": "У утверждений есть источники, отсутствующие источники отмечены; результаты не утверждают художественный канон.",
+      "on_pass": [
+        "N05"
+      ],
+      "on_fail": "N42",
+      "on_blocked": "N43",
+      "stage": "idea",
+      "implementation_status": "ROLE_ONLY"
+    },
+    {
+      "id": "N05",
+      "name": "Фиксация брифа и критериев",
+      "executor": "код + автор при существенном выборе",
+      "inputs": "Бриф, результаты исследования, правила мира, выбранный эталон при наличии.",
+      "task": "Зафиксировать ревизию и хэши. Для новых правил/идентичностей запросить явное утверждение автора; разрешённую творческую свободу записать. Если эталона нет — предложить конкретные критерии, не объявлять их утверждёнными автоматически.",
+      "outputs": "brief.snapshot + requirements_version + canon_scope + review_bar",
+      "acceptance": "Установлено, что обязательно, что допускает варианты и что неизвестно; правила согласованы для данной задачи.",
+      "on_pass": [
+        "N06"
+      ],
+      "on_fail": "N42",
+      "on_blocked": "N43",
+      "stage": "idea",
+      "implementation_status": "NEW"
+    },
+    {
+      "id": "N06",
+      "name": "A1: варианты развития идеи",
+      "executor": "A1",
+      "inputs": "Зафиксированный бриф, канон, исследование и профильные навыки.",
+      "task": "Предложить несколько содержательно отличающихся концепций в согласованном количестве (по умолчанию 3): конфликт, ход событий, комедийный механизм, финал, производственная сложность. Не генерировать медиа.",
+      "outputs": "concepts[] с ID + tradeoffs",
+      "acceptance": "Варианты отличаются по содержанию, выполняют бриф; новые факты обозначены предложениями.",
+      "on_pass": [
+        "N07"
+      ],
+      "on_fail": "N42",
+      "on_blocked": "N43",
+      "stage": "concept",
+      "implementation_status": "ROLE_ONLY"
+    },
+    {
+      "id": "N07",
+      "name": "Критика вариантов",
+      "executor": "A6 / A7 / A8 по применимости через S07",
+      "inputs": "Отдельные варианты, требования и релевантные правила/критерии.",
+      "task": "A6 проверяет задачу; A7 — канон; A8 оценивает драматургический потенциал текста в режиме TEXT_CRAFT, если разрешены модель и критерии. Не оценивает несуществующее видео.",
+      "outputs": "concept_reviews[] + largest_gaps",
+      "acceptance": "Каждое обязательное требование проверено; замечания привязаны к варианту; текст не выдаётся за медиадоказательство.",
+      "on_pass": [
+        "N08"
+      ],
+      "on_fail": "N42",
+      "on_blocked": "N43",
+      "stage": "concept",
+      "implementation_status": "NEW",
+      "astra_v1_1": {
+        "review_policy": "Review all variants independently; N08 may choose if >=2 distinct acceptable options. Weak extra options do not block."
+      }
+    },
+    {
+      "id": "N08",
+      "name": "Выбор концепции",
+      "executor": "A0 + автор при необходимости",
+      "inputs": "Варианты и независимые замечания.",
+      "task": "Сформировать рекомендацию. При явном делегировании выбрать в пределах брифа; иначе запросить выбор автора. Не угадывать предпочтения и не принимать смену канона самостоятельно.",
+      "outputs": "concept.selected + decision_record",
+      "acceptance": "Один ID выбран с причиной и авторизацией выбора; остальные сохранены.",
+      "on_pass": [
+        "N09"
+      ],
+      "on_fail": "N42",
+      "on_blocked": "N43",
+      "stage": "concept",
+      "implementation_status": "NEW"
+    },
+    {
+      "id": "N09",
+      "name": "A1: сценарий и реплики",
+      "executor": "A1",
+      "inputs": "Выбранная концепция, бриф, канон, допустимая длительность.",
+      "task": "Разработать сцены, действия, реплики, драматические биты, подготовку и раскрытие. Вернуть варианты спорных решений отдельно; сохранить стабильные ID сцен/реплик.",
+      "outputs": "script.candidate + scene_ids + dialogue_ids",
+      "acceptance": "История завершена в заданном объёме; реплики привязаны к персонажам; нет скрытого изменения концепции.",
+      "on_pass": [
+        "N10"
+      ],
+      "on_fail": "N42",
+      "on_blocked": "N43",
+      "stage": "script",
+      "implementation_status": "ROLE_ONLY"
+    },
+    {
+      "id": "N10",
+      "name": "Критика сценария",
+      "executor": "A6 / A7 / A8 по применимости через S07",
+      "inputs": "Замороженный текст сценария, отдельные пакеты требований/канона/текстового ремесла.",
+      "task": "Проверить обязательные события, причинность, канон, ясность, темп и подачу реплик; при FAIL вернуть крупнейшую проблему A1. Текстовое ремесло не требует рендера, но требует разрешения и критериев.",
+      "outputs": "script.reviewed + stage_verdicts",
+      "acceptance": "Все обязательные для сценария критики PASS на одной версии; канон и публикация не утверждаются этим шагом.",
+      "on_pass": [
+        "N11"
+      ],
+      "on_fail": "N42",
+      "on_blocked": "N43",
+      "stage": "script",
+      "implementation_status": "NEW"
+    },
+    {
+      "id": "N11",
+      "name": "A2: подбор персонажей и локаций",
+      "executor": "A2",
+      "inputs": "Проверенный сценарий, каталоги персонажей/мира, доступные ресурсы.",
+      "task": "Подобрать образы персонажей, одежду, локации и постоянный реквизит под смысл сцены; сопоставить реплики с исполнителями; сформировать заявки на недостающие виды/образы.",
+      "outputs": "casting_plan + location_plan + asset_requests",
+      "acceptance": "Все сцены имеют состав/локацию; выбор объяснён; новые образы остаются кандидатами.",
+      "on_pass": [
+        "N12"
+      ],
+      "on_fail": "N42",
+      "on_blocked": "N43",
+      "stage": "direction",
+      "implementation_status": "ROLE_ONLY"
+    },
+    {
+      "id": "N12",
+      "name": "Комплект референсов мира",
+      "executor": "код + A2 + автор для нового канона",
+      "inputs": "Планы N11, оригиналы и утверждённые версии образов/локаций.",
+      "task": "Собрать реальные файлы лица, фигуры, одежды, геометрии, материалов и реквизита с ролями. Недостающее создать отдельной разрешённой задачей через тот же image-маршрут; новый эталон утверждает автор. В пилоте допускается ручной манифест.",
+      "outputs": "reference_pack.versioned + unknowns",
+      "acceptance": "Лица и пространство не противоречат друг другу; неподтверждённая реконструкция не объявлена каноном; необходимые виды доступны.",
+      "on_pass": [
+        "N13"
+      ],
+      "on_fail": "N42",
+      "on_blocked": "N43",
+      "stage": "direction",
+      "implementation_status": "NEW",
+      "astra_v1_1": {
+        "reference_subflow": "Call N15-N19 with mode=reference_candidate; return CANDIDATE to N12; owner approval before approved_ref; absent refs BLOCKED"
+      }
+    },
+    {
+      "id": "N13",
+      "name": "A2: режиссёрская разработка кадров",
+      "executor": "A2; A1 для изменения текста",
+      "inputs": "Сценарий, подбор персонажей/мира, референсы.",
+      "task": "Для каждого кадра определить функцию, участников, действие, мизансцену, размер/ракурс, оптику как эффект, камеру, свет, длительность, реплики и актёрскую подачу, звук, связи с соседями. Изменение смысла/текста реплики отправить A1, постановочную подачу решает A2.",
+      "outputs": "shot_cards[] + scene_geography + performance_notes",
+      "acceptance": "Покрыты все биты/реплики; нет незаметно добавленных событий; ось и география согласованы; смена сценария вызывает N10.",
+      "on_pass": [
+        "N14"
+      ],
+      "on_fail": "N42",
+      "on_blocked": "N43",
+      "stage": "direction",
+      "implementation_status": "ROLE_ONLY"
+    },
+    {
+      "id": "N14",
+      "name": "Критика режиссёрского решения",
+      "executor": "A6 / A7 / A8 по применимости через S07",
+      "inputs": "Карточки, сценарий, планы мира и референсы.",
+      "task": "Проверить полноту покрытия, читаемость действий, географию, раскрытие информации, осуществимость и непрерывность. Судить о плане как о плане, не о готовом кадре.",
+      "outputs": "direction.reviewed + required_fixes",
+      "acceptance": "Карточки выполнимы, каждое замечание имеет shot_id; все обязательные проверки пройдены.",
+      "on_pass": [
+        "N15"
+      ],
+      "on_fail": "N42",
+      "on_blocked": "N43",
+      "stage": "direction",
+      "implementation_status": "NEW"
+    },
+    {
+      "id": "N15",
+      "name": "A3: запросы изображений",
+      "executor": "A3 + S02/S03",
+      "inputs": "Проверенные карточки и референсы, точная модель/режим/API.",
+      "task": "Собрать художественный промпт по профилю модели; назначить роли и приоритет референсов; код адаптера формирует параметры. При смене модели пересобирать из карточки, не из цепочки переписанных промптов.",
+      "outputs": "image.request_candidate + source_versions",
+      "acceptance": "Применены нужные навыки/справки; роли файлов и неизменяемые черты явны; неподдерживаемых полей нет.",
+      "on_pass": [
+        "N16"
+      ],
+      "on_fail": "N42",
+      "on_blocked": "N43",
+      "stage": "image",
+      "implementation_status": "ROLE_ONLY",
+      "astra_v1_1": {
+        "modes": [
+          "shot_image",
+          "reference_candidate"
+        ],
+        "reference_candidate_inputs": "minimal approved identity anchors, not an already complete reference pack"
+      }
+    },
+    {
+      "id": "N16",
+      "name": "Проверка image-запроса",
+      "executor": "код + независимая содержательная проверка",
+      "inputs": "Промпт, параметры, файлы, постановка и профиль подключения.",
+      "task": "Проверить API-схему, размеры/число входов, роли, сохранение замысла, противоречия и стоимость; показать редактируемый предпросмотр. Правка пользователем аннулирует прежний hash/approval запроса.",
+      "outputs": "image.request_validated + request_hash",
+      "acceptance": "Техническая проверка PASS и содержательная проверка PASS; имеется доверенное разрешение расходов на точный запрос/пакет.",
+      "on_pass": [
+        "N17"
+      ],
+      "on_fail": "N42",
+      "on_blocked": "N43",
+      "stage": "image",
+      "implementation_status": "NEW"
+    },
+    {
+      "id": "N17",
+      "name": "Отправка генерации изображения",
+      "executor": "адаптер провайдера + S04/S05",
+      "inputs": "Проверенный запрос и его разрешение.",
+      "task": "Отправить один разрешённый запрос с idempotency key, зарегистрировать provider_job_id. Не делать несанкционированные внутренние повторы/дополнительные варианты.",
+      "outputs": "image.provider_job",
+      "acceptance": "Подтверждение приёма и журнал расхода сохранены; неизвестный исход переводится на сверку.",
+      "on_pass": [
+        "N18"
+      ],
+      "on_fail": "N43",
+      "on_blocked": "N43",
+      "stage": "image",
+      "implementation_status": "NEW"
+    },
+    {
+      "id": "N18",
+      "name": "Получение и сохранение изображения",
+      "executor": "S05 + S01",
+      "inputs": "Provider job и доступный результат.",
+      "task": "Дождаться статуса без повторного submit; скачать разрешённый результат, проверить декодирование/размеры, сохранить оригинал и метаданные как candidate.",
+      "outputs": "image.asset + checksum + provenance",
+      "acceptance": "Существует читаемый локальный файл, а не только URL или отчёт; данные соответствуют заданию и job.",
+      "on_pass": [
+        "N19"
+      ],
+      "on_fail": "N43",
+      "on_blocked": "N43",
+      "stage": "image",
+      "implementation_status": "NEW"
+    },
+    {
+      "id": "N19",
+      "name": "Критика реального изображения",
+      "executor": "A6 / A7 / A8 через S06/S07",
+      "inputs": "Фактическая картинка, требования кадра, эталоны персонажей/локации, bar.",
+      "task": "Проверить действие/состав, сходство, одежду, геометрию локации, реквизит и художественную читаемость. Не принимать описание/URL за просмотр. Изменять только провалившийся кадр.",
+      "outputs": "image.take_selected + verdicts",
+      "acceptance": "Все обязательные IMAGE-проверки PASS; выбран конкретный дубль, версия и связь с shot_id.",
+      "on_pass": [
+        "N20"
+      ],
+      "on_fail": "N42",
+      "on_blocked": "N43",
+      "stage": "image",
+      "implementation_status": "NEW",
+      "astra_v1_1": {
+        "on_reference_candidate": "N12 with owner approval; never N20 until reference approved"
+      }
+    },
+    {
+      "id": "N20",
+      "name": "A5: план речи и звука",
+      "executor": "A5",
+      "inputs": "Сценарий, реплики, режиссёрская подача, проверенные кадры.",
+      "task": "Составить речевой лист, разрешённые голоса, интонации/паузы, фон, SFX/музыку и требования к длительности/миксу. Разделять реплики по смыслу и лимитам модели, сохраняя всю речь и темп.",
+      "outputs": "audio_plan + dialogue_segments + voice_refs",
+      "acceptance": "Каждая реплика имеет исполнителя и ID; полная речь сохранена; источники музыки/голоса и возможность использования определены.",
+      "on_pass": [
+        "N21"
+      ],
+      "on_fail": "N42",
+      "on_blocked": "N43",
+      "stage": "audio",
+      "implementation_status": "ROLE_ONLY",
+      "astra_v1_1": {
+        "audio_strategy_source": "freeze speech_strategy and independent required speech/ambience/sfx/music stems before branching",
+        "speech_strategy": [
+          "external_tts",
+          "native_video",
+          "silent"
+        ]
+      },
+      "p0_pilot": {
+        "pilot_strategy": "external_tts",
+        "native_audio_enabled": false,
+        "required_stems": [
+          "voice",
+          "sfx",
+          "music"
+        ],
+        "optional_stems": [
+          "ambience"
+        ]
+      }
+    },
+    {
+      "id": "N21",
+      "name": "Подготовка аудиозапросов",
+      "executor": "A5 + A3 для профиля + адаптер",
+      "inputs": "Аудиоплан, выбранный TTS/SFX/music API и документы режима.",
+      "task": "Применить поддерживаемые теги/поля; отделить произносимый текст от режиссёрских инструкций; сопоставить голос и персонажа. Не подменять платформенные правила промптами другой модели.",
+      "outputs": "audio.requests_candidate",
+      "acceptance": "Текст не изменён без решения A1/автора; теги совместимы; голос доступен и разрешён.",
+      "on_pass": [
+        "N22"
+      ],
+      "on_fail": "N42",
+      "on_blocked": "N43",
+      "stage": "audio",
+      "implementation_status": "NEW",
+      "p0_pilot": {
+        "required_stems": [
+          "voice",
+          "sfx",
+          "music"
+        ],
+        "voice_timing": "measured_with_ffprobe"
+      }
+    },
+    {
+      "id": "N22",
+      "name": "Проверка аудиозапросов",
+      "executor": "код + содержательная проверка",
+      "inputs": "Запросы речи/фоновых звуков/музыки, исходные реплики.",
+      "task": "Проверить полноту текста, границы сегментов, поддерживаемые теги, voice/model IDs, лимиты, права использования и разрешение расходов; отсутствующая музыка может быть явно исключена по брифу.",
+      "outputs": "audio.requests_validated",
+      "acceptance": "Нет потери слов, служебные теги не станут речью по ошибке; обязательные входы и approvals есть.",
+      "on_pass": [
+        "N23"
+      ],
+      "on_fail": "N42",
+      "on_blocked": "N43",
+      "stage": "audio",
+      "implementation_status": "NEW",
+      "astra_v1_1": {
+        "native_path": "Only skip external speech synthesis. Music/SFX/ambience jobs remain required. Native dialogue has estimated timing until decoded N30"
+      },
+      "p0_pilot": {
+        "pilot_policy": "external_tts_only",
+        "native_audio": "DISABLED_UNTIL_CODEX_REVIEW"
+      }
+    },
+    {
+      "id": "N23",
+      "name": "Генерация речи и звуков",
+      "executor": "аудиоадаптер + S04/S05",
+      "inputs": "Проверенные аудиозапросы.",
+      "task": "Отправить разрешённые TTS/SFX/music задания, зарегистрировать каждый provider job; сохранять самостоятельные дорожки и связь с репликой/сценой.",
+      "outputs": "audio.provider_jobs[]",
+      "acceptance": "Нет незарегистрированных вызовов или автоматической подмены голоса.",
+      "on_pass": [
+        "N24"
+      ],
+      "on_fail": "N43",
+      "on_blocked": "N43",
+      "stage": "audio",
+      "implementation_status": "NEW",
+      "astra_v1_1": {
+        "native_path": "SKIPPED only for speech stem; external effects and music still generated"
+      },
+      "p0_pilot": {
+        "pilot_policy": "external_tts_only_and_independent_SFX_music"
+      }
+    },
+    {
+      "id": "N24",
+      "name": "Получение и измерение аудио",
+      "executor": "S05 + S06 + S01",
+      "inputs": "Аудиозадания и файлы.",
+      "task": "Сохранить дорожки, декодировать, измерить фактические длительности и свойства; подготовить транскрипцию/таймкоды при необходимости. Транскрипт хранить как отдельное доказательство.",
+      "outputs": "audio.assets + timings + transcript",
+      "acceptance": "Файлы воспроизводятся; длительности реальные; реплики не потеряны и не заменены.",
+      "on_pass": [
+        "N25"
+      ],
+      "on_fail": "N43",
+      "on_blocked": "N43",
+      "stage": "audio",
+      "implementation_status": "NEW",
+      "astra_v1_1": {
+        "native_path": "native dialogue measured post-N30, not assumed available before N26"
+      },
+      "p0_pilot": {
+        "timing": "measure_actual_audio_length_with_ffprobe_before_N26"
+      }
+    },
+    {
+      "id": "N25",
+      "name": "Критика реального аудио",
+      "executor": "A6 / A7 / A8 через S06/S07",
+      "inputs": "Дорожки для прослушивания, текст/подача и голосовые эталоны.",
+      "task": "Прослушать слова, темп, интонацию, согласованность голоса, артефакты/паузы/перегруз; проверить текст дополнительно транскриптом. Без слухового анализа тембр/эмоция не получают PASS.",
+      "outputs": "audio.reviewed + dialogue_timings",
+      "acceptance": "Все обязательные AUDIO-критерии покрыты; замечания привязаны к дорожке и времени.",
+      "on_pass": [
+        "N26"
+      ],
+      "on_fail": "N42",
+      "on_blocked": "N43",
+      "stage": "audio",
+      "implementation_status": "NEW",
+      "astra_v1_1": {
+        "native_path": "native dialogue from video N30 measured here, on PASS go N32 only if native video already accepted",
+        "repair_routes": {
+          "native_speech": "N27",
+          "external_audio": "N21",
+          "mix_issue": "N32"
+        }
+      },
+      "p0_pilot": {
+        "audio_review": "actual_voice+effects+music required, not merely LLM text"
+      }
+    },
+    {
+      "id": "N26",
+      "name": "A2: согласование тайминга и движения",
+      "executor": "A2 + A5",
+      "inputs": "Проверенные кадры и фактическая длительность реплик.",
+      "task": "Согласовать начало/конец действия, движение камеры и время речи; определить I2V/другой режим, старт/конец, необходимость lip-sync. Если провайдер создаёт нативную речь, выбрать этот путь заранее и не дублировать голос.",
+      "outputs": "video.shot_plan + audio_strategy + duration_map",
+      "acceptance": "План выполним по лимитам модели; полная речь помещается без произвольного ускорения; новый монтажный план имеет версию.",
+      "on_pass": [
+        "N27"
+      ],
+      "on_fail": "N42",
+      "on_blocked": "N43",
+      "stage": "video",
+      "implementation_status": "NEW",
+      "astra_v1_1": {
+        "timing": "external uses actual dialogue duration; native uses explicit estimated range marked ESTIMATED and compares after N30",
+        "audio_strategy_source": "N20"
+      },
+      "p0_pilot": {
+        "duration_source": "actual_measured_voice_milliseconds; no estimated native sound"
+      }
+    },
+    {
+      "id": "N27",
+      "name": "A3: запросы видео",
+      "executor": "A3 + профиль подключения",
+      "inputs": "План N26, утверждённый исходный кадр, нужные медиа.",
+      "task": "Сформировать промпт действия/камеры, ограничения идентичности и состояния мира, поддерживаемые start/end/audio/reference inputs. Нативный диалог или lip-sync выбирать только при подтверждённой поддержке API.",
+      "outputs": "video.requests_candidate",
+      "acceptance": "Входы соответствуют модели и ролям; исходный кадр не заменён; движение описано однозначно.",
+      "on_pass": [
+        "N28"
+      ],
+      "on_fail": "N42",
+      "on_blocked": "N43",
+      "stage": "video",
+      "implementation_status": "ROLE_ONLY"
+    },
+    {
+      "id": "N28",
+      "name": "Проверка видеозапросов",
+      "executor": "код + содержательная проверка",
+      "inputs": "Видеозапросы, параметры, входные файлы и тайминг.",
+      "task": "Проверить ограничения режима, длительности, соотношение сторон, действие/звук, референсы и цену. Показать предпросмотр, получить точное разрешение запроса/пакета.",
+      "outputs": "video.requests_validated",
+      "acceptance": "Нет неподдерживаемых полей; событие и речь выполнимы в заданном интервале.",
+      "on_pass": [
+        "N29"
+      ],
+      "on_fail": "N42",
+      "on_blocked": "N43",
+      "stage": "video",
+      "implementation_status": "NEW",
+      "astra_v1_1": {
+        "lip_sync": "Must re-preflight after N30 original video saved and before second N29 paid operation"
+      }
+    },
+    {
+      "id": "N29",
+      "name": "Генерация видео / lip-sync",
+      "executor": "видеоадаптер + S04/S05",
+      "inputs": "Проверенные запросы, исходные кадры и разрешённые аудиовходы.",
+      "task": "Отправить задания; lip-sync при необходимости — отдельная зависимая операция с собственным approval. Зарегистрировать запросы и возможную стоимость.",
+      "outputs": "video.provider_jobs[]",
+      "acceptance": "Каждая операция имеет уникальный ключ и provider ID; timeout не вызывает слепой повтор.",
+      "on_pass": [
+        "N30"
+      ],
+      "on_fail": "N43",
+      "on_blocked": "N43",
+      "stage": "video",
+      "implementation_status": "NEW",
+      "astra_v1_1": {
+        "jobs": [
+          "video_generation",
+          "lip_sync"
+        ],
+        "lip_sync_dependency": "saved verified video asset from N30; distinct job/request/hash and approval; do not re-submit source video"
+      },
+      "p0_pilot": {
+        "video_generation_and_lipsync": "different jobs, profile, request_hash, cost authorization; no re-render original on lip-sync fail"
+      }
+    },
+    {
+      "id": "N30",
+      "name": "Получение и инспекция видео",
+      "executor": "S05 + S06 + S01",
+      "inputs": "Видео jobs и результат.",
+      "task": "Сохранить клип, проверить поток/длительность/fps/аудиодорожки, подготовить последовательность кадров и доступ к движению/звуку с таймкодами.",
+      "outputs": "video.assets + inspection_manifest",
+      "acceptance": "Получен настоящий декодируемый клип; доступны именно проверяемые области, coverage зафиксирован.",
+      "on_pass": [
+        "N31"
+      ],
+      "on_fail": "N43",
+      "on_blocked": "N43",
+      "stage": "video",
+      "implementation_status": "NEW",
+      "astra_v1_1": {
+        "derivative_provenance": "source_checksum, derivative_checksum, transform_id/version/hash, streams, timing, viewer-side access",
+        "lip_sync_branch": "when needed N28->N29->N30 as separate dependent job"
+      },
+      "p0_pilot": {
+        "must_persist_verified_source_before_lipsync": true
+      }
+    },
+    {
+      "id": "N31",
+      "name": "Критика реального клипа",
+      "executor": "A6 / A7 / A8 через S06/S07",
+      "inputs": "Клип, ключевые кадры, звук, карточка и эталоны.",
+      "task": "Проверить выполненное действие, тайминг, сходство при поворотах, геометрию, камеру, речь/lip-sync и артефакты. Проверка статичных кадров не подтверждает всю динамику/звук.",
+      "outputs": "video.take_selected + scope_verdicts",
+      "acceptance": "Для обязательных аспектов достаточное coverage; нет ложного общего PASS при недоступном звуке/движении.",
+      "on_pass": [
+        "N32"
+      ],
+      "on_fail": "N42",
+      "on_blocked": "N43",
+      "stage": "video",
+      "implementation_status": "NEW",
+      "astra_v1_1": {
+        "scope": "no video or audio verdict PASS without actual modality coverage and matching checksum"
+      }
+    },
+    {
+      "id": "N32",
+      "name": "A5: монтажная сборка как план",
+      "executor": "A5",
+      "inputs": "Проверенные дубли, аудио, сценарий и режиссёрская последовательность.",
+      "task": "Составить EDL/timeline с точными ID, in/out, дорожками, переходами, титрами и параметрами экспорта; явно устранить дублирование нативного и внешнего звука. Не обрезать слова ради хронометража.",
+      "outputs": "edit.timeline + dependency_manifest",
+      "acceptance": "Все файлы существуют, реплики полны, стыки и уровни продуманы; нет недостающих обязательных сцен.",
+      "on_pass": [
+        "N33"
+      ],
+      "on_fail": "N42",
+      "on_blocked": "N43",
+      "stage": "edit",
+      "implementation_status": "ROLE_ONLY",
+      "astra_v1_1": {
+        "manifest": "expected_media_manifest frozen with required shot/dialogue/music/sfx/ambience/title slots and source revisions; all mandatory slots fulfilled before timeline"
+      }
+    },
+    {
+      "id": "N33",
+      "name": "Рендер итогового файла",
+      "executor": "локальный worker / монтажный инструмент",
+      "inputs": "Валидный timeline и реальные файлы.",
+      "task": "Через доступное окружение выполнить сборку, сведение и титры, сохранить master candidate. Если выбран CapCut-only путь, дождаться подтверждённого экспорта, не выдавать проект за MP4.",
+      "outputs": "master.candidate + render_log + file_hash",
+      "acceptance": "Существует полностью декодируемый файл с ожидаемыми видео/аудио и размерами; код/EDL не считается рендером.",
+      "on_pass": [
+        "N34"
+      ],
+      "on_fail": "N43",
+      "on_blocked": "N43",
+      "stage": "edit",
+      "implementation_status": "NEW",
+      "astra_v1_1": {
+        "manifest": "frozen verified slot manifest before export; no partial batch approval"
+      }
+    },
+    {
+      "id": "N34",
+      "name": "Техническая проверка экспорта (без LLM)",
+      "executor": "локальный FFmpeg/ffprobe worker + проверка FastAPI",
+      "inputs": "Реальный master, текст, выбранные дубли, эталон.",
+      "task": "Проверить существование и checksum реального master, декодируемые потоки, длительность, формат/FPS, обязательный звук, заданные технические пороги (LUFS/тишина/чёрные интервалы). Не выполнять художественную критику, не вызывать A6/A7/A8.",
+      "outputs": "TechnicalQCResult (PASS_TECHNICAL/FAIL/BLOCKED)",
+      "acceptance": "Данные от доверенного media worker на актуальном master checksum; отсутствие реального файла = BLOCKED; PASS_TECHNICAL не является creative PASS.",
+      "on_pass": [
+        "N35"
+      ],
+      "on_fail": "N42",
+      "on_blocked": "N43",
+      "stage": "edit",
+      "implementation_status": "NEW",
+      "astra_v1_1": {
+        "technical_only": "Export technical QC only. Non-technical final master craft critics run once in N36/N37/N38."
+      },
+      "astra_v1_2": {
+        "executor_class": "trusted_local_ffmpeg_worker",
+        "runtime_model_class": "NONE",
+        "llm_calls": 0,
+        "input_contract": "TechnicalQCRequest→TechnicalQCResult",
+        "output_contract": "contracts/final-runtime-v1_2.schema.json#/$defs/TechnicalQCResult",
+        "required_evidence": [
+          "real_master_sha256",
+          "ffprobe_streams",
+          "decode",
+          "verified_worker_identity"
+        ],
+        "blocked_without": [
+          "local_worker",
+          "actual_mp4",
+          "matching_content_checksum"
+        ]
+      },
+      "p0_pilot": {
+        "llm_calls": 0,
+        "executor": "local_ffprobe_ffmpeg_worker"
+      }
+    },
+    {
+      "id": "N35",
+      "name": "Заморозить финальный пакет",
+      "executor": "код + S01/S06",
+      "inputs": "Проверенный master, бриф/канон/bar, исходные версии и журнал.",
+      "task": "Создать release_candidate_id и checksum итогового файла; собрать реальные данные просмотра/прослушивания для трёх финальных критиков. Не включать их предыдущие мнения и самооценку исполнителей.",
+      "outputs": "final.review_snapshot",
+      "acceptance": "Все три критика будут проверять один и тот же файл/хэш и актуальные правила; пакет не меняется в процессе.",
+      "on_pass": [
+        "N36",
+        "N37",
+        "N38"
+      ],
+      "on_fail": "N43",
+      "on_blocked": "N43",
+      "stage": "final",
+      "implementation_status": "NEW",
+      "astra_v1_1": {
+        "snapshot": "review_round_id, full snapshot_hash=hash(master checksum, expected slots, requirements, canon, review_bar, policies, profile+skills hashes, source dependencies)"
+      },
+      "astra_v1_2": {
+        "executor_class": "trusted_FastAPI_and_local_worker; optionally local or paid_STT",
+        "runtime_model_class": "NONE for manifest (STT separately budgeted)",
+        "llm_calls": 0,
+        "input_contract": "TechnicalQCResult + master+manifest+approved brief/canon/review bar/profile+skill revisions",
+        "output_contract": "contracts/final-runtime-v1_2.schema.json#/$defs/FrozenReviewPacket",
+        "required_evidence": [
+          "master_sha256",
+          "immutable_round_snapshot",
+          "capabilities_and_media_uris",
+          "three_isolated_role_packets"
+        ],
+        "blocked_without": [
+          "real_accessible_media",
+          "trusted_manifest",
+          "approved_policies"
+        ]
+      },
+      "p0_pilot": {
+        "without_mp4": "BLOCKED_REAL_MEDIA"
+      }
+    },
+    {
+      "id": "N36",
+      "name": "Финальный A6: соответствие заданию",
+      "executor": "A6",
+      "inputs": "Итоговый файл/доказательства и только утверждённые требования + IDs.",
+      "task": "Независимо проверить все обязательные события, содержание, форматы, длительности, реплики и технические требования. Не полагаться на промежуточные PASS.",
+      "outputs": "final.verdict.A6",
+      "acceptance": "Полное покрытие требований; evidence с source hash/таймкодами; отсутствующее наблюдение — BLOCKED.",
+      "on_pass": [
+        "N39"
+      ],
+      "on_fail": "N39",
+      "on_blocked": "N39",
+      "stage": "final",
+      "implementation_status": "ROLE_ONLY",
+      "astra_v1_1": {
+        "review": "must match exact review_round_id, snapshot_hash and master checksum; distinct isolated reviewer session"
+      },
+      "astra_v1_2": {
+        "executor_class": "independent_video_audio_reviewer",
+        "runtime_model_class": "verified_video_and_audio_capable_Gemini-class_or_equivalent",
+        "default_max_initial_calls": 1,
+        "input_contract": "ReviewerPacket(role=A6)+actual media+requirements IDs",
+        "output_contract": "contracts/final-runtime-v1_2.schema.json#/$defs/CriticVerdict",
+        "required_evidence": [
+          "per_requirement_temporal_coverage",
+          "actual_video_and_audio_as_needed"
+        ],
+        "blocked_without": [
+          "verified_coverage",
+          "request_budget",
+          "approved_source_revision"
+        ]
+      }
+    },
+    {
+      "id": "N37",
+      "name": "Финальный A7: мир и непрерывность",
+      "executor": "A7",
+      "inputs": "Тот же итоговый файл и утверждённые эталоны/канон.",
+      "task": "Независимо проверить персонажей, голоса, одежду, географию локаций, реквизит, причинность/непрерывность. Не использовать вердикт A6/A8.",
+      "outputs": "final.verdict.A7",
+      "acceptance": "Нарушения привязаны к кадрам/времени и конкретным утверждённым правилам.",
+      "on_pass": [
+        "N39"
+      ],
+      "on_fail": "N39",
+      "on_blocked": "N39",
+      "stage": "final",
+      "implementation_status": "ROLE_ONLY",
+      "astra_v1_1": {
+        "review": "must match exact review_round_id, snapshot_hash and master checksum; distinct isolated reviewer session"
+      },
+      "astra_v1_2": {
+        "executor_class": "independent_visual_video_reviewer",
+        "runtime_model_class": "verified_multimodal_video_capable; Sonnet_frame_only_when_criterion_is_static",
+        "default_max_initial_calls": 1,
+        "input_contract": "ReviewerPacket(role=A7)+approved_Vault_refs+actual media",
+        "output_contract": "contracts/final-runtime-v1_2.schema.json#/$defs/CriticVerdict",
+        "required_evidence": [
+          "character_identity",
+          "approved_canon_hash",
+          "continuity_timeline"
+        ],
+        "blocked_without": [
+          "approved_references",
+          "motion_audio_coverage_if_required",
+          "request_budget"
+        ]
+      }
+    },
+    {
+      "id": "N38",
+      "name": "Финальный A8: ремесло",
+      "executor": "A8",
+      "inputs": "Тот же итоговый файл, доступный эталон, утверждённый bar и отдельное разрешение.",
+      "task": "Независимо оценить постановку, игру/реакции, читаемость, монтажный ритм и звук по наблюдаемым критериям; дать одну крупнейшую проблему при FAIL. A8 включать только после реализации авторизации и реального media inspection.",
+      "outputs": "final.verdict.A8",
+      "acceptance": "Проанализированы реальные обязательные модальности, критерии конкретны; без доступа/approval — BLOCKED.",
+      "on_pass": [
+        "N39"
+      ],
+      "on_fail": "N39",
+      "on_blocked": "N39",
+      "stage": "final",
+      "implementation_status": "ROLE_ONLY",
+      "astra_v1_1": {
+        "review": "disabled pending access to original media with audio/motion coverage and explicit budget approval"
+      },
+      "astra_v1_2": {
+        "executor_class": "independent_temporal_and_audio_craft_reviewer",
+        "runtime_model_class": "verified_native_audio_video_capable; expensive_model_only_with_owner_grant",
+        "default_max_initial_calls": 1,
+        "input_contract": "ReviewerPacket(role=A8)+actual video+audio+craft_bar",
+        "output_contract": "contracts/final-runtime-v1_2.schema.json#/$defs/CriticVerdict",
+        "required_evidence": [
+          "video_motion",
+          "sound_listening",
+          "cut_boundaries",
+          "dialogue_timing"
+        ],
+        "blocked_without": [
+          "A8_separately_authorized",
+          "verified_multimodal_capability",
+          "actual_mp4"
+        ],
+        "runtime_status": "DISABLED_BLOCKED_UNTIL_MP4_AND_BUDGET"
+      },
+      "p0_pilot": {
+        "without_real_multimodal": "BLOCKED",
+        "enabled": false
+      }
+    },
+    {
+      "id": "N39",
+      "name": "Свести три финальных вердикта",
+      "executor": "код",
+      "inputs": "Ответы A6/A7/A8 и final.review_snapshot.",
+      "task": "Проверить JSON, роли, версии/хэши, coverage и доказательства. Ровно три валидных PASS на одной версии → awaiting_owner_approval. Любой FAIL → адресная правка; BLOCKED → остановка, не PASS.",
+      "outputs": "final.qa_summary + required_action",
+      "acceptance": "Нет majority vote, усреднения оценок или самоодобрения A0; критики не заменяют решение владельца.",
+      "on_pass": [
+        "N40"
+      ],
+      "on_fail": "N42",
+      "on_blocked": "N43",
+      "stage": "final",
+      "implementation_status": "NEW",
+      "astra_v1_1": {
+        "gate": "exactly one current verdict per A6/A7/A8 for identical snapshot; reject dup/stale/partial; owner decision still needed"
+      },
+      "astra_v1_2": {
+        "executor_class": "trusted_FastAPI_SQLite_transaction",
+        "runtime_model_class": "NONE",
+        "llm_calls": 0,
+        "input_contract": "3 CriticVerdict + FrozenReviewPacket + evidence provenance",
+        "output_contract": "contracts/final-runtime-v1_2.schema.json#/$defs/DecisionEnvelope",
+        "required_evidence": [
+          "exact_current_round_and_snapshot_hash",
+          "unique_roles",
+          "backend_verified_media",
+          "nonstale_approvals"
+        ],
+        "blocked_without": [
+          "all_3_unique_PASS",
+          "single_frozen_snapshot",
+          "backend_verification"
+        ]
+      }
+    },
+    {
+      "id": "N40",
+      "name": "Решение человека",
+      "executor": "автор через доверенный интерфейс",
+      "inputs": "Реальный итоговый файл и три вердикта с замечаниями.",
+      "task": "Дать просмотр/прослушивание, принять явное действие: отправить эту версию в Готовые либо вернуть с замечанием. Утверждать конкретный hash; изменение после просмотра требует новой проверки. Обход FAIL/BLOCKED не является штатным путём.",
+      "outputs": "owner.final_decision",
+      "acceptance": "Три PASS проверены кодом; решение принадлежит владельцу и связано с текущим файлом.",
+      "on_pass": [
+        "N41"
+      ],
+      "on_fail": "N42",
+      "on_blocked": "N43",
+      "stage": "final",
+      "implementation_status": "NEW",
+      "astra_v1_1": {
+        "owner": "authenticated Studio session only; immutable master hash and current snapshot revision"
+      },
+      "astra_v1_2": {
+        "executor_class": "authenticated_Studio_owner_session",
+        "runtime_model_class": "NONE",
+        "llm_calls": 0,
+        "input_contract": "DecisionEnvelope + current owner session + viewable master",
+        "output_contract": "contracts/final-runtime-v1_2.schema.json#/$defs/OwnerReviewDecision",
+        "blocked_without": [
+          "owner_session",
+          "current_review_snapshot",
+          "human_decision"
+        ]
+      }
+    },
+    {
+      "id": "N41",
+      "name": "Отправить в Готовые",
+      "executor": "код + хранилище",
+      "inputs": "Решение владельца и неизменённый финальный файл.",
+      "task": "Атомарно зарегистрировать READY и безопасно скопировать/зарегистрировать готовый файл с manifest; проверить checksum и идемпотентность. Сохранить рабочие версии; не публиковать в соцсети.",
+      "outputs": "ready.asset + release_manifest",
+      "acceptance": "Только явно принятая версия попала в Готовые; повтор не создаёт дубль; оригиналы сохранены.",
+      "on_pass": [
+        "END"
+      ],
+      "on_fail": "N43",
+      "on_blocked": "N43",
+      "stage": "ready",
+      "implementation_status": "NEW",
+      "astra_v1_1": {
+        "ready": "atomically verify unchanged entire snapshot, fresh reviews+owner decision+file checksum; repeat same decision idempotent"
+      },
+      "astra_v1_2": {
+        "executor_class": "trusted_FastAPI_SQLite_storage",
+        "runtime_model_class": "NONE",
+        "llm_calls": 0,
+        "input_contract": "OwnerReviewDecision + current master checksum + verified final round",
+        "output_contract": "contracts/final-runtime-v1_2.schema.json#/$defs/ReadyManifest",
+        "blocked_without": [
+          "same_snapshot",
+          "same_master_checksum",
+          "persisted_trusted_round",
+          "owner_authenticated"
+        ]
+      },
+      "p0_pilot": {
+        "ready_requires": "human_auth+master_hash+three_current_role_verdicts"
+      }
+    },
+    {
+      "id": "N42",
+      "name": "A0: адресный возврат",
+      "executor": "A0 + код зависимостей",
+      "inputs": "FAIL/замечание автора, версия, доказательство и владелец дефекта.",
+      "task": "Выбрать один корневой дефект и нужный этап, сформировать узкую задачу; код вычисляет зависимые результаты и разрешённый target. Сохранить старые файлы, пометить зависимые проверки устаревшими, проверить остаток бюджета/раундов.",
+      "outputs": "repair_task + invalidation_plan + resume_target",
+      "acceptance": "Исполнитель и причина явны; одобрения старых запросов не переиспользуются; нет полного перезапуска без зависимости.",
+      "on_pass": [
+        "DYNAMIC"
+      ],
+      "on_fail": "N43",
+      "on_blocked": "N43",
+      "stage": "control",
+      "implementation_status": "NEW",
+      "astra_v1_1": {
+        "repairs": "native speech=>N27, external speech/music/sfx=>N21, edit/mix=>N32; no bypass preflight or paid approval"
+      },
+      "p0_pilot": {
+        "repair": "only failed slot, cache other slots by verified checksum"
+      }
+    },
+    {
+      "id": "N43",
+      "name": "Пауза и восстановление",
+      "executor": "код + автор/оператор",
+      "inputs": "Недостающие входы, provider error, неизвестный исход, лимит, отказ автора.",
+      "task": "Сохранить checkpoint и точную причину, показать безопасное следующее действие. Продолжить только после устранения причины/нужного решения; неизвестный submit сначала сверить по provider job.",
+      "outputs": "paused.checkpoint + missing_inputs + recovery_action",
+      "acceptance": "Нет повторной оплаты от повторного запуска; старое принятие не применяется к новым входам.",
+      "on_pass": [
+        "RESUME"
+      ],
+      "on_fail": "END",
+      "on_blocked": "END",
+      "stage": "control",
+      "implementation_status": "NEW",
+      "astra_v1_1": {
+        "unknown": "never auto-retry SUBMITTING after timeout; persist reservation and PAUSED/UNKNOWN"
+      }
+    },
+    {
+      "id": "S01",
+      "name": "Хранилище и версии",
+      "executor": "код",
+      "inputs": "Артефакты, исходники, связи и утверждения.",
+      "task": "Хранить оригиналы/кандидаты/выбранные дубли/утверждённый канон/готовые раздельно; ID, revision, hash, provenance и граф зависимостей. Проверять принадлежность проекту и атомарность записи.",
+      "outputs": "versioned_asset + dependency_edges",
+      "acceptance": "Нет потери старых версий, смешения персонажей/проектов или самопринятия AI.",
+      "on_pass": [
+        "CALLER"
+      ],
+      "on_fail": "N43",
+      "on_blocked": "N43",
+      "stage": "shared",
+      "implementation_status": "NEW",
+      "astra_v1_1": {
+        "pilot_storage": "existing FastAPI+SQLite as sole durable state; atomic revision CAS/lease, not n8n execution state"
+      },
+      "p0_pilot": {
+        "source_of_truth": "existing SQLite Studio, additive p0_ schema"
+      }
+    },
+    {
+      "id": "S02",
+      "name": "Выбор и загрузка навыков",
+      "executor": "код + агент подбора",
+      "inputs": "Этап, постановка, каталог навыков и нужные справки.",
+      "task": "Подключить обязательную основу этапа и дополнительные знания по задаче; загрузить содержимое/нужные references, сохранить версии и обоснование применения. Не считать имя навыка его применением.",
+      "outputs": "skill_context + skills_manifest",
+      "acceptance": "Инструкции действительно включены в контекст нужного вызова; конфликты выявлены; нет механической загрузки всей библиотеки.",
+      "on_pass": [
+        "CALLER"
+      ],
+      "on_fail": "N43",
+      "on_blocked": "N43",
+      "stage": "shared",
+      "implementation_status": "PARTIAL"
+    },
+    {
+      "id": "S03",
+      "name": "Профиль модели и адаптер",
+      "executor": "код + проверенная документация",
+      "inputs": "Модель, версия, режим, API-провайдер и нужные входы.",
+      "task": "Хранить официальные источники/дату проверки, prompt recipes и контракт API. Проверять мультиреференсы, размеры, длительности, форматы и поддержку аудио/структурных входов. Смена модели пересобирает запрос.",
+      "outputs": "model_profile + validated_payload",
+      "acceptance": "Никаких полей чужого API; недоступное не выдумывается; поддержка документированная и испытанная помечена раздельно.",
+      "on_pass": [
+        "CALLER"
+      ],
+      "on_fail": "N43",
+      "on_blocked": "N43",
+      "stage": "shared",
+      "implementation_status": "NEW"
+    },
+    {
+      "id": "S04",
+      "name": "Разрешение расходов и резерв",
+      "executor": "код + владелец",
+      "inputs": "Точный hash запроса или ограниченного пакета, цена, provider/model, бюджет.",
+      "task": "Проверить доверенное approval, максимальные вызовы/стоимость/срок, зарезервировать расход до отправки; все LLM/критики тоже учитываются. При смене запроса/профиля переоценить. Не доверять флагам из промпта.",
+      "outputs": "authorized_reservation / BLOCKED",
+      "acceptance": "Без разрешения нет внешнего платного вызова; неизвестная цена/жёсткость лимита явно обработана; внутренних бесконтрольных retries нет.",
+      "on_pass": [
+        "CALLER"
+      ],
+      "on_fail": "N43",
+      "on_blocked": "N43",
+      "stage": "shared",
+      "implementation_status": "NEW",
+      "astra_v1_1": {
+        "budgets": "BudgetGrant limits and per-request immutable authorization; recheck hash/profile/cost and reserve before each paid submit"
+      },
+      "p0_pilot": {
+        "spend_gate": "immutable request-specific authorization and cap_cents"
+      }
+    },
+    {
+      "id": "S05",
+      "name": "Жизненный цикл provider job",
+      "executor": "код / провайдер",
+      "inputs": "Авторизованный запрос или существующий job ID.",
+      "task": "Идемпотентный submit, сохранение job ID, polling/callback, проверка body-level status, download и учёт доступного usage/billing. Timeout после отправки — UNKNOWN и сверка, не новый submit.",
+      "outputs": "provider_job + assets + cost_state",
+      "acceptance": "Не обещать exactly-once списание без поддержки провайдера; повторы и дубли callback не создают нового задания.",
+      "on_pass": [
+        "CALLER"
+      ],
+      "on_fail": "N43",
+      "on_blocked": "N43",
+      "stage": "shared",
+      "implementation_status": "NEW",
+      "astra_v1_1": {
+        "unknown": "PREPARED saved before submit; timeout or lost job id => UNKNOWN, preserve reservation, no automatic resubmit"
+      },
+      "p0_pilot": {
+        "unknown": "never retry without provider reconciliation"
+      }
+    },
+    {
+      "id": "S06",
+      "name": "Подготовка доказательств",
+      "executor": "инструменты изображения/аудио/видео",
+      "inputs": "Сохранённый файл, его hash и критерии проверки.",
+      "task": "Декодировать изображение; дать реальный доступ к видео/временным фрагментам и аудио; измерить свойства, подготовить кадры/транскрипт/таймкоды. Указать coverage и ограничения, не подменять слух транскриптом.",
+      "outputs": "evidence_manifest + accessible_media",
+      "acceptance": "Каждый аспект проверяем реально; URL/лог/один кадр не подтверждает динамику или звук.",
+      "on_pass": [
+        "CALLER"
+      ],
+      "on_fail": "N43",
+      "on_blocked": "N43",
+      "stage": "shared",
+      "implementation_status": "NEW",
+      "astra_v1_1": {
+        "provenance": "actual media decoded/viewed by critic; derivative checksum/origin/window/stream and validated viewer-side access"
+      },
+      "astra_v1_2": {
+        "local_media_worker": "ffprobe/FFmpeg must run on separate Windows worker, not n8n Cloud Code node",
+        "stt": "Whisper local CPU or paid remote STT separately, word timestamps not perfect sync proof"
+      }
+    },
+    {
+      "id": "S07",
+      "name": "Независимая критика этапа",
+      "executor": "A6/A7/A8 + код",
+      "inputs": "Замороженный артефакт, применимые критерии/эталоны и разрешение вызовов.",
+      "task": "Сформировать разные пакеты, новые сессии без истории автора/чужих вердиктов. A6 требования, A7 канон, A8 ремесло по области. Проверить ответы и покрытие. Выбор обязательных критиков фиксируется политикой этапа, не желанием автора артефакта.",
+      "outputs": "stage.review_bundle",
+      "acceptance": "FAIL — дефект с evidence; BLOCKED — нехватка данных; все обязательные PASS — лишь допуск дальше. Смысл цитат не подтверждается одним строковым совпадением.",
+      "on_pass": [
+        "CALLER"
+      ],
+      "on_fail": "N42",
+      "on_blocked": "N43",
+      "stage": "shared",
+      "implementation_status": "PARTIAL",
+      "astra_v1_2": {
+        "critic_policy": "three separate reviewer packets+session ids+model capabilities; text or frames not enough for audio/lip sync"
+      }
+    },
+    {
+      "id": "S08",
+      "name": "Журнал и checkpoint",
+      "executor": "код",
+      "inputs": "События всех узлов и изменения входов.",
+      "task": "Записывать run/node/attempt IDs, versions, inputs/outputs refs, approvals, вызовы/ошибки и расходы. Возобновлять с первого затронутого этапа, не с начала проекта. Ограничивать доступ к журналу.",
+      "outputs": "run_state + audit_log",
+      "acceptance": "Секреты и чужие истории не уходят критикам; завершённые платные jobs не отправляются повторно при resume.",
+      "on_pass": [
+        "CALLER"
+      ],
+      "on_fail": "N43",
+      "on_blocked": "N43",
+      "stage": "shared",
+      "implementation_status": "NEW",
+      "astra_v1_1": {
+        "checkpoint": "durable op/state revision, lease CAS, idempotent callbacks; two resumers cannot execute same paid operation"
+      },
+      "p0_pilot": {
+        "resume": "single atomic lease and state_version"
+      }
+    },
+    {
+      "id": "S09",
+      "name": "Решения владельца",
+      "executor": "доверенный интерфейс / автор",
+      "inputs": "Конкретный выбор/запрос/файл с revision/hash.",
+      "task": "Разделять выбор концепции, утверждение нового канона, бюджет, выбор дубля и финальное READY. Пакетное разрешение допустимо только с явным объёмом/лимитом; молчание не согласие.",
+      "outputs": "decision_record",
+      "acceptance": "Решение связано с субъектом/объектом/версией и видом действия; free-text внутри LLM не самоподтверждается.",
+      "on_pass": [
+        "CALLER"
+      ],
+      "on_fail": "N43",
+      "on_blocked": "N43",
+      "stage": "shared",
+      "implementation_status": "NEW",
+      "astra_v1_1": {
+        "approval": "human Studio session scoped exact object/revision/action; service token or LLM cannot approve"
+      }
+    }
+  ],
+  "conditional_routes": [
+    {
+      "node_id": "N20",
+      "condition": "speech_strategy=frozen",
+      "next": "N21",
+      "reason": "Freeze strategy and required speech/music/sfx/ambience slots before any branch"
+    },
+    {
+      "node_id": "N22",
+      "condition": "speech_strategy=external_tts AND requests_fully_authorized",
+      "next": "N23",
+      "reason": "External speech and independent mandatory sound stems"
+    },
+    {
+      "node_id": "N22",
+      "condition": "speech_strategy=native_video AND speech_request_validated",
+      "next": "N26",
+      "reason": "Skip only external speech synth; independent external music/sfx/ambience branch still processed via N23–N25; native speech timing remains ESTIMATED"
+    },
+    {
+      "node_id": "N30",
+      "condition": "source_video_saved AND separate_lip_sync_required",
+      "next": "N28",
+      "reason": "Lip-sync dependent job with new approval and preflight; do not repeat source generation"
+    },
+    {
+      "node_id": "N30",
+      "condition": "source_video_saved AND no_lip_sync_required",
+      "next": "N31",
+      "reason": "Inspect real video before reviewer"
+    },
+    {
+      "node_id": "N31",
+      "condition": "video_review_passed AND native_audio_not_yet_reviewed",
+      "next": "N25",
+      "reason": "Extract and measure actual native speech/audio from saved video first"
+    },
+    {
+      "node_id": "N25",
+      "condition": "native_audio_review_passed AND video_already_reviewed",
+      "next": "N32",
+      "reason": "Avoid loop back to video generation"
+    },
+    {
+      "node_id": "N19",
+      "condition": "image_mode=reference_candidate AND media_review_passed",
+      "next": "N12",
+      "reason": "Register CANDIDATE; owner approval for canon required"
+    },
+    {
+      "node_id": "N19",
+      "condition": "image_mode=shot_image AND media_review_passed",
+      "next": "N20",
+      "reason": "Use verified shot image as production asset"
+    },
+    {
+      "node_id": "N34",
+      "condition": "technical_export_checks_passed",
+      "next": "N35",
+      "reason": "No duplicate creative media review at N34"
+    },
+    {
+      "node_id": "N39",
+      "condition": "A6_A7_A8_unique_PASS_same_current_snapshot AND actual_media_verified",
+      "next": "N40",
+      "reason": "Owner approval required, no auto READY"
+    },
+    {
+      "node_id": "N39",
+      "condition": "any_FAIL",
+      "next": "N42",
+      "reason": "Return to root-cause stage, with new snapshot on change"
+    },
+    {
+      "node_id": "N39",
+      "condition": "BLOCKED_OR_STALE",
+      "next": "N43",
+      "reason": "No majority vote; block missing modality evidence"
+    }
+  ],
+  "repair_targets": [
+    "N03",
+    "N04",
+    "N05",
+    "N06",
+    "N08",
+    "N09",
+    "N11",
+    "N12",
+    "N13",
+    "N15",
+    "N20",
+    "N21",
+    "N26",
+    "N27",
+    "N32",
+    "N33"
+  ],
+  "astra_review_closure_document": "ASTRA_FIXES_V1_1.md",
+  "runtime_status": {
+    "p0_state_and_approvals": "DESIGNED_NOT_INTEGRATED",
+    "p0_submit_recovery": "DESIGNED_NOT_INTEGRATED",
+    "p0_paid_budget": "DESIGNED_NOT_INTEGRATED",
+    "p0_media_capability": "BLOCKED_NO_REAL_MP4",
+    "p1_media_routing": "SPECIFIED",
+    "p1_snapshot_aggregation": "SPECIFIED",
+    "p2_duplicate_review": "REMOVED_FROM_PLANNED_ROUTE"
+  },
+  "astra_runtime_model_matrix": "N34_N41_RUNTIME_MODEL_MATRIX.md",
+  "runtime_schema": "contracts/final-runtime-v1_2.schema.json",
+  "runtime_cost_policy": "no model calls N34,N39,N40,N41; N35 STT approval separate; N36-38 budgeted multimedia only",
+  "physical_workflows_manifest": "integrations/n8n/WF_00_WF_06_MANIFEST.json",
+  "physical_workflows_count": 7,
+  "pilot": {
+    "MOCK_MODE": true,
+    "native_audio_enabled": false,
+    "speech_strategy": "external_tts",
+    "audio_tracks": [
+      "voice",
+      "sfx",
+      "music"
+    ],
+    "actual_provider_enabled": false,
+    "production_release_enabled": false
+  },
+  "implementation_status": "PARTIAL_MOCK_AND_ISOLATED_SQLITE_TESTS_NOT_PRODUCTION"
+}

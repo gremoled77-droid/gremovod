@@ -1,0 +1,52 @@
+{
+  "name": "WF_06_Repair_Router — MOCK ONLY (SOURCE EXPORT)",
+  "active": false,
+  "nodes": [
+    {
+      "id": "30319f45-afad-4546-a504-a5b0df8d2a18",
+      "name": "Input from WF_00",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "inputSource": "passthrough"
+      }
+    },
+    {
+      "id": "c47c7659-e679-41ea-b3fc-2405ac3761fd",
+      "name": "N42–N43 / MOCK ONLY",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const p=$input.first().json;if(!p.MOCK_MODE||p.review_status!=='BLOCKED_NO_REAL_MEDIA')throw Error('MOCK_ONLY');const target='shot_02';const after=p.video.map(x=>x.slot_id===target?{...x,uri:'mock://shot_02_repair.mp4',repaired:true}:{...x,cache_reused:true});return [{json:{...p,repaired_slot_id:target,video_after_repair:after,unchanged_cached:after.filter(x=>x.slot_id!==target).every(x=>x.uri===p.video.find(a=>a.slot_id===x.slot_id).uri),history:[...p.history,'WF_06:MOCK'],paid_calls:0,final_release_approved:false}}];"
+      }
+    }
+  ],
+  "connections": {
+    "Input from WF_00": {
+      "main": [
+        [
+          {
+            "node": "N42–N43 / MOCK ONLY",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "tags": []
+}

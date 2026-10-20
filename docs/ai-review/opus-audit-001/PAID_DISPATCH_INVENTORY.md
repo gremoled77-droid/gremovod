@@ -1,0 +1,63 @@
+# Инвентарь исходящих платных вызовов (backend/)
+
+Сгенерировано `scripts/p0_paid_dispatch_audit.py`. Только чтение, ничего не вызывается.
+
+| Файл:строка | Функция | За P0-шлюзом | Строки |
+|---|---|---|---|
+| `activity.py:56` | `collect` | **нет** | items.append({'id': r['id'], 'source': 'native', 'kind': 'image' if r['operation'] in {'generate', 'edit'} els |
+| `adapters.py:332` | `submit_path` | **нет** | def submit_path(spec): |
+| `adapters.py:333` | `submit_path` | **нет** | return spec.get('submit_path', DEFAULT_SUBMIT_PATH) |
+| `character_voice.py:29` | `<module level>` | **нет** | class Generate(Phrase): |
+| `character_voice.py:133` | `register.generate` | **нет** | async def generate(pid:str,nid:str,body:Generate): |
+| `character_voice.py:145` | `register.generate` | **нет** | db.execute('INSERT INTO jobs VALUES(?,?,?,?,?,?,?,?,?)',(body.request_id,body.project_id,'audio',voice['provid |
+| `connections.py:11` | `<module level>` | **нет** | 'piapi':{'name':'PiAPI','env':'PIAPI_API_KEY','file':'PIAPI_API_KEY.txt','url':'https://api.piapi.ai/account/i |
+| `connections.py:12` | `<module level>` | **нет** | 'openai':{'name':'OpenAI','env':'OPENAI_API_KEY','file':'OPENAI_API_KEY.txt','url':'https://api.openai.com/v1/ |
+| `connections.py:15` | `<module level>` | **нет** | 'kie':{'name':'KIE','env':'KIE_API_KEY','file':'KIE_API_KEY.txt','url':'https://api.kie.ai/api/v1/chat/credit' |
+| `economics.py:57` | `register.report` | **нет** | attempts.append({'id':row['id'],'status':row['status'],'provider':'codex_chat','target':row['target'],'kind':' |
+| `job_delivery.py:55` | `register.start.monitor` | **нет** | logging.getLogger(__name__).exception('Task monitor failed; no generation was submitted') |
+| `job_delivery.py:56` | `register.start` | **нет** | if ENABLED:app.state.delivery_monitor=asyncio.create_task(monitor()) |
+| `job_recovery.py:44` | `register.recover` | **нет** | changed=db.execute("UPDATE jobs SET task_id=?,status=?,response=? WHERE id=? AND task_id IS NULL AND status IN |
+| `kie.py:1` | `<module level>` | **нет** | """KIE (api.kie.ai): отправка задания и чтение статуса. |
+| `kie.py:38` | `submitted` | **нет** | def submitted(value): |
+| `kie.py:64` | `submit` | **нет** | async def submit(key, body): |
+| `kie.py:65` | `submit` | **нет** | return submitted(await request('POST', SUBMIT_PATH, key, body)) |
+| `main.py:177` | `create_task` | **нет** | async def create_task(req:TaskRequest,x_api_key:str|None=Header(default=None)): |
+| `main.py:360` | `seedance_draft` | **нет** | if not row or str(row['status']).lower() in {'failed','cancelled','canceled','submitting','submission_unknown' |
+| `main.py:440` | `preview_model_job` | **нет** | 'verified_at':spec.get('verified_at'),'path':adapters.submit_path(spec), |
+| `main.py:467` | `model_job` | **нет** | db.execute('INSERT INTO jobs VALUES(?,?,?,?,?,?,?,?,?)',(jid,body.project_id,spec['kind'],spec['provider'],Non |
+| `main.py:471` | `model_job` | **нет** | if spec['provider']=='kie': result=await kie.submit(key,adapters.wire_body(spec,payload)) |
+| `main.py:472` | `model_job` | **нет** | else: result=await request_piapi('POST',adapters.submit_path(spec),key,adapters.wire_body(spec,payload)) |
+| `main.py:477` | `model_job` | **нет** | status=str(task.get('status','submitted')) |
+| `main.py:643` | `agent_completion` | **нет** | response=await client.post('https://api.openai.com/v1/responses',headers={'Authorization':'Bearer '+key,'Conte |
+| `model_catalog.py:10` | `<module level>` | **нет** | 'hunyuan-i2v': {'launch_enabled':True,'verified_at':'2026-10-15','price_usd':0.09,'adapter':'hunyuan_i2v','kin |
+| `model_catalog.py:11` | `<module level>` | **нет** | 'seedream-5-pro': {'launch_enabled':False,'kind':'image','model':'seedream','task_type':'seedream-5-pro','size |
+| `model_catalog.py:12` | `<module level>` | **нет** | 'seedream-5-lite': {'launch_enabled':True,'verified_at':'2026-10-15','price_usd':0.052,'kind':'image','model': |
+| `model_catalog.py:13` | `<module level>` | **нет** | 'nano-banana-2.1': {'launch_enabled':False,'kind':'image','model':'gemini','task_type':'nano-banana-2.1','reso |
+| `model_catalog.py:14` | `<module level>` | **нет** | 'seedance-2.5': {'launch_enabled':False,'price_per_second_usd':{'480p':0.15,'720p':0.35,'1080p':0.8},'kind':'v |
+| `model_catalog.py:65` | `<module level>` | **нет** | 'max_refs':1,'ref_field':'image','docs':'https://piapi.ai/minimax-h3', |
+| `model_catalog.py:94` | `<module level>` | **нет** | 'docs':'https://piapi.ai/docs/image-editing-api/super-resolution-api'} |
+| `model_catalog.py:208` | `<module level>` | **нет** | PROVIDER_HOSTS = {'piapi': 'piapi.ai', 'kie': 'kie.ai'} |
+| `model_catalog.py:214` | `<module level>` | **нет** | 'qwen-image-2.1': {'piapi': 'https://piapi.ai/qwen-image'}, |
+| `native_chat.py:28` | `<module level>` | **нет** | brief: str = Field(default='', max_length=4000)  # готовый промпт из «Кадров» (только generate) |
+| `native_chat.py:114` | `register.enqueue` | **нет** | if not all([body.production_id,body.production_node_id,body.entity_revision]) or body.operation not in {'promp |
+| `native_chat.py:115` | `register.enqueue` | **нет** | raise HTTPException(400,'Для карточки нужны проект, адресат и версия; допустимы prompt или generate') |
+| `native_chat.py:127` | `register.enqueue` | **нет** | raise HTTPException(400,'Готовый промпт принимают только generate и prompt без сцены') |
+| `native_chat.py:136` | `register.enqueue` | **нет** | 'execution':{'intent':body.operation,'prompt_only':body.operation=='prompt','instructions':character_descripti |
+| `p0_control.py:197` | `_block_unresolved_attempt` | **нет** | AND (state IN ('AUTHORIZED','SUBMITTING','SUBMITTED','UNKNOWN','CANCEL_REQUESTED') |
+| `p0_control.py:293` | `begin_submit` | **нет** | def begin_submit(db, *, job_id, worker, expected_version, request_sha, profile_revision): |
+| `p0_control.py:301` | `begin_submit` | **нет** | j["lease_owner"]!=worker or (j["lease_until_ms"] or 0)<=t or j["submit_count"]!=0): |
+| `p0_control.py:302` | `begin_submit` | **нет** | raise Conflict("not authorized, lease expired or already submitted") |
+| `p0_control.py:309` | `begin_submit` | **нет** | db.execute("""UPDATE p0_jobs SET state='SUBMITTING',submit_count=1, |
+| `p0_control.py:318` | `mark_unknown` | **нет** | raise Conflict("ambiguous submit only after SUBMITTING") |
+| `p0_control.py:330` | `accept_provider_id` | **нет** | raise Conflict("lost response or duplicate submit; manual reconcile") |
+| `p0_control.py:331` | `accept_provider_id` | **нет** | db.execute("""UPDATE p0_jobs SET state='SUBMITTED',provider_job_id=?, |
+| `p0_control.py:607` | `update_snapshot_revision` | **нет** | WHERE run_id=? AND state IN ('SUBMITTING','SUBMITTED','UNKNOWN')""",(run_id,)).fetchone()[0] |
+| `p0_provider_dispatch.py:31` | `plan_dispatch` | **нет** | def plan_dispatch(*, kind, mock_mode, verified_request_grant=False, |
+| `reference_upload.py:40` | `upload` | **нет** | response=await client.post(UPLOAD_URL,headers={'x-api-key':key},json={'file_name':filename,'file_data':base64. |
+| `reference_upload.py:55` | `upload_free` | **нет** | response=await client.post(FREE_UPLOAD_URL,data={'expiryHours':'24'},files={'files':(filename,content)}) |
+| `remote_access.py:109` | `<module level>` | **нет** | f.onsubmit=async e=>{e.preventDefault();const r=await fetch('/api/login',{method:'POST',headers:{'Content-Type |
+| `temp_cleanup.py:69` | `candidates` | **нет** | if meta.get('provider') in GENERATED_PROVIDERS_EXCLUDED or meta.get('keep'): |
+| `temp_cleanup.py:98` | `move_to_trash` | **нет** | or meta.get('provider') in GENERATED_PROVIDERS_EXCLUDED |
+| `temp_cleanup.py:240` | `register.schedule` | **нет** | asyncio.get_event_loop().create_task(loop()) |
+
+Всего мест: 55; за шлюзом: 0; вне шлюза: 55.

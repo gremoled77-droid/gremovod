@@ -1,0 +1,593 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "GremoVOD N01–N11 scenario draft boundaries (schema does not imply approval)",
+  "description": "S01 and owner session must validate hashes, source permission, character profiles and budgets before LLM. Structures alone are not evidence.",
+  "$defs": {
+    "IdeaIntake": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "project_id",
+        "task_id",
+        "original_text",
+        "source_status"
+      ],
+      "properties": {
+        "kind": {
+          "const": "N01_IDEA"
+        },
+        "project_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 180
+        },
+        "task_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 180
+        },
+        "original_text": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_status": {
+          "enum": [
+            "DEMO_ONLY",
+            "UNAPPROVED",
+            "OWNER_ORIGINAL"
+          ]
+        },
+        "source_revision": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 180
+        }
+      }
+    },
+    "BriefCandidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "task_id",
+        "status",
+        "requirements",
+        "canon_status",
+        "research_questions"
+      ],
+      "properties": {
+        "kind": {
+          "const": "N03_BRIEF_CANDIDATE"
+        },
+        "task_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 180
+        },
+        "status": {
+          "const": "CANDIDATE"
+        },
+        "requirements": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "requirement",
+              "origin"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 180
+              },
+              "requirement": {
+                "type": "string",
+                "minLength": 1
+              },
+              "origin": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 180
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "canon_status": {
+          "enum": [
+            "NOT_VERIFIED",
+            "APPROVED_REFS"
+          ]
+        },
+        "research_questions": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "duration_target_seconds": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        }
+      }
+    },
+    "FrozenBriefSnapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "task_id",
+        "snapshot_hash",
+        "source_revision",
+        "canon_revision",
+        "requirements_hash",
+        "approved_by_studio_owner",
+        "skill_bundle_hash"
+      ],
+      "properties": {
+        "kind": {
+          "const": "N05_FROZEN_BRIEF"
+        },
+        "task_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 180
+        },
+        "snapshot_hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "source_revision": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 180
+        },
+        "canon_revision": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 180
+        },
+        "requirements_hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "approved_by_studio_owner": {
+          "type": "boolean"
+        },
+        "skill_bundle_hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "ConceptCandidates": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "snapshot_hash",
+        "concepts",
+        "model_profile_id"
+      ],
+      "properties": {
+        "kind": {
+          "const": "N06_CONCEPTS"
+        },
+        "snapshot_hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "model_profile_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 180
+        },
+        "concepts": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "concept_id",
+              "logline",
+              "protagonist_goal",
+              "obstacle",
+              "comedy_mechanism",
+              "ending",
+              "estimated_complexity"
+            ],
+            "properties": {
+              "concept_id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 180
+              },
+              "logline": {
+                "type": "string",
+                "minLength": 1
+              },
+              "protagonist_goal": {
+                "type": "string",
+                "minLength": 1
+              },
+              "obstacle": {
+                "type": "string",
+                "minLength": 1
+              },
+              "comedy_mechanism": {
+                "type": "string",
+                "minLength": 1
+              },
+              "ending": {
+                "type": "string",
+                "minLength": 1
+              },
+              "estimated_complexity": {
+                "enum": [
+                  "LOW",
+                  "MEDIUM",
+                  "HIGH",
+                  "UNKNOWN"
+                ]
+              },
+              "new_canon_proposals": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "ConceptReview": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "snapshot_hash",
+        "per_concept",
+        "required_reviewers_present"
+      ],
+      "properties": {
+        "kind": {
+          "const": "N07_CONCEPT_REVIEW"
+        },
+        "snapshot_hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "per_concept": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "concept_id",
+              "verdict",
+              "evidence_refs",
+              "role"
+            ],
+            "properties": {
+              "concept_id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 180
+              },
+              "verdict": {
+                "enum": [
+                  "PASS",
+                  "FAIL",
+                  "BLOCKED"
+                ]
+              },
+              "evidence_refs": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 180
+                }
+              },
+              "role": {
+                "enum": [
+                  "A6",
+                  "A7"
+                ]
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "required_reviewers_present": {
+          "type": "boolean"
+        },
+        "advisory_notes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "lens": {
+                "enum": [
+                  "Visionary",
+                  "Viewer",
+                  "Operator",
+                  "Finance",
+                  "Skeptic"
+                ]
+              },
+              "note": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": [
+              "lens",
+              "note"
+            ],
+            "additionalProperties": false
+          }
+        }
+      }
+    },
+    "OwnerConceptChoice": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "snapshot_hash",
+        "selected_concept_id",
+        "owner_decision_id",
+        "owner_verified_by_backend",
+        "source_revision"
+      ],
+      "properties": {
+        "kind": {
+          "const": "N08_OWNER_CHOICE"
+        },
+        "snapshot_hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "selected_concept_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 180
+        },
+        "owner_decision_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 180
+        },
+        "owner_verified_by_backend": {
+          "type": "boolean"
+        },
+        "source_revision": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 180
+        }
+      }
+    },
+    "ScriptCandidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "snapshot_hash",
+        "selected_concept_id",
+        "scenes",
+        "author_version_preserved"
+      ],
+      "properties": {
+        "kind": {
+          "const": "N09_SCRIPT"
+        },
+        "snapshot_hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "selected_concept_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 180
+        },
+        "author_version_preserved": {
+          "type": "boolean"
+        },
+        "scenes": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": [
+              "scene_id",
+              "action",
+              "dialogue"
+            ],
+            "properties": {
+              "scene_id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 180
+              },
+              "action": {
+                "type": "string",
+                "minLength": 1
+              },
+              "dialogue": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "dialogue_id",
+                    "character_id",
+                    "text"
+                  ],
+                  "properties": {
+                    "dialogue_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 180
+                    },
+                    "character_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 180
+                    },
+                    "text": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "voice_profile_status": {
+                      "enum": [
+                        "APPROVED",
+                        "MISSING",
+                        "CANDIDATE"
+                      ]
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      }
+    },
+    "DirectorPlan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "snapshot_hash",
+        "source_script_revision",
+        "scene_cast",
+        "asset_requests"
+      ],
+      "properties": {
+        "kind": {
+          "const": "N11_DIRECTOR_PLAN"
+        },
+        "snapshot_hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "source_script_revision": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 180
+        },
+        "scene_cast": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "scene_id",
+              "character_ids",
+              "location_id"
+            ],
+            "properties": {
+              "scene_id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 180
+              },
+              "character_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 180
+                }
+              },
+              "location_id": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "approved_reference_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 180
+                }
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "asset_requests": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "request_id",
+              "missing_reference_kind",
+              "reason"
+            ],
+            "properties": {
+              "request_id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 180
+              },
+              "missing_reference_kind": {
+                "enum": [
+                  "CHARACTER",
+                  "LOCATION",
+                  "VOICE",
+                  "PROP",
+                  "OTHER"
+                ]
+              },
+              "reason": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      }
+    }
+  },
+  "oneOf": [
+    {
+      "$ref": "#/$defs/IdeaIntake"
+    },
+    {
+      "$ref": "#/$defs/BriefCandidate"
+    },
+    {
+      "$ref": "#/$defs/FrozenBriefSnapshot"
+    },
+    {
+      "$ref": "#/$defs/ConceptCandidates"
+    },
+    {
+      "$ref": "#/$defs/ConceptReview"
+    },
+    {
+      "$ref": "#/$defs/OwnerConceptChoice"
+    },
+    {
+      "$ref": "#/$defs/ScriptCandidate"
+    },
+    {
+      "$ref": "#/$defs/DirectorPlan"
+    }
+  ]
+}

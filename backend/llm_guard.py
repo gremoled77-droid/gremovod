@@ -19,6 +19,7 @@ from fastapi import Header, HTTPException
 from pydantic import BaseModel, Field
 
 from backend.model_catalog import LLM_MODELS, llm_spec, llm_resolve, llm_wire_model
+from backend import spend_ledger
 
 # USD за 1 млн токенов (piapi.ai/docs/llm-api/completions, акционные цены на 2026-10-16).
 # Цены не дублируются: они берутся из единого реестра backend/model_catalog.py::LLM_MODELS.
@@ -42,7 +43,9 @@ PERMIT_TTL_SECONDS = 600
 
 # Статусы, при которых деньги удерживаются: резерв, подтверждённый факт, неопределённый исход.
 # Только 'failed' означает «провайдер ничего не списал» — резерв снят.
-HOLDING_STATUSES = ('reserved', 'done', 'submission_unknown')
+# Определение одно на оба контура: журнал вызовов и общий счётчик денег не должны
+# решать, какие вызовы держат деньги, по-разному.
+HOLDING_STATUSES = spend_ledger.LLM_HOLDING_STATUSES
 HOLDING_SQL = 'status IN (' + ','.join('?' * len(HOLDING_STATUSES)) + ')'
 
 

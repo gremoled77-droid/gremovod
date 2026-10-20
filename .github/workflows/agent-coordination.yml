@@ -1,0 +1,37 @@
+name: Agent handoff and workflow export checks
+
+on:
+  push:
+    branches:
+      - 'coordination/**'
+  pull_request:
+    paths:
+      - 'AGENT_BUILD_MANUAL.md'
+      - 'AGENTS.md'
+      - 'STATUS.md'
+      - 'workflows/**'
+      - 'prompts/**'
+      - 'docs/AGENT_ROLE_MATRIX.md'
+      - 'docs/CODEX_REVIEW_PACKET.md'
+      - 'docs/agent_handoffs/**'
+      - 'tools/test_agent_coordination.py'
+      - 'tools/test_agent_scope.py'
+      - 'tools/check_agent_scope.py'
+      - '.github/workflows/agent-scope-guard.yml'
+      - '.github/workflows/agent-coordination.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-agent-handoff:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Validate handoff files, role boundaries and seven safe MOCK n8n JSON files
+        run: python -m unittest -v tools.test_agent_coordination tools.test_agent_scope

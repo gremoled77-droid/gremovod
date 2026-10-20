@@ -13,6 +13,8 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from urllib.parse import urlsplit
 
+from backend import spend_ledger
+
 LAUNCH_TOKEN = secrets.token_urlsafe(32)
 SIGNING_KEY = secrets.token_bytes(32)
 # Ключ подписи измерений мастера: с перезапуском студии отчёт перестаёт проверяться,
@@ -102,26 +104,12 @@ class BudgetLimits(BaseModel):
 def released(status, response):
     """Резерв снимается только с заданий, которые точно ничего не стоили: провайдер отклонил заявку до создания
     задачи (в ответе только detail) или сам сообщил списание 0 (PiAPI: meta.usage.consume). Всё неясное остаётся в резерве."""
-    if status not in {'failed', 'cancelled'}:
-        return False
-    try:
-        value = json.loads(response or '{}')
-    except (TypeError, ValueError):
-        return False
-    if not isinstance(value, dict):
-        return False
-    task = value.get('data')
-    if task is None:
-        return 'detail' in value and 'task_id' not in value
-    usage = ((task.get('meta') or {}).get('usage') or {}) if isinstance(task, dict) else {}
-    consume = usage.get('consume')
-    return isinstance(consume, (int, float)) and not isinstance(consume, bool) and consume == 0
+    return spend_ledger.released(status, response)
 
 
 def reservations(db):
     """Одобренные запуски, которые держат бюджет: без заданий, чей резерв уже снят."""
-    rows = db.execute('SELECT a.estimated_usd,j.project_id,j.created_at,j.status,j.response FROM generation_approvals a JOIN jobs j ON j.id=a.job_id').fetchall()
-    return [r for r in rows if not released(r['status'], r['response'])]
+    return spend_ledger.legacy_reservations(db)
 
 
 def llm_reservations(db):
@@ -129,38 +117,22 @@ def llm_reservations(db):
 
     Деньги LLM и генераций считаются одним счётчиком. Раньше лимиты проекта и дня проверялись
     двумя разными счётчиками, и порядок «сначала LLM, потом медиа» или наоборот давал разный ответ."""
-    from backend import llm_guard
-    try:
-        rows = db.execute('SELECT project_id,usd,created_at,status FROM llm_calls').fetchall()
-    except sqlite3.OperationalError:  # таблица появляется при запуске сервера
-        return []
-    return [r for r in rows if r['status'] in llm_guard.HOLDING_STATUSES]
+    return spend_ledger.llm_reservations(db)
 
 
 def budget_state(db, project_id):
-    """Сколько денег занято в проекте и за сегодня: генерации и платные LLM-вызовы вместе."""
-    config = db.execute('SELECT project_usd,daily_usd FROM spending_limits WHERE id=1').fetchone()
-    today = datetime.now(MOSCOW).date().isoformat()
-    rows = reservations(db)
-    project_used = sum(r['estimated_usd'] for r in rows if r['project_id'] == project_id)
-    daily_used = sum(r['estimated_usd'] for r in rows if datetime.fromisoformat(r['created_at']).astimezone(MOSCOW).date().isoformat() == today)
-    llm = llm_reservations(db)
-    llm_project = sum(r['usd'] for r in llm if r['project_id'] == project_id)
-    llm_daily = sum(r['usd'] for r in llm if datetime.fromisoformat(r['created_at']).astimezone(MOSCOW).date().isoformat() == today)
-    return {'project_limit_usd':config['project_usd'], 'daily_limit_usd':config['daily_usd'],
-            'project_reserved_usd':round(project_used+llm_project,6), 'daily_reserved_usd':round(daily_used+llm_daily,6),
-            'media_reserved_usd':round(project_used,6), 'llm_reserved_usd':round(llm_project,6), 'day_moscow':today}
+    """Единый счётчик: одобрения Studio и резервы P0-конвертов считаются вместе."""
+    return spend_ledger.state(db, project_id)
 
 
 def check_budget(db, project_id, cost):
     """Единый барьер для всех платных путей: генерации, голос и LLM считаются по одному лимиту."""
     from backend import series_economics
     series_economics.check_budget(db,project_id,cost)
-    value = budget_state(db, project_id)
-    if value['project_reserved_usd'] + cost > value['project_limit_usd'] + 1e-9:
-        raise HTTPException(400, 'Превышен серверный бюджет проекта. Измени лимит в разделе «Экономика».')
-    if value['daily_reserved_usd'] + cost > value['daily_limit_usd'] + 1e-9:
-        raise HTTPException(400, 'Превышен дневной серверный бюджет. Измени лимит в разделе «Экономика».')
+    try:
+        spend_ledger.check(db, project_id, cost)
+    except spend_ledger.BudgetExceeded as exc:
+        raise HTTPException(400, str(exc))
 
 
 def spend_reserved(db, kind, ref, model=None):

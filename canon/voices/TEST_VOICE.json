@@ -1,0 +1,9 @@
+{
+  "id": "TEST_VOICE",
+  "kind": "MOCK_VOICE_ONLY",
+  "approved": false,
+  "provider": null,
+  "voice_id": null,
+  "consent_verified": false,
+  "description": "Нет клонирования голоса. Используется синтетический тестовый тон."
+}

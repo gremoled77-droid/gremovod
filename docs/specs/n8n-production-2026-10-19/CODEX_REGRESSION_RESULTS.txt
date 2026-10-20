@@ -1,0 +1,49 @@
+test_failed_migration_leaves_schema_unchanged (review_p0_regressions.DraftAcceptanceRegressions.test_failed_migration_leaves_schema_unchanged) ... FAIL
+test_missing_planned_slot_cannot_pass_manifest (review_p0_regressions.DraftAcceptanceRegressions.test_missing_planned_slot_cannot_pass_manifest) ... FAIL
+test_unknown_blocks_new_attempt_for_same_slot (review_p0_regressions.DraftAcceptanceRegressions.test_unknown_blocks_new_attempt_for_same_slot) ... FAIL
+
+======================================================================
+FAIL: test_failed_migration_leaves_schema_unchanged (review_p0_regressions.DraftAcceptanceRegressions.test_failed_migration_leaves_schema_unchanged)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\BLOWKA\Documents\!GREM TAXI\outputs\n8n-codex-review-20261019\docs\specs\n8n-production-2026-10-19\review_p0_regressions.py", line 66, in test_failed_migration_leaves_schema_unchanged
+    self.assertEqual([tuple(r) for r in after], [tuple(r) for r in before],
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                     "Migration failure must not leave partially applied DDL")
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: Lists differ: [('idx_p0_envelopes_run', 'CREATE INDEX idx_[1855 chars]one)] != [('jobs', 'CREATE TABLE jobs(id TEXT PRIMARY[152 chars]one)]
+
+First differing element 0:
+('idx_p0_envelopes_run', 'CREATE INDEX idx_[44 chars]id)')
+('jobs', 'CREATE TABLE jobs(id TEXT PRIMARY[16 chars]XT)')
+
+First list contains 6 additional elements.
+First extra element 4:
+('p0_jobs', 'CREATE TABLE p0_jobs(job_id TEXT PRIMARY KEY)')
+
+Diff is 2378 characters long. Set self.maxDiff to None to see it. : Migration failure must not leave partially applied DDL
+
+======================================================================
+FAIL: test_missing_planned_slot_cannot_pass_manifest (review_p0_regressions.DraftAcceptanceRegressions.test_missing_planned_slot_cannot_pass_manifest)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\BLOWKA\Documents\!GREM TAXI\outputs\n8n-codex-review-20261019\docs\specs\n8n-production-2026-10-19\review_p0_regressions.py", line 46, in test_missing_planned_slot_cannot_pass_manifest
+    self.assertFalse(p.manifest_ready(self.db, run_id="r1", expected_source_revision="v1"),
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                     "No frozen expected manifest exists to detect missing shot_02")
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: True is not false : No frozen expected manifest exists to detect missing shot_02
+
+======================================================================
+FAIL: test_unknown_blocks_new_attempt_for_same_slot (review_p0_regressions.DraftAcceptanceRegressions.test_unknown_blocks_new_attempt_for_same_slot)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\BLOWKA\Documents\!GREM TAXI\outputs\n8n-codex-review-20261019\docs\specs\n8n-production-2026-10-19\review_p0_regressions.py", line 37, in test_unknown_blocks_new_attempt_for_same_slot
+    self.assertEqual(total, 1, "UNKNOWN must block a second submission under a new job ID")
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 2 != 1 : UNKNOWN must block a second submission under a new job ID
+
+----------------------------------------------------------------------
+Ran 3 tests in 0.338s
+
+FAILED (failures=3)

@@ -1,0 +1,52 @@
+{
+  "name": "WF_02_Canon_And_Images — MOCK ONLY (SOURCE EXPORT)",
+  "active": false,
+  "nodes": [
+    {
+      "id": "a990da1d-2e31-46f1-ad22-3b3a6124495b",
+      "name": "Input from WF_00",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "inputSource": "passthrough"
+      }
+    },
+    {
+      "id": "d86a5a93-12ca-4832-891d-cad0c43d1f2c",
+      "name": "N12–N19 / MOCK ONLY",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const p=$input.first().json;if(!p.MOCK_MODE||!p.shots)throw Error('MOCK_ONLY');return [{json:{...p,canon_fixtures:[{id:'TEST_A',status:'TEST_ONLY'},{id:'TEST_B',status:'TEST_ONLY'}],images:p.shots.map(s=>({slot_id:s.slot_id,uri:'mock://'+s.slot_id+'.png',verified:false})),history:[...p.history,'WF_02:MOCK'],paid_calls:0}}];"
+      }
+    }
+  ],
+  "connections": {
+    "Input from WF_00": {
+      "main": [
+        [
+          {
+            "node": "N12–N19 / MOCK ONLY",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "tags": []
+}
