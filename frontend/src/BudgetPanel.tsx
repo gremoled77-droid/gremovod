@@ -11,6 +11,9 @@ type Budget = {
   llm_project_usd?: number;
   llm_daily_usd?: number;
   llm_calls_project?: number;
+  llm_unknown_calls?: number;
+  llm_unknown_usd?: number;
+  llm_over_estimate_usd?: number;
 };
 export default function BudgetPanel({projectId}: {projectId: string}) {
   const [data, setData] = useState<Budget | null>(null),
@@ -70,10 +73,16 @@ export default function BudgetPanel({projectId}: {projectId: string}) {
             {data.daily_reserved_usd.toFixed(3)} за {data.day_moscow} (МСК).
           </p>
           <p>
-            LLM-запросы (в лимитах учтены дополнительно к генерациям): {smallUsd(data.llm_project_usd ?? 0)} в
+            LLM-запросы (включены в этот же лимит вместе с генерациями): {smallUsd(data.llm_project_usd ?? 0)} в
             проекте ({data.llm_calls_project ?? 0} вызовов); {smallUsd(data.llm_daily_usd ?? 0)} за сутки по
             всей студии.
           </p>
+          {(data.llm_unknown_calls ?? 0) > 0 && (
+            <p>
+              Неопределённых вызовов ждут сверки: {data.llm_unknown_calls} на {smallUsd(data.llm_unknown_usd ?? 0)}.
+              Их резерв удерживается и блокирует новые платные запуски до ручной сверки.
+            </p>
+          )}
           <div className="param-grid">
             <label>
               Лимит каждого проекта, USD
@@ -111,9 +120,9 @@ export default function BudgetPanel({projectId}: {projectId: string}) {
             Сохранить лимиты
           </button>
           <p className="muted">
-            Лимиты общие для студии и проверяются сервером. Учёт идёт по оценкам до отправки, включая
-            неопределённые и неудачные запросы; это не подтверждение списаний провайдера. Чат Codex не
-            расходует эти API-бюджеты. Ноль запрещает новые платные генерации.
+            Лимиты общие для студии и проверяются сервером. Учёт идёт по оценкам до отправки: отказ провайдера
+            резерв освобождает, а неопределённый исход удерживает резерв до ручной сверки. Это не подтверждение
+            списаний провайдера. Чат Codex не расходует эти API-бюджеты. Ноль запрещает новые платные генерации.
           </p>
         </>
       )}
