@@ -8,7 +8,7 @@ import re
 from pathlib import Path
 from fastapi import HTTPException
 
-RULES_VERSION='2026-10-17.1'
+RULES_VERSION='2026-10-20.1'
 PROFILES=json.loads((Path(__file__).parent/'prompt_profiles.json').read_text(encoding='utf-8'))
 
 def reference_label(target, index):
@@ -67,7 +67,16 @@ asks to change something in a clip, begin with "In @video1, change". Keep the wo
 with the declared task (reference, edit or extend) because the provider re-checks it.
 Do not include generate_audio, negative_prompt, enhancement, draft or API flags in the prompt.'''
 
-def system_rules(spec):
+FOUND_FOOTAGE_RULES='''FOUND-FOOTAGE PROFILE. Apply only when explicitly selected.
+WORLD LOCK: State the fixed location, lighting, geometry and cast, including the exact number of heroes and other principal characters. State what remains unchanged throughout the video. By default, state that there are no cuts or time jumps. Derive the lock only from the brief and actual supplied references; never invent characters, props or references.
+TIMECODED BEATS: Use sequential contiguous intervals in the exact form "0-3s: ...". Cover the full requested duration from 0s to the end with no gaps or overlaps, and describe the visible action in each interval in chronological order. Treat each interval as a timed part of the recording, not automatically as a cut. Keep every take continuous. If several takes are explicitly requested, make only those requested take boundaries explicit and invent no other cuts or time jumps. Treat this as the explicit exception to the video-wide one-coherent-shot, one-principal-action, one-camera-move and one-camera-motive defaults: apply those limits within each continuous take, not across the whole video.
+MANDATORY/NEGATIVE: End with two labelled blocks: "MANDATORY: ..." and "NEGATIVE: ...". List what must be visible in MANDATORY and what must not appear in NEGATIVE. Derive both blocks only from the brief and actual supplied references. Use only actual supplied reference indexes; never invent entities, props or references.'''
+
+def system_rules(spec, prompt_style=None):
+    if prompt_style is not None and prompt_style!='found-footage':
+        raise ValueError(f'Unknown prompt style: {prompt_style}')
+    if prompt_style=='found-footage' and spec['kind']!='video':
+        raise ValueError('The found-footage prompt style requires a video model')
     rules=COMMON_RULES+'\n'+PILLARS_RULES
     if spec['kind']=='video': rules+='\n'+PILLARS_VIDEO+'\n'+VIDEO_RULES
     if spec['task_type']=='seedance-2.5': rules+='\n'+SEEDANCE_RULES
@@ -76,4 +85,6 @@ def system_rules(spec):
     if profile:
         rules+='\nMODEL-SPECIFIC PROMPT ORDER: '+profile['order']+'\n'+profile['rules']
     rules+='\nScene assets have explicit roles. Preserve the character from character references and geometry from location references; do not copy a reference background into the wrong role. The scene brief overrides generic world style when explicitly requested. Never claim that a metadata-only asset was visually inspected.'
+    if prompt_style=='found-footage':
+        rules+='\n'+FOUND_FOOTAGE_RULES
     return rules
