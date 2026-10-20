@@ -54,10 +54,45 @@ param(
 $ErrorActionPreference = 'Stop'
 
 # --- resolve the repository -------------------------------------------------
-if (-not $RepoPath) {
-    $RepoPath = (& git -C $PSScriptRoot rev-parse --show-toplevel 2>$null)
-    if (-not $RepoPath) { $RepoPath = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path }
+function Resolve-GitRoot {
+    param([string]$StartPath)
+    if (-not $StartPath) { return $null }
+    if (-not (Test-Path $StartPath)) { return $null }
+    $old = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        # git writes "fatal: not a git repository" to stderr; swallow it instead of
+        # letting ErrorActionPreference=Stop turn it into a terminating error.
+        $out = (& git -C $StartPath rev-parse --show-toplevel 2>&1 | Out-String).Trim()
+        if ($LASTEXITCODE -eq 0 -and $out) {
+            if (Test-Path (Join-Path $out '.git')) { return $out }
+        }
+    }
+    catch { }
+    finally { $ErrorActionPreference = $old }
+    return $null
 }
+
+if (-not $RepoPath) { $RepoPath = $env:GREMOVOD_ROOT }
+
+if (-not $RepoPath) {
+    # 1) the script itself lives inside a repository or worktree
+    $RepoPath = Resolve-GitRoot -StartPath $PSScriptRoot
+}
+
+if (-not $RepoPath) {
+    # 2) the current directory is a repository (daily use from the GremoVOD root)
+    $RepoPath = Resolve-GitRoot -StartPath (Get-Location).Path
+}
+
+if (-not $RepoPath) {
+    Write-Host 'Could not locate the GremoVOD repository.' -ForegroundColor Red
+    Write-Host "Tried: script folder '$PSScriptRoot' and current folder '$((Get-Location).Path)'." -ForegroundColor Red
+    Write-Host 'Run it from the GremoVOD root, or pass -RepoPath <path>,' -ForegroundColor Yellow
+    Write-Host 'or set GREMOVOD_ROOT to the repository path.' -ForegroundColor Yellow
+    exit 2
+}
+
 $RepoPath = (Resolve-Path $RepoPath).Path
 if (-not (Test-Path (Join-Path $RepoPath '.git'))) {
     Write-Error "Not a Git repository: $RepoPath"
