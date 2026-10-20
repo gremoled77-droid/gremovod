@@ -19,11 +19,12 @@ class QaReviewsTests(unittest.TestCase):
 
     def prepare(self):
         main.os.environ['STUDIO_SERVICE_TOKENS'] = f'{TOKEN}:*'
-        # Машинный вызов идёт только по токену: браузерной сессии у него нет.
-        self.client.headers.pop('X-Studio-Session', None)
-        self.client.headers['Authorization'] = f'Bearer {TOKEN}'
         self.pid = self.client.post('/api/projects', json={'title': 'QA', 'state': {}}).json()['id']
         main.os.environ['STUDIO_SERVICE_TOKENS'] = f'{TOKEN}:{self.pid};{NARROW}:another-project'
+        # Машинный вызов идёт только по токену: браузерной сессии у него нет.
+        self.client.headers.pop('X-Studio-Session', None)
+        self.client.cookies.clear()
+        self.client.headers['Authorization'] = f'Bearer {TOKEN}'
 
     def create(self, **extra):
         body = {'project_id': self.pid, 'task_id': 'task-1', 'artifact_id': 'artifact-1', 'artifact_revision': 'rev-3',
@@ -38,6 +39,14 @@ class QaReviewsTests(unittest.TestCase):
         body = {'role': role, 'verdict': 'PASS', 'artifact_revision': 'rev-3', 'checked_scopes': ['TEXT'],
                 'scope_results': {'TEXT': 'PASS'}, 'evidence': [], 'request_id': 'x', **extra}
         return self.client.post(f'/api/qa/reviews/{review_id}/verdicts', json=body)
+
+    def test_token_does_not_open_the_rest_of_the_api(self):
+        self.prepare()
+        # Приёмочный контур токен открывает.
+        self.assertEqual(self.client.get('/api/qa/reviews/nope').status_code, 404)
+        # Остальное — только по браузерной сессии владельца.
+        self.assertEqual(self.client.get('/api/projects').status_code, 401)
+        self.assertEqual(self.client.get('/api/budgets/limits').status_code, 401)
 
     def test_machine_token_is_required(self):
         self.prepare()

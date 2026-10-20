@@ -18,6 +18,10 @@ from fastapi import HTTPException
 
 ENV = 'STUDIO_SERVICE_TOKENS'
 
+# Машинный токен не должен открывать весь API: только приёмочный контур.
+# Генерация, медиа и настройки остаются за браузерной сессией владельца.
+ALLOWED_PREFIXES = ('/api/qa/',)
+
 
 def tokens():
     """{токен: {проект, ...}} из окружения сервера."""
@@ -52,6 +56,17 @@ def identify(request):
 
 def allowed(scopes, project_id):
     return bool(scopes) and ('*' in scopes or project_id in scopes)
+
+
+def machine_ok(request):
+    """Токен есть и путь входит в разрешённые для машинного доступа.
+
+    Токен открывает только приёмочный контур: /api/qa/*. Всё остальное — генерация,
+    медиа, настройки — остаётся за браузерной сессией владельца."""
+    scopes, _ = identify(request)
+    if not scopes:
+        return False
+    return request.url.path.startswith(ALLOWED_PREFIXES)
 
 
 def require_token(request):

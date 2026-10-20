@@ -122,8 +122,8 @@ def register(app, studio):
         public = request.url.path in {'/api/health','/api/session','/api/login','/api/logout','/login'} or not (request.url.path.startswith('/api/') or request.url.path in {'/docs','/redoc','/openapi.json','/docs/oauth2-redirect'})
         worker = request.url.path.startswith('/api/chatgpt/worker/')
         from backend import service_auth
-        machine = service_auth.identify(request)[0]
-        request.state.service_scopes = machine
+        machine = service_auth.machine_ok(request)
+        request.state.service_scopes = service_auth.identify(request)[0]
         supplied = request.headers.get('x-studio-session') or request.cookies.get('studio_session', '')
         if not public and not worker and not machine and not secrets.compare_digest(supplied.encode(), LAUNCH_TOKEN.encode()):
             return JSONResponse({'detail':'Локальная сессия отсутствует. Обнови страницу студии.'}, status_code=401)
