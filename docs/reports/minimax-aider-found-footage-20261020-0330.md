@@ -20,9 +20,9 @@
 - **New tests on pre-change code:** 3 errors + 1 failure, exit code **1** — тесты действительно ловят отсутствие реализации, а не тавтологичны
 - **Final tests:** 246 тестов / 246 прошли; process exit code **0** (прогон выполнен независимо от утверждения Aider)
 - **Unintended file changes:** none. Единственный побочный артефакт — каталог кэша тегов `.aider.tags.cache.v4/` в корне worktree (untracked, в коммит не попал). История чата и ввода выведены в `%TEMP%`
-- **Git commit SHA:** см. handoff-сообщение и follow-up-коммит метаданных этой ветки
-- **GitHub push:** см. follow-up-коммит метаданных этой ветки
-- **PR URL:** см. follow-up-коммит метаданных этой ветки
+- **Git commit SHA:** `d2e2386c2d9660b93eee0cd581c4953674d6a213` (`feat(prompt-rules): профиль промпта found-footage` — один коммит с тремя файлами: две правки Aider + этот отчёт). Второй, служебный коммит этой ветки фиксирует результаты публикации.
+- **GitHub push:** **success** — `git push -u origin test/minimax-aider-found-footage-20261020-0330` (новая ветка, без force push).
+- **PR URL:** **draft PR #40** — https://github.com/gremoled77-droid/gremovod/pull/40 (base `main`, head `test/minimax-aider-found-footage-20261020-0330`, помечен как экспериментальный; не сливать).
 - **Token usage / money:** Aider измерил 28k sent / 21k received и **$0.02** за один вызов по официальному тарифу MiniMax M3.1-Flash ($0.15/M input, $0.60/M output). Сторона MiniMax Code в этом прогоне не измерялась. Источник списания (квота подписки M Plan или баланс pay-as-you-go) не проверялся отдельно
 - **Problems and remediation:**
   1. `--no-gitignore` в Aider 0.86.2 означает «не добавлять `.aider*` в `.gitignore`», а не «игнорировать `.gitignore` при выборе файлов». Добавлен `--add-gitignore-files` — иначе часть путей недоступна.
