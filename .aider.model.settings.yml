@@ -20,3 +20,4 @@ check-update: false
 
 read:
   - MINIMAX_SKILLS.md
+  - AGENTS.md

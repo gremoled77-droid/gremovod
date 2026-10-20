@@ -11,5 +11,7 @@ __pycache__/
 *.svg
 *.sql
 migrations/
-docs/
+# docs: текстовые документы нужны агенту (стандарты, архитектура, handoff).
+# Тяжёлые выгрузки промптов — нет.
+docs/official-prompts/
 tests/fixtures/
