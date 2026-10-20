@@ -17,6 +17,7 @@
       "as_of": "2026-10-20",
       "protocol": "responses",
       "base_url": "https://api.kie.ai",
+      "path_prefix": "codex",
       "capabilities": {
         "tools": false,
         "streaming": false,
@@ -45,6 +46,7 @@
       "as_of": "2026-10-20",
       "protocol": "anthropic_messages",
       "base_url": "https://api.kie.ai",
+      "path_prefix": "anthropic",
       "capabilities": {
         "tools": false,
         "streaming": false,
@@ -73,6 +75,7 @@
       "as_of": "2026-10-20",
       "protocol": "openai_chat",
       "base_url": "https://api.piapi.ai",
+      "path_prefix": "",
       "capabilities": {
         "tools": false,
         "streaming": false,
@@ -101,6 +104,7 @@
       "as_of": "2026-10-20",
       "protocol": "openai_chat",
       "base_url": "https://api.minimax.io",
+      "path_prefix": "",
       "capabilities": {
         "tools": false,
         "streaming": false,
@@ -129,6 +133,7 @@
       "as_of": "2026-10-20",
       "protocol": "openai_chat",
       "base_url": "https://api.deepseek.com",
+      "path_prefix": "",
       "capabilities": {
         "tools": false,
         "streaming": false,
@@ -157,6 +162,7 @@
       "as_of": "2026-10-20",
       "protocol": "openai_chat",
       "base_url": "https://openrouter.ai/api",
+      "path_prefix": "",
       "capabilities": {
         "tools": false,
         "streaming": false,

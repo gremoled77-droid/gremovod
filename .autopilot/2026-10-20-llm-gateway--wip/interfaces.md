@@ -31,6 +31,7 @@ class Route:
     protocol: str
     role: str                # 'simple' | 'editorial' | 'coding' | 'backup' | 'extra'
     base_url: str
+    path_prefix: str = ''    # префикс пути, задаётся реестром (у Kie: 'codex', 'anthropic')
     free: bool               # маршрут подтверждённо бесплатный
     opt_in: bool             # требует явного разрешения владельца
 
@@ -86,6 +87,7 @@ class ModelEntry:
     role: str
     free: bool
     opt_in: bool
+    path_prefix: str = ''    # префикс пути эндпоинта, задаётся владельцем в конфигурации
     base_url: str
     capabilities: Capabilities
 
@@ -121,6 +123,9 @@ def summarize_spend(db, project_ids: list[str]) -> dict   # actual_cost_usd / re
 - `allow_free=True` открывает и маршруты с `free`, и маршруты с `opt_in`.
 - Старые записи журнала со статусом `failed` считаются как 0 — старая схема их уже обнуляла, восстановить факт нельзя.
 - Цены в реестре — USD за 1 000 000 токенов, точность `small_amount_precision` (6).
+- **Правило владельца: платный маршрут никогда не показывает подтверждённый $0.00.** В `actual_quote` не-бесплатный маршрут без usage → `cost_usd=None`, `status='unknown'` — **никогда** `0.0/'confirmed'`. Нулевой факт у платного маршрута возможен только когда usage есть и сам даёт ноль. Бесплатный маршрут → `0.0`, `status='free'`.
+- Параметр `charge_possible` в `actual_quote` **не влияет на результат расчёта**. Он — флаг для журнала (таск 03): «точно не списано» → резерв освобождается; «возможно списано» → резерв остаётся и попадает в «неизвестные списания / нужна сверка». Источник флага — `ProviderResult.charged_possible`.
+- **Адрес эндпоинта = `base_url` + (`/` + `path_prefix`, если непусто) + путь протокола** (`/v1/responses`, `/v1/messages`, `/v1/chat/completions`). Префикс задаёт владелец в конфигурации, код его не угадывает: у Kie — `codex` (ответы) и `anthropic` (сообщения), у остальных — пусто.
 
 **Файлы конфигурации реестра:**
 
@@ -142,15 +147,45 @@ class ProviderResult:
     text: str
     usage: Usage
     error_kind: str | None   # 'timeout' | 'http_401' | 'http_403' | 'http_429' | 'http_5xx' | 'cloudflare_1010' | 'bad_body' | 'no_usage'
-    charged_possible: bool   # True для timeout/429/5xx/1010 — списание могло произойти
+    charged_possible: bool   # True — списание могло произойти
     provider_request_id: str | None
 
-async def complete(route: Route, messages: list[dict], max_tokens: int, *, client: httpx.AsyncClient | None = None) -> ProviderResult
+async def complete(route: Route, messages: list[dict], max_tokens: int, *,
+                   client: httpx.AsyncClient | None = None,
+                   api_key: str | None = None,
+                   registry: Registry | None = None,
+                   allow_free: bool = False) -> ProviderResult
 ```
+
+`client`, `api_key`, `registry`, `allow_free` — необязательные; вызов ровно по §2 (только `route`, `messages`, `max_tokens`) работает как раньше. `allow_free` — разрешение владельца на `opt_in`-маршрут (имя как у `select_route`).
 
 **Прячет:** URL, заголовки, форму ответа каждого провайдера, разбор `usage`.
 
 **Шов для тестов:** `client` — внедряемый `httpx.AsyncClient`. Все провайдеры закрываются `httpx.MockTransport`; ни один тест не ходит в сеть.
+
+**Смысл `charged_possible` (зафиксировано таском 02):**
+
+| `error_kind` | `charged_possible` | Почему |
+|---|---|---|
+| `timeout`, `http_403`, `http_429`, `http_5xx`, `cloudflare_1010` | `True` | запрос дошёл до провайдера, списание могло произойти |
+| `no_usage`, нечитаемое тело | `True` | исход неопределён — ноль не подставляется |
+| `http_401`, явный отказ провайдера (200 с телом-ошибкой, 4xx) | `False` | ключ отклонён или провайдер прямо отказал — запрос не обработан, списания не было |
+
+Ошибка `bad_body` одна, а исходов за ней два: нечитаемое тело — списание возможно (`True`), явный отказ провайдера — списания не было (`False`). Различает их флаг, а не имя ошибки.
+
+**Отказы до сети:** маршрут вне реестра, ненастроенный ключ, маршрут с `enabled=false`, `opt_in`-маршрут без разрешения, маршрут с ненулевым тарифом и `verified_at=null` → `HTTPException 400`, **сетевого вызова нет**. Без переданного реестра берётся реестр по умолчанию (приложенный пример, где всё выключено) — поведение **закрыто по умолчанию**: сеть не трогается, пока владелец явно не включил маршрут.
+
+**Внешние факты по API Kie.ai** (сверено с официальной документацией, `docs.kie.ai`):
+
+- базовый адрес — `https://api.kie.ai`; авторизация **всегда** `Authorization: Bearer` (заголовок с именем `apikey` отклоняется с 401);
+- Responses: `POST https://api.kie.ai/codex/v1/responses` (семейство GPT-5.4 / GPT-5.5) и `POST https://api.kie.ai/api/v1/responses` (единый Codex-эндпоинт). Префикс пути зависит от семейства модели;
+- Anthropic Messages: `POST https://api.kie.ai/anthropic/v1/messages` (база `https://api.kie.ai/anthropic`);
+- список моделей: `GET https://api.kie.ai/openai/v1/models` и `GET https://api.kie.ai/anthropic/v1/models`; эндпоинта `/v1/models` на голом хосте нет — 404;
+- форма ответа Responses: текст в `output[].content[].text` (`type: 'output_text'`); `usage` содержит `input_tokens`, `output_tokens`, `total_tokens`, `input_tokens_details.cached_tokens`;
+- usage Anthropic: `input_tokens` **не включает** кеш, кеш идёт отдельно в `cache_read_input_tokens` и `cache_creation_input_tokens`.
+
+**Ключи новых провайдеров** — по образцу `PIAPI_API_KEY`/`KIE_API_KEY`: `MINIMAX_API_KEY`, `DEEPSEEK_API_KEY`, `OPENROUTER_API_KEY`; файл `*_API_KEY.txt` в корне репозитория; `configured` в `GET /api/connections`. В SQLite не пишутся, в ответы и логи не попадают. В `.env.example` — имена с пустыми значениями.
+
 
 ## 3. `backend/llm_guard.py` — существующий, меняется
 
@@ -169,7 +204,7 @@ async def complete(route: Route, messages: list[dict], max_tokens: int, *, clien
 | `execution_provider` | TEXT | кто выполнил |
 | `execution_model` | TEXT | что выполнил |
 | `actual_cost_usd` | REAL | подтверждённое фактическое списание |
-| `actual_status` | TEXT | `confirmed` / `free` / `unknown` / `estimated` |
+| `actual_status` | TEXT | `confirmed` / `free` / `unknown` / `estimated` / `not_charged` |
 | `reserved_usd` | REAL | зарезервировано (не деньги, потолок) |
 | `billing_source` | TEXT | откуда взята сумма |
 | `reference_provider` | TEXT | `kie` / `piapi` |
@@ -187,6 +222,19 @@ async def complete(route: Route, messages: list[dict], max_tokens: int, *, clien
 | `provider_request_id` | TEXT | id запроса у провайдера |
 
 Колонка `usd` **сохраняет прежний смысл** (оценка при `reserved`, факт при `done`, 0 при `failed`) — обратная совместимость. Позиционный `INSERT INTO llm_calls VALUES(...)` **переводится на именованные колонки**.
+
+**Как журнал трактует `actual_status`** (задано решением по дозапросу таска 02, применяется в таске 03):
+
+| `actual_status` | Фактическое списание | Резерв | Попадает в «Фактически потрачено» | Попадает в «Неизвестные списания» |
+|---|---|---|---|---|
+| `confirmed` | сумма по фактическому usage | снят | да | нет |
+| `free` | 0 | снят | да (ноль) | нет |
+| `estimated` | предвызовная оценка | держится | нет | нет |
+| `unknown` | нет числа | **держится** | нет | **да** |
+| `not_charged` | 0 | **снят** | нет | нет |
+
+`not_charged` ставится, когда провайдер точно отказал и списания не было (`ProviderResult.charged_possible = False`, например 401). Такой вызов не создаёт шума в сверке, но и не прячется: у него ненулевой `reserved_usd` в момент резервирования, который снимается освобождением.
+
 
 **Прячет:** SQL резервирования, формирование подписи, проверку лимитов.
 

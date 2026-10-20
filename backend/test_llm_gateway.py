@@ -328,12 +328,15 @@ class ActualQuoteTests(RegistryCase):
         self.assertEqual(quote.status, 'unknown')
         self.assertNotEqual(quote.cost_usd, 0)
 
-    def test_call_that_could_not_be_charged_costs_zero(self):
+    def test_paid_route_without_usage_is_never_confirmed_zero(self):
+        # Платный маршрут без usage не бывает подтверждённым нулём: списание неизвестно.
+        # charge_possible — флаг журнала, на расчёт не влияет.
         registry = self.write_registry(standard_config())
         route = registry.route('kie', 'gpt-6-luna')
         quote = llm_gateway.actual_quote(registry, route, None, charge_possible=False)
-        self.assertEqual(quote.cost_usd, 0.0)
-        self.assertEqual(quote.status, 'confirmed')
+        self.assertIsNone(quote.cost_usd)
+        self.assertEqual(quote.status, 'unknown')
+        self.assertNotEqual(quote.cost_usd, 0)
 
     def test_route_without_confirmed_tariff_is_unknown_not_zero(self):
         registry = self.write_registry(standard_config())

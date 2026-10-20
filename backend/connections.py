@@ -13,6 +13,9 @@ PROVIDERS={
     'elevenlabs':{'name':'ElevenLabs','env':'ELEVENLABS_API_KEY','file':'ELEVENLABS_API_KEY.txt','url':'https://api.elevenlabs.io/v1/user/subscription','header':'xi-api-key','docs':'https://elevenlabs.io/docs/api-reference/user/subscription/get'},
     'fish':{'name':'Fish Audio','env':'FISH_AUDIO_API_KEY','file':'FISH_AUDIO_API_KEY.txt','url':'https://api.fish.audio/wallet/self/api-credit','header':'Authorization','docs':'https://docs.fish.audio/api-reference/openapi.json'},
     'kie':{'name':'KIE','env':'KIE_API_KEY','file':'KIE_API_KEY.txt','url':'https://api.kie.ai/api/v1/chat/credit','header':'Authorization','docs':'https://docs.kie.ai/common-api/get-account-credits'},
+    'minimax':{'name':'MiniMax','env':'MINIMAX_API_KEY','file':'MINIMAX_API_KEY.txt','url':'https://api.minimax.io/v1/models','header':'Authorization','docs':'https://platform.minimax.io/docs/api-reference/api-overview'},
+    'deepseek':{'name':'DeepSeek','env':'DEEPSEEK_API_KEY','file':'DEEPSEEK_API_KEY.txt','url':'https://api.deepseek.com/user/balance','header':'Authorization','docs':'https://api-docs.deepseek.com/quick_start/pricing'},
+    'openrouter':{'name':'OpenRouter','env':'OPENROUTER_API_KEY','file':'OPENROUTER_API_KEY.txt','url':'https://openrouter.ai/api/v1/auth/key','header':'Authorization','docs':'https://openrouter.ai/docs/api-reference/limits'},
 }
 ELEVENLABS_LEGACY_FILE=Path(os.getenv('ELEVENLABS_KEY_FILE') or str(Path.home()/'Documents'/'!GREM TAXI'/'.secrets'/'elevenlabs-api-key.txt'))
 # Ключ KIE, сохранённый kie-access/connect.ps1: DPAPI текущего пользователя Windows (ConvertFrom-SecureString, hex).

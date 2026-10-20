@@ -13,7 +13,7 @@ window.STATE =
   "skillDir": "C:/Users/BLOWKA/.minimax/skills/autopilot",
   "baseCommit": "df1e1a3",
   "startedAt": "2026-10-20T13:38:10+03:00",
-  "updatedAt": "2026-10-20T15:27:31+03:00",
+  "updatedAt": "2026-10-20T17:10:16+03:00",
   "finishedAt": null,
   "stages": [
     {
@@ -62,8 +62,8 @@ window.STATE =
   ],
   "requirements": {
     "total": 60,
-    "done": 0,
-    "inTicket": 60,
+    "done": 14,
+    "inTicket": 46,
     "inSpec": 0,
     "placeholder": 0,
     "deferred": 0,
@@ -105,14 +105,20 @@ window.STATE =
       ],
       "review": "да — фундамент",
       "model": "сильная",
-      "status": "repair",
+      "status": "done",
       "retries": 0,
       "repairs": 2,
       "startedAt": "2026-10-20T14:27:41+03:00",
       "repairFindings": [
         "reference_quote падает TypeError на записи реестра с незаполненным тарифом",
         "ориентир не доходит до alternative_baseline, если у default_baseline не заполнен тариф"
-      ]
+      ],
+      "finishedAt": "2026-10-20T15:49:55+03:00",
+      "tests": {
+        "passed": 276,
+        "failed": 0
+      },
+      "commit": "94d294a"
     },
     {
       "id": "02",
@@ -136,9 +142,13 @@ window.STATE =
       ],
       "review": "да — риск",
       "model": "сильная",
-      "status": "pending",
+      "status": "repair",
       "retries": 0,
-      "repairs": 0
+      "repairs": 1,
+      "startedAt": "2026-10-20T15:49:56+03:00",
+      "repairFindings": [
+        "неверный путь Kie Responses (404) и нет гейта на выключенный маршрут — реальный POST с ключом"
+      ]
     },
     {
       "id": "03",
@@ -283,10 +293,17 @@ window.STATE =
       "repairs": 0
     }
   ],
-  "tests": null,
+  "tests": {
+    "passed": 276,
+    "failed": 0
+  },
   "debt": {
     "placeholders": [
-      "Тарифы, capabilities и base_url маршрутов minimax/deepseek/openrouter в config/llm_gateway.prices.example.json — иллюстративные (capabilities=false, часть тарифов null, verified_at=null, enabled=false). Заполняет владелец после живой проверки; до этого маршруты не включаются."
+      "Тарифы, capabilities и base_url маршрутов minimax/deepseek/openrouter в config/llm_gateway.prices.example.json — иллюстративные (capabilities=false, часть тарифов null, verified_at=null, enabled=false). Заполняет владелец после живой проверки; до этого маршруты не включаются.",
+      "Путь проверки ключа MiniMax (/v1/models) не подтверждён документацией — владелец сверяет перед включением маршрута",
+      "Точные upstream model id для Kie GPT-6 Luna / Claude Haiku 5.5 и MiniMax M3.1 Flash не подтверждены — по документации Kie модели берутся из GET /openai/v1/models и GET /anthropic/v1/models",
+      "Форма тела Responses-запроса к Kie (input/content) и пути чата MiniMax и OpenRouter не подтверждены живой проверкой — владелец сверяет своим ключом перед включением маршрутов",
+      "Цена записи кеша (Anthropic cache_creation) отдельно не тарифицируется — токены записи считаются по обычному входному тарифу; владелец уточняет, если нужен отдельный тариф"
     ],
     "assumptions": [],
     "emptyEnv": []
@@ -298,7 +315,10 @@ window.STATE =
     "deferred": 0,
     "items": []
   },
-  "concerns": [],
+  "concerns": [
+    "test_default_registry_is_closed подменяет load_registry — поведение «закрыто по умолчанию» не закреплено тестом, проверено вручную",
+    "actual_quote и гейт адаптера по-разному определяют «бесплатный маршрут»: расчёт даёт 0.0/confirmed для тарифа 0/0 при free=false, гейт считает 0/0 свободным; сумма  в обоих, денежной дыры нет"
+  ],
   "blind": null,
   "beats": [
     "2026-10-20T13:38:10+03:00",
@@ -316,9 +336,16 @@ window.STATE =
     "2026-10-20T14:59:18+03:00",
     "2026-10-20T15:08:14+03:00",
     "2026-10-20T15:08:15+03:00",
-    "2026-10-20T15:27:31+03:00"
+    "2026-10-20T15:27:31+03:00",
+    "2026-10-20T15:49:55+03:00",
+    "2026-10-20T15:49:56+03:00",
+    "2026-10-20T16:24:57+03:00",
+    "2026-10-20T16:36:31+03:00",
+    "2026-10-20T16:36:32+03:00",
+    "2026-10-20T16:36:33+03:00",
+    "2026-10-20T17:10:16+03:00"
   ],
-  "rev": 19,
+  "rev": 27,
   "waiting": null,
   "waits": [
     {
@@ -446,18 +473,77 @@ window.STATE =
       ],
       "act": "repair",
       "note": "ориентир не доходит до alternative_baseline, если у default_baseline не заполнен тариф"
+    },
+    {
+      "t": "2026-10-20T15:49:55+03:00",
+      "k": "ticket",
+      "ids": [
+        "01"
+      ],
+      "act": "done",
+      "tests": {
+        "passed": 276,
+        "failed": 0
+      }
+    },
+    {
+      "t": "2026-10-20T15:49:56+03:00",
+      "k": "ticket",
+      "ids": [
+        "02"
+      ],
+      "act": "start"
+    },
+    {
+      "t": "2026-10-20T16:24:57+03:00",
+      "k": "add",
+      "key": "debt.placeholders",
+      "n": 1
+    },
+    {
+      "t": "2026-10-20T16:24:57+03:00",
+      "k": "add",
+      "key": "debt.placeholders",
+      "n": 1
+    },
+    {
+      "t": "2026-10-20T16:36:31+03:00",
+      "k": "ticket",
+      "ids": [
+        "02"
+      ],
+      "act": "repair",
+      "note": "неверный путь Kie Responses (404) и нет гейта на выключенный маршрут — реальный POST с ключом"
+    },
+    {
+      "t": "2026-10-20T16:36:32+03:00",
+      "k": "add",
+      "key": "debt.placeholders",
+      "n": 1
+    },
+    {
+      "t": "2026-10-20T16:36:33+03:00",
+      "k": "add",
+      "key": "debt.placeholders",
+      "n": 1
+    },
+    {
+      "t": "2026-10-20T17:10:16+03:00",
+      "k": "add",
+      "key": "concerns",
+      "n": 2
     }
   ],
   "reqList": [
     {
       "id": "R01",
       "text": "«Подтяни ветку origin/minimax/llm-gateway»",
-      "status": "in-ticket"
+      "status": "done"
     },
     {
       "id": "R02",
       "text": "«Прочитай ТЗ, правила отображения стоимости и handoff»",
-      "status": "in-ticket"
+      "status": "done"
     },
     {
       "id": "R03",
@@ -467,7 +553,7 @@ window.STATE =
     {
       "id": "R04",
       "text": "«в карточках показываем стоимость по тарифам Kie/PiAPI даже для бесплатных вызовов»",
-      "status": "in-ticket"
+      "status": "done"
     },
     {
       "id": "R05",
@@ -512,7 +598,7 @@ window.STATE =
     {
       "id": "R13",
       "text": "«Сначала составить карту того, что уже реализовано.» + «Не переписывать image/video»",
-      "status": "in-ticket"
+      "status": "done"
     },
     {
       "id": "R14",
@@ -542,7 +628,7 @@ window.STATE =
     {
       "id": "R19",
       "text": "«Route modes manual/auto. По умолчанию без параллельных вызовов нескольких LLM.»",
-      "status": "in-ticket"
+      "status": "done"
     },
     {
       "id": "R20",
@@ -557,12 +643,12 @@ window.STATE =
     {
       "id": "R22",
       "text": "«Usage, cache tokens, unknown-cost status, сохраняемые price snapshots.»",
-      "status": "in-ticket"
+      "status": "done"
     },
     {
       "id": "R23",
       "text": "«Никакой фиктивной точности при отсутствующем usage; ноль только при подтверждённо бесплатном маршруте.»",
-      "status": "in-ticket"
+      "status": "done"
     },
     {
       "id": "R24",
@@ -582,7 +668,7 @@ window.STATE =
     {
       "id": "R27",
       "text": "«A. Аудит: сопоставить существующий код, схемы БД, маршруты и зависимости. Отчет о блокерах и о том, что можно переиспользовать.»",
-      "status": "in-ticket"
+      "status": "done"
     },
     {
       "id": "R28",
@@ -667,22 +753,22 @@ window.STATE =
     {
       "id": "R44",
       "text": "«Если Kie.ai или PiAPI действительно продаёт ту же модель — сравнивать с её точным тарифом, пометка exact_model.»",
-      "status": "in-ticket"
+      "status": "done"
     },
     {
       "id": "R45",
       "text": "«использовать только явно названный ценовой ориентир другой модели, по умолчанию Kie GPT-6 Luna; альтернативный ориентир PiAPI GPT-5.6 Luna.»",
-      "status": "in-ticket"
+      "status": "done"
     },
     {
       "id": "R46",
       "text": "«На карточке обязательно писать: «Ценовой ориентир Kie GPT-6 Luna (другая модель, сравнение по объёму токенов)».»",
-      "status": "in-ticket"
+      "status": "done"
     },
     {
       "id": "R47",
       "text": "«Непроверенный тариф выводить как «Не подтверждён», а не $0.»",
-      "status": "in-ticket"
+      "status": "done"
     },
     {
       "id": "R48",
@@ -717,7 +803,7 @@ window.STATE =
     {
       "id": "R54",
       "text": "«Если usage неизвестен — оставить статус estimated, не выдавать за точную сумму. Поддерживать дробные суммы менее 1 цента без округления к $0.00.»",
-      "status": "in-ticket"
+      "status": "done"
     },
     {
       "id": "R55",
@@ -747,7 +833,7 @@ window.STATE =
     {
       "id": "R60i",
       "text": "(подразумевается) Ориентир и фактическое списание должны попадать в один и тот же учёт вызовов, чтобы «Бюджет» и карточка не расходились",
-      "status": "in-ticket"
+      "status": "done"
     }
   ],
   "gates": {

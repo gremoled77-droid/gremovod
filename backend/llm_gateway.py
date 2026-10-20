@@ -70,6 +70,7 @@ class Route:
     cached_input_per_mtok: float | None = None
     rate_limit: str | None = None
     upstream_version: str | None = None
+    path_prefix: str = ''
     source: str = ''
     as_of: str = ''
 
@@ -133,6 +134,7 @@ class ModelEntry:
     max_input_tokens: int | None
     rate_limit: str | None
     upstream_version: str | None
+    path_prefix: str = ''
 
     def rate(self) -> Rate:
         return Rate(provider=self.provider, model=self.model, input_per_mtok=self.input_per_mtok,
@@ -147,7 +149,7 @@ class ModelEntry:
                      enabled=self.enabled, verified_at=self.verified_at, capabilities=self.capabilities,
                      max_input_tokens=self.max_input_tokens, cached_input_per_mtok=self.cached_input_per_mtok,
                      rate_limit=self.rate_limit, upstream_version=self.upstream_version,
-                     source=self.source, as_of=self.as_of)
+                     source=self.source, as_of=self.as_of, path_prefix=self.path_prefix)
 
 
 @dataclass(frozen=True)
@@ -279,6 +281,7 @@ def _entry_from(raw: dict, default_as_of: str) -> ModelEntry:
         max_input_tokens=(int(raw['max_input_tokens']) if raw.get('max_input_tokens') is not None else None),
         rate_limit=_optional_str(raw.get('rate_limit')),
         upstream_version=_optional_str(raw.get('upstream_version')),
+        path_prefix=str(raw.get('path_prefix') or ''),
     )
 
 
@@ -404,8 +407,13 @@ def actual_quote(registry: Registry, route: Route, usage: Usage | None = None, *
                  charge_possible: bool = True) -> ActualQuote:
     """Фактическое списание: строго по тарифу провайдера-исполнителя.
 
-    Ноль бывает только у подтверждённо бесплатного маршрута. Неопределённый исход (таймаут, 429, 5xx)
-    остаётся неизвестным списанием, а не $0.
+    Ноль бывает только у подтверждённо бесплатного маршрута. У платного маршрута без usage
+    списание неизвестно (cost_usd=None, status='unknown') — подтверждённых $0.00 не бывает.
+    Ноль у платного маршрута возможен, только если usage есть и сам даёт ноль биллябельных токенов.
+
+    charge_possible на расчёт не влияет. Это флаг для журнала: «точно не списано» — резерв
+    освобождается; «возможно списано» — резерв остаётся и попадает в «неизвестные списания /
+    нужна сверка».
     """
     entry = registry.entry(route.provider, route.model)
     if route.free or (entry is not None and entry.free):
@@ -416,10 +424,8 @@ def actual_quote(registry: Registry, route: Route, usage: Usage | None = None, *
                            billing_source='route_tariff')
     cost = _cost_of(entry, usage, registry.precision)
     if cost is None:
-        if charge_possible:
-            return ActualQuote(cost_usd=None, status='unknown', provider=route.provider, model=route.model,
-                               billing_source='route_tariff')
-        return ActualQuote(cost_usd=0.0, status='confirmed', provider=route.provider, model=route.model,
+        # usage нет: списание неизвестно, подтверждённого нуля у платного маршрута не бывает
+        return ActualQuote(cost_usd=None, status='unknown', provider=route.provider, model=route.model,
                            billing_source='route_tariff')
     status = 'estimated' if (usage is not None and usage.estimated) else 'confirmed'
     return ActualQuote(cost_usd=cost, status=status, provider=route.provider, model=route.model,
