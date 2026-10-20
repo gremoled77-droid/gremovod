@@ -17,7 +17,7 @@
       "as_of": "2026-10-20",
       "protocol": "responses",
       "base_url": "https://api.kie.ai",
-      "path_prefix": "codex",
+      "path_prefix": "openai",
       "capabilities": {
         "tools": false,
         "streaming": false,
@@ -46,7 +46,7 @@
       "as_of": "2026-10-20",
       "protocol": "anthropic_messages",
       "base_url": "https://api.kie.ai",
-      "path_prefix": "anthropic",
+      "path_prefix": "claude",
       "capabilities": {
         "tools": false,
         "streaming": false,
