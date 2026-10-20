@@ -1,8 +1,33 @@
 # Облачный контур приёмки: n8n Cloud → туннель → студия
 
-Дата: 2026-10-20. Источник workflow: `integrations/n8n/workflows/gremovod-qa-studio-loop.ts`.
-Workflow в n8n Cloud: `GremoVOD — приёмка через студию (черновик)`, id `4YoGZBPw7SVXc1kg`,
-адрес `https://gremovod.app.n8n.cloud/workflow/4YoGZBPw7SVXc1kg` (черновик, не опубликован).
+Дата: 2026-10-20 (реконструкция v2). Источники workflow: `integrations/n8n/workflows/gremovod-qa-studio-live-v2.ts`,
+`gremovod-qa-studio-loop-v2.ts`, `gremovod-drive-to-qa-v2.ts`, `gremovod-studio-diagnostics.ts`.
+
+Проект n8n Cloud: `GremoVOD <gremshrem@gmail.com>`, id `jG7gkyrK2hH0rEBj`.
+Корневая папка v2: `GremoVOD v2 — пересборка с нуля`, id `NfNcDHsZU3fowZPt`.
+Все workflow'и v2 — черновики (`active: false`), публикация остаётся за владельцем.
+
+## Структура папок v2
+
+| Папка | id | Состав |
+|---|---|---|
+| `GremoVOD v2 — пересборка с нуля` | `NfNcDHsZU3fowZPt` | корень v2 |
+| `01. Приёмка студии (живой контур)` | `RPNiOECzgayYsmfa` | LIVE-контур, диагностика |
+| `02. Google Drive → студия QA` | `iv7dq27eHJWIbrvG` | приём файлов из Drive |
+| `03. Черновики и агрегатор (без платных вызовов)` | `CHmWnHcYIQ52y5ls` | черновик-контур, агрегатор |
+| `99. Архив предыдущей сборки (не использовать)` | `lAxpTYqcsySbFZxc` | сборка v1 |
+
+## Workflow v2
+
+| Workflow | id | Узлов | Назначение |
+|---|---|---|---|
+| `GremoVOD v2 — приёмка через студию (LIVE, MiniMax)` | `uGwbv0h0RhHtGGmF` | 15 | два независимых критика MiniMax M3.1 Flash |
+| `GremoVOD v2 — приёмка через студию (черновик, без моделей)` | `ppBluN9SO4cjTkLY` | 11 | полный путь по студии без платных вызовов |
+| `GremoVOD v2 — Google Drive → приёмка в студии` | `s4c8D6EgCjdMzovc` | 9 | файл из Drive → текст → ревью в студии |
+| `GremoVOD v2 — диагностика связи со студией` | `YGJoocKSr2KmwIu7` | 4 | туннель + токен, без платных вызовов |
+| `GremoVOD QA Orchestrator — safe draft` | `nh3ARcl4XPW6RHqs` | 7 | агрегатор вердиктов, логика покрыта тестом |
+
+Адреса: `https://gremovod.app.n8n.cloud/workflow/<id>`.
 
 ## Что делает контур
 
@@ -14,9 +39,9 @@ Workflow в n8n Cloud: `GremoVOD — приёмка через студию (ч�
    сверяет доказательство с доверенным источником и **сам** пересчитывает итог; в ответе — `server_receipt`.
 4. Итог забирается из студии: `GET /api/qa/reviews/{id}`. Итог считает сервер, а не n8n.
 
-Пока независимые критики A6/A7 не подключены, workflow отправляет честные вердикты `BLOCKED`
-с указанием, что именно не подключено. Это осознанное поведение: «зелёный» статус без критика
-не появится.
+Критик не может выдать «зелёный» статус мимо сервера: если модель вернула нестрогий JSON,
+вердикт остаётся `BLOCKED` с указанием причины. Это закреплено тестом
+`integrations/n8n/tests/n8n-v2-workflows.test.mjs`.
 
 ## Доступ к студии
 
@@ -40,17 +65,35 @@ Workflow в n8n Cloud: `GremoVOD — приёмка через студию (ч�
 
 ## Настройка в n8n (одно действие)
 
-1. Создать credential типа **Header Auth** с именем `GremoVOD Studio QA Token`:
-   - имя заголовка `Authorization`,
-   - значение `Bearer <машинный токен студии>`.
-2. Выбрать его в шести HTTP-узлах: «Создать ревью», «Пакет: критик ТЗ», «Отправить вердикт ТЗ»,
-   «Пакет: критик системы», «Отправить вердикт системы», «Итог ревью».
+1. Открыть credential **Header Auth** → исправить **имя заголовка** на `Authorization`
+   (значение остаётся `Bearer <машинный токен студии>`).
+2. Проверить, что кред выбран в шести HTTP-узлах LIVE-контура: «Создать ревью», «Пакет: критик ТЗ»,
+   «Отправить вердикт ТЗ», «Пакет: критик системы», «Отправить вердикт системы», «Итог ревью».
    Узлы настроены на тип `httpHeaderAuth`, так что в их списке Credentials показывается именно
    обычный Header Auth. С типом `httpTemplatedCustom Auth` кред не находился — поэтому узлы
    переведены на `httpHeaderAuth`.
-3. Прогнать вручную: вердикты будут `BLOCKED` (критики не подключены) — это ожидаемо.
+3. Прогнать `GremoVOD v2 — диагностика связи со студией`: вердикт `ТОКЕН ПРИНЯТ` означает,
+   что туннель и авторизация в порядке.
 
 Токен в workflow не попадает: он живёт только в credential.
+
+### Известная поломка, из-за которой контур не стартует
+
+Оба существующих кредита типа Header Auth («Header Auth account», «Header Auth account 2») названы
+именем credential'а, а не именем HTTP-заголовка. n8n отвечает:
+
+```
+Header name must be a valid HTTP token ["GremoVOD Studio QA Token"]
+```
+
+Токен при этом верный, и путь n8n Cloud → туннель → студия работает: с тем же токеном, но с
+заголовком `Authorization`, студия отвечает `404 Ревью не найдено` (токен принят). Ломается ровно
+одна строка в одном креде — её и нужно поправить в UI. Создать или изменить credential средствами
+MCP нельзя: в наборе инструментов n8n такого нет, только чтение и привязка к узлам.
+
+Для Google Drive нужен отдельный credential типа Google Drive OAuth (`googleDriveOAuth2Api`) —
+его тоже создаёт владелец; в исходнике он назван `Google Drive — gremshrem`.
+
 
 ## Публичный адрес студии
 
@@ -73,44 +116,58 @@ id `df5b9eda-c6a8-49c2-ac05-7bf3344a56a1`, DNS-запись `studio.grem.win` у
 
 ## Workflow в n8n Cloud
 
-- `GremoVOD — приёмка через студию (черновик)`, id `4YoGZBPw7SVXc1kg` — MOCK: критеки отвечают честным
-  `BLOCKED`, платных вызовов нет. Источник: `integrations/n8n/workflows/gremovod-qa-studio-loop.ts`.
-- `GremoVOD — приёмка через студию (LIVE, MiniMax)`, id `Lg0bNtjIaZl15ae7` — два независимых критика
-  на MiniMax M3.1 Flash, каждый со своим изолированным пакетом. Источник:
-  `integrations/n8n/workflows/gremovod-qa-studio-live.ts`.
-- `Стенд: критик MiniMax (проверка формата JSON)`, id `vfmPTZXvSQ0lPPNX` — один вызов модели с тем же
-  промптом, чтобы проверить формат ответа и цитирование ревизии.
+Актуальная сборка — v2, в папке `GremoVOD v2 — пересборка с нуля` (таблица выше).
+Сборка v1 перенесена в `99. Архив предыдущей сборки (не использовать)`:
+
+- `GremoVOD — приёмка через студию (черновик)`, id `4YoGZBPw7SVXc1kg`;
+- `GremoVOD — приёмка через студию (LIVE, MiniMax)`, id `Lg0bNtjIaZl15ae7`;
+- `Стенд: критик MiniMax (проверка формата JSON)`, id `vfmPTZXvSQ0lPPNX`.
 
 ### Что нужно от владельца, чтобы поехало
 
-Два креда в n8n Cloud:
-
-1. **Header Auth «GremoVOD Studio QA Token»** — `Authorization: Bearer <машинный токен студии>`.
-   Назначить шести HTTP-узлам: «Создать ревью», «Пакет: критик ТЗ», «Отправить вердикт ТЗ»,
-   «Пакет: критик системы», «Отправить вердикт системы», «Итог ревью».
-   Узлы уже настроены на тип `httpHeaderAuth` (раньше был `httpTemplatedCustomAuth`, и в списке
-   Credentials показывались только Templated Custom Auth — кредит не находился). Создайте обычный
-   **Header Auth**, и он появится в выпадающем списке этих узлов.
+1. **Починить кред Header Auth.** В обоих существующих кредитах вместо имени HTTP-заголовка
+   стоит `GremoVOD Studio QA Token` — n8n не может собрать такой заголовок. Нужно
+   `Authorization` / `Bearer <машинный токен студии>`. Подробности в разделе
+   «Известная поломка» выше. Креды уже назначены нужным узлам.
 2. **Кред MiniMax для n8n.** Управляемый «Gateway credits» платформы для узла `lmChatMinimax`
    не поддерживает эту операцию: n8n отвечает
    `400 Gateway credits don't currently support this operation. Switch to using your own credential to continue.`
    Нужен собственный ключ M Plan (Header Auth `Authorization: Bearer <MiniMax Subscription Key>`
    для `https://api.minimax.io/v1/chat/completions` либо `minimaxApi`-кред для узла модели).
-   Квота M Plan в этом проекте закрывается 2026-10-25 — стоит проверить остаток до ��того.
+   Квота M Plan в этом проекте закрывается 2026-10-25 — стоит проверить остаток до этого.
+3. **Кред Google Drive OAuth** — для контура `02. Google Drive → студия QA`. Без него
+   workflow лежит черновиком: скачать файл нечем.
 
 ### Проверено вживую 20.10.2026
 
 - `https://studio.grem.win/api/health` → 200 (туннель Cloudflare, именованный, DNS разошёлся).
 - `/api/qa/reviews/*` без токена → 401; с токеном своего проекта → 200/404 по сути;
   с токеном чужого проекта → 403; обычный `/api/projects` с токеном → 401 (токен открывает только `/api/qa/*`).
+- Связка n8n Cloud → туннель → студия подтверждена из самого n8n: запрос с заголовком
+  `Authorization` и верным токеном вернул `404 Ревью не найдено`, то есть авторизация прошла.
+- Через кред Header Auth с текущим (сломанным) именем заголовка — `ERR_INVALID_HTTP_TOKEN`.
 - Стенд модели: n8n дошёл до вызова MiniMax (запрос ушёл на `ai-assistant.n8n.io`, 379 токенов
   в промпте) и получил 400 от гейтвея — то есть весь конвейер до провайдера собран правильно,
-  остаётся только кред.
+  остаётся только кред. В v2 кред модели привязан к `MiniMax account` — это собственный ключ
+  (`isManaged: false`), а не управляемый шлюз.
+
+## Google Drive
+
+Контур `GremoVOD v2 — Google Drive → приёмка в студии` (`s4c8D6EgCjdMzovc`):
+
+1. Источник — ручной запуск с `file_id` во входе либо триггер «новый файл в папке» Google Drive.
+2. Файл скачивается, из него извлекается текст (`.md`, `.txt`, `.json`, `.docx`).
+   Пустой или бинарный файл в приёмку не идёт — узел падает с понятной причиной.
+3. Текст превращается в ревью студии, критику ТЗ отдаётся пакет `REVIEW-REQ`.
+4. Отчёт фиксирует, что файл принят в студию; вердикт и выпуск — за владельцем.
+
+Платных вызовов в контуре нет. Кред типа Google Drive OAuth создаёт владелец в n8n.
 
 ## Чего контур ещё не умеет
 
-- **Критики A6/A7/A8 не подключены.** Нужен поддерживаемый способ вызова saved Agents из workflow;
-  `messageAnAgent` в n8n помечен `@deprecated: retired`. Пока — честный `BLOCKED`.
+- **Критики A6/A7/A8 не подключены как отдельные сущности.** В LIVE-контуре критики
+  реализованы как изолированные вызовы MiniMax внутри одного workflow; запуск saved Agents
+  из workflow в n8n помечен `@deprecated: retired`. Пока — честный `BLOCKED`.
 - **Медиа-области (`IMAGE`, `VIDEO`, `AUDIO`) всегда `BLOCKED`.** Доверенный источник появится
   вместе с media inspector; сейчас `trusted_sources` для медиа пуст.
 - **Workflow ничего не публикует.** Даже `TEXT_PRECHECK_PASSED_AWAITING_OWNER` — это не релиз:
