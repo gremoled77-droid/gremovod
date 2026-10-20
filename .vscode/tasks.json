@@ -28,7 +28,7 @@
     {
       "id": "gremovodGaPr",
       "type": "promptString",
-      "description": "Номер PR MiniMax (GA-01, GA-02 и т.д.)",
+      "description": "Числовой номер GitHub Pull Request MiniMax (например, 1234; не GA-01)",
       "default": ""
     }
   ]
