@@ -2,6 +2,7 @@ import BudgetPanel from './BudgetPanel';
 import {useEffect, useState} from 'react';
 import {apiFetch} from './api';
 import {responseJson} from './ChatGPTPanel';
+import {budgetLines, type BudgetSummary} from './llmDisplay';
 import {smallUsd} from './usdFormat';
 type Entry = {
   id: string;
@@ -27,6 +28,10 @@ type LlmUsage = {
   estimated_usd: number;
   today_usd: number;
   by_model: Record<string, {calls: number; usd: number}>;
+  actual_cost_usd?: number;
+  reserved_usd?: number;
+  unknown_cost_usd?: number;
+  reference_cost_usd?: number;
 };
 type Report = {
   llm?: LlmUsage;
@@ -153,6 +158,14 @@ export default function EconomicsPanel({projectId, revision}: {projectId: string
     };
   }, [projectId, revision, tick]);
   const money = (n: number | null) => (n === null ? '—' : '$' + n.toFixed(3));
+  // Разбивка LLM та же, что в API: факт, резерв, неизвестные списания и неденежный ориентир.
+  const llm: BudgetSummary = {
+    actual_cost_usd: data?.llm?.actual_cost_usd ?? 0,
+    reserved_usd: data?.llm?.reserved_usd ?? 0,
+    unknown_cost_usd: data?.llm?.unknown_cost_usd ?? 0,
+    reference_cost_usd: data?.llm?.reference_cost_usd ?? 0,
+    calls: data?.llm?.calls ?? 0,
+  };
   return (
     <section className="panel">
       <div className="panel-title">
@@ -199,14 +212,24 @@ export default function EconomicsPanel({projectId, revision}: {projectId: string
             </article>
           </div>
           {data.llm && data.llm.calls > 0 && (
-            <p className="muted">
-              LLM-запросы из воркфлоу: {data.llm.calls} · {smallUsd(data.llm.usd)} по токенам (оценка{' '}
-              {smallUsd(data.llm.estimated_usd)}), сегодня {smallUsd(data.llm.today_usd)}.{' '}
-              {Object.entries(data.llm.by_model)
-                .map(([model, v]) => `${model}: ${v.calls} · ${smallUsd(v.usd)}`)
-                .join('; ')}
-              . В «Расходы ролика» не входят: у них отдельный журнал.
-            </p>
+            <>
+              <p className="muted">
+                LLM-запросы из воркфлоу: {data.llm.calls} вызовов. Разбивка та же, что в API:
+              </p>
+              <ul style={{margin: '4px 0 8px', paddingLeft: 18}}>
+                {budgetLines(llm).map(line => (
+                  <li key={line}>{line}</li>
+                ))}
+              </ul>
+              <p className="muted">
+                Экспозиция (факт + резервы + неизвестные списания): {smallUsd(data.llm.usd)}; оценка по токенам{' '}
+                {smallUsd(data.llm.estimated_usd)}, сегодня {smallUsd(data.llm.today_usd)}.{' '}
+                {Object.entries(data.llm.by_model)
+                  .map(([model, v]) => `${model}: ${v.calls} · ${smallUsd(v.usd)}`)
+                  .join('; ')}
+                . В «Расходы ролика» не входят: у них отдельный журнал.
+              </p>
+            </>
           )}
           {data.llm_calls_unpriced > 0 && (
             <p className="notice">

@@ -13,7 +13,7 @@ window.STATE =
   "skillDir": "C:/Users/BLOWKA/.minimax/skills/autopilot",
   "baseCommit": "df1e1a3",
   "startedAt": "2026-10-20T13:38:10+03:00",
-  "updatedAt": "2026-10-20T23:26:42+03:00",
+  "updatedAt": "2026-10-20T23:26:43+03:00",
   "finishedAt": null,
   "stages": [
     {
@@ -62,8 +62,8 @@ window.STATE =
   ],
   "requirements": {
     "total": 60,
-    "done": 34,
-    "inTicket": 26,
+    "done": 37,
+    "inTicket": 23,
     "inSpec": 0,
     "placeholder": 0,
     "deferred": 0,
@@ -225,14 +225,20 @@ window.STATE =
       ],
       "review": "да — риск",
       "model": "обычная",
-      "status": "repair",
+      "status": "done",
       "retries": 0,
       "repairs": 2,
       "startedAt": "2026-10-20T19:32:33+03:00",
       "repairFindings": [
         "неизвестное списание агента может остаться без резерва и вне итогов; задание агенту уходит без проверки лимита; запись о расходе после коммита задания",
         "400 на отчёте отвергает бесплатную модель (тариф 0/0) и оставляет задание в preparing, блокируя очередь агента по студии; отчёт failed не журналирует расход"
-      ]
+      ],
+      "finishedAt": "2026-10-20T23:26:42+03:00",
+      "tests": {
+        "passed": 349,
+        "failed": 0
+      },
+      "commit": "c33635c"
     },
     {
       "id": "05",
@@ -317,13 +323,14 @@ window.STATE =
       ],
       "review": "нет",
       "model": "обычная",
-      "status": "pending",
+      "status": "in-progress",
       "retries": 0,
-      "repairs": 0
+      "repairs": 0,
+      "startedAt": "2026-10-20T23:26:43+03:00"
     }
   ],
   "tests": {
-    "passed": 115,
+    "passed": 349,
     "failed": 0
   },
   "debt": {
@@ -396,9 +403,10 @@ window.STATE =
     "2026-10-20T21:29:41+03:00",
     "2026-10-20T21:29:42+03:00",
     "2026-10-20T22:42:10+03:00",
-    "2026-10-20T23:26:42+03:00"
+    "2026-10-20T23:26:42+03:00",
+    "2026-10-20T23:26:43+03:00"
   ],
-  "rev": 42,
+  "rev": 44,
   "waiting": null,
   "waits": [
     {
@@ -711,6 +719,26 @@ window.STATE =
       "k": "add",
       "key": "concerns",
       "n": 4
+    },
+    {
+      "t": "2026-10-20T23:26:42+03:00",
+      "k": "ticket",
+      "ids": [
+        "04"
+      ],
+      "act": "done",
+      "tests": {
+        "passed": 349,
+        "failed": 0
+      }
+    },
+    {
+      "t": "2026-10-20T23:26:43+03:00",
+      "k": "ticket",
+      "ids": [
+        "06"
+      ],
+      "act": "start"
     }
   ],
   "reqList": [
@@ -737,7 +765,7 @@ window.STATE =
     {
       "id": "R05",
       "text": "«а в разделе «Бюджет» суммируем только фактические расходы»",
-      "status": "in-ticket"
+      "status": "done"
     },
     {
       "id": "R06",
@@ -902,7 +930,7 @@ window.STATE =
     {
       "id": "R38",
       "text": "«Fallback после Free корректно добавляет только платежи реально платного поставщика; неизвестные начисления не становятся нулём.»",
-      "status": "in-ticket"
+      "status": "done"
     },
     {
       "id": "R39",
@@ -987,7 +1015,7 @@ window.STATE =
     {
       "id": "R55",
       "text": "«Actual spend = сумма подтвержденных реальных начислений за успешные и сверенные вызовы; зарезервированные и неопределенные суммы показывать отдельно и учитывать в блокирующих лимитах.»",
-      "status": "in-ticket"
+      "status": "done"
     },
     {
       "id": "R56",

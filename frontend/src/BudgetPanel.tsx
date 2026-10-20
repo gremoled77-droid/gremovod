@@ -1,6 +1,7 @@
 import {useEffect, useState} from 'react';
 import {apiFetch} from './api';
 import {responseJson} from './ChatGPTPanel';
+import {budgetLines, type BudgetSummary} from './llmDisplay';
 import {smallUsd} from './usdFormat';
 type Budget = {
   project_limit_usd: number;
@@ -11,6 +12,10 @@ type Budget = {
   llm_project_usd?: number;
   llm_daily_usd?: number;
   llm_calls_project?: number;
+  actual_cost_usd?: number;
+  reserved_usd?: number;
+  unknown_cost_usd?: number;
+  reference_cost_usd?: number;
 };
 export default function BudgetPanel({projectId}: {projectId: string}) {
   const [data, setData] = useState<Budget | null>(null),
@@ -40,6 +45,14 @@ export default function BudgetPanel({projectId}: {projectId: string}) {
       active = false;
     };
   }, [projectId]);
+  // Та же сводка, что отдаёт API: факт, резерв, неизвестные списания и неденежный ориентир.
+  const llm: BudgetSummary = {
+    actual_cost_usd: data?.actual_cost_usd ?? 0,
+    reserved_usd: data?.reserved_usd ?? 0,
+    unknown_cost_usd: data?.unknown_cost_usd ?? 0,
+    reference_cost_usd: data?.reference_cost_usd ?? 0,
+    calls: data?.llm_calls_project ?? 0,
+  };
   const save = async () => {
     setBusy(true);
     setError('');
@@ -70,9 +83,17 @@ export default function BudgetPanel({projectId}: {projectId: string}) {
             {data.daily_reserved_usd.toFixed(3)} за {data.day_moscow} (МСК).
           </p>
           <p>
-            LLM-запросы (в лимитах учтены дополнительно к генерациям): {smallUsd(data.llm_project_usd ?? 0)} в
-            проекте ({data.llm_calls_project ?? 0} вызовов); {smallUsd(data.llm_daily_usd ?? 0)} за сутки по
-            всей студии.
+            LLM в проекте ({data.llm_calls_project ?? 0} вызовов) — разбивка та же, что в API:
+          </p>
+          <ul style={{margin: '4px 0 8px', paddingLeft: 18}}>
+            {budgetLines(llm).map(line => (
+              <li key={line}>{line}</li>
+            ))}
+          </ul>
+          <p className="muted">
+            Экспозиция LLM (факт + удерживаемые резервы + неизвестные списания):{' '}
+            {smallUsd(data.llm_project_usd ?? 0)} в проекте; {smallUsd(data.llm_daily_usd ?? 0)} за сутки по всей
+            студии. В лимитах учтена дополнительно к генерациям.
           </p>
           <div className="param-grid">
             <label>

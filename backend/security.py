@@ -135,12 +135,17 @@ def register(app, studio):
     @app.get('/api/budgets/{project_id}')
     def budgets(project_id: str):
         studio.project(project_id)
-        from backend import llm_guard
+        from backend import llm_guard, llm_gateway
         with studio.connect() as db:
             llm_project = llm_guard.summary(db, {project_id})
             llm_all = llm_guard.summary(db)
+            # Четыре величины LLM раздельными полями: факт, резерв, неизвестные списания и неденежный ориентир.
+            # llm_project_usd остаётся экспозицией (факт + резерв + неизвестные) — её проверяет лимит.
+            spend = llm_gateway.summarize_spend(db, [project_id])
             return {**budget_state(db, project_id), 'llm_project_usd': llm_project['usd'], 'llm_daily_usd': llm_all['today_usd'],
-                    'llm_calls_project': llm_project['calls']}
+                    'llm_calls_project': llm_project['calls'],
+                    'actual_cost_usd': spend['actual_cost_usd'], 'reserved_usd': spend['reserved_usd'],
+                    'unknown_cost_usd': spend['unknown_cost_usd'], 'reference_cost_usd': spend['reference_cost_usd']}
 
     @app.put('/api/budgets/limits')
     def limits(body: BudgetLimits):

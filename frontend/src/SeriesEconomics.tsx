@@ -1,6 +1,7 @@
 import {useEffect, useState} from 'react';
 import {apiFetch} from './api';
 import {responseJson} from './ChatGPTPanel';
+import {budgetLines, type BudgetSummary} from './llmDisplay';
 import {smallUsd} from './usdFormat';
 type Summary = {
   actual_usd_known: number;
@@ -11,7 +12,15 @@ type Summary = {
   success_percent: number | null;
   limit_usd: number | null;
   chat_api_equivalent_usd: number;
-  llm?: {calls: number; usd: number; estimated_usd: number};
+  llm?: {
+    calls: number;
+    usd: number;
+    estimated_usd: number;
+    actual_cost_usd?: number;
+    reserved_usd?: number;
+    unknown_cost_usd?: number;
+    reference_cost_usd?: number;
+  };
 };
 export default function SeriesEconomics({pid, sid}: {pid: string; sid: string}) {
   const [data, setData] = useState<Summary | null>(null),
@@ -37,6 +46,14 @@ export default function SeriesEconomics({pid, sid}: {pid: string; sid: string}) 
       live = false;
     };
   }, [pid, sid, tick]);
+  // Разбивка LLM та же, что в API: факт, резерв, неизвестные списания и неденежный ориентир.
+  const llm: BudgetSummary = {
+    actual_cost_usd: data?.llm?.actual_cost_usd ?? 0,
+    reserved_usd: data?.llm?.reserved_usd ?? 0,
+    unknown_cost_usd: data?.llm?.unknown_cost_usd ?? 0,
+    reference_cost_usd: data?.llm?.reference_cost_usd ?? 0,
+    calls: data?.llm?.calls ?? 0,
+  };
   return (
     <details>
       <summary>Экономика и бюджет серии</summary>
@@ -51,6 +68,11 @@ export default function SeriesEconomics({pid, sid}: {pid: string; sid: string}) 
             LLM-запросы кадров серии: <b>{smallUsd(data.llm?.usd ?? 0)}</b> ({data.llm?.calls ?? 0} вызовов).
             Входят в проверку лимита серии. Запросы из общего проекта сюда не попадают.
           </p>
+          <ul style={{margin: '4px 0 8px', paddingLeft: 18}}>
+            {budgetLines(llm).map(line => (
+              <li key={line}>{line}</li>
+            ))}
+          </ul>
           <p>
             Завершённых попыток: {data.attempts} · использовано: {data.used_generations} · выход годных:{' '}
             {data.success_percent === null ? '—' : data.success_percent + '%'}.
