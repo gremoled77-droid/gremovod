@@ -22,6 +22,36 @@ def llm_scope(scope):
     """Идентификаторы LLM, доступные в области."""
     return {key for key,spec in LLM_MODELS.items() if scope in spec['scopes']}
 
+def llm_spec(model, provider=None):
+    """Запись реестра для модели.
+
+    None, если модели нет в реестре или её обслуживает другой провайдер.
+    Провайдер берётся из реестра, а не из кода вызова: провайдеры заменяемы,
+    PiAPI — текущий тестовый провайдер, а не единственный возможный.
+    """
+    spec=LLM_MODELS.get(model)
+    if spec is None: return None
+    if provider is not None and spec['provider']!=provider: return None
+    return spec
+
+def llm_resolve(model):
+    """Запись реестра по имени модели.
+
+    Принимает и идентификатор из реестра, и имя модели у провайдера: задания
+    MiniMax хранят проводное имя ('MiniMax-M3.1-Flash').
+    """
+    spec=LLM_MODELS.get(model)
+    if spec is not None: return spec
+    for value in LLM_MODELS.values():
+        if value.get('provider_model')==model: return value
+    return None
+
+def llm_wire_model(model):
+    """Имя модели на стороне провайдера (у провайдера может быть другое)."""
+    spec=llm_resolve(model)
+    if spec is None: return model
+    return spec.get('provider_model', model)
+
 # Доступны в чате и в агентах: workflow + idea.
 ALLOWED_CHAT=llm_scope('workflow')|llm_scope('idea')
 IMAGE_TASKS={'seedream-5-pro','seedream-5-lite','gpt-image-2','nano-banana-2','qwen-image-2.1'}

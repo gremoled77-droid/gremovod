@@ -8,12 +8,14 @@ from fastapi import APIRouter, HTTPException
 
 ROOT=Path(__file__).resolve().parent.parent
 PROVIDERS={
-    'piapi':{'name':'PiAPI','env':'PIAPI_API_KEY','file':'PIAPI_API_KEY.txt','url':'https://api.piapi.ai/account/info','header':'X-API-Key','docs':'https://piapi.ai/docs/account-info-api'},
+    'piapi':{'name':'PiAPI','env':'PIAPI_API_KEY','file':'PIAPI_API_KEY.txt','url':'https://api.piapi.ai/account/info','header':'X-API-Key','header_key':True,'docs':'https://piapi.ai/docs/account-info-api'},
     'openai':{'name':'OpenAI','env':'OPENAI_API_KEY','file':'OPENAI_API_KEY.txt','url':'https://api.openai.com/v1/models','header':'Authorization','docs':'https://developers.openai.com/api/reference/resources/models/methods/list'},
     'elevenlabs':{'name':'ElevenLabs','env':'ELEVENLABS_API_KEY','file':'ELEVENLABS_API_KEY.txt','url':'https://api.elevenlabs.io/v1/user/subscription','header':'xi-api-key','docs':'https://elevenlabs.io/docs/api-reference/user/subscription/get'},
     'fish':{'name':'Fish Audio','env':'FISH_AUDIO_API_KEY','file':'FISH_AUDIO_API_KEY.txt','url':'https://api.fish.audio/wallet/self/api-credit','header':'Authorization','docs':'https://docs.fish.audio/api-reference/openapi.json'},
     'kie':{'name':'KIE','env':'KIE_API_KEY','file':'KIE_API_KEY.txt','url':'https://api.kie.ai/api/v1/chat/credit','header':'Authorization','docs':'https://docs.kie.ai/common-api/get-account-credits'},
 }
+# 'header_key': True — провайдер принимает ключ из заголовка запроса (X-PiAPI-Key).
+# Остальные берут ключ с сервера: переменная окружения, файл проекта или DPAPI.
 ELEVENLABS_LEGACY_FILE=Path(os.getenv('ELEVENLABS_KEY_FILE') or str(Path.home()/'Documents'/'!GREM TAXI'/'.secrets'/'elevenlabs-api-key.txt'))
 # Ключ KIE, сохранённый kie-access/connect.ps1: DPAPI текущего пользователя Windows (ConvertFrom-SecureString, hex).
 KIE_DPAPI_FILES=[Path(p) for p in (os.getenv('KIE_DPAPI_FILE'),) if p]+[ROOT/'kie-access'/'api-key.dpapi',

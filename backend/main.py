@@ -9,11 +9,11 @@ from fastapi import FastAPI, HTTPException, Header, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from fastapi.responses import FileResponse
-from backend.connections import router as connections_router, credential, provider_key
+from backend.connections import router as connections_router, credential, provider_key, PROVIDERS
 from backend.image_assets import download_image, inspect_image, output_urls, download_video
 from backend.prompt_rules import RULES_VERSION, system_rules, PROFILES, reference_label, validate_prompt
 from backend.llm_response import chat_text, upstream_error
-from backend.model_catalog import MODEL_SPECS, ALLOWED_CHAT, IMAGE_TASKS, VIDEO_MODELS
+from backend.model_catalog import MODEL_SPECS, ALLOWED_CHAT, IMAGE_TASKS, VIDEO_MODELS, llm_spec, llm_wire_model
 from backend import adapters, kie
 from backend import camera_movements
 from backend import frame_composition
@@ -116,8 +116,28 @@ class TaskRequest(BaseModel):
     kind:str='image'
     payload:dict[str,Any]
 
-def get_key(header:str|None):
-    return credential('piapi',header,PIAPI_KEY_FILE)[0]
+def get_key(header:str|None, provider:str='piapi'):
+    """Ключ провайдера: заголовок запроса, переменная окружения или файл проекта.
+
+    Путь к файлу проекта задан только для провайдера по умолчанию; у остальных
+    путь берётся из connections.PROVIDERS.
+    """
+    override=PIAPI_KEY_FILE if provider=='piapi' else None
+    return credential(provider,header,override)[0]
+
+def provider_credential(provider:str, request_key:str|None=None):
+    """Ключ провайдера для платного вызова.
+
+    Ключ из заголовка запроса принимает только тот провайдер, которому он
+    принадлежит (connections.PROVIDERS[...]['header_key']); остальные берут ключ
+    с сервера. Провайдеры заменяемы, поэтому выбор идёт по реестру, а не по
+    имени вендора в коде.
+    """
+    spec=PROVIDERS.get(provider)
+    if spec is None: raise HTTPException(400,'Неизвестный провайдер: '+str(provider))
+    if spec.get('header_key') and request_key:
+        return get_key(request_key,provider)
+    return provider_key(provider)
 
 def up_error(response:httpx.Response):
     if response.status_code==403 and ('1010' in response.text or 'browser_signature_banned' in response.text):
@@ -129,14 +149,30 @@ def require_spend_reservation(spend,payload=None):
 
     Резерв в журнале расходов — единственное основание платить. Маршрут, который
     его не создал, получает 403 и до провайдера не доходит.
+    spend: (вид, ref) или (вид, ref, модель из реестра) — модель связывает резерв
+    с конкретной моделью, а не с тем именем, которое уходит по проводу.
     """
     if not spend or len(spend)<2:
         raise HTTPException(403,'Платный вызов без резерва в журнале расходов запрещён. Сначала оценка цены и подтверждение.')
-    model=payload.get('model') if isinstance(payload,dict) else None
+    model=spend[2] if len(spend)>2 else (payload.get('model') if isinstance(payload,dict) else None)
     with connect() as db:
         reserved=security.spend_reserved(db,spend[0],spend[1],model)
     if not reserved:
         raise HTTPException(403,'Резерв в журнале расходов не найден или уже использован — платный вызов отклонён.')
+
+# Транспорт чат-платформы: провайдер → отправка запроса. Сегодня это PiAPI —
+# тестовый провайдер. Новый провайдер подключается здесь, не трогая учёт денег.
+LLM_TRANSPORTS={}
+
+async def provider_chat(provider, key, payload, spend=None):
+    """Чат-платформа провайдера: одна точка отправки для всех LLM.
+
+    Провайдер приходит из реестра моделей, транспорт выбирается по нему же.
+    """
+    send=LLM_TRANSPORTS.get(provider)
+    if send is None:
+        raise HTTPException(400,f'У провайдера {provider} нет настроенной чат-платформы в студии.')
+    return await send(key,payload,spend)
 
 async def request_piapi(method:str,path:str,key:str,payload:dict|None=None,spend:tuple|None=None):
     """Единая точка выхода к PiAPI.
@@ -159,6 +195,10 @@ async def request_piapi(method:str,path:str,key:str,payload:dict|None=None,spend
     if not isinstance(value,dict) or ('choices' not in value and value.get('code',200) not in (0,200)): raise HTTPException(502,'PiAPI вернул неожиданный ответ; проверь историю задач перед повторной оплатой')
     return value
 
+# PiAPI — тестовый провайдер чат-платформы. Его OpenAI-совместимый эндпоинт
+# /v1/chat/completions обслуживает и GPT-модели, и MiniMax (с именем из реестра).
+LLM_TRANSPORTS['piapi']=lambda key,payload,spend: request_piapi('POST','/v1/chat/completions',key,payload,spend=spend)
+
 class UnifiedChatRequest(BaseModel):
     provider:str='openai'
     model:str='gpt-4.1-mini'
@@ -172,10 +212,12 @@ class UnifiedChatRequest(BaseModel):
 
 @app.post('/api/llm/chat')
 async def unified_chat(body:UnifiedChatRequest, x_api_key:str|None=Header(default=None)):
-    if body.provider!='piapi': raise HTTPException(400,'Платный LLM доступен только через PiAPI')
-    key=get_key(x_api_key)
+    spec=llm_spec(body.model, body.provider)
+    if spec is None:
+        raise HTTPException(400, f'Модель {body.model} не найдена в реестре или её не обслуживает провайдер {body.provider}.')
+    key=provider_credential(spec['provider'], x_api_key)
     if not key or not key.isascii() or any(c.isspace() for c in key):
-        raise HTTPException(400,'Введи корректный API-ключ PiAPI')
+        raise HTTPException(400,'Введи корректный API-ключ провайдера')
     from backend import llm_guard
     return await llm_guard.guarded_chat(sys.modules[__name__],body,key)
 
@@ -208,8 +250,8 @@ async def job_status(job_id:str,x_api_key:str|None=Header(default=None)):
     with connect() as db: job=db.execute('SELECT * FROM jobs WHERE id=?',(job_id,)).fetchone()
     if not job: raise HTTPException(404,'Задание не найдено')
     if job['status'] in {'completed','failed','submission_unknown'} or not job['task_id']: return {'job_id':job_id,'upstream':json.loads(job['response'])}
-    if job['provider']=='kie': result=await kie.fetch(provider_key('kie'),job['task_id'])
-    else: result=await request_piapi('GET','/api/v1/task/'+job['task_id'],get_key(x_api_key))
+    if job['provider']=='kie': result=await kie.fetch(provider_key(job['provider']),job['task_id'])
+    else: result=await request_piapi('GET','/api/v1/task/'+job['task_id'],provider_credential(job['provider'],x_api_key))
     status=(result.get('data') or {}).get('status','unknown')
     with connect() as db: db.execute('UPDATE jobs SET status=?,response=? WHERE id=?',(status,json.dumps(result,ensure_ascii=False),job_id))
     return {'job_id':job_id,'upstream':result}
@@ -338,9 +380,10 @@ def compose_preview(body:ComposeRequest):
 async def compose(body:ComposeRequest, x_api_key:str|None=Header(default=None)):
     context=compose_context(body)
     if not body.approved: raise HTTPException(400,'Нужно подтверждение платного LLM-запроса')
-    if body.provider=='piapi' and body.model not in ALLOWED_CHAT: raise HTTPException(400,'Недопустимая LLM-модель PiAPI')
-    if body.provider not in {'piapi','openai'}: raise HTTPException(400,'Неизвестный LLM-провайдер')
-    key=get_key(x_api_key) if body.provider=='piapi' else provider_key('openai',x_api_key)
+    if body.model not in ALLOWED_CHAT: raise HTTPException(400,'Недопустимая LLM-модель')
+    if llm_spec(body.model, body.provider) is None:
+        raise HTTPException(400, f'Модель {body.model} не найдена в реестре или её не обслуживает провайдер {body.provider}.')
+    key=provider_credential(body.provider, x_api_key)
     content,usage=await agent_completion(body.provider,body.model,key,system_rules(MODEL_SPECS[body.target]),json.dumps(context,ensure_ascii=False))
     if not content.strip(): raise HTTPException(502,'LLM вернула пустой промпт')
     try: validate_prompt(body.target,content,len(context['references']))
@@ -483,7 +526,7 @@ async def model_job(body:ModelJobRequest,x_api_key:str|None=Header(default=None)
     if not body.approved or body.max_cost_usd<cost: raise HTTPException(400,f'Подтверди платный запуск и лимит не меньше ${cost:.3f}')
     security.verify_quote(body.quote_token,body.project_id,payload,cost)
     spec=MODEL_SPECS[body.model_id]
-    key=provider_key('kie') if spec['provider']=='kie' else get_key(x_api_key)
+    key=provider_credential(spec['provider'], x_api_key)
     jid=body.request_id
     # Reserve before upstream I/O. Never retry a submission with an uncertain result.
     with connect() as db:
@@ -664,15 +707,16 @@ def agent_config():
     return {'roles':list(AGENT_ROLES),'providers':['piapi'],'note':'Only LLM planning is executed. Generation requires separate approval. No API keys are saved.'}
 
 async def agent_completion(provider:str,model:str,key:str,system:str,prompt:str,spend:tuple|None=None):
-    """Платный вызов агента: только PiAPI и только по резерву в журнале расходов.
+    """Платный вызов агента: провайдер из реестра и только по резерву в журнале расходов.
 
-    Второй провайдер (OpenAI) убран: у него не было ни оценки, ни лимита, ни записи
-    в журнале расходов, поэтому цена такого вызова была неучтённой.
+    Прямой вызов OpenAI убран: у него не было ни оценки, ни лимита, ни записи
+    в журнале расходов, поэтому цена такого вызова была неучтённой. Любой новый
+    провайдер подключается через реестр и общий учёт — не отдельным вызовом.
     """
-    if provider!='piapi':
-        raise HTTPException(400,'Платный LLM доступен только через PiAPI')
-    if model not in ALLOWED_CHAT: raise HTTPException(400,'Unknown PiAPI LLM model')
-    value=await request_piapi('POST','/v1/chat/completions',key,{'model':model,'messages':[{'role':'system','content':system},{'role':'user','content':prompt}]},spend=spend)
+    if llm_spec(model, provider) is None:
+        raise HTTPException(400, f'Модель {model} не найдена в реестре или её не обслуживает провайдер {provider}.')
+    if model not in ALLOWED_CHAT: raise HTTPException(400, f'Модель {model} недоступна в этом сценарии')
+    value=await provider_chat(provider,key,{'model':llm_wire_model(model),'messages':[{'role':'system','content':system},{'role':'user','content':prompt}]},spend=spend)
     return chat_text(value),value.get('usage',{})
 
 @app.post('/api/agents/run')

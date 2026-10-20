@@ -12,7 +12,7 @@ from typing import Any, Literal
 from fastapi import Header, HTTPException
 from pydantic import BaseModel, Field
 
-from backend.model_catalog import LLM_MODELS
+from backend.model_catalog import LLM_MODELS, llm_spec, llm_resolve, llm_wire_model
 
 # USD за 1 млн токенов (piapi.ai/docs/llm-api/completions, акционные цены на 2026-10-16).
 # Цены не дублируются: они берутся из единого реестра backend/model_catalog.py::LLM_MODELS.
@@ -326,13 +326,16 @@ async def execute_minimax_task(studio, task_id, body, key):
     task = TextTask.model_validate(json.loads(row['spec']))
     messages = task_messages(task)
     if not key:
-        raise HTTPException(400, 'Передай API-ключ PiAPI в заголовке Authorization или X-PiAPI-Key')
+        raise HTTPException(400, 'Передай API-ключ провайдера в заголовке Authorization или X-PiAPI-Key')
+    spec = llm_resolve(task.model)
+    if spec is None:
+        raise HTTPException(400, f'Модель {task.model} не найдена в реестре LLM.')
     call_id = reserve_minimax_task(studio, row, body.revision)
-    provider_body = {'model': canonical_minimax_model(task.model), 'messages': messages, 'max_tokens': task.max_tokens}
+    provider_body = {'model': llm_wire_model(task.model), 'messages': messages, 'max_tokens': task.max_tokens}
     if task.response_format == 'json':
         provider_body['response_format'] = {'type': 'json_object'}
     try:
-        value = await studio.request_piapi('POST', '/v1/chat/completions', key, provider_body, spend=('llm_call', call_id))
+        value = await studio.provider_chat(spec['provider'], key, provider_body, spend=('llm_call', call_id, row['model']))
         content = studio.chat_text(value)
         if not isinstance(content, str):
             raise ValueError('Провайдер вернул результат не строкой')
@@ -491,8 +494,8 @@ def register(app, studio):
 async def guarded_chat(studio, body, key):
     """Единственный путь платного LLM-вызова. Резерв в бюджете создаётся до обращения к провайдеру."""
     from backend import security
-    if body.provider != 'piapi':
-        raise HTTPException(400, 'Платный LLM доступен только через PiAPI')
+    if llm_spec(body.model, body.provider) is None:
+        raise HTTPException(400, f'Модель {body.model} не найдена в реестре или её не обслуживает провайдер {body.provider}.')
     if not body.project_id:
         raise HTTPException(400, 'Укажи проект для учёта расхода')
     studio.project(body.project_id)
@@ -515,7 +518,7 @@ async def guarded_chat(studio, body, key):
         db.execute('INSERT INTO llm_calls VALUES(?,?,?,?,?,?,?,?,?,?)',
                    (call_id, request_id, body.project_id, body.model, 'reserved', cost, cost, None, None, studio.now()))
     try:
-        value = await studio.request_piapi('POST', '/v1/chat/completions', key, {'model': body.model, 'messages': messages, 'max_tokens': body.max_tokens}, spend=('llm', request_id))
+        value = await studio.provider_chat(body.provider, key, {'model': llm_wire_model(body.model), 'messages': messages, 'max_tokens': body.max_tokens}, spend=('llm', request_id, body.model))
         text = studio.chat_text(value)
     except Exception:
         with studio.connect() as db:
