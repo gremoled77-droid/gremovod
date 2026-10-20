@@ -1,0 +1,35 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "GremoVOD: Codex feedback → MiniMax (GitHub PR)",
+      "type": "shell",
+      "command": "powershell.exe",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "${workspaceFolder}/scripts/agent-handoff/Get-CodexReview.ps1",
+        "-PrNumber",
+        "${input:gremovodGaPr}"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      },
+      "problemMatcher": []
+    }
+  ],
+  "inputs": [
+    {
+      "id": "gremovodGaPr",
+      "type": "promptString",
+      "description": "Номер PR MiniMax (GA-01, GA-02 и т.д.)",
+      "default": ""
+    }
+  ]
+}
