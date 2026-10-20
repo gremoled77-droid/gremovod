@@ -37,10 +37,10 @@
 ## Однократная локальная команда (вместо VS Code Task)
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\agent-handoff\Get-CodexReview.ps1 -PrNumber 56
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\agent-handoff\Get-CodexReview.ps1 -PrNumber 1234
 ```
 
-Число 56 — **пример**, не номер гарантированного PR. Используй реальный номер GA-01.
+Число 1234 — **условный пример**, не номер гарантированного PR. Используй реальный номер GA-01.
 
 ## Проверки готовности
 
