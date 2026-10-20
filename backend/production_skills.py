@@ -57,16 +57,36 @@ def registry():
     return _cache['registry']
 
 
-def _item(name):
-    for item in registry()['skills']:
-        if item['id'] == name:
-            return item
+def available():
+    """Идентификаторы скиллов в порядке реестра (канонические имена)."""
+    return [item['id'] for item in registry()['skills']]
+
+
+def aliases():
+    """Совместимые идентификаторы: алиас → канонический скилл.
+
+    Алиас не создаёт второго текста: он указывает на тот же файл, поэтому в n8n
+    и в бэкенде не может оказаться двух расходящихся версий одного скилла.
+    """
+    return {alias: item['id'] for item in registry()['skills'] for alias in item.get('aliases', [])}
+
+
+def canonical(name):
+    """Приводит идентификатор (в том числе алиас) к каноническому имени."""
+    if name in available():
+        return name
+    alias = aliases().get(name)
+    if alias:
+        return alias
     raise SkillError(f'Неизвестный производственный скилл: {name}')
 
 
-def available():
-    """Идентификаторы скиллов в порядке реестра."""
-    return [item['id'] for item in registry()['skills']]
+def _item(name):
+    wanted = canonical(name)
+    for item in registry()['skills']:
+        if item['id'] == wanted:
+            return item
+    raise SkillError(f'Неизвестный производственный скилл: {name}')
 
 
 def text(name):
@@ -83,11 +103,8 @@ def text(name):
 
 
 def bundle(names):
-    """Скиллы в порядке реестра, без повторов."""
-    wanted = set(names or ())
-    unknown = wanted - set(available())
-    if unknown:
-        raise SkillError('Неизвестные производственные скиллы: ' + ', '.join(sorted(unknown)))
+    """Скиллы в порядке реестра, без повторов; алиасы сворачиваются в канонические имена."""
+    wanted = {canonical(name) for name in (names or ())}
     return [item['id'] for item in registry()['skills'] if item['id'] in wanted]
 
 
@@ -107,8 +124,32 @@ def bundle_hash(names):
 
 
 def for_stage(stage_id):
-    """Скиллы, объявленные для стадии сценария."""
+    """Скиллы, объявленные для стадии сценария (N01–N11, N42)."""
     return [item['id'] for item in registry()['skills'] if stage_id in item.get('stages', [])]
+
+
+def base_skill():
+    """Скилл, подключаемый ко всем вызовам без исключения."""
+    name = registry().get('base_skill')
+    if not name:
+        raise SkillError('В реестре не задан базовый скилл')
+    return canonical(name)
+
+
+def for_screen(screen_id):
+    """Набор скиллов экрана студии: базовый плюс экранные."""
+    screens = registry().get('screens', {})
+    if screen_id not in screens:
+        raise SkillError(f'Неизвестный экран студии: {screen_id}. Доступны: ' + ', '.join(sorted(screens)))
+    return bundle([base_skill()] + list(screens[screen_id].get('skills', [])))
+
+
+def for_gate(gate_id):
+    """Набор скиллов ворот: базовый плюс скиллы ворот."""
+    gates = registry().get('gates', {})
+    if gate_id not in gates:
+        raise SkillError(f'Неизвестные ворота: {gate_id}. Доступны: ' + ', '.join(sorted(gates)))
+    return bundle([base_skill()] + list(gates[gate_id].get('skills', [])))
 
 
 def for_native_chat(operation, target_kind, has_canon=False):

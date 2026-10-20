@@ -15,7 +15,10 @@ from backend import production_skills
 
 ROOT = Path(__file__).resolve().parents[1]
 CONTRACT = ROOT / 'docs/specs/n8n-production-2026-10-19/contracts/scenario-skills-routing-v1.json'
-IDS = ['skill-strict-json-output', 'skill-canon-lock', 'skill-video-prompt-crafter', 'skill-cheap-gatekeeper']
+IDS = ['skill-strict-json-output', 'skill-canon-lock', 'skill-video-prompt-crafter', 'skill-cheap-gatekeeper',
+       'skill-evidence-packager']
+SCENARIO_IDS = ['skill-strict-json-output', 'skill-canon-lock', 'skill-video-prompt-crafter', 'skill-cheap-gatekeeper']
+SCREENS = ['studio', 'styles', 'characters', 'storyboard', 'create', 'video', 'audio', 'files', 'economics']
 LLM_ENGINES = {'BOUNDED_LLM', 'CREATIVE_LLM', 'DIRECTOR_LLM', 'BOUNDED_LLM_AND_CODE', 'RESEARCH_ON_DEMAND'}
 
 
@@ -24,7 +27,7 @@ def routing():
 
 
 class ProductionSkillsRegistry(unittest.TestCase):
-    def test_registry_lists_four_skills(self):
+    def test_registry_lists_five_skills(self):
         self.assertEqual(production_skills.available(), IDS)
 
     def test_skill_files_exist(self):
@@ -111,23 +114,34 @@ class ProductionSkillsContracts(unittest.TestCase):
         canon = production_skills.text('skill-canon-lock')
         self.assertIn('canon_revision_id', canon)
         self.assertIn('[CANON]', canon)
+        self.assertIn('детализировать действие', canon)
         crafter = production_skills.text('skill-video-prompt-crafter')
         self.assertIn('found_footage', crafter)
         self.assertIn('handheld camera shake', crafter)
         gatekeeper = production_skills.text('skill-cheap-gatekeeper')
         self.assertIn('REJECTED_PRECHECK', gatekeeper)
         self.assertIn('2.5 слов в секунду', gatekeeper)
+        packager = production_skills.text('skill-evidence-packager')
+        self.assertIn('PASS_TECHNICAL', packager)
+        self.assertIn('unmeasured', packager)
+        self.assertIn('coverage', packager)
 
     def test_routing_contract_registers_production_skills(self):
         entries = {item['id']: item for item in routing()['skills']}
         allowed = {f'N{i:02d}' for i in range(1, 12)} | {'N42'}
-        for name in IDS:
+        for name in SCENARIO_IDS:
             self.assertIn(name, entries)
             entry = entries[name]
             self.assertEqual(entry['kind'], 'repo_existing')
             self.assertTrue((ROOT / entry['repository_path']).is_file(), entry['repository_path'])
             self.assertTrue(entry['used_by'])
             self.assertTrue(set(entry['used_by']).issubset(allowed), entry['used_by'])
+
+    def test_registry_stages_match_contract_used_by(self):
+        entries = {item['id']: item for item in routing()['skills']}
+        for name in SCENARIO_IDS:
+            stages = [item['stages'] for item in production_skills.registry()['skills'] if item['id'] == name][0]
+            self.assertEqual(sorted(stages), sorted(entries[name]['used_by']), name)
 
     def test_story_plan_system_prompt_includes_strict_json(self):
         from backend import story_plan
@@ -266,6 +280,56 @@ class SkillSyncCompatibility(unittest.TestCase):
                     continue
                 target = posixpath.normpath(posixpath.join(name, link.split('#')[0]))
                 self.assertTrue((ROOT / 'skills' / target).is_file(), target)
+
+
+class SkillRegistryRouting(unittest.TestCase):
+    """Алиасы, экраны студии и ворота — всё в одном реестре."""
+
+    def test_alias_resolves_to_canonical_skill(self):
+        self.assertEqual(production_skills.canonical('skill-precheck-filter'), 'skill-cheap-gatekeeper')
+        self.assertEqual(production_skills.aliases(), {'skill-precheck-filter': 'skill-cheap-gatekeeper'})
+
+    def test_alias_and_canonical_give_the_same_text(self):
+        self.assertEqual(production_skills.text('skill-precheck-filter'),
+                         production_skills.text('skill-cheap-gatekeeper'))
+
+    def test_bundle_folds_alias_into_canonical(self):
+        self.assertEqual(production_skills.bundle(['skill-precheck-filter', 'skill-cheap-gatekeeper']),
+                         ['skill-cheap-gatekeeper'])
+
+    def test_base_skill_is_strict_json(self):
+        self.assertEqual(production_skills.base_skill(), 'skill-strict-json-output')
+
+    def test_every_screen_gets_the_base_skill(self):
+        for screen in SCREENS:
+            self.assertEqual(production_skills.for_screen(screen)[0], 'skill-strict-json-output', screen)
+
+    def test_screen_routing(self):
+        screens = production_skills.registry()['screens']
+        self.assertEqual(sorted(screens), sorted(SCREENS))
+        self.assertIn('skill-canon-lock', production_skills.for_screen('characters'))
+        self.assertIn('skill-video-prompt-crafter', production_skills.for_screen('create'))
+        self.assertIn('skill-evidence-packager', production_skills.for_screen('economics'))
+
+    def test_gates(self):
+        self.assertIn('skill-cheap-gatekeeper', production_skills.for_gate('pre_critics'))
+        self.assertIn('skill-evidence-packager', production_skills.for_gate('evidence'))
+
+    def test_unknown_screen_and_gate_are_rejected(self):
+        with self.assertRaises(production_skills.SkillError):
+            production_skills.for_screen('nope')
+        with self.assertRaises(production_skills.SkillError):
+            production_skills.for_gate('nope')
+
+    def test_registry_references_only_known_skills(self):
+        registry = production_skills.registry()
+        known = set(production_skills.available()) | set(production_skills.aliases())
+        for screen, item in registry['screens'].items():
+            for name in item['skills']:
+                self.assertIn(name, known, screen)
+        for gate, item in registry['gates'].items():
+            for name in item['skills']:
+                self.assertIn(name, known, gate)
 
 
 if __name__ == '__main__':

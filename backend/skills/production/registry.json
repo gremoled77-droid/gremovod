@@ -1,6 +1,7 @@
 {
-  "registry_version": "1.0",
-  "description": "Производственные скиллы бэкенда GremoVOD: тексты, которые backend подтягивает в системный промпт. Хэш считается по тексту с нормализованными переводами строк (CRLF/LF дают одно значение).",
+  "registry_version": "2.0",
+  "description": "Производственные скиллы бэкенда GremoVOD: тексты лежат в skills/<имя>/SKILL.md, реестр перечисляет версии, хэши, стадии сценария, роли и маршрутизацию по экранам студии. Хэш считается по тексту с нормализованными переводами строк (CRLF/LF дают одно значение).",
+  "base_skill": "skill-strict-json-output",
   "skills": [
     {
       "id": "skill-strict-json-output",
@@ -8,6 +9,7 @@
       "sha256": "679d353ad85fd9015cc78859a20850147009300d298c607688d94156205c8d9e",
       "version": "1.0",
       "scope": "every_llm_system_prompt",
+      "aliases": [],
       "stages": ["N03", "N04", "N06", "N07", "N09", "N10", "N11"],
       "roles": ["A0", "A4", "A1", "A6", "A7", "A8", "A2"],
       "output_contract": "json_only",
@@ -19,15 +21,16 @@
     {
       "id": "skill-canon-lock",
       "file": "skill-canon-lock/SKILL.md",
-      "sha256": "6cfe7b8b07700f9bf5bad7550fffe57f97098fb5769f23068ec1bb7c251ac31f",
-      "version": "1.0",
+      "sha256": "2993a79f3f90d199bde1a5817880f36dfe5c23567de8b70451f868e0c5e6616f",
+      "version": "1.1",
       "scope": "canon_bearing_calls",
+      "aliases": [],
       "stages": ["N03", "N06", "N07", "N09", "N10"],
       "roles": ["A0", "A1", "A6", "A7"],
       "output_contract": "json_only",
       "requires_canon": true,
       "budget_role": "worker",
-      "instruction": "Замок канона и непрерывности персонажей: правка утверждённого не допускается, визуальные якоря дублируются в каждом шоте",
+      "instruction": "Замок канона и непрерывности персонажей: правка утверждённого не допускается, в кадре разрешено только детализировать действие, визуальные якоря дублируются в каждом шоте",
       "wired_in": ["backend/native_chat.py"]
     },
     {
@@ -36,6 +39,7 @@
       "sha256": "3705bf904ef518e8154f734551afafa19db71938070f3d0ebebf84c03b158562",
       "version": "1.0",
       "scope": "visual_prompt_preparation",
+      "aliases": [],
       "stages": ["N11", "N42"],
       "roles": ["A2"],
       "output_contract": "free_prompt_text",
@@ -50,6 +54,7 @@
       "sha256": "63f917c9672d152351f30e196b978bc26f6ddc208ed06aa64bf1190ff702b3ad",
       "version": "1.0",
       "scope": "pre_critic_gate",
+      "aliases": ["skill-precheck-filter"],
       "stages": ["N07", "N10"],
       "roles": ["A6", "A7", "A8"],
       "output_contract": "status_plus_defect_address",
@@ -57,6 +62,36 @@
       "budget_role": "worker",
       "instruction": "Дешёвая проверка артефакта до вызова A6/A7/A8; при нарушении — REJECTED_PRECHECK без платного вызова",
       "wired_in": []
+    },
+    {
+      "id": "skill-evidence-packager",
+      "file": "skill-evidence-packager/SKILL.md",
+      "sha256": "f436e19b1ef8bb00051e1365eae3b2d0725ae0c071861879b329c235b55268db",
+      "version": "1.0",
+      "scope": "evidence_packaging",
+      "aliases": [],
+      "stages": [],
+      "roles": ["A8"],
+      "output_contract": "structured_evidence_report",
+      "requires_canon": false,
+      "budget_role": "worker",
+      "instruction": "Сухой технический отчёт по артефакту: измерения, источники, покрытие; вердикт ставит серверный QC, а не модель",
+      "wired_in": []
     }
-  ]
+  ],
+  "screens": {
+    "studio": {"title": "Идея", "skills": []},
+    "styles": {"title": "Мир", "skills": ["skill-canon-lock"]},
+    "characters": {"title": "Персонажи", "skills": ["skill-canon-lock"]},
+    "storyboard": {"title": "Раскадровка", "skills": ["skill-canon-lock"]},
+    "create": {"title": "Кадры", "skills": ["skill-video-prompt-crafter"]},
+    "video": {"title": "Видео", "skills": ["skill-canon-lock", "skill-video-prompt-crafter"]},
+    "audio": {"title": "Звук", "skills": ["skill-canon-lock"]},
+    "files": {"title": "Монтаж", "skills": []},
+    "economics": {"title": "Выпуск", "skills": ["skill-evidence-packager"]}
+  },
+  "gates": {
+    "pre_critics": {"title": "Ворота перед дорогими критиками A6–A8", "skills": ["skill-cheap-gatekeeper"]},
+    "evidence": {"title": "Пакет доказательств для Media Inspector и QA", "skills": ["skill-evidence-packager"]}
+  }
 }
