@@ -19,9 +19,9 @@
   - `.aider.tags.cache.v4/` — Aider's tag cache directory created in the worktree root (untracked, not committed). `HEAD` of this branch does not contain the `.aider*` ignore rule.
   - Aider chat history and input history were redirected outside the repository to `%TEMP%\gremovod-aider-20261020-030447-*` and are not part of Git.
   - `tools/` is matched by `.gitignore` in this repo, so the three test files are invisible to plain `git status`; they were added with `git add -f`.
-- **Git commit SHA:** recorded in the handoff message and in the follow-up metadata commit of this branch
-- **GitHub push:** see the follow-up metadata commit of this branch (result reported in the handoff message)
-- **PR URL:** see the follow-up metadata commit of this branch (draft PR, reported in the handoff message)
+- **Git commit SHA:** `2f2bdcf0e907c364747058c0be850ad1cf41e85d` (`test(agent): verify minimax-to-aider handoff` — the single commit carrying the three test files and this report). A second, metadata-only commit on the same branch records the publish results below.
+- **GitHub push:** **success** — `git push -u origin test/minimax-aider-smoke-20261020-030447` (new branch, no force push). Remote now contains exactly the 4 files of this test (`4 files changed, 137 insertions(+)` relative to `origin/main`).
+- **PR URL:** **draft PR #38** — https://github.com/gremoled77-droid/gremovod/pull/38 (base `main`, head `test/minimax-aider-smoke-20261020-030447`, marked as draft and explicitly *do not merge*).
 - **Token usage / money:** Aider measured **4.7k tokens sent / 586 received** and reported **$0.0011** for the message, computed from the official MiniMax pay-as-you-go rate for `MiniMax-M3.1-Flash` ($0.15/M input, $0.60/M output). The MiniMax Code side of this test was not measured. Whether the M Plan subscription quota or a pay-as-you-go balance absorbs this amount was **not** independently verified.
 - **Problems and remediation:**
   1. `--no-gitignore` in Aider 0.86.2 means *"do not add `.aider*` to `.gitignore`"*, **not** *"ignore `.gitignore` when selecting files"*. Because `tools/` is listed in `.gitignore` (line 30), Aider skipped the target file with `Skipping ... that matches gitignore spec`. **Remediation:** the run used `--add-gitignore-files` in addition to the prescribed `--no-gitignore`. This is the only deviation from the prescribed command line, and it is required for the target file to be editable at all.
