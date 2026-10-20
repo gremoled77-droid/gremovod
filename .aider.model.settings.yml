@@ -1,10 +1,22 @@
-- name: openai/MiniMax-M3.1-Flash  # Замени на актуальный идентификатор модели в текущей среде, если он отличается
-  edit_format: diff
-  use_repo_map: true
-  send_undo_reply: true
-  lazy: true
-  examples_as_sys_msg: true     # Фиксирует примеры в системном промпте для удержания кэша
-  reminder: none                # Отключает дублирующие напоминания в конце чата для экономии токенов
-  extra_params:
-    temperature: 0.05
-    top_p: 0.95
+# --- МГНОВЕННЫЙ ОТКЛИК И СТРИМИНГ ---
+stream: true                  # Выводить текст сразу по мере генерации, не ждать конца ответа
+cache-prompts: false          # Отключаем эмуляцию кэша Aider (MiniMax кэширует префикс сам на бэкенде!)
+cache-keepalive-pings: 0      # Убираем фоновые пинги, подвешивающие терминал
+
+# --- ОБЛЕГЧЕННАЯ КАРТА ПРОЕКТА ---
+map-tokens: 1024              # Снижаем с 2048 до 1024 — парсится и обрабатывается моделью в 2 раза быстрее
+map-refresh: manual
+subtree-only: true
+
+# --- ОТКЛЮЧЕНИЕ ТОРМОЗЯЩИХ ХУКОВ ---
+edit-format: diff
+auto-lint: false              # КРИТИЧНО ДЛЯ СКОРОСТИ: запускайте линтер только перед пушем, а не после каждой правки!
+auto-commits: false           # Убирает ВТОРОЙ запрос к нейросети для генерации commit message (экономит 5-10 сек на каждом шаге)
+dirty-commits: false
+
+# --- ПРОПУСК ПРОВЕРКИ МЕТАДАННЫХ МОДЕЛИ ПРИ СТАРТЕ ---
+show-model-warnings: false
+check-update: false
+
+read:
+  - MINIMAX_SKILLS.md
