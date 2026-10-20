@@ -262,21 +262,23 @@ class ErrorTests(AdapterCase):
     async def test_error_kinds_are_distinguished(self):
         """Каждый вид отказа провайдера опознаётся отдельно; списание не обнуляется молча."""
         cases = [
+            # (вид отказа, ответ провайдера, списание возможно, usage, который должен уцелеть)
             # 401: ключ отклонён — запрос не обработан, списания не было
-            ('http_401', httpx.Response(401, json={'error': {'message': 'invalid api key'}}), False),
+            ('http_401', httpx.Response(401, json={'error': {'message': 'invalid api key'}}), False, (None, None)),
             # 403: доступ закрыт после отправки — списание неизвестно
-            ('http_403', httpx.Response(403, json={'error': {'message': 'forbidden'}}), True),
+            ('http_403', httpx.Response(403, json={'error': {'message': 'forbidden'}}), True, (None, None)),
             # блокировка Cloudflare
-            ('cloudflare_1010', httpx.Response(403, text='browser_signature_banned Error 1010'), True),
-            ('http_429', httpx.Response(429, json={'error': {'message': 'rate limit reached'}}), True),
-            ('http_5xx', httpx.Response(503, text='upstream unavailable'), True),
+            ('cloudflare_1010', httpx.Response(403, text='browser_signature_banned Error 1010'), True, (None, None)),
+            ('http_429', httpx.Response(429, json={'error': {'message': 'rate limit reached'}}), True, (None, None)),
+            ('http_5xx', httpx.Response(503, text='upstream unavailable'), True, (None, None)),
             # HTTP 200 с телом-ошибкой: провайдер отказал, обработки не было
-            ('bad_body', httpx.Response(200, json={'code': 500, 'msg': 'internal error'}), False),
-            # HTTP 200 без распознаваемого ответа: неизвестно, обработал ли провайдер запрос
+            ('bad_body', httpx.Response(200, json={'code': 500, 'msg': 'internal error'}), False, (None, None)),
+            # HTTP 200 без пригодного текста: неизвестно, обработал ли провайдер запрос,
+            # но разобранный usage не теряется — по нему факт списания известен
             ('bad_body', httpx.Response(200, json={'id': 'chatcmpl-1',
-                                                  'usage': {'prompt_tokens': 10, 'completion_tokens': 2}}), True),
+                                                  'usage': {'prompt_tokens': 10, 'completion_tokens': 2}}), True, (10, 2)),
         ]
-        for kind, response, charged in cases:
+        for kind, response, charged, expected_usage in cases:
             with self.subTest(kind=kind, status=response.status_code):
                 def handler(request, response=response):
                     return response
@@ -288,8 +290,7 @@ class ErrorTests(AdapterCase):
                 self.assertEqual(result.error_kind, kind)
                 self.assertEqual(result.charged_possible, charged)
                 self.assertEqual(result.text, '')
-                self.assertIsNone(result.usage.input_tokens)
-                self.assertIsNone(result.usage.output_tokens)
+                self.assertEqual((result.usage.input_tokens, result.usage.output_tokens), expected_usage)
 
     async def test_timeout_is_unknown_charge_not_free(self):
         """Таймаут: ответа нет, но списание могло произойти."""

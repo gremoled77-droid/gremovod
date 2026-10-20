@@ -2,11 +2,14 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   actualLine,
+  approvalMoney,
   budgetLines,
   cardFrom,
   cardLines,
   executionLine,
   expectedPaymentLine,
+  exposureLine,
+  limitsFootnote,
   maxApprovedLine,
   modelLabel,
   providerTitle,
@@ -91,6 +94,32 @@ test('до согласия видны ожидаемый реальный пл�
   assert.equal(expectedPaymentLine(card()), 'Ожидаемый реальный платёж: $0.000300');
   assert.equal(maxApprovedLine(0.5), 'Максимальный одобренный расход: $0.5000');
   assert.equal(maxApprovedLine(null), 'Максимальный одобренный расход: не задан');
+});
+
+test('деньги окна подтверждения: ориентир первым, обе суммы — до согласия', () => {
+  const money = approvalMoney(card(), 0.5);
+  assert.equal(money.lines.length, 3);
+  assert.equal(money.reference, referenceLine(card()));
+  assert.equal(money.expectedPayment, 'Ожидаемый реальный платёж: $0.000300');
+  assert.equal(money.maxApproved, 'Максимальный одобренный расход: $0.5000');
+  assert.deepEqual(money.lines, [money.reference, money.expectedPayment, money.maxApproved]);
+  assert.ok(money.lines[0].startsWith('По тарифу Kie.ai'));
+});
+
+test('экспозиция LLM подписана и не путается с фактически потраченным', () => {
+  const line = exposureLine('LLM-запросов кадров серии', 0.0003, 3);
+  assert.ok(line.startsWith('Экспозиция LLM-запросов кадров серии'));
+  assert.ok(line.includes('факт + резервы + неизвестные списания'));
+  assert.ok(line.includes('$0.000300'));
+  assert.ok(line.includes('3 вызовов'));
+  assert.ok(!line.includes('Фактически потрачено'));
+});
+
+test('сноска лимитов: работа агента в чате Codex занимает те же лимиты', () => {
+  const note = limitsFootnote();
+  assert.ok(note.includes('Работа агента в чате Codex'));
+  assert.ok(note.includes('занимает те же лимиты'));
+  assert.ok(!note.includes('не расходует'));
 });
 
 test('сводка бюджета: четыре итога раздельными строками, ориентир — не деньги', () => {

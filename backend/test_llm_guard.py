@@ -510,6 +510,64 @@ class LlmJournalTests(unittest.TestCase):
         self.assertEqual(paid_row['actual_cost_usd'], 0.00027)
         self.assertEqual(self.spent(), (0.00027, 0.00027))
 
+    def test_paid_opt_in_route_takes_the_only_paid_slot(self):
+        registry = self.registry(rate(**KIE),
+                                 rate('kie', 'gpt-6-luna-optin', role='coding', input=0.03, output=0.15, opt_in=True),
+                                 rate(**MINIMAX), rate(**DEEPSEEK))
+        # платный маршрут по оптину — платный: он занимает единственное платное место цепочки,
+        # а не встаёт перед ним вторым платным маршрутом (две платные попытки на один запрос)
+        chain = llm_guard.plan_chain(registry, 'coding', allow_free=True)
+        self.assertEqual([(r.provider, r.model) for r in chain], [('kie', 'gpt-6-luna-optin')])
+        self.assertLessEqual(len([r for r in chain if not r.free]), 1)
+        # без разрешения владельца маршрут по оптину в цепочку не попадает
+        chain_without = llm_guard.plan_chain(registry, 'coding', allow_free=False)
+        self.assertEqual([(r.provider, r.model) for r in chain_without], [('minimax', 'MiniMax-M3.1-Flash')])
+
+    def test_zero_tariff_route_without_free_flag_is_free_not_confirmed_zero(self):
+        self.prepare()
+        # тариф 0/0 без флага free: маршрут бесплатный, поэтому подтверждённого нуля у него быть не может
+        registry = self.registry(rate(**KIE), rate(**MINIMAX),
+                                 rate('openrouter', 'minimax/minimax-m3.1-flash:free', role='coding',
+                                      input=0, output=0, free=False, opt_in=False))
+        result = ProviderResult(ok=True, text='Бесплатный ответ', usage=Usage(1000, 200), error_kind=None,
+                                charged_possible=False, provider_request_id='req-zero')
+        with patch.object(llm_guard, 'current_registry', return_value=registry), \
+                patch.object(llm_adapters, 'complete', AsyncMock(return_value=result)):
+            body, quote = self.estimate('minimax/minimax-m3.1-flash:free')
+            r = self.client.post('/api/llm/chat', json=self.chat_body(body, quote, 'journal-zero'))
+            self.assertEqual(r.status_code, 200, r.text)
+            self.assertEqual(r.json()['execution']['status'], 'free')
+        row = self.rows()[0]
+        self.assertEqual(row['actual_status'], 'free')
+        self.assertEqual(row['actual_cost_usd'], 0.0)
+        self.assertEqual(self.spent(), (0.0, 0.0))
+
+    def test_adapter_path_keeps_usage_when_the_answer_is_unusable(self):
+        self.prepare()
+        registry = self.registry(rate(**KIE), rate(**MINIMAX))
+        answered = {'choices': [{'message': {'role': 'assistant', 'content': ''}}],
+                    'usage': {'prompt_tokens': 1000, 'completion_tokens': 200}}
+        real_complete = llm_adapters.complete
+
+        async def fake_complete(route, messages, max_tokens, **kwargs):
+            transport = httpx.MockTransport(lambda request: httpx.Response(200, json=answered))
+            async with httpx.AsyncClient(transport=transport) as client:
+                return await real_complete(route, messages, max_tokens, client=client, **kwargs)
+
+        with patch.object(llm_guard, 'current_registry', return_value=registry), \
+                patch.object(llm_adapters.connections, 'provider_key', return_value='test-key'), \
+                patch.object(llm_adapters, 'complete', fake_complete):
+            body, quote = self.estimate('MiniMax-M3.1-Flash')
+            r = self.client.post('/api/llm/chat', json=self.chat_body(body, quote, 'journal-adapter'))
+            self.assertEqual(r.status_code, 502, r.text)
+        row = self.rows()[0]
+        # провайдер ответил и тарифицировал: факт известен по usage, а не «списание неизвестно»
+        self.assertEqual(row['actual_status'], 'confirmed')
+        self.assertEqual(row['actual_cost_usd'], 0.00027)
+        self.assertEqual(row['input_tokens'], 1000)
+        self.assertEqual(row['output_tokens'], 200)
+        self.assertEqual(self.spent(), (0.00027, 0.00027))
+
     def test_chain_stops_when_limit_does_not_cover_paid_route(self):
         self.prepare()
         self.client.put('/api/budgets/limits', json={'project_usd': 0.00001, 'daily_usd': 0.00001})

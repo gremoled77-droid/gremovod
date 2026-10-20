@@ -403,6 +403,16 @@ def reference_quote(registry: Registry, route: Route, usage: Usage | None = None
                           rate_verified=verified, label=_reference_label(entry, kind, cost, status, verified))
 
 
+def is_free_entry(entry: ModelEntry | None) -> bool:
+    """Маршрут подтверждённо бесплатный: флаг free или тариф 0/0.
+
+    Нулевой тариф — это тариф, а не его отсутствие: запись есть и цены известны,
+    просто платить не нужно. Отсутствие записи или null-цены — это уже отсутствие тарифа.
+    """
+    return bool(entry is not None
+                and (entry.free or (entry.input_per_mtok == 0 and entry.output_per_mtok == 0)))
+
+
 def actual_quote(registry: Registry, route: Route, usage: Usage | None = None, *,
                  charge_possible: bool = True) -> ActualQuote:
     """Фактическое списание: строго по тарифу провайдера-исполнителя.
@@ -416,7 +426,7 @@ def actual_quote(registry: Registry, route: Route, usage: Usage | None = None, *
     нужна сверка».
     """
     entry = registry.entry(route.provider, route.model)
-    if route.free or (entry is not None and entry.free):
+    if route.free or is_free_entry(entry):
         return ActualQuote(cost_usd=0.0, status='free', provider=route.provider, model=route.model,
                            billing_source='free_quota')
     if entry is None or entry.input_per_mtok is None or entry.output_per_mtok is None:
@@ -437,18 +447,45 @@ def _has_tariff(entry: ModelEntry | None) -> bool:
     return entry is not None and entry.input_per_mtok is not None and entry.output_per_mtok is not None
 
 
-def agent_has_tariff(registry: Registry, provider: str | None, model: str | None) -> bool:
-    """Есть ли в реестре тариф, по которому считается цена работы агента.
+def _has_paid_tariff(entry: ModelEntry | None) -> bool:
+    """Тариф платный: цены заполнены и не нулевые.
 
-    Нулевой тариф (0/0, подтверждённо бесплатный) — тоже тариф: работа не отклоняется,
-    строка получает actual_status='free'. Отказ возможен только когда тарифа нет вовсе:
-    записи нет либо её цены null.
+    Нулевой тариф (0/0) — тоже тариф, но резерв он не держит: подтверждённо бесплатный маршрут
+    не может прикрыть неподтверждённое списание.
+    """
+    return bool(entry is not None and entry.input_per_mtok is not None and entry.output_per_mtok is not None
+                and (entry.input_per_mtok > 0 or entry.output_per_mtok > 0))
+
+
+def _agent_reserve_entry(registry: Registry, provider: str | None, model: str | None) -> ModelEntry | None:
+    """Запись реестра, по тарифу которой держится резерв работы агента.
+
+    Порядок: названная модель → базовая линия владельца → любой платный маршрут с тарифом.
+    Названная модель прикрывает сама себя: её тариф — это и есть её списание, а у маршрута 0/0
+    списание подтверждённо нулевое. Для остальных случаев источник резерва — только платный
+    маршрут: резерв прикрывает неподтверждённое списание, а нулевой тариф денег под это не даёт.
+    Платного тарифа нет — работа агента не ставится, иначе списание ушло бы мимо лимитов.
     """
     entry = registry.entry(provider, model)
     if _has_tariff(entry):
-        return True
+        return entry
     baseline = registry.baseline('default_baseline')
-    return _has_tariff(baseline)
+    if _has_paid_tariff(baseline):
+        return baseline
+    for item in registry.entries:
+        if _has_paid_tariff(item):
+            return item
+    return None
+
+
+def agent_has_tariff(registry: Registry, provider: str | None, model: str | None) -> bool:
+    """Есть ли в реестре тариф, по которому работа агента посчитана и придержана.
+
+    Резерв работы агента прикрывает неподтверждённое списание, поэтому источник резерва —
+    платный маршрут с тарифом: нулевой тариф (0/0) денег под это не даёт. Такого маршрута нет —
+    работа агента не ставится (400), иначе неизвестное списание ушло бы мимо лимитов.
+    """
+    return _agent_reserve_entry(registry, provider, model) is not None
 
 
 def agent_quote(registry: Registry, provider: str | None, model: str | None,
@@ -484,15 +521,13 @@ def agent_reserve(registry: Registry, provider: str | None, model: str | None, u
     """Сумма под риском вызова агента: оценка по тарифу маршрута.
 
     Модели агента в реестре нет — за оценку берётся базовая линия владельца: иначе неизвестное
-    списание не попало бы ни в один итог и прошло бы мимо лимитов. Подтверждённо бесплатный
-    маршрут (тариф 0/0) даёт нулевой резерв — это тариф, а не его отсутствие.
+    списание не попало бы ни в один итог и прошло бы мимо лимитов. Источник резерва — платный
+    маршрут с тарифом: нулевой тариф (0/0) не прикрывает неподтверждённое списание.
     """
-    entry = registry.entry(provider, model)
-    quote = actual_quote(registry, entry.route(), usage) if entry is not None else None
-    if quote is None or quote.cost_usd is None:
-        baseline = registry.baseline('default_baseline')
-        if baseline is not None:
-            quote = actual_quote(registry, baseline.route(), usage)
+    entry = _agent_reserve_entry(registry, provider, model)
+    if entry is None:
+        return 0.0
+    quote = actual_quote(registry, entry.route(), usage)
     return float(quote.cost_usd or 0.0) if quote is not None else 0.0
 
 

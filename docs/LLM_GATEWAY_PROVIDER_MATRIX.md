@@ -38,7 +38,7 @@
 
 - базовый адрес — `https://api.kie.ai`;
 - авторизация **всегда** `Authorization: Bearer` — заголовок с именем `apikey` отклоняется с 401;
-- список моделей: `GET https://api.kie.ai/openai/v1/models` и `GET https://api.kie.ai/anthropic/v1/models`; эндпоинта `/v1/models` на голом хосте нет — 404;
+- список моделей: `GET https://api.kie.ai/openai/v1/models` и `GET https://api.kie.ai/anthropic/v1/models`. Живая проба без ключа (2026-10-21): оба пути отвечают HTTP 401 (путь есть, нужен ключ), `/v1/models` на голом хосте тоже существует — HTTP 200 с телом `{"code":401,"msg":"Unauthorized …"}`; заведомо кривой путь → настоящий HTTP 404;
 - форма ответа Responses: текст в `output[].content[].text` (`type: 'output_text'`); `usage` содержит `input_tokens`, `output_tokens`, `total_tokens`, `input_tokens_details.cached_tokens`;
 - usage Anthropic: `input_tokens` **не включает** кеш — кеш идёт отдельно в `cache_read_input_tokens` и `cache_creation_input_tokens`.
 
@@ -110,7 +110,7 @@
 - протокол `openai_chat`, адрес `https://openrouter.ai/api`, модель `minimax/minimax-m3.1-flash:free`, цена 0 / 0;
 - маршрут помечен `free: true` и `opt_in: true`: берётся **только** при `allow_free: true` в запросе, иначе шлюз его не выбирает;
 - `quota_limited: true`, `rate_limit: "free tier quota"` — квота бесплатного уровня;
-- нулевой тариф в реестре считается тарифом: строка журнала получает `actual_status = 'free'` и факт 0, отказа по лимиту нет. Отказ (400) бывает только когда тарифа нет вовсе.
+- нулевой тариф в реестре считается тарифом: строка журнала получает `actual_status = 'free'` и факт 0, отказа по лимиту нет. Отказ (400) бывает только когда тарифа нет вовсе; для работы агента нужен платный маршрут с тарифом — держать резерв под неподтверждённое списание нулевым тарифом нельзя.
 
 **Что НЕ подтверждено:**
 

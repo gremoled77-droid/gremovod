@@ -40,7 +40,7 @@ class Route:
     cached_input_per_mtok: float | None = None
     rate_limit: str | None = None
     upstream_version: str | None = None
-    path_prefix: str = ''    # префикс пути, задаётся реестром (у Kie: 'codex', 'anthropic')
+    path_prefix: str = ''    # префикс пути, задаётся реестром (у Kie: 'openai', 'claude')
     source: str = ''
     as_of: str = ''
 
@@ -138,7 +138,7 @@ def summarize_spend(db, project_ids: list[str]) -> dict   # actual_cost_usd / re
 - Цены в реестре — USD за 1 000 000 токенов, точность `small_amount_precision` (6).
 - **Правило владельца: платный маршрут никогда не показывает подтверждённый $0.00.** В `actual_quote` не-бесплатный маршрут без usage → `cost_usd=None`, `status='unknown'` — **никогда** `0.0/'confirmed'`. Нулевой факт у платного маршрута возможен только когда usage есть и сам даёт ноль. Бесплатный маршрут → `0.0`, `status='free'`.
 - Параметр `charge_possible` в `actual_quote` **не влияет на результат расчёта**. Он — флаг для журнала (таск 03): «точно не списано» → резерв освобождается; «возможно списано» → резерв остаётся и попадает в «неизвестные списания / нужна сверка». Источник флага — `ProviderResult.charged_possible`.
-- **Адрес эндпоинта = `base_url` + (`/` + `path_prefix`, если непусто) + путь протокола** (`/v1/responses`, `/v1/messages`, `/v1/chat/completions`). Префикс задаёт владелец в конфигурации, код его не угадывает: у Kie — `codex` (ответы) и `anthropic` (сообщения), у остальных — пусто.
+- **Адрес эндпоинта = `base_url` + (`/` + `path_prefix`, если непусто) + путь протокола** (`/v1/responses`, `/v1/messages`, `/v1/chat/completions`). Префикс задаёт владелец в конфигурации, код его не угадывает: у Kie — `openai` (ответы) и `claude` (сообщения), у остальных — пусто.
 
 **Файлы конфигурации реестра:**
 
@@ -193,9 +193,9 @@ async def complete(route: Route, messages: list[dict], max_tokens: int, *,
 **Внешние факты по API Kie.ai** (сверено с официальной документацией, `docs.kie.ai`):
 
 - базовый адрес — `https://api.kie.ai`; авторизация **всегда** `Authorization: Bearer` (заголовок с именем `apikey` отклоняется с 401);
-- Responses: `POST https://api.kie.ai/codex/v1/responses` (семейство GPT-5.4 / GPT-5.5) и `POST https://api.kie.ai/api/v1/responses` (единый Codex-эндпоинт). Префикс пути зависит от семейства модели;
-- Anthropic Messages: `POST https://api.kie.ai/anthropic/v1/messages` (база `https://api.kie.ai/anthropic`);
-- список моделей: `GET https://api.kie.ai/openai/v1/models` и `GET https://api.kie.ai/anthropic/v1/models`; эндпоинта `/v1/models` на голом хосте нет — 404;
+- Responses: `POST https://api.kie.ai/openai/v1/responses` (семейство GPT-6) — префикс пути зависит от семейства модели; в реестре владельца стоит `openai`;
+- Anthropic Messages: `POST https://api.kie.ai/claude/v1/messages` (база `https://api.kie.ai/claude`) — в реестре владельца `claude`;
+- список моделей: `GET https://api.kie.ai/openai/v1/models` и `GET https://api.kie.ai/anthropic/v1/models`. Живая проба без ключа: `GET https://api.kie.ai/v1/models` → **401 Unauthorized** (путь существует, нужна авторизация), а заведомо неверный путь → настоящий 404. **Признак «404» вводит в заблуждение: живой путь отвечает 401.**
 - форма ответа Responses: текст в `output[].content[].text` (`type: 'output_text'`); `usage` содержит `input_tokens`, `output_tokens`, `total_tokens`, `input_tokens_details.cached_tokens`;
 - usage Anthropic: `input_tokens` **не включает** кеш, кеш идёт отдельно в `cache_read_input_tokens` и `cache_creation_input_tokens`.
 
@@ -284,7 +284,11 @@ class ProviderCallFailed(HTTPException):
 
 Вызов агента ложится в `llm_calls` с `request_id = <job_id>-agent` (идемпотентность по нему же) и `actual_status` = `confirmed` / `free` / `unknown`. Расчёт тарифа агента — чистые функции `backend/llm_gateway.py`: `agent_quote`, `agent_reference`, `agent_estimate_usage`, `agent_reserve` (без БД и без сети).
 
-**Нулевой тариф — не отсутствие тарифа.** Маршрут с тарифом 0/0 (подтверждённо бесплатный, например OpenRouter Free) даёт `actual_status='free'`, факт 0, резерв 0 — и **не отклоняется**. Отказ (400) допустим только когда тарифа в реестре действительно нет: записи нет либо её цены `null`. Ноль тарифа и ноль записи — разные вещи.
+**Нулевой тариф — не отсутствие тарифа.** Маршрут с тарифом 0/0 (подтверждённо бесплатный, например OpenRouter Free) даёт `actual_status='free'`, факт 0, резерв 0 — и **не отклоняется**. Ноль тарифа и ноль записи — разные вещи.
+
+**Но источником резерва под неподтверждённое списание 0/0 быть не может.** Для агентского вызова, у которого расход не подтверждён, резерв берётся **только с платного маршрута с тарифом**: сначала названная агентом модель, потом базовая линия (если платная), потом любой платный маршрут реестра. Если платного тарифа нет — **400, задание не создаётся** (fail-closed): работа агента стоит денег, и если верхней оценки нет, отправлять её нельзя.
+
+Инвариант, который обязан выполняться всегда: **любая строка с `actual_status='unknown'` имеет ненулевой `reserved_usd`, попадает в `unknown_cost_usd` и занимает блокирующий лимит.** Нулевой резерв у неизвестного списания — это выдуманный ноль в другой форме.
 
 Если агент не назвал модель, резерв считается по базовой линии реестра — иначе неизвестное списание не попало бы ни в один итог и прошло бы мимо лимитов.
 
@@ -359,7 +363,7 @@ export function statusLine(card: LlmCard): string             // «Беспла�
 export function actualLine(card: LlmCard): string             // фактический платёж; для неизвестного — без «$0»
 export function cardLines(card: LlmCard): string[]            // порядок строк зафиксирован тестом: тариф → исполнитель → статус → платёж
 export function expectedPaymentLine(card: LlmCard): string   // ожидаемый реальный платёж в окне подтверждения
-export function maxApprovedLine(card: LlmCard): string        // максимальный одобренный расход в окне подтверждения
+export function maxApprovedLine(limitUsd: number | null | undefined): string  // максимальный одобренный расход в окне подтверждения
 export function budgetLines(summary: BudgetSummary): string[]
 ```
 

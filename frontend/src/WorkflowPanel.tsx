@@ -15,7 +15,7 @@ import {
 import {apiFetch} from './api';
 import LimitPicker from './LimitPicker';
 import LlmCostCard from './LlmCostCard';
-import {cardFrom, type LlmCard} from './llmDisplay';
+import {approvalMoney, cardFrom, type LlmCard} from './llmDisplay';
 import {initialLimit, limitAllowed} from './spendLimit';
 import {useSharedActivity} from './ActivityContext';
 import {
@@ -35,7 +35,6 @@ import {
 } from './workflowPlan';
 import {useNodePrices} from './workflowPrices';
 import {LLM_MAX_TOKENS, LLM_MODELS} from './llmPricing';
-import {smallUsd} from './usdFormat';
 import {missingAssetIds} from './workflowLibrary';
 
 type Graph = {nodes: Node[]; edges: Edge[]};
@@ -1262,15 +1261,21 @@ export default function WorkflowPanel({
             <section className="panel generation-review" role="dialog" aria-modal="true">
               <h2>Запустить всё: платные узлы</h2>
               <ol>
-                {review.llmSteps.map(s => (
-                  <li key={s.nodeId}>
-                    LLM {LLM_MODELS[s.model]?.label || s.model} · текст · ожидаемый платёж{' '}
-                    {smallUsd(review.estimates[s.nodeId])}
-                    <div style={{marginTop: 6}}>
-                      <LlmCostCard card={review.cards[s.nodeId]} title="Оценка вызова" />
-                    </div>
-                  </li>
-                ))}
+                {review.llmSteps.map(s => {
+                  const money = approvalMoney(review.cards[s.nodeId], review.cards[s.nodeId]?.actual?.max_cost_usd);
+                  return (
+                    <li key={s.nodeId}>
+                      LLM {LLM_MODELS[s.model]?.label || s.model} · текст
+                      <div style={{marginTop: 6}}>
+                        <LlmCostCard card={review.cards[s.nodeId]} title="Оценка вызова" />
+                      </div>
+                      <p>
+                        <b>{money.expectedPayment}</b>
+                      </p>
+                      <p className="muted">{money.maxApproved}</p>
+                    </li>
+                  );
+                })}
                 {review.steps.map(s => (
                   <li key={s.nodeId}>
                     {IMAGE_MODELS[s.model] || VIDEO_MODELS[s.model]?.label || s.model} · референсов:{' '}

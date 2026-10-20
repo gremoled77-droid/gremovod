@@ -48,9 +48,14 @@ class ProviderResult:
     provider_request_id: str | None
 
 
-def _failure(error_kind: str, *, charged: bool, request_id: str | None = None) -> ProviderResult:
-    """Неудачный исход: текста нет, расход неизвестен, тело провайдера наружу не отдаётся."""
-    return ProviderResult(ok=False, text='', usage=Usage(None, None, estimated=True),
+def _failure(error_kind: str, *, charged: bool, request_id: str | None = None,
+             usage: Usage | None = None) -> ProviderResult:
+    """Неудачный исход: текста нет, расход неизвестен, тело провайдера наружу не отдаётся.
+
+    usage передаётся, когда провайдер ответил и его usage разобран: по нему известен факт
+    списания, даже если пригодного текста в ответе нет.
+    """
+    return ProviderResult(ok=False, text='', usage=usage or Usage(None, None, estimated=True),
                            error_kind=error_kind, charged_possible=charged, provider_request_id=request_id)
 
 
@@ -77,7 +82,7 @@ def _gate(entry: ModelEntry, *, allow_free: bool) -> None:
     if entry.opt_in and not allow_free:
         raise HTTPException(400, 'Маршрут требует явного разрешения владельца: '
                             + entry.provider + '/' + entry.model)
-    free_confirmed = entry.free or (entry.input_per_mtok == 0 and entry.output_per_mtok == 0)
+    free_confirmed = llm_gateway.is_free_entry(entry)
     if not free_confirmed and not entry.verified_at:
         raise HTTPException(400, 'Тариф маршрута не подтверждён вживую: ' + entry.provider + '/' + entry.model)
 
@@ -248,7 +253,8 @@ def _result_of(protocol: str, response) -> ProviderResult:
         return _failure('no_usage', charged=True, request_id=request_id)
     text = _text_of(protocol, value)
     if not text:
-        return _failure('bad_body', charged=True, request_id=request_id)
+        # провайдер ответил, но пригодного текста нет: разобранный usage не теряется — по нему факт известен
+        return _failure('bad_body', charged=True, request_id=request_id, usage=usage)
     return ProviderResult(ok=True, text=text, usage=usage, error_kind=None,
                           charged_possible=False, provider_request_id=request_id)
 

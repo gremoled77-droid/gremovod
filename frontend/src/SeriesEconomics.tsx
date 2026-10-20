@@ -1,8 +1,7 @@
 import {useEffect, useState} from 'react';
 import {apiFetch} from './api';
 import {responseJson} from './ChatGPTPanel';
-import {budgetLines, type BudgetSummary} from './llmDisplay';
-import {smallUsd} from './usdFormat';
+import {budgetLines, exposureLine, type BudgetSummary} from './llmDisplay';
 type Summary = {
   actual_usd_known: number;
   reserved_usd: number;
@@ -65,8 +64,8 @@ export default function SeriesEconomics({pid, sid}: {pid: string; sid: string}) 
             {data.unknown_cost_count}. Резерв по оценкам: ${data.reserved_usd.toFixed(3)}.
           </p>
           <p>
-            LLM-запросы кадров серии: <b>{smallUsd(data.llm?.usd ?? 0)}</b> ({data.llm?.calls ?? 0} вызовов).
-            Входят в проверку лимита серии. Запросы из общего проекта сюда не попадают.
+            {exposureLine('LLM-запросов кадров серии', data.llm?.usd ?? 0, data.llm?.calls ?? 0)}. Входят в
+            проверку лимита серии. Запросы из общего проекта сюда не попадают.
           </p>
           <ul style={{margin: '4px 0 8px', paddingLeft: 18}}>
             {budgetLines(llm).map(line => (

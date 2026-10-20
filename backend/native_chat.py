@@ -7,6 +7,7 @@ import json
 import secrets
 import time
 import uuid
+from contextlib import contextmanager
 from pathlib import Path
 
 from fastapi import Header, HTTPException, UploadFile, File, Form
@@ -53,6 +54,35 @@ class Progress(BaseModel):
     provider: str | None = Field(default=None, max_length=60)
     model: str | None = Field(default=None, max_length=120)
     usage: AgentUsage | None = None
+
+
+@contextmanager
+def released_on_error(studio, job_id):
+    """Сбой внутри транзакции не оставляет задание в невынимаемом состоянии.
+
+    Отчёт, который не удалось записать, не должен держать задание в 'preparing':
+    очередь агента заблокирована по всей студии, а задание нельзя ни отменить, ни поставить заново.
+    """
+    try:
+        yield
+    except Exception:
+        release_job(studio, job_id)
+        raise
+
+
+def release_job(studio, job_id):
+    """Снять задание с невынимаемого состояния.
+
+    Отчёт, который не принят, или сбой журналирования не должны оставлять задание в
+    'preparing': иначе очередь агента заблокирована по всей студии, а задание нельзя ни
+    отменить, ни поставить заново. Задание переходит в 'failed' — из этого состояния
+    его можно поставить заново.
+    """
+    with studio.connect() as db:
+        db.execute("UPDATE native_chat_jobs SET status='failed',message=?,updated_at=? "
+                   "WHERE id=? AND status IN ('preparing','generating')",
+                   ('Отчёт не принят: задание можно переделать или поставить заново', studio.now(), job_id))
+        db.execute('UPDATE native_chat_worker SET seen=?,busy=0 WHERE id=1', (time.time(),))
 
 
 def agent_report(body: Progress) -> dict:
@@ -303,12 +333,15 @@ def register(app, studio):
         authenticate(x_studio_worker)
         with studio.connect() as db:
             llm_guard.ensure_schema(db)
-        with studio.connect() as db:
+        invalid = False
+        with released_on_error(studio, job_id), studio.connect() as db:
             db.execute('BEGIN IMMEDIATE')
             item = db.execute('SELECT * FROM native_chat_jobs WHERE id=?', (job_id,)).fetchone()
             if not item:
                 raise HTTPException(404, 'Задание не найдено')
-            if item['status'] not in {'preparing', 'generating'}:
+            if item['status'] not in {'preparing', 'generating', 'failed'}:
+                # 'failed' тоже принимается: отчёт можно переделать и прислать снова,
+                # а задание при этом не висит в 'preparing' и не блокирует очередь агента
                 raise HTTPException(409, 'Задание больше не выполняется')
             final_prompt = body.prompt.strip() or item['prompt']
             refusal = None
@@ -319,10 +352,10 @@ def register(app, studio):
                 charge = journal_agent_call(studio, db, item, body, agent_context(item), final_prompt, status='failed')
                 refusal = charge['refusal']
                 over_limit = charge['over_limit']
-            elif item['operation']=='describe_character' and item['status']=='preparing' and body.status=='identity_ready' and body.identity is not None:
+            elif item['operation']=='describe_character' and item['status'] in {'preparing', 'failed'} and body.status=='identity_ready' and body.identity is not None:
                 result=character_description.apply(db,studio,item,body.identity)
                 final_prompt=json.dumps(result,ensure_ascii=False);state='completed'
-            elif item['operation']!='describe_character' and item['status'] == 'preparing' and body.status == 'prompt_ready' and final_prompt:
+            elif item['operation']!='describe_character' and item['status'] in {'preparing', 'failed'} and body.status == 'prompt_ready' and final_prompt:
                 state = 'generating' if item['operation'] in {'generate','edit'} else 'completed'
                 if item['operation']=='edit':final_prompt=PRESERVE_VISUAL+'\n\nREQUESTED CHANGE:\n'+final_prompt
                 studio.validate_prompt(item['target'], final_prompt, len(json.loads(item['request'])['context']['references']))
@@ -355,14 +388,22 @@ def register(app, studio):
                             container.setdefault('compositionPromptBasis',{})[item['target']]=frame_composition.basis(context.get('frame_composition'))
                         db.execute('UPDATE projects SET state=?,updated_at=? WHERE id=?', (json.dumps(latest, ensure_ascii=False), studio.now(), item['project_id']))
             else:
-                raise HTTPException(409, 'Недопустимый переход этапа')
+                # отчёт не соответствует этапу: задание переводится в вынимаемое состояние,
+                # иначе оно осталось бы в 'preparing' и заблокировало очередь агента
+                state = 'failed'
+                final_prompt = item['prompt']
+                invalid = True
             message = body.message
+            if invalid:
+                message = 'Отчёт не принят: недопустимый переход этапа. Задание можно переделать или поставить заново.'
             if refusal:
                 message = 'Отчёт агента отвергнут: ' + refusal
             elif over_limit:
                 message = (message + ' ' if message else '') + 'Лимит превышен: расход агента записан и занимает лимит.'
             db.execute('UPDATE native_chat_jobs SET status=?,prompt=?,message=?,updated_at=? WHERE id=?', (state, final_prompt, message, studio.now(), job_id))
             db.execute('UPDATE native_chat_worker SET seen=?,busy=? WHERE id=1', (time.time(), int(state not in {'failed', 'completed'})))
+        if invalid:
+            raise HTTPException(409, 'Недопустимый переход этапа')
         if refusal:
             raise HTTPException(400, refusal)
         if item['operation']=='describe_character':

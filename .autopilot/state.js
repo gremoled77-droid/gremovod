@@ -13,7 +13,7 @@ window.STATE =
   "skillDir": "C:/Users/BLOWKA/.minimax/skills/autopilot",
   "baseCommit": "df1e1a3",
   "startedAt": "2026-10-20T13:38:10+03:00",
-  "updatedAt": "2026-10-20T23:26:43+03:00",
+  "updatedAt": "2026-10-21T02:37:40+03:00",
   "finishedAt": null,
   "stages": [
     {
@@ -48,12 +48,14 @@ window.STATE =
     },
     {
       "id": "build",
-      "status": "active",
-      "startedAt": "2026-10-20T14:27:40+03:00"
+      "status": "done",
+      "startedAt": "2026-10-20T14:27:40+03:00",
+      "finishedAt": "2026-10-21T00:06:23+03:00"
     },
     {
       "id": "review",
-      "status": "pending"
+      "status": "active",
+      "startedAt": "2026-10-21T00:06:23+03:00"
     },
     {
       "id": "final",
@@ -62,8 +64,8 @@ window.STATE =
   ],
   "requirements": {
     "total": 60,
-    "done": 37,
-    "inTicket": 23,
+    "done": 60,
+    "inTicket": 0,
     "inSpec": 0,
     "placeholder": 0,
     "deferred": 0,
@@ -106,14 +108,14 @@ window.STATE =
       "review": "да — фундамент",
       "model": "сильная",
       "status": "done",
+      "startedAt": "2026-10-20T14:27:41+03:00",
+      "finishedAt": "2026-10-20T15:49:55+03:00",
       "retries": 0,
       "repairs": 2,
-      "startedAt": "2026-10-20T14:27:41+03:00",
       "repairFindings": [
         "reference_quote падает TypeError на записи реестра с незаполненным тарифом",
         "ориентир не доходит до alternative_baseline, если у default_baseline не заполнен тариф"
       ],
-      "finishedAt": "2026-10-20T15:49:55+03:00",
       "tests": {
         "passed": 276,
         "failed": 0
@@ -138,18 +140,19 @@ window.STATE =
       "zone": [
         "backend/llm_adapters.py",
         "backend/test_llm_adapters.py",
-        "backend/connections.py"
+        "backend/connections.py",
+        ".env.example"
       ],
       "review": "да — риск",
       "model": "сильная",
       "status": "done",
+      "startedAt": "2026-10-20T15:49:56+03:00",
+      "finishedAt": "2026-10-20T17:10:18+03:00",
       "retries": 0,
       "repairs": 1,
-      "startedAt": "2026-10-20T15:49:56+03:00",
       "repairFindings": [
         "неверный путь Kie Responses (404) и нет гейта на выключенный маршрут — реальный POST с ключом"
       ],
-      "finishedAt": "2026-10-20T17:10:18+03:00",
       "tests": {
         "passed": 299,
         "failed": 0
@@ -188,14 +191,14 @@ window.STATE =
       "review": "да — риск",
       "model": "сильная",
       "status": "done",
+      "startedAt": "2026-10-20T17:10:19+03:00",
+      "finishedAt": "2026-10-20T19:32:32+03:00",
       "retries": 0,
       "repairs": 2,
-      "startedAt": "2026-10-20T17:10:19+03:00",
       "repairFindings": [
         "платный маршрут без usage пишет usd=0 под done; legacy-путь не отличает подтверждённый отказ от 5xx",
         "HTTP 200 без пригодного текста выходит мимо классификатора: платный вызов показан как 0 потраченного, резерв висит фантомом"
       ],
-      "finishedAt": "2026-10-20T19:32:32+03:00",
       "tests": {
         "passed": 327,
         "failed": 0
@@ -221,19 +224,21 @@ window.STATE =
       "zone": [
         "backend/economics.py",
         "backend/series_economics.py",
+        "backend/native_chat.py",
+        "backend/llm_gateway.py",
         "backend/test_llm_cost_display.py"
       ],
       "review": "да — риск",
       "model": "обычная",
       "status": "done",
+      "startedAt": "2026-10-20T19:32:33+03:00",
+      "finishedAt": "2026-10-20T23:26:42+03:00",
       "retries": 0,
       "repairs": 2,
-      "startedAt": "2026-10-20T19:32:33+03:00",
       "repairFindings": [
         "неизвестное списание агента может остаться без резерва и вне итогов; задание агенту уходит без проверки лимита; запись о расходе после коммита задания",
         "400 на отчёте отвергает бесплатную модель (тариф 0/0) и оставляет задание в preparing, блокируя очередь агента по студии; отчёт failed не журналирует расход"
       ],
-      "finishedAt": "2026-10-20T23:26:42+03:00",
       "tests": {
         "passed": 349,
         "failed": 0
@@ -268,10 +273,10 @@ window.STATE =
       "review": "нет",
       "model": "обычная",
       "status": "done",
-      "retries": 0,
-      "repairs": 0,
       "startedAt": "2026-10-20T19:32:34+03:00",
       "finishedAt": "2026-10-20T20:04:13+03:00",
+      "retries": 0,
+      "repairs": 0,
       "tests": {
         "passed": 115,
         "failed": 0
@@ -316,6 +321,7 @@ window.STATE =
         "frontend/src/EconomicsPanel.tsx",
         "frontend/src/BudgetPanel.tsx",
         "frontend/src/SeriesEconomics.tsx",
+        "backend/security.py",
         "docs/LLM_GATEWAY_ARCHITECTURE.md",
         "docs/LLM_GATEWAY_PROVIDER_MATRIX.md",
         "docs/LLM_GATEWAY_TEST_REPORT.md",
@@ -323,14 +329,64 @@ window.STATE =
       ],
       "review": "нет",
       "model": "обычная",
-      "status": "in-progress",
+      "status": "done",
+      "startedAt": "2026-10-20T23:26:43+03:00",
+      "finishedAt": "2026-10-21T00:06:22+03:00",
       "retries": 0,
       "repairs": 0,
-      "startedAt": "2026-10-20T23:26:43+03:00"
+      "tests": {
+        "passed": 353,
+        "failed": 0
+      },
+      "commit": "d7e3e15"
+    },
+    {
+      "id": "F1",
+      "title": "Ремонт ветки: две платные попытки, потерянный usage, зависшая очередь и ложные утверждения",
+      "requirements": [
+        "R21",
+        "R23",
+        "R30",
+        "R33",
+        "R34",
+        "R42",
+        "R49",
+        "R50",
+        "R57"
+      ],
+      "blockedBy": [],
+      "wave": 6,
+      "zone": [
+        "backend/llm_guard.py",
+        "backend/llm_gateway.py",
+        "backend/llm_adapters.py",
+        "backend/native_chat.py",
+        "backend/test_llm_guard.py",
+        "backend/test_llm_adapters.py",
+        "backend/test_llm_cost_display.py",
+        "backend/test_budget_breakdown.py",
+        "frontend/src/BudgetPanel.tsx",
+        "frontend/src/SeriesEconomics.tsx",
+        "frontend/src/WorkflowPanel.tsx",
+        "docs/HANDOFF_MINIMAX_LLM_GATEWAY.md",
+        "docs/LLM_GATEWAY_PROVIDER_MATRIX.md",
+        "docs/LLM_GATEWAY_ARCHITECTURE.md",
+        "docs/LLM_GATEWAY_TEST_REPORT.md",
+        ".gitignore"
+      ],
+      "review": "да — ремонт ветки",
+      "model": "сильная",
+      "status": "repair",
+      "startedAt": "2026-10-21T00:39:22+03:00",
+      "retries": 0,
+      "repairs": 1,
+      "repairFindings": [
+        "fallback резерва агента берёт 0/0-маршрут и даёт нулевой резерв: задание ставится при исчерпанном лимите, списание невидимо"
+      ]
     }
   ],
   "tests": {
-    "passed": 349,
+    "passed": 353,
     "failed": 0
   },
   "debt": {
@@ -404,9 +460,17 @@ window.STATE =
     "2026-10-20T21:29:42+03:00",
     "2026-10-20T22:42:10+03:00",
     "2026-10-20T23:26:42+03:00",
-    "2026-10-20T23:26:43+03:00"
+    "2026-10-20T23:26:43+03:00",
+    "2026-10-21T00:06:22+03:00",
+    "2026-10-21T00:06:23+03:00",
+    "2026-10-21T00:39:20+03:00",
+    "2026-10-21T00:39:21+03:00",
+    "2026-10-21T00:39:22+03:00",
+    "2026-10-21T00:39:24+03:00",
+    "2026-10-21T01:58:55+03:00",
+    "2026-10-21T02:37:40+03:00"
   ],
-  "rev": 44,
+  "rev": 52,
   "waiting": null,
   "waits": [
     {
@@ -739,6 +803,65 @@ window.STATE =
         "06"
       ],
       "act": "start"
+    },
+    {
+      "t": "2026-10-21T00:06:22+03:00",
+      "k": "ticket",
+      "ids": [
+        "06"
+      ],
+      "act": "done",
+      "tests": {
+        "passed": 353,
+        "failed": 0
+      }
+    },
+    {
+      "t": "2026-10-21T00:06:23+03:00",
+      "k": "stage",
+      "id": "review",
+      "act": "start"
+    },
+    {
+      "t": "2026-10-21T00:39:20+03:00",
+      "k": "add",
+      "key": "report",
+      "n": 5
+    },
+    {
+      "t": "2026-10-21T00:39:21+03:00",
+      "k": "tickets",
+      "n": 7
+    },
+    {
+      "t": "2026-10-21T00:39:22+03:00",
+      "k": "ticket",
+      "ids": [
+        "F1"
+      ],
+      "act": "start"
+    },
+    {
+      "t": "2026-10-21T00:39:24+03:00",
+      "k": "gate",
+      "g": "G3",
+      "ok": true,
+      "problems": 0
+    },
+    {
+      "t": "2026-10-21T01:58:55+03:00",
+      "k": "ticket",
+      "ids": [
+        "F1"
+      ],
+      "act": "repair",
+      "note": "fallback резерва агента берёт 0/0-маршрут и даёт нулевой резерв: задание ставится при исчерпанном лимите, списание невидимо"
+    },
+    {
+      "t": "2026-10-21T02:37:40+03:00",
+      "k": "add",
+      "key": "report",
+      "n": 1
     }
   ],
   "reqList": [
@@ -755,7 +878,7 @@ window.STATE =
     {
       "id": "R03",
       "text": "«Реализуй LLM Gateway по этапам»",
-      "status": "in-ticket"
+      "status": "done"
     },
     {
       "id": "R04",
@@ -775,7 +898,7 @@ window.STATE =
     {
       "id": "R07",
       "text": "«Работай в отдельном worktree»",
-      "status": "in-ticket"
+      "status": "done"
     },
     {
       "id": "R08",
@@ -785,22 +908,22 @@ window.STATE =
     {
       "id": "R09",
       "text": "«Не объединяй изменения в main до проверки»",
-      "status": "in-ticket"
+      "status": "done"
     },
     {
       "id": "R10",
       "text": "«/plan-first /auto-verify»",
-      "status": "in-ticket"
+      "status": "done"
     },
     {
       "id": "R11",
       "text": "«не редактировать корневую main или чужие worktrees, не останавливать рабочие процессы 8000/5173»",
-      "status": "in-ticket"
+      "status": "done"
     },
     {
       "id": "R12",
       "text": "«не применять reset --hard / force-push»",
-      "status": "in-ticket"
+      "status": "done"
     },
     {
       "id": "R13",
@@ -885,47 +1008,47 @@ window.STATE =
     {
       "id": "R29",
       "text": "«C. Остальные: MiniMax direct, DeepSeek direct, OpenRouter free + предсказуемые fallback и ограничение бюджета; mock-схемы.»",
-      "status": "in-ticket"
+      "status": "done"
     },
     {
       "id": "R30",
       "text": "«D. UI и n8n: минимальные изменения существующих экранов; одинаковые правила учёта в UI, API и агентах; dry-run инструкции n8n.»",
-      "status": "in-ticket"
+      "status": "done"
     },
     {
       "id": "R31",
       "text": "«E. Реальные проверки: только после отдельного одобрения владельца для конкретных расходов. Не включать запуск новой модели без подтвержденных схемы, тарифа и разрешения.»",
-      "status": "in-ticket"
+      "status": "done"
     },
     {
       "id": "R32",
       "text": "«Не подключать LangChain, Redis, Celery, Kafka, новую БД, облачные сервисы только ради MVP.»",
-      "status": "in-ticket"
+      "status": "done"
     },
     {
       "id": "R33",
       "text": "«Команды для полной проверки: python -X utf8 -m unittest discover -s backend -p \"test_.py\"; python -m pytest backend (если доступно); в frontend npm test и npm run build. Указать фактические PASS/FAIL/SKIP; не утверждать, что тесты запущен…",
-      "status": "in-ticket"
+      "status": "done"
     },
     {
       "id": "R34",
       "text": "«Краткое описание выполненного по этапам, коммиты и точные результаты тестов. Прежде всего выполнить этап A и B, не отвлекаться на ненужные модули.»",
-      "status": "in-ticket"
+      "status": "done"
     },
     {
       "id": "R35",
       "text": "«Это поручение начать реализацию в своей ветке, но не согласие на покупку токенов, активацию платных генераций, force push, смену конфигурации рабочей студии или объединение в main.»",
-      "status": "in-ticket"
+      "status": "done"
     },
     {
       "id": "R36",
       "text": "«Бесплатный OpenRouter отдает корректный тарифный ориентир Kie/PiAPI, бюджет +$0.»",
-      "status": "in-ticket"
+      "status": "done"
     },
     {
       "id": "R37",
       "text": "«Платный direct API показывает ориентир и отдельно истинную сумму к оплате до подтверждения; бюджет учитывает только фактическую стоимость.»",
-      "status": "in-ticket"
+      "status": "done"
     },
     {
       "id": "R38",
@@ -945,17 +1068,17 @@ window.STATE =
     {
       "id": "R41",
       "text": "«Ветку minimax/llm-gateway (не сливать автоматически в main).»",
-      "status": "in-ticket"
+      "status": "done"
     },
     {
       "id": "R42",
       "text": "«Документацию docs/LLM_GATEWAY_ARCHITECTURE.md, docs/LLM_GATEWAY_PROVIDER_MATRIX.md, docs/LLM_GATEWAY_TEST_REPORT.md и docs/HANDOFF_MINIMAX_LLM_GATEWAY.md.»",
-      "status": "in-ticket"
+      "status": "done"
     },
     {
       "id": "R43",
       "text": "«Аддитивные миграции, адаптеры, UI-изменения, офлайн-тесты; небольшой пример конфигурации без секретов.»",
-      "status": "in-ticket"
+      "status": "done"
     },
     {
       "id": "R44",
@@ -990,17 +1113,17 @@ window.STATE =
     {
       "id": "R50",
       "text": "«В «Бюджет / Экономика» основной итог: «Фактически потрачено»; отдельные итоги: «Зарезервировано» и «Неизвестные списания / нужна сверка». Допускается отдельный, явно не денежный итог «Эквивалент по Kie/PiAPI», не смешиваемый с реальными з…",
-      "status": "in-ticket"
+      "status": "done"
     },
     {
       "id": "R51",
       "text": "«Бюджет: фактически +$0.00. Нельзя начислять $0.000300 как долг.»",
-      "status": "in-ticket"
+      "status": "done"
     },
     {
       "id": "R52",
       "text": "«Хранить раздельно: исполнение: execution_provider, execution_model, actual_cost_usd, actual_status, reserved_usd, billing_source, request_id; ориентир: reference_provider (kie/piapi), reference_model, reference_kind (exact_model/reference…",
-      "status": "in-ticket"
+      "status": "done"
     },
     {
       "id": "R53",
@@ -1020,7 +1143,7 @@ window.STATE =
     {
       "id": "R56",
       "text": "«Не ставить фактический $0 для потенциально оплаченного timeout, 429, 5xx или неопределенного ответа. Реальный $0.00 допустим лишь для подтверждённого бесплатного маршрута без платной надбавки. Платный fallback учитывать как реальный платё…",
-      "status": "in-ticket"
+      "status": "done"
     },
     {
       "id": "R57",
@@ -1035,7 +1158,7 @@ window.STATE =
     {
       "id": "R59",
       "text": "«do_not_override_existing_owner_limits: true»",
-      "status": "in-ticket"
+      "status": "done"
     },
     {
       "id": "R60i",
@@ -1059,9 +1182,17 @@ window.STATE =
     },
     "G3": {
       "ok": true,
-      "at": "2026-10-20T14:25:31+03:00",
+      "at": "2026-10-21T00:39:24+03:00",
       "problems": 0
     }
   },
-  "result": null
+  "result": null,
+  "report": [
+    "403 без маркеров Cloudflare классифицируется по-разному в двух путях: legacy отпускает резерв, адаптер удерживает его навсегда — деньги не теряются, но бюджет владельца блокируется отказом, который ничего не стоил",
+    "Не-HTTPException из транспорта (внутренняя ошибка) оставляет строку в status=reserved/actual_status=estimated навсегда и блокирует повтор с тем же request_id (409). Резерв учтён в лимите, но виден в «зарезервировано», а не в корзине «неизвестные списания», которую владелец сверяет",
+    "Гейт «тариф есть» бьёт и по describe_character, чьи вызовы не журналируются, а economics их исключает: проверка без учётного контрапункта, операция не запускается вовсе, бюджет по ней не виден",
+    "Новые тесты закрепляют текст ошибок (backend/test_llm_cost_display.py:184,215,246,284,298,308; backend/test_budget_breakdown.py:245) — смена формулировки сломает их; классификация уже структурная, закрепления быть не должно",
+    "Пробел покрытия: нет теста на отчёт агента с названной, но отсутствующей в реестре моделью",
+    "Тариф дешевле половины микродоллара (вход 0 + выход ≤ 0.02 USD/Mtok) округляется до нуля при точности 6 → резерв 0.0, и задание агента может встать при исчерпанном лимите. Текущие тарифы владельца (0.02/0.08, 0.15/0.6, 0.03/0.15) это не задевает"
+  ]
 }

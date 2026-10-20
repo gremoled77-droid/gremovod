@@ -288,6 +288,65 @@ class AgentCallTests(GatewayCase):
             self.assertEqual(db.execute('SELECT COUNT(*) FROM native_chat_jobs WHERE id=?',
                                         ('agent-no-tariff-0001',)).fetchone()[0], 0)
 
+    def test_agent_job_is_refused_when_the_registry_has_only_a_zero_tariff(self):
+        pid = self.agent_project()
+        # в реестре только подтверждённо бесплатный маршрут 0/0: держать резерв под
+        # неподтверждённое списание нечем, поэтому работа агента не ставится (fail-closed)
+        priceless = {'provider': 'kie', 'model': 'gpt-6-luna', 'role': 'simple', 'input': None, 'output': None}
+        registry = self.registry(rate(**priceless), rate(**OPENROUTER))
+        with patch.object(llm_guard, 'current_registry', return_value=registry):
+            created = self.client.post('/api/chatgpt/jobs', json=self.agent_body(pid, 'agent-zero-only-0001'))
+        self.assertEqual(created.status_code, 400)
+        self.assertIn('тариф', created.text.lower())
+        # работа не уходит воркеру и в журнале не остаётся
+        self.worker_has_no_job()
+        with main.connect() as db:
+            self.assertEqual(db.execute('SELECT COUNT(*) FROM native_chat_jobs WHERE id=?',
+                                        ('agent-zero-only-0001',)).fetchone()[0], 0)
+
+    def test_agent_reserve_falls_back_to_a_paid_route_and_holds_the_unknown_charge(self):
+        pid = self.agent_project()
+        # базовая линия без цены, в реестре бесплатный 0/0 и платный маршрут:
+        # резерв держит платный маршрут, а не нулевой тариф
+        priceless = {'provider': 'kie', 'model': 'gpt-6-luna', 'role': 'simple', 'input': None, 'output': None}
+        registry = self.registry(rate(**priceless), rate(**OPENROUTER), rate(**MINIMAX))
+        with patch.object(llm_guard, 'current_registry', return_value=registry):
+            created = self.client.post('/api/chatgpt/jobs', json=self.agent_body(pid, 'agent-paid-fallback-0001'))
+        self.assertEqual(created.status_code, 200, created.text)
+        reserve = llm_gateway.agent_reserve(registry, None, None, llm_gateway.agent_estimate_usage('{}', ''))
+        self.assertGreater(reserve, 0)
+        # агент не назвал расход: списание неизвестно, но резерв ненулевой
+        claim = self.client.post('/api/chatgpt/worker/claim', headers=self.worker_headers()).json()
+        job = claim['job']['id']
+        with patch.object(llm_guard, 'current_registry', return_value=registry):
+            ready = self.client.post(f'/api/chatgpt/worker/jobs/{job}/progress', headers=self.worker_headers(),
+                                     json={'status': 'prompt_ready', 'prompt': 'A wide view of an empty courtyard at dusk.'})
+        self.assertEqual(ready.status_code, 200, ready.text)
+        unknown = [row for row in self.rows(pid) if row['actual_status'] == 'unknown']
+        self.assertEqual(len(unknown), 1)
+        self.assertGreater(unknown[0]['reserved_usd'], 0)
+        llm = self.llm_block(pid)
+        self.assertGreater(llm['unknown_cost_usd'], 0)
+        self.assertEqual(llm['actual_cost_usd'], 0)
+        # и неизвестное списание занимает лимит проекта
+        self.client.put('/api/budgets/limits', json={'project_usd': 0.000001, 'daily_usd': 2})
+        blocked = self.chat(registry, PAID, pid, 'agent-paid-fallback-0002')
+        self.assertEqual(blocked.status_code, 400)
+        self.assertIn('бюджет', blocked.text.lower())
+
+    def test_agent_job_is_refused_when_the_limit_is_exhausted_and_the_fallback_is_free(self):
+        pid = self.agent_project()
+        # лимит проекта исчерпан, а единственный нулевой тариф резерв не держит:
+        # работа агента не должна проходить с нулевым резервом
+        priceless = {'provider': 'kie', 'model': 'gpt-6-luna', 'role': 'simple', 'input': None, 'output': None}
+        registry = self.registry(rate(**priceless), rate(**OPENROUTER), rate(**MINIMAX))
+        self.client.put('/api/budgets/limits', json={'project_usd': 0.0000001, 'daily_usd': 2})
+        with patch.object(llm_guard, 'current_registry', return_value=registry):
+            created = self.client.post('/api/chatgpt/jobs', json=self.agent_body(pid, 'agent-limit-free-0001'))
+        self.assertEqual(created.status_code, 400)
+        self.assertIn('бюджет', created.text.lower())
+        self.worker_has_no_job()
+
     def test_agent_job_is_refused_when_the_project_limit_is_exhausted(self):
         pid = self.agent_project()
         registry = self.registry(rate(**KIE), rate(**MINIMAX))
@@ -317,12 +376,32 @@ class AgentCallTests(GatewayCase):
             with self.assertRaises(sqlite3.IntegrityError):
                 self.client.post(f'/api/chatgpt/worker/jobs/{job}/progress', headers=self.worker_headers(),
                                  json={'status': 'prompt_ready', 'prompt': 'A wide view of an empty courtyard at dusk.'})
-        # задание не помечено выполненным: расход агента не потерян
+        # задание не помечено выполненным: расход агента не потерян,
+        # но и не остаётся в невынимаемом состоянии 'preparing'
         with main.connect() as db:
             item = db.execute('SELECT status FROM native_chat_jobs WHERE id=?', (job,)).fetchone()
             rows = db.execute('SELECT COUNT(*) FROM llm_calls WHERE project_id=?', (pid,)).fetchone()[0]
-        self.assertEqual(item['status'], 'preparing')
+        self.assertEqual(item['status'], 'failed')
         self.assertEqual(rows, 0)
+
+    def test_rejected_report_does_not_block_the_agent_queue(self):
+        pid, job = self.agent_job('agent-invalid-transition-0001')
+        registry = self.registry(rate(**KIE), rate(**MINIMAX))
+        with patch.object(llm_guard, 'current_registry', return_value=registry):
+            # обычный отчёт с пустым промптом: переход этапа недопустим
+            rejected = self.client.post(f'/api/chatgpt/worker/jobs/{job}/progress', headers=self.worker_headers(),
+                                        json={'status': 'prompt_ready', 'prompt': ''})
+        self.assertEqual(rejected.status_code, 409)
+        with main.connect() as db:
+            item = db.execute('SELECT status FROM native_chat_jobs WHERE id=?', (job,)).fetchone()
+        # задание не остаётся в невынимаемом состоянии 'preparing'
+        self.assertEqual(item['status'], 'failed')
+        # очередь агента по всей студии не заблокирована: задание заводится заново и уходит воркеру
+        with patch.object(llm_guard, 'current_registry', return_value=registry):
+            again = self.client.post('/api/chatgpt/jobs', json=self.agent_body(pid, 'agent-after-reject-0001'))
+        self.assertEqual(again.status_code, 200, again.text)
+        claim = self.client.post('/api/chatgpt/worker/claim', headers=self.worker_headers()).json()
+        self.assertIsNotNone(claim.get('job'))
 
     def test_agent_call_is_journaled_once_per_request_id(self):
         pid = self.agent_project()

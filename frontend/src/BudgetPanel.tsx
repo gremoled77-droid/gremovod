@@ -1,7 +1,7 @@
 import {useEffect, useState} from 'react';
 import {apiFetch} from './api';
 import {responseJson} from './ChatGPTPanel';
-import {budgetLines, type BudgetSummary} from './llmDisplay';
+import {budgetLines, limitsFootnote, type BudgetSummary} from './llmDisplay';
 import {smallUsd} from './usdFormat';
 type Budget = {
   project_limit_usd: number;
@@ -131,11 +131,7 @@ export default function BudgetPanel({projectId}: {projectId: string}) {
           >
             Сохранить лимиты
           </button>
-          <p className="muted">
-            Лимиты общие для студии и проверяются сервером. Учёт идёт по оценкам до отправки, включая
-            неопределённые и неудачные запросы; это не подтверждение списаний провайдера. Чат Codex не
-            расходует эти API-бюджеты. Ноль запрещает новые платные генерации.
-          </p>
+          <p className="muted">{limitsFootnote()}</p>
         </>
       )}
       {error && <p role="alert">{error}</p>}

@@ -292,17 +292,32 @@ def resolve_route(registry, provider, model, allow_free=False):
     return None
 
 
+def _route_is_free(registry, route):
+    """Маршрут подтверждённо бесплатный: флаг free или тариф 0/0 по записи реестра."""
+    if route.free:
+        return True
+    return llm_gateway.is_free_entry(registry.entry(route.provider, route.model))
+
+
 def plan_chain(registry, task, allow_free=False):
-    """Цепочка маршрутов задачи: сначала бесплатные, затем не больше одного платного."""
+    """Цепочка маршрутов задачи: сначала бесплатные, затем не больше одного платного.
+
+    Бесплатный маршрут — подтверждённо нулевой тариф (флаг free или тариф 0/0). Платный маршрут
+    по оптину тоже платный: он занимает единственное платное место цепочки, а не встаёт перед ним
+    вторым платным маршрутом (две платные попытки на один запрос не делается).
+    """
     chain = []
     paid = None
     for role in (task, 'backup'):
         for entry in registry.entries_for_role(role):
             if not entry.enabled:
                 continue
-            if entry.free or entry.opt_in:
-                if allow_free:
+            if llm_gateway.is_free_entry(entry):
+                # бесплатный маршрут денег не стоит; opt-in требует разрешения владельца
+                if allow_free or not (entry.free or entry.opt_in):
                     chain.append(entry.route())
+                continue
+            if entry.opt_in and not allow_free:
                 continue
             if entry.input_per_mtok is None or entry.output_per_mtok is None:
                 continue
@@ -423,11 +438,15 @@ async def call_provider(studio, route, messages, max_tokens, key, registry, allo
                 'status_code': int(getattr(exc, 'status_code', 400) or 400), 'detail': exc.detail,
                 'answered': False}
     if not result.ok:
+        # провайдер ответил и его usage разобран — ответ считается полученным:
+        # по usage известен факт списания, даже если пригодного текста нет
+        answered = (result.usage is not None
+                    and (result.usage.input_tokens is not None or result.usage.output_tokens is not None))
         return {'ok': False, 'text': '', 'usage': result.usage, 'usage_raw': usage_dict(result.usage),
                 'error_kind': result.error_kind, 'charged_possible': bool(result.charged_possible),
                 'provider_request_id': result.provider_request_id, 'status_code': 502,
                 'detail': 'Провайдер не вернул пригодный ответ: ' + str(result.error_kind),
-                'answered': False}
+                'answered': answered}
     return {'ok': True, 'text': result.text, 'usage': result.usage, 'usage_raw': usage_dict(result.usage),
             'error_kind': None, 'charged_possible': False, 'provider_request_id': result.provider_request_id,
             'status_code': 200, 'detail': None, 'answered': True}
@@ -485,9 +504,10 @@ def register(app, studio):
         return {'estimated_usd': cost, 'quote_token': token, 'max_tokens': body.max_tokens, 'model': body.model,
                 'reference': reference,
                 'execution': {'provider': primary.provider, 'model': primary.model,
-                              'status': 'free' if primary.free else 'paid'},
+                              'status': 'free' if _route_is_free(registry, primary) else 'paid'},
                 'actual': {'cost_usd': None, 'status': 'estimated', 'max_cost_usd': cost},
-                'route_chain': [{'provider': route.provider, 'model': route.model, 'free': route.free} for route in chain]}
+                'route_chain': [{'provider': route.provider, 'model': route.model,
+                                 'free': _route_is_free(registry, route)} for route in chain]}
 
 
 async def guarded_chat(studio, body, key=None):

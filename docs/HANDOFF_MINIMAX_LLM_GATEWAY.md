@@ -16,24 +16,10 @@
 | `e087879` | 2026-10-20 | **T03** — журнал вызовов, подпись оценки, защита денег | `backend/llm_guard.py` +518/−54, `backend/main.py` +40/−15, `backend/security.py` +15/−3, `backend/test_llm_guard.py` +432/−4, `backend/test_llm_quote.py` +70/−0; итого +1234/−109 в 11 файлах |
 | `35ce981` | 2026-10-20 | **T05** — карточка LLM-вызова в интерфейсе | `frontend/src/llmDisplay.ts` +229/−0, `llmDisplay.test.mjs` +136/−0, `LlmApprovalDialog.tsx` +93/−0, `LlmCostCard.tsx` +40/−0, `llmAsk.ts` +38/−8, `IdeaBrief.tsx` +61/−34, `OutlineDialog.tsx` +39/−15, `WorkflowPanel.tsx` +46/−6, `WorldFromBrief.tsx` +43/−47; итого +821/−143 в 13 файлах |
 | `c33635c` | 2026-10-20 | **T04** — бюджет и экономика: факт, резерв, неизвестные списания, ориентир раздельно | `backend/llm_gateway.py` +74/−3, `backend/native_chat.py` +169/−20, `backend/economics.py` +4/−2, `backend/series_economics.py` +7/−4, `backend/test_llm_cost_display.py` +524/−0; итого +887/−53 в 10 файлах |
-| `6756149` | 2026-10-20 | префиксы путей Kie по рабочему конфигу владельца (`openai`/`claude` вместо `codex`/`anthropic`) | `config/llm_gateway.prices.example.json` +3/−2 |
+| `6756149` | 2026-10-20 | префиксы путей Kie по рабочему конфигу владельца (`openai`/`claude` вместо `codex`/`anthropic`) | `config/llm_gateway.prices.example.json` +2/−2, `.autopilot/2026-10-20-llm-gateway--wip/spec.md` +1/−0; итого +3/−2 в 2 файлах |
+| `d7e3e15` | 2026-10-20 | **T06** — панели бюджета, четыре раздельных итога в API и документация шлюза | `backend/security.py` +7/−2, `backend/test_budget_breakdown.py` +81/−0, `frontend/src/BudgetPanel.tsx` +24/−3, `frontend/src/Dock.tsx` +20/−0, `frontend/src/EconomicsPanel.tsx` +31/−8, `frontend/src/SeriesEconomics.tsx` +23/−1, `docs/HANDOFF_MINIMAX_LLM_GATEWAY.md` +176/−18, `docs/LLM_GATEWAY_ARCHITECTURE.md` +248/−0, `docs/LLM_GATEWAY_PROVIDER_MATRIX.md` +131/−0, `docs/LLM_GATEWAY_TEST_REPORT.md` +164/−0; итого +950/−49 в 13 файлах (три из них — служебные `.autopilot/*`) |
 
-**Таск 06 (панели бюджета и документация) в коммитах ещё нет** — коммитит оркестратор. Незакоммиченные файлы таска:
-
-```
-M backend/security.py                        +7/−2    четыре величины в /api/budgets/{project_id}
-M frontend/src/BudgetPanel.tsx               +24/−3   разбивка LLM в панели «Бюджет»
-M frontend/src/Dock.tsx                      +20/−0   разбивка LLM в панели «Очередь и бюджет»
-M frontend/src/EconomicsPanel.tsx            +31/−8   разбивка LLM в «Экономике»
-M frontend/src/SeriesEconomics.tsx          +23/−1   разбивка LLM в экономике серии
-?? backend/test_budget_breakdown.py                  4 новых теста
-?? docs/LLM_GATEWAY_ARCHITECTURE.md                 новая
-?? docs/LLM_GATEWAY_PROVIDER_MATRIX.md              новая
-?? docs/LLM_GATEWAY_TEST_REPORT.md                  новая
-M docs/HANDOFF_MINIMAX_LLM_GATEWAY.md               этот файл, переписан
-```
-
-Изменения в `.autopilot/*` (`state.js`, `dashboard.html`, `manifest.md`) — служебные, внесены оркестратором, не таском 06.
+**Ремонтный круг после `d7e3e15` (F1) — в рабочем дереве, коммит за оркестратором:** закрыты находки ревью — цепочка маршрутов больше не делает две платные попытки на один запрос, тариф 0/0 больше не даёт подтверждённый $0.00, адаптерный путь не теряет разобранный `usage`, отвергнутый отчёт агента больше не оставляет задание в `preparing`, а резерв работы агента держит только платный маршрут с тарифом (бесплатный 0/0 под неподтверждённое списание денег не даёт — при его отсутствии работа агента не ставится).
 
 ---
 
@@ -77,12 +63,12 @@ M docs/HANDOFF_MINIMAX_LLM_GATEWAY.md               этот файл, пере�
 
 | Команда | Результат |
 |---|---|
-| `C:\AI_Workflow_Studio\.venv\Scripts\python.exe -X utf8 -m unittest discover -s backend -p "test_*.py"` | `Ran 353 tests` — **OK** (прогоны: 103.917 / 121.961 / 114.604 с; на старте таска было 349) |
+| `C:\AI_Workflow_Studio\.venv\Scripts\python.exe -X utf8 -m unittest discover -s backend -p "test_*.py"` | `Ran 360 tests` — **OK** (прогоны: 103.917 / 121.961 / 114.604 с на таске 06; 133.973 с после ремонта F1; на старте таска было 349) |
 | `… -m unittest backend.test_budget_breakdown` **до** реализации | `Ran 4 tests` — **FAILED (errors=4)**, `KeyError: 'actual_cost_usd'` |
 | `… -m unittest backend.test_budget_breakdown` **после** реализации | `Ran 4 tests in 1.479s` — **OK** |
 | `… -m unittest` (две обязательные ситуации, 3 теста) | `Ran 3 tests in 1.092s` — **OK** |
-| `npm test` (из `frontend/`) | `tests 115 / pass 115 / fail 0`, 6.9 с |
-| `npm run build` (из `frontend/`) | успешно: `tsc --noEmit` + `vite build`, 1876 модулей, 3.94 с |
+| `npm test` (из `frontend/`) | `tests 118 / pass 118 / fail 0`, 9.9 с (на таске 06 было 115) |
+| `npm run build` (из `frontend/`) | успешно: `tsc --noEmit` + `vite build`, 1876 модулей, 4.51 с |
 | живой платный вызов провайдеру | **не выполнялся** (нет одобрения владельца) |
 | живая сверка тарифов | **не выполнялась** |
 | ручная проверка панелей в браузере | **не выполнялась** (работающая студия на 8000 не перезапускалась) |
@@ -132,7 +118,7 @@ TODO.md                       +2 / −…
 - **minimax** — цены 0.15 / 0.60 есть, но путь чата подтвердить не удалось: нужен живой POST с ключом владельца; путь проверки ключа (`/v1/models`) документацией не подтверждён.
 - **deepseek** — цены `null`: тарифа нет, маршрут в цепочку не попадает; `requires_dynamic_tier_check: true`.
 - **openrouter** — 0/0, `free: true`, `opt_in: true`, квота бесплатного уровня; тариф не подтверждён, остаток квоты не измерялся.
-- **kie** — точные upstream model id для `gpt-6-luna` и `claude-haiku-5-5` **угадывать нельзя**: их берут списком `GET https://api.kie.ai/openai/v1/models` и `GET https://api.kie.ai/anthropic/v1/models` (эндпоинта `/v1/models` на голом хосте нет — 404). Цены 0.03/0.15 и 0.06/0.30 взяты из ТЗ владельца, живой сверки не было. Префиксы путей в рабочем конфиге — `openai` и `claude`, в документации Kie упоминаются `codex`/`api` и `anthropic`; расхождение не разрешено — сверять живым ответом.
+- **kie** — точные upstream model id для `gpt-6-luna` и `claude-haiku-5-5` **угадывать нельзя**: их берут списком `GET https://api.kie.ai/openai/v1/models` и `GET https://api.kie.ai/anthropic/v1/models`. Живая проба без ключа (2026-10-21): оба пути → HTTP 401 (путь есть, нужен ключ), `GET https://api.kie.ai/v1/models` на голом хосте тоже существует — HTTP 200 с телом `{"code":401,"msg":"Unauthorized …"}`, а заведомо кривой путь отдаёт настоящий HTTP 404. Цены 0.03/0.15 и 0.06/0.30 взяты из ТЗ владельца, живой сверки не было. Префиксы путей в рабочем конфиге — `openai` и `claude`, в документации Kie упоминаются `codex`/`api` и `anthropic`; расхождение не разрешено — сверять живым ответом.
 
 Подробности по каждому провайдеру — `docs/LLM_GATEWAY_PROVIDER_MATRIX.md`.
 
@@ -146,12 +132,12 @@ TODO.md                       +2 / −…
 
 ### 4.6. Находки ревью по агентскому пути
 
-Все четыре проверены по коду (см. `backend/native_chat.py`, `backend/llm_gateway.py`):
+Все четыре проверены по коду (см. `backend/native_chat.py`, `backend/llm_gateway.py`); пункты 2–4 исправлены ремонтным кругом F1:
 
-1. **Гейт «тариф есть» бьёт и по `describe_character`.** `journal_agent_call()` (строка 113) вызывается на любом отчёте агента, включая распознавание референсов в GPT-чате. Если в реестре нет тарифа, операция `describe_character` будет отклонена тем же отказом, что и платная.
-2. **Гейт постановки смотрит только базовую линию.** При постановке задания (строка 264) вызывается `agent_has_tariff(registry, None, None)`, а `Registry.entry(None, None)` возвращает `None` → проверяется только `default_baseline` (`kie/gpt-6-luna`). Модель, которую агент реально возьмёт, на этом шаге не проверяется.
-3. **Тариф 0/0 без флага `free` при отчёте без usage даёт `unknown` с нулевым резервом.** В `actual_quote()` нулевой тариф без `free` не даёт `free`: без usage списание = `unknown`, `cost_usd = None`. Резерв (`agent_reserve`) считается по базовой линии и равен нулю только если базовая линия тоже 0/0. В рабочем примере базовая линия платная, поэтому резерв ненулевой — но статус строки будет `unknown`, а не `free`.
-4. **При сбое вставки в `llm_calls` задание остаётся в `preparing` и удерживает очередь воркера.** Покрыто тестом `backend/test_llm_cost_display.py::test_agent_job_is_not_completed_when_the_spend_row_fails`: при `sqlite3.IntegrityError` на вставке задание остаётся в статусе `preparing`, строк в `llm_calls` — 0. Исходный паттерн студии; в рамках шлюза не менялся.
+1. **Гейт «тариф есть» бьёт и по `describe_character`.** `journal_agent_call()` (строка 113) вызывается на любом отчёте агента, включая распознавание референсов в GPT-чате. Если в реестре нет платного маршрута с тарифом, операция `describe_character` будет отклонена тем же отказом, что и платная: резерв под неподтверждённое списание держать нечем. Названный маршрут 0/0 отказом не считается — его списание подтверждённо нулевое (см. п. 2).
+2. **Гейт постановки смотрит только базовую линию — исправлено (F1).** `agent_has_tariff()` берёт тариф по цепочке «названная модель → базовая линия → любой платный маршрут с тарифом». Источник резерва — **платный** маршрут: нулевой тариф (0/0) — это тариф, но держать резерв под неподтверждённое списание он не может (денег под него нет), поэтому в запасной источник он не попадает. Платного тарифа в реестре нет — работа агента не ставится (400 «Для работы агента нет тарифа»), как до F1: иначе неизвестное списание ушло бы мимо лимитов. Названная модель прикрывает сама себя (у маршрута 0/0 списание подтверждённо нулевое, строка получает `actual_status='free'` и нулевой резерв). Тесты: `backend/test_llm_cost_display.py::test_agent_job_is_refused_when_the_registry_has_only_a_zero_tariff`, `::test_agent_reserve_falls_back_to_a_paid_route_and_holds_the_unknown_charge`, `::test_agent_job_is_refused_when_the_limit_is_exhausted_and_the_fallback_is_free`.
+3. **Тариф 0/0 без флага `free` давал `confirmed` с нулевым списанием — исправлено (F1).** `actual_quote()` считает тариф 0/0 подтверждённо бесплатным маршрутом (общий признак `llm_gateway.is_free_entry()` — шлюз, гейт адаптера и цепочка маршрутов считают одинаково): строка получает `actual_status='free'`, факт 0, резерв 0. Подтверждённого $0.00 у платного маршрута больше не бывает. Тест: `backend/test_llm_guard.py::test_zero_tariff_route_without_free_flag_is_free_not_confirmed_zero`.
+4. **При сбое вставки в `llm_calls` задание оставалось в `preparing` — исправлено (F1).** Отвергнутый отчёт и сбой транзакции переводят задание в `failed` с сообщением в задании: очередь агента по всей студии не блокируется, задание можно переделать (исправленный отчёт) или поставить заново, а расход агента при отказе не теряется. Тесты: `backend/test_llm_cost_display.py::test_rejected_report_does_not_block_the_agent_queue` и `::test_agent_job_is_not_completed_when_the_spend_row_fails`.
 
 ---
 
@@ -165,8 +151,8 @@ TODO.md                       +2 / −…
 | 4 | Учёт image/video отсутствует, 29 заданий PiAPI без списаний | `clip_costs`, вне шлюза | открыто, владелецу решать отдельно |
 | 5 | Ветка `minimax/paid-llm-guard` не слита, конфликт по `backend/security.py` | `C:\AI_Workflow_Studio` | открыто: слияние не выполнялось |
 | 6 | Ключи в `~/.minimax/config.yaml` открытым текстом | конфиг рантайма | открыто: перевыпуск и перенос в env |
-| 7 | Гейт тарифа бьёт по `describe_character`; гейт постановки смотрит только базовую линию | `backend/native_chat.py` | открыто: правка вне зоны шлюза |
-| 8 | Сбой вставки в `llm_calls` оставляет задание в `preparing` | `backend/native_chat.py` | открыто: исходный паттерн студии |
+| 7 | Гейт тарифа бьёт по `describe_character`; гейт постановки смотрит только базовую линию | `backend/native_chat.py` | частично закрыто (F1): гейт постановки и резерв считаются по платному маршруту с тарифом (0/0 резерв не держит, платного тарифа нет — 400); право `describe_character` без тарифа — открыто, вне зоны шлюза |
+| 8 | Сбой вставки в `llm_calls` оставляет задание в `preparing` | `backend/native_chat.py` | закрыто (F1): задание переходит в `failed`, очередь агента не блокируется |
 | 9 | Панели бюджета проверены только типами и сборкой — в живом интерфейсе не смотрелись | фронтенд | открыто: нужен перезапуск студии и осмотр |
 
 ---
