@@ -32,7 +32,7 @@ WF_00 — девять узлов: ручной триггер, узел «Ин�
 
 ### 1.2 Код внутри узла — явный MOCK
 
-`workflows/WF_06_Repair_Router.json` целиком (2 161 байт с BOM):
+`workflows/WF_06_Repair_Router.json` целиком (1 614 байт):
 
 ```json
 {
@@ -390,5 +390,5 @@ checkpoint, `S09` решения владельца.
 | Манифест | **точен** | сверено 4/4 проверяемых факта |
 | Медиа-домены в n8n | **MOCK** | `real_provider_enabled: false`, `real_media_evidence_available: false` |
 | Медиа-домены в FastAPI (`main`) | **IMPLEMENTED** | `adapters.py`, `sound.py`, `edit_list.py` — см. `ARCHITECTURE_MAP.md` §4 |
-| Адресный ремонт | **работает в MOCK** | `repaired_slot_id: "shot_02"`, `other_shots_reused: true` |
+| Адресный ремонт | **работает в MOCK** | `repaired_slot_id: "shot_02"`, `other_shots_reused: true`. **Уточнение GPT-6 Astra:** это MOCK-прогон, а не независимая проверка исполнения в бою — §C-08 фиксирует, что исполняемый код ремонта отсутствует |
 | Бюджет/резерв/лизы в n8n | **SPEC-ONLY** (S04) + **IMPLEMENTED** в P0-контуре PR #29 | две реализации, вопрос их стыковки — OI-05 |
