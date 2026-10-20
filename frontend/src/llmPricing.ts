@@ -12,11 +12,11 @@ export const LLM_MODELS: Record<string, {label: string; input: number; output: n
 };
 export const LLM_MAX_TOKENS = 2000;
 
-/** Верхняя оценка: вход ≈ 1 токен на 2 символа (как в backend llm_guard.estimate_usd), выход — весь лимит max_tokens. */
+/** Верхняя оценка: вход ≈ 1 токен на 1,5 символа (как в backend llm_guard.estimate_usd), выход — весь лимит max_tokens. */
 export function llmEstimate(model: string, inputChars: number, maxTokens = LLM_MAX_TOKENS): number {
   const price = LLM_MODELS[model];
   if (!price) return 0;
-  const inputTokens = Math.ceil(inputChars / 2) + 50;
+  const inputTokens = Math.ceil(inputChars / 1.5) + 50;
   return (inputTokens * price.input + maxTokens * price.output) / 1_000_000;
 }
 
@@ -28,6 +28,6 @@ export const IDEA_LLM_MODELS: Record<string, {label: string; input: number; outp
 export function ideaEstimate(model: string, inputChars: number, maxTokens = LLM_MAX_TOKENS): number {
   const price = IDEA_LLM_MODELS[model];
   if (!price) return 0;
-  const inputTokens = Math.ceil(inputChars / 2) + 40;
+  const inputTokens = Math.ceil(inputChars / 1.5) + 50;
   return (inputTokens * price.input + maxTokens * price.output) / 1_000_000;
 }

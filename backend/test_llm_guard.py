@@ -68,7 +68,7 @@ class LlmGuardTests(unittest.TestCase):
         self.assertEqual(self.client.post('/api/llm/estimate', json={**base, 'project_id': 'absent'}).status_code, 404)
         self.assertEqual(self.client.post('/api/llm/estimate', json={**base, 'messages': [{'role': 'user', 'content': '  '}]}).status_code, 400)
 
-    def test_budget_reserved_before_call_and_failed_call_frees_it(self):
+    def test_budget_reserved_before_call_and_reserve_survives_unknown_outcome(self):
         self.prepare()
         self.client.put('/api/budgets/limits', json={'project_usd': 0.00001, 'daily_usd': 0.00001})
         body, quote = self.estimate()
@@ -83,8 +83,19 @@ class LlmGuardTests(unittest.TestCase):
             r = self.client.post('/api/llm/chat', json=self.chat_body(body, quote, request_id='llm-test-request-2'))
             self.assertEqual(r.status_code, 502)
         with main.connect() as db:
-            self.assertEqual(db.execute("SELECT status,usd FROM llm_calls WHERE request_id='llm-test-request-2'").fetchone()['usd'], 0)
-            self.assertEqual(llm_guard.spent(db, self.pid), (0.0, 0.0))
+            row = db.execute("SELECT status,usd,estimated_usd FROM llm_calls WHERE request_id='llm-test-request-2'").fetchone()
+            # Исход неизвестен: резерв держится до сверки, деньги не возвращаются в лимит.
+            self.assertEqual(row['status'], 'submission_unknown')
+            self.assertEqual(row['usd'], quote['estimated_usd'])
+            self.assertGreater(llm_guard.spent(db, self.pid)[0], 0)
+        rejected = AsyncMock(side_effect=main.HTTPException(400, 'PiAPI отклонил запрос'))
+        with patch.object(main, 'request_piapi', rejected):
+            r = self.client.post('/api/llm/chat', json=self.chat_body(body, quote, request_id='llm-test-request-3'))
+            self.assertEqual(r.status_code, 400)
+        with main.connect() as db:
+            row = db.execute("SELECT status,usd FROM llm_calls WHERE request_id='llm-test-request-3'").fetchone()
+            # Отказ провайдера до исполнения: резерв освобождается.
+            self.assertEqual((row['status'], row['usd']), ('failed', 0))
 
     def test_other_paid_llm_routes_stay_closed(self):
         for endpoint in ('/api/compose', '/api/agents/run'):

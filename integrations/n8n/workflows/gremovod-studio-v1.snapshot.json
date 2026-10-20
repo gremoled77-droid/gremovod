@@ -1,0 +1,459 @@
+{
+  "notice": "REFERENCE SNAPSHOT ONLY. Sanitized; not guaranteed to be directly importable. Do not deploy automatically. GitHub changes do not update n8n.",
+  "recordedAt": "2026-10-19",
+  "name": "GremoVOD Studio v1 (без генерации)",
+  "id": "SrlmcCnwPrOZVnFH",
+  "active": false,
+  "versionId": "e3d7188d-12c4-4ca4-ace8-0f0fcb247c88",
+  "nodes": [
+    {
+      "id": "44b8499a-a552-415d-a6d1-971d449ab687",
+      "name": "Ввод проекта",
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.5,
+      "position": [
+        0,
+        256
+      ],
+      "parameters": {
+        "options": {}
+      }
+    },
+    {
+      "id": "6e19b74a-1a1a-4302-84a3-7ea00fa6490d",
+      "name": "Стандарты",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        224,
+        256
+      ],
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "s1",
+              "name": "standards",
+              "type": "string",
+              "value": "S01 РОЛИ: A0 Продюсер — пакеты, проверка, отчёт. A1 Сценарист — сцены с ID и сверка с каноном. A2 Режиссёр — карточки кадров. A3 Промпты — предпросмотр заданий. Никто не придумывает факты: сценарий, канон и персонажи — только от автора.\n\nS02 ИДЕНТИФИКАТОРЫ: сцена PRJ-E01-S03; кадр PRJ-E01-S03-SH05; дубль PRJ-E01-S03-SH05-IMG-T02 (IMG, VID, SND). PRJ — код проекта из входа. ID не меняются между этапами.\nСТАТУСЫ: предложено → понравилось → выбранный дубль → утверждённый референс → канон. Статус меняет только автор. Всё, что создают агенты, имеет статус «предложено».\n\nS03 ПАКЕТ ПЕРЕДАЧИ:\nПАКЕТ: <ID> / этап: <этап>\nОТ: <агент> → КОМУ: <агент>\nЗАДАЧА: ...\nВХОДЫ: ...\nУТВЕРЖДЕНО: ... | НЕ УТВЕРЖДЕНО: ...\nОГРАНИЧЕНИЯ: основной формат 16:9, решение для 9:16 обязательно\nГОТОВО, КОГДА: ...\nВЕРНУТЬ: ...\n\nS04 КАРТОЧКА КАДРА: ID; назначение (драматическая задача); персонажи; локация; видимое действие; крупность, ракурс, композиция 16:9; решение для 9:16; движение камеры (если нужно); длительность, сек; реплика; звук; референсы с ролями; непрерывность (внешность, одежда, реквизит, география, направление движения); следующий шаг.\n\nS05 РОЛИ РЕФЕРЕНСОВ: личность, одежда, локация, композиция, стиль. У каждого референса одна роль, роли не подменять.\n\nS06 ПРЕДПРОСМОТР ГЕНЕРАЦИИ: ID кадра; генератор и режим; промпт на английском; референсы с ролями; параметры (только известные для этой модели); ожидаемый результат; стоимость или «неизвестна»; статус «НЕ ЗАПУСКАТЬ до согласования цены автором».\n\nS07 ЧЕК-ЛИСТ: ID сохранены на всех этапах; у каждого кадра заполнены все поля S04; есть решение для 9:16; противоречия с каноном показаны, а не исправлены молча; факты не придуманы; генерация не запускалась; API-ключей в тексте нет."
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "7a8e8bcb-ef9d-4b46-aafe-864cbacfda2b",
+      "name": "A0 Продюсер: пакет",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        448,
+        256
+      ],
+      "parameters": {
+        "promptType": "define",
+        "text": "=ВХОД АВТОРА:\n{{ $('Ввод проекта').item.json.chatInput }}",
+        "options": {
+          "systemMessage": "=Ты — A0, Продюсер-координатор GremoVOD Studio. Ты не пишешь сцены и не придумываешь факты. Сценарий, канон и персонажи берёшь только из входа автора. Если сценария нет, ответь одной строкой: НЕТ СЦЕНАРИЯ.\nЗадача: определить код проекта и сформировать ПАКЕТ ПЕРЕДАЧИ для A1 по шаблону S03. В ВХОДЫ вставь сценарий, канон и персонажей дословно, без сокращений.\n\nСТАНДАРТЫ:\n{{ $('Стандарты').item.json.standards }}"
+        }
+      }
+    },
+    {
+      "id": "44a5d3f9-686b-4af4-a36a-ef7892fb9000",
+      "name": "Модель A0",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.6,
+      "position": [
+        528,
+        480
+      ],
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "claude-sonnet-5-5",
+          "mode": "id"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "48bc829f-5caf-40c7-b5c0-5a90e87677c4",
+      "name": "A1 Сценарист",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        800,
+        256
+      ],
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.output }}",
+        "options": {
+          "systemMessage": "=Ты — A1, Сценарист и хранитель канона. Разбиваешь сценарий автора на сцены с ID по S02 и ничего не дописываешь. Сверяешь каждую сцену с УТВЕРЖДЁННЫМ КАНОНОМ из пакета. Противоречия не исправляешь, а выносишь списком.\nФормат ответа:\nСЦЕНЫ: для каждой — ID, локация, время, персонажи, действие, реплики (по тексту автора).\nПРОТИВОРЕЧИЯ: если их нет, напиши строго «ПРОТИВОРЕЧИЯ: НЕТ». Если есть, для каждого укажи: что в сценарии / что в каноне / вопрос автору.\n\nСТАНДАРТЫ:\n{{ $('Стандарты').item.json.standards }}"
+        }
+      }
+    },
+    {
+      "id": "63b7db00-d886-4e36-a1c1-e947b3bcda52",
+      "name": "Модель A1",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.6,
+      "position": [
+        880,
+        480
+      ],
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "claude-sonnet-5-5",
+          "mode": "id"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "853661f9-e7c6-4787-b6e3-3653a79950ba",
+      "name": "Канон чист?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1152,
+        256
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $json.output }}",
+              "rightValue": "ПРОТИВОРЕЧИЯ: НЕТ",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "f3aab46d-fa24-487a-a063-dddaf1e52186",
+      "name": "A2 Режиссёр",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        1376,
+        0
+      ],
+      "parameters": {
+        "promptType": "define",
+        "text": "=СЦЕНЫ ОТ A1:\n{{ $('A1 Сценарист').item.json.output }}\n\nВХОД АВТОРА (канон, персонажи, референсы):\n{{ $('Ввод проекта').item.json.chatInput }}",
+        "options": {
+          "systemMessage": "=Ты — A2, Режиссёр раскадровки. Для каждой сцены сначала сформулируй драматическую задачу, затем действие, мизансцену, композицию, свет, камеру и звук. Разложи сцену на кадры и заполни по каждому все поля карточки S04. Сохраняй ID сцен и давай кадрам ID по S02. Следи за непрерывностью: внешность, одежда, реквизит, география, направление движения. Промпты для генераторов не пиши. Не добавляй событий, которых нет в сценарии.\n\nСТАНДАРТЫ:\n{{ $('Стандарты').item.json.standards }}"
+        }
+      }
+    },
+    {
+      "id": "0dd19588-1543-44bc-83e7-d302549e5f11",
+      "name": "Модель A2",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.6,
+      "position": [
+        1456,
+        224
+      ],
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "claude-sonnet-5-5",
+          "mode": "id"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "fe41b630-8d9d-4375-b5d9-a33b86ee38a0",
+      "name": "A3 Промпты",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        1728,
+        112
+      ],
+      "parameters": {
+        "promptType": "define",
+        "text": "=КАРТОЧКИ КАДРОВ ОТ A2:\n{{ $json.output }}\n\nВХОД АВТОРА (генератор, референсы):\n{{ $('Ввод проекта').item.json.chatInput }}",
+        "options": {
+          "systemMessage": "=Ты — A3, Специалист по промптам. Для каждого кадра подготовь ПРЕДПРОСМОТР по шаблону S06. Генератор и режим бери только из поля ГЕНЕРАТОР во входе автора. Если генератор не указан, пиши «ГЕНЕРАТОР НЕ ВЫБРАН» и составляй нейтральный промпт без параметров модели. Не придумывай параметры и цены. Референсам назначай роли по S05. Ничего не запускай. Пояснения пиши по-русски, промпты — на английском.\n\nСТАНДАРТЫ:\n{{ $('Стандарты').item.json.standards }}"
+        }
+      }
+    },
+    {
+      "id": "6cb60c1d-135f-4ff2-b402-fd00cd2a9f5a",
+      "name": "Модель A3",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.6,
+      "position": [
+        1808,
+        336
+      ],
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "claude-sonnet-5-5",
+          "mode": "id"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "2e0625a7-0e0d-46e9-9277-0fdfab4d3c70",
+      "name": "A0 Продюсер: проверка",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        2080,
+        112
+      ],
+      "parameters": {
+        "promptType": "define",
+        "text": "=ВХОД АВТОРА:\n{{ $('Ввод проекта').item.json.chatInput }}\n\nA1 СЦЕНЫ:\n{{ $('A1 Сценарист').item.json.output }}\n\nA2 КАРТОЧКИ:\n{{ $('A2 Режиссёр').item.json.output }}\n\nA3 ПРЕДПРОСМОТР:\n{{ $json.output }}",
+        "options": {
+          "systemMessage": "=Ты — A0, Продюсер-координатор. Проверь результаты A1, A2 и A3 по чек-листу S07 и сверь их со входом автора. Ничего не переписывай за агентов, только найди нарушения.\nФормат ответа:\nПРОЕКТ / ЭТАП / ОБЪЕКТ (ID)\nЧЕК-ЛИСТ: по каждому пункту S07 — выполнено или нарушено, с указанием ID.\nВОПРОСЫ АВТОРУ: ...\nРЕЕСТР: таблица ID → тип → статус (все материалы в статусе «предложено»).\nПодготовлено: ... | Проверено: ... | Не проверено: ... | Следующий шаг: ...\n\nСТАНДАРТЫ:\n{{ $('Стандарты').item.json.standards }}"
+        }
+      }
+    },
+    {
+      "id": "3acbdf7f-e1bf-4a14-b585-bab5d72aa11e",
+      "name": "Модель A0 проверка",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.6,
+      "position": [
+        2160,
+        336
+      ],
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "claude-sonnet-5-5",
+          "mode": "id"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "db29ba12-4da6-42f7-9f42-c012309c54d1",
+      "name": "Итог",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        2432,
+        112
+      ],
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "o2",
+              "name": "output",
+              "type": "string",
+              "value": "=## Отчёт A0\n{{ $json.output }}\n\n---\n## Сцены (A1)\n{{ $('A1 Сценарист').item.json.output }}\n\n## Карточки кадров (A2)\n{{ $('A2 Режиссёр').item.json.output }}\n\n## Предпросмотр заданий (A3)\n{{ $('A3 Промпты').item.json.output }}"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "574ebf38-c800-4540-89d7-43f61cca08fb",
+      "name": "Стоп: вопросы автору",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        1440,
+        400
+      ],
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "o1",
+              "name": "output",
+              "type": "string",
+              "value": "=⛔ Конвейер остановлен: найдены противоречия с каноном. Решите их и отправьте исправленный вход.\n\n{{ $json.output }}"
+            }
+          ]
+        },
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "Ввод проекта": {
+      "main": [
+        [
+          {
+            "node": "Стандарты",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Стандарты": {
+      "main": [
+        [
+          {
+            "node": "A0 Продюсер: пакет",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "A0 Продюсер: пакет": {
+      "main": [
+        [
+          {
+            "node": "A1 Сценарист",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Модель A0": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "A0 Продюсер: пакет",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "A1 Сценарист": {
+      "main": [
+        [
+          {
+            "node": "Канон чист?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Модель A1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "A1 Сценарист",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Канон чист?": {
+      "main": [
+        [
+          {
+            "node": "A2 Режиссёр",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Стоп: вопросы автору",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "A2 Режиссёр": {
+      "main": [
+        [
+          {
+            "node": "A3 Промпты",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Модель A2": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "A2 Режиссёр",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "A3 Промпты": {
+      "main": [
+        [
+          {
+            "node": "A0 Продюсер: проверка",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Модель A3": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "A3 Промпты",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "A0 Продюсер: проверка": {
+      "main": [
+        [
+          {
+            "node": "Итог",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Модель A0 проверка": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "A0 Продюсер: проверка",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  }
+}

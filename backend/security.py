@@ -4,6 +4,7 @@ import hmac
 import json
 import os
 import secrets
+import sqlite3
 import time
 from datetime import datetime, timezone, timedelta
 
@@ -123,16 +124,36 @@ def reservations(db):
     return [r for r in rows if not released(r['status'], r['response'])]
 
 
+def llm_reservations(db):
+    """Платные LLM-вызовы, которые держат бюджет: резерв, подтверждённый факт и неопределённый исход.
+
+    Деньги LLM и генераций считаются одним счётчиком. Раньше лимиты проекта и дня проверялись
+    двумя разными счётчиками, и порядок «сначала LLM, потом медиа» или наоборот давал разный ответ."""
+    from backend import llm_guard
+    try:
+        rows = db.execute('SELECT project_id,usd,created_at,status FROM llm_calls').fetchall()
+    except sqlite3.OperationalError:  # таблица появляется при запуске сервера
+        return []
+    return [r for r in rows if r['status'] in llm_guard.HOLDING_STATUSES]
+
+
 def budget_state(db, project_id):
+    """Сколько денег занято в проекте и за сегодня: генерации и платные LLM-вызовы вместе."""
     config = db.execute('SELECT project_usd,daily_usd FROM spending_limits WHERE id=1').fetchone()
     today = datetime.now(MOSCOW).date().isoformat()
     rows = reservations(db)
     project_used = sum(r['estimated_usd'] for r in rows if r['project_id'] == project_id)
     daily_used = sum(r['estimated_usd'] for r in rows if datetime.fromisoformat(r['created_at']).astimezone(MOSCOW).date().isoformat() == today)
-    return {'project_limit_usd':config['project_usd'], 'daily_limit_usd':config['daily_usd'], 'project_reserved_usd':round(project_used,6), 'daily_reserved_usd':round(daily_used,6), 'day_moscow':today}
+    llm = llm_reservations(db)
+    llm_project = sum(r['usd'] for r in llm if r['project_id'] == project_id)
+    llm_daily = sum(r['usd'] for r in llm if datetime.fromisoformat(r['created_at']).astimezone(MOSCOW).date().isoformat() == today)
+    return {'project_limit_usd':config['project_usd'], 'daily_limit_usd':config['daily_usd'],
+            'project_reserved_usd':round(project_used+llm_project,6), 'daily_reserved_usd':round(daily_used+llm_daily,6),
+            'media_reserved_usd':round(project_used,6), 'llm_reserved_usd':round(llm_project,6), 'day_moscow':today}
 
 
 def check_budget(db, project_id, cost):
+    """Единый барьер для всех платных путей: генерации, голос и LLM считаются по одному лимиту."""
     from backend import series_economics
     series_economics.check_budget(db,project_id,cost)
     value = budget_state(db, project_id)
@@ -182,8 +203,11 @@ def register(app, studio):
             return JSONResponse({'detail':'Запрос с постороннего сайта запрещён'}, status_code=403)
         public = request.url.path in {'/api/health','/api/session','/api/login','/api/logout','/login'} or not (request.url.path.startswith('/api/') or request.url.path in {'/docs','/redoc','/openapi.json','/docs/oauth2-redirect'})
         worker = request.url.path.startswith('/api/chatgpt/worker/')
+        from backend import service_auth
+        machine = service_auth.machine_ok(request)
+        request.state.service_scopes = service_auth.identify(request)[0]
         supplied = request.headers.get('x-studio-session') or request.cookies.get('studio_session', '')
-        if not public and not worker and not secrets.compare_digest(supplied.encode(), LAUNCH_TOKEN.encode()):
+        if not public and not worker and not machine and not secrets.compare_digest(supplied.encode(), LAUNCH_TOKEN.encode()):
             return JSONResponse({'detail':'Локальная сессия отсутствует. Обнови страницу студии.'}, status_code=401)
         # Заморозка платного LLM-резерва на старых составных маршрутах. Это не граница
         # оплаты: настоящая граница — резерв в журнале расходов, который проверяется
@@ -213,7 +237,8 @@ def register(app, studio):
             llm_project = llm_guard.summary(db, {project_id})
             llm_all = llm_guard.summary(db)
             return {**budget_state(db, project_id), 'llm_project_usd': llm_project['usd'], 'llm_daily_usd': llm_all['today_usd'],
-                    'llm_calls_project': llm_project['calls']}
+                    'llm_calls_project': llm_project['calls'], 'llm_unknown_calls': llm_project['unknown_calls'],
+                    'llm_unknown_usd': llm_project['unknown_usd'], 'llm_over_estimate_usd': llm_project['over_estimate_usd']}
 
     @app.put('/api/budgets/limits')
     def limits(body: BudgetLimits):

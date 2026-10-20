@@ -56,12 +56,16 @@ class LlmRegistryTests(unittest.TestCase):
     def test_frontend_estimate_is_not_below_backend_estimate(self):
         """Предпросмотр цены во фронтенде не должен быть дешевле оценки, которую enforced backend."""
         from backend import llm_guard
-        for key,spec in LLM_MODELS.items():
+        divisor = float(re.search(r'inputChars\s*/\s*([\d.]+)', self.source).group(1))
+        self.assertEqual(divisor, llm_guard.INPUT_CHARS_PER_TOKEN,
+                         'фронтенд и backend считают входные токены по-разному')
+        for key, spec in LLM_MODELS.items():
             if 'workflow' not in spec['scopes']:
                 continue
             chars = 4000
             backend = llm_guard.estimate_usd(key, [{'role': 'user', 'content': 'x' * chars}], llm_guard.MAX_OUTPUT_TOKENS)
-            frontend = (round((chars/2 + 50) * spec['price_in'] + llm_guard.MAX_OUTPUT_TOKENS * spec['price_out'], 6)) / 1_000_000
+            frontend = ((chars / divisor + 50) * spec['price_in']
+                        + llm_guard.MAX_OUTPUT_TOKENS * spec['price_out']) / 1_000_000
             self.assertGreaterEqual(frontend, backend, f'{key}: предпросмотр дешевле оценки backend')
 
 

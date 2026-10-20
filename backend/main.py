@@ -883,6 +883,8 @@ from backend import clip_chain
 clip_chain.register(app,sys.modules[__name__])
 from backend import llm_guard
 llm_guard.register(app,sys.modules[__name__])
+from backend import qa_reviews
+qa_reviews.register(app,sys.modules[__name__])
 from backend import idea_background
 idea_background.register(app,sys.modules[__name__])
 from backend import workflow_import

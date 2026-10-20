@@ -1,0 +1,222 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/gremoled77-droid/gremovod/blob/integration/n8n/integrations/n8n/contracts/qa-reviewer-output-v1.schema.json",
+  "title": "GremoVOD QA reviewer observation v1 (UNTRUSTED MODEL OUTPUT)",
+  "description": "Schema for independent reviewer model output. Does not establish that evidence was actually viewed. Only FastAPI may validate evidence provenance and owner approval.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "role",
+    "project_id",
+    "task_id",
+    "artifact_id",
+    "artifact_revision",
+    "artifact_scope",
+    "requested_scopes",
+    "checked_scopes",
+    "scope_results",
+    "verdict",
+    "evidence",
+    "missing_inputs",
+    "biggest_gap",
+    "model_used"
+  ],
+  "properties": {
+    "role": {
+      "type": "string",
+      "enum": [
+        "REVIEW-REQ",
+        "REVIEW-SYSTEM",
+        "REVIEW-CRAFT"
+      ]
+    },
+    "project_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "task_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "artifact_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "artifact_revision": {
+      "type": "string",
+      "minLength": 1
+    },
+    "canon_revision": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "brief_revision": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "bar_revision": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "artifact_scope": {
+      "type": "string",
+      "enum": [
+        "TEXT",
+        "IMAGE",
+        "VIDEO",
+        "AUDIO"
+      ]
+    },
+    "requested_scopes": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/scope"
+      }
+    },
+    "checked_scopes": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/scope"
+      }
+    },
+    "scope_results": {
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": {
+        "$ref": "#/$defs/scope"
+      },
+      "additionalProperties": {
+        "$ref": "#/$defs/verdict"
+      }
+    },
+    "verdict": {
+      "$ref": "#/$defs/verdict"
+    },
+    "evidence": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/evidence"
+      }
+    },
+    "missing_inputs": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "biggest_gap": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "fixes_to_request": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "model_used": {
+      "type": "string",
+      "minLength": 1
+    },
+    "coverage_note": {
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "$defs": {
+    "scope": {
+      "type": "string",
+      "enum": [
+        "TEXT",
+        "IMAGE",
+        "VIDEO",
+        "AUDIO"
+      ]
+    },
+    "verdict": {
+      "type": "string",
+      "enum": [
+        "PASS",
+        "FAIL",
+        "BLOCKED"
+      ]
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scope",
+        "evidence_type",
+        "observation"
+      ],
+      "properties": {
+        "scope": {
+          "$ref": "#/$defs/scope"
+        },
+        "evidence_type": {
+          "type": "string",
+          "enum": [
+            "text_quote",
+            "image_observation",
+            "video_frame",
+            "video_segment",
+            "audio_observation",
+            "transcript_quote",
+            "trusted_metadata"
+          ]
+        },
+        "observation": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_asset_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_text_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "frame_number": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "timecode_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "segment_end_ms": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "anyOf": [
+        {
+          "required": [
+            "source_asset_id"
+          ]
+        },
+        {
+          "required": [
+            "source_text_revision"
+          ]
+        }
+      ]
+    }
+  }
+}
