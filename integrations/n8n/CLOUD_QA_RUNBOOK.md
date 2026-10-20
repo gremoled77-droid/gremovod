@@ -69,6 +69,39 @@ id `df5b9eda-c6a8-49c2-ac05-7bf3344a56a1`, DNS-запись `studio.grem.win` у
 Если `studio.grem.win` не резолвится — ещё не разошлась делегация NS домена `grem.win`
 после регистрации. Это не ошибка контура: туннель и DNS-запись на стороне Cloudflare уже созданы.
 
+## Workflow в n8n Cloud
+
+- `GremoVOD — приёмка через студию (черновик)`, id `4YoGZBPw7SVXc1kg` — MOCK: критеки отвечают честным
+  `BLOCKED`, платных вызовов нет. Источник: `integrations/n8n/workflows/gremovod-qa-studio-loop.ts`.
+- `GremoVOD — приёмка через студию (LIVE, MiniMax)`, id `Lg0bNtjIaZl15ae7` — два независимых критика
+  на MiniMax M3.1 Flash, каждый со своим изолированным пакетом. Источник:
+  `integrations/n8n/workflows/gremovod-qa-studio-live.ts`.
+- `Стенд: критик MiniMax (проверка формата JSON)`, id `vfmPTZXvSQ0lPPNX` — один вызов модели с тем же
+  промптом, чтобы проверить формат ответа и цитирование ревизии.
+
+### Что нужно от владельца, чтобы поехало
+
+Два креда в n8n Cloud:
+
+1. **Header Auth «GremoVOD Studio QA Token»** — `Authorization: Bearer <машинный токен студии>`.
+   Назначить шести HTTP-узлам: «Создать ревью», «Пакет: критик ТЗ», «Отправить вердикт ТЗ»,
+   «Пакет: критик системы», «Отправить вердикт системы», «Итог ревью».
+2. **Кред MiniMax для n8n.** Управляемый «Gateway credits» платформы для узла `lmChatMinimax`
+   не поддерживает эту операцию: n8n отвечает
+   `400 Gateway credits don't currently support this operation. Switch to using your own credential to continue.`
+   Нужен собственный ключ M Plan (Header Auth `Authorization: Bearer <MiniMax Subscription Key>`
+   для `https://api.minimax.io/v1/chat/completions` либо `minimaxApi`-кред для узла модели).
+   Квота M Plan в этом проекте закрывается 2026-10-25 — стоит проверить остаток до ��того.
+
+### Проверено вживую 20.10.2026
+
+- `https://studio.grem.win/api/health` → 200 (туннель Cloudflare, именованный, DNS разошёлся).
+- `/api/qa/reviews/*` без токена → 401; с токеном своего проекта → 200/404 по сути;
+  с токеном чужого проекта → 403; обычный `/api/projects` с токеном → 401 (токен открывает только `/api/qa/*`).
+- Стенд модели: n8n дошёл до вызова MiniMax (запрос ушёл на `ai-assistant.n8n.io`, 379 токенов
+  в промпте) и получил 400 от гейтвея — то есть весь конвейер до провайдера собран правильно,
+  остаётся только кред.
+
 ## Чего контур ещё не умеет
 
 - **Критики A6/A7/A8 не подключены.** Нужен поддерживаемый способ вызова saved Agents из workflow;
