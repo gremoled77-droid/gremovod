@@ -291,7 +291,7 @@ def _artifact_path(studio, row) -> Path:
     return path
 
 
-def _store(studio, project_id, artifact_id, digest, result, signature):
+def _store(studio, project_id, artifact_id, digest, result, signature, master=None):
     record = {
         'artifact_id': artifact_id,
         'project_id': project_id,
@@ -299,7 +299,7 @@ def _store(studio, project_id, artifact_id, digest, result, signature):
         'verdict': result['status'],
         'reason': result.get('reason') or '',
         'checks': json.dumps(result.get('checks') or [], ensure_ascii=False),
-        'measurements': json.dumps(result.get('master') or {}, ensure_ascii=False),
+        'measurements': json.dumps(master or {}, ensure_ascii=False),
         'observations': json.dumps(result.get('observations') or {}, ensure_ascii=False),
         'signature': signature,
         'created_at': studio.now(),
@@ -349,21 +349,65 @@ def _accept(studio, project_id, artifact_id, report, signature, manifest):
         raise HTTPException(400, 'Отчёт относится к другому артефакту')
     path = _artifact_path(studio, _artifact(studio, project_id, artifact_id))
     observations = report.get('observations') or {}
+    master = report.get('master') or {}
     if not path.is_file():
         result = {'status': BLOCKED, 'reason': 'файл мастера недоступен на диске',
                   'checks': [], 'observations': observations}
-        _store(studio, project_id, artifact_id, str(report.get('master_sha256') or ''), result, signature)
+        _store(studio, project_id, artifact_id, str(report.get('master_sha256') or ''), result, signature, master)
         return result
     digest = sha256_file(path)
     if report.get('master_sha256') != digest:
         result = {'status': BLOCKED, 'reason': 'хеш мастера в отчёте не совпадает с файлом в библиотеке',
                   'checks': [], 'observations': observations}
-        _store(studio, project_id, artifact_id, digest, result, signature)
+        _store(studio, project_id, artifact_id, digest, result, signature, master)
         return result
-    measurement = {'master': report.get('master') or {}, 'observations': observations}
+    measurement = {'master': master, 'observations': observations}
     result = verdict(measurement, manifest)
-    _store(studio, project_id, artifact_id, digest, result, signature)
+    _store(studio, project_id, artifact_id, digest, result, signature, master)
     return result
+
+
+def master_facts(studio, project_id, artifact_id):
+    """Факты о мастере: путь, хеш, вердикт N34, измерения.
+
+    Единый источник истины для технической проверки и для заморозки медиа в
+    QA-контуре: и там, и там мастер — это один и тот же файл в библиотеке.
+    """
+    facts = {'exists': False, 'path': None, 'sha256': '', 'qc_verdict': '', 'measurements': {},
+             'observations': {}, 'reason': 'итоговый артефакт не найден'}
+    with studio.connect() as db:
+        row = db.execute('SELECT * FROM release_artifacts WHERE id=? AND project_id=?',
+                         (artifact_id, project_id)).fetchone()
+        if row is None:
+            return facts
+        asset = db.execute('SELECT filename FROM library_assets WHERE id=?', (row['library_asset_id'],)).fetchone()
+        try:
+            qc = db.execute('SELECT * FROM release_artifact_qc WHERE artifact_id=?', (artifact_id,)).fetchone()
+        except Exception:
+            qc = None
+    if asset is None:
+        facts['reason'] = 'файл выпуска не найден в библиотеке'
+        return facts
+    root = Path(studio.LIBRARY_ROOT).resolve()
+    path = (root / asset['filename']).resolve()
+    if not path.is_relative_to(root):
+        facts['reason'] = 'файл выпуска вне библиотеки'
+        return facts
+    facts['path'] = path
+    facts['exists'] = path.is_file()
+    if facts['exists']:
+        facts['sha256'] = sha256_file(path)
+        facts['reason'] = ''
+    else:
+        facts['reason'] = 'файл мастера отсутствует на диске'
+    if qc is not None:
+        facts['qc_verdict'] = qc['verdict'] or ''
+        for field, key in (('measurements', 'measurements'), ('observations', 'observations')):
+            try:
+                facts[key] = json.loads(qc[field])
+            except (TypeError, ValueError):
+                facts[key] = {}
+    return facts
 
 
 def register(app, studio):

@@ -20,6 +20,8 @@ import uuid
 from fastapi import HTTPException, Request
 from pydantic import BaseModel, Field
 
+from backend import media_qc
+
 SCOPES = ('TEXT', 'IMAGE', 'VIDEO', 'AUDIO')
 EVIDENCE_TYPES = {
     'TEXT': ('text_quote', 'transcript_quote'),
@@ -32,6 +34,81 @@ ROLES = ('REVIEW-REQ', 'REVIEW-SYSTEM', 'REVIEW-CRAFT')
 PHASE_ROLES = {'TEXT_PRECHECK': ('REVIEW-REQ', 'REVIEW-SYSTEM'), 'FINAL_MEDIA': ROLES}
 PHASE_SCOPES = {'TEXT_PRECHECK': ('TEXT',), 'FINAL_MEDIA': SCOPES}
 VERDICTS = ('PASS', 'FAIL', 'BLOCKED')
+MEDIA_SCOPES = ('IMAGE', 'VIDEO', 'AUDIO')
+# N35: колонки заморозки медиа. Для старых баз добавляются ALTER-ом.
+FREEZE_COLUMNS = {
+    'master_sha256': 'TEXT', 'media_asset_id': 'TEXT', 'qc_verdict': 'TEXT', 'snapshot_hash': 'TEXT',
+    'evidence_manifest': 'TEXT', 'required_modalities': 'TEXT', 'processing_rights': 'INTEGER',
+    'model_profiles': 'TEXT', 'skill_profiles': 'TEXT', 'stt_transcript': 'TEXT',
+}
+
+
+def freeze_media(studio, body):
+    """N35: замораживает мастер для ревью.
+
+    Медиа подтверждается, только если выполнено всё: мастер лежит в библиотеке,
+    N34 дал PASS_TECHNICAL, право на обработку подтверждено, а требуемые
+    модальности покрыты мастером. Иначе область остаётся BLOCKED — как в
+    спецификации N35, а не «на глаз».
+    """
+    manifest = {
+        'status': 'BLOCKED', 'reason': '', 'master': {}, 'qc': {},
+        'required_modalities': list(body.required_modalities), 'coverage': {},
+        'processing_rights': bool(body.processing_rights_confirmed),
+        'stt_is_voice_evidence': False,
+    }
+    if body.media_url and not body.media_asset_id:
+        manifest['reason'] = 'медиа доступно только по неподтверждённому URL'
+        return manifest
+    if not body.media_asset_id:
+        manifest['reason'] = 'мастер не указан'
+        return manifest
+    facts = media_qc.master_facts(studio, body.project_id, body.media_asset_id)
+    manifest['master'] = {'artifact_id': body.media_asset_id, 'sha256': facts['sha256'],
+                          'local_path': str(facts['path'] or '')}
+    manifest['qc'] = {'verdict': facts['qc_verdict'], 'measurements': facts['measurements'],
+                      'observations': facts['observations']}
+    if not facts['exists']:
+        manifest['reason'] = facts['reason'] or 'мастер недоступен'
+        return manifest
+    if facts['qc_verdict'] != 'PASS_TECHNICAL':
+        manifest['reason'] = f'техническая проверка N34 не пройдена ({facts["qc_verdict"] or "не проводилась"})'
+        return manifest
+    if not body.processing_rights_confirmed:
+        manifest['reason'] = 'право на обработку контента не подтверждено'
+        return manifest
+    measurements = facts['measurements'] or {}
+    has_video = bool(measurements.get('width') and measurements.get('height'))
+    has_audio = bool(measurements.get('audio_codec'))
+    for modality in body.required_modalities:
+        if modality == 'AUDIO':
+            covered, reason = has_audio, 'в мастере нет аудиодорожки'
+        elif modality in ('VIDEO', 'IMAGE'):
+            covered, reason = has_video, 'в мастере нет видеопотока'
+        else:
+            covered, reason = False, 'неизвестная модальность'
+        manifest['coverage'][modality] = {'status': 'CONFIRMED' if covered else 'BLOCKED',
+                                          'reason': '' if covered else reason}
+    blocked = [name for name, item in manifest['coverage'].items() if item['status'] != 'CONFIRMED']
+    if blocked:
+        manifest['status'] = 'PARTIAL'
+        manifest['reason'] = '; '.join(f'{name}: {manifest["coverage"][name]["reason"]}' for name in blocked)
+        return manifest
+    manifest['status'] = 'CONFIRMED'
+    return manifest
+
+
+def snapshot_hash(body, shas, manifest):
+    """Хеш всего замороженного манифеста: раунд и хеш связывают пакеты критиков."""
+    payload = {
+        'project_id': body.project_id, 'task_id': body.task_id, 'artifact_id': body.artifact_id,
+        'artifact_revision': body.artifact_revision, 'artifact_sha': shas['artifact'],
+        'canon_sha': shas['canon'], 'brief_sha': shas['brief'], 'review_phase': body.review_phase,
+        'requested_scopes': list(body.requested_scopes), 'required_reviewers': list(body.required_reviewers),
+        'review_round': body.review_round, 'media': manifest,
+        'model_profiles': body.model_profiles, 'skill_profiles': body.skill_profiles,
+    }
+    return hashlib.sha256(json.dumps(payload, sort_keys=True, ensure_ascii=False).encode('utf-8')).hexdigest()
 
 
 def sha(text):
@@ -51,6 +128,14 @@ class ReviewCreate(BaseModel):
     required_reviewers: list[str] = Field(default_factory=list)
     review_round: int = Field(default=1, ge=1, le=99)
     request_id: str = Field(min_length=8, max_length=100, pattern=r'^[a-zA-Z0-9_-]+$')
+    # N35: заморозка медиа. Мастер называет сам вызывающий, проверяет сервер.
+    media_asset_id: str = ''
+    media_url: str = ''
+    required_modalities: list[str] = Field(default_factory=list)
+    processing_rights_confirmed: bool = False
+    model_profiles: dict = Field(default_factory=dict)
+    skill_profiles: dict = Field(default_factory=dict)
+    stt_transcript: str = ''
 
 
 class VerdictIn(BaseModel):
@@ -78,8 +163,14 @@ def trusted_sources(review, scope):
         if review['brief_sha']:
             sources.append(review['brief_sha'])
         return sources
-    # Медиа-источники появятся вместе с media inspector. До него область не подтверждена.
-    return []
+    # Медиа-источник — замороженный мастер. Он доверен только если N35 подтвердил
+    # покрытие области: без заморозки источника нет, и область остаётся BLOCKED.
+    manifest = review.get('evidence_manifest') or {}
+    coverage = (manifest.get('coverage') or {}).get(scope) or {}
+    if coverage.get('status') != 'CONFIRMED':
+        return []
+    master = review.get('master_sha256') or ''
+    return [master] if master else []
 
 
 def _evidence_matches(evidence, scope, sources):
@@ -108,7 +199,8 @@ def verify_scopes(review, body):
             continue
         if not sources:
             results[scope] = 'BLOCKED'
-            notes.append(f'{scope}: у сервера нет доверенного источника для области (media inspector не подключён)')
+            reason = (review.get('evidence_manifest') or {}).get('reason') or 'медиа не заморожено'
+            notes.append(f'{scope}: у сервера нет доверенного источника для области ({reason})')
             continue
         if claimed in ('PASS', 'FAIL') and not match:
             results[scope] = 'BLOCKED'
@@ -149,6 +241,11 @@ def review_status(review, verdicts):
 
 
 def _row_to_review(row):
+    manifest = {}
+    try:
+        manifest = json.loads(row['evidence_manifest']) if row['evidence_manifest'] else {}
+    except (TypeError, ValueError, IndexError, KeyError):
+        manifest = {}
     return {
         'review_id': row['review_id'],
         'project_id': row['project_id'],
@@ -164,6 +261,13 @@ def _row_to_review(row):
         'required_reviewers': json.loads(row['required_reviewers']),
         'status': row['status'],
         'created_at': row['created_at'],
+        'snapshot_hash': row['snapshot_hash'] if 'snapshot_hash' in row.keys() else '',
+        'master_sha256': row['master_sha256'] if 'master_sha256' in row.keys() else '',
+        'media_asset_id': row['media_asset_id'] if 'media_asset_id' in row.keys() else '',
+        'qc_verdict': row['qc_verdict'] if 'qc_verdict' in row.keys() else '',
+        'evidence_manifest': manifest,
+        'required_modalities': json.loads(row['required_modalities']) if 'required_modalities' in row.keys() and row['required_modalities'] else [],
+        'processing_rights': bool(row['processing_rights']) if 'processing_rights' in row.keys() else False,
     }
 
 
@@ -177,6 +281,10 @@ def register(app, studio):
                 task_id TEXT NOT NULL,artifact_id TEXT NOT NULL,artifact_revision TEXT NOT NULL,artifact_sha TEXT,canon_sha TEXT,brief_sha TEXT,
                 review_phase TEXT NOT NULL,requested_scopes TEXT NOT NULL,required_reviewers TEXT NOT NULL,review_round INTEGER NOT NULL DEFAULT 1,
                 artifact_text TEXT,canon_text TEXT,brief_text TEXT,status TEXT NOT NULL,created_at TEXT NOT NULL,updated_at TEXT NOT NULL)''')
+            existing = {r['name'] for r in db.execute('PRAGMA table_info(qa_reviews)')}
+            for name, kind in FREEZE_COLUMNS.items():
+                if name not in existing:
+                    db.execute(f'ALTER TABLE qa_reviews ADD COLUMN {name} {kind}')
             db.execute('''CREATE TABLE IF NOT EXISTS qa_verdicts(verdict_id TEXT PRIMARY KEY,review_id TEXT NOT NULL,role TEXT NOT NULL,model TEXT,
                 verdict TEXT NOT NULL,artifact_revision TEXT NOT NULL,checked_scopes TEXT NOT NULL,claimed_scope_results TEXT NOT NULL,scope_results TEXT NOT NULL,evidence TEXT NOT NULL,
                 trusted_evidence TEXT NOT NULL,biggest_gap TEXT,missing_inputs TEXT NOT NULL,model_used TEXT,actual_usd REAL,notes TEXT NOT NULL,
@@ -211,18 +319,33 @@ def register(app, studio):
             raise HTTPException(400, f'В фазе {body.review_phase} требуются критики {", ".join(PHASE_ROLES[body.review_phase])}')
         review_id = uuid.uuid4().hex
         now = studio.now()
+        # N35: заморозка медиа и хеш всего манифеста. Считает сервер, не вызывающий.
+        shas = {'artifact': sha(body.artifact_text) if body.artifact_text else '',
+                'canon': sha(body.canon_text) if body.canon_text else '',
+                'brief': sha(body.brief_text) if body.brief_text else ''}
+        manifest = freeze_media(studio, body) if body.media_asset_id or body.media_url else {}
+        frozen_hash = snapshot_hash(body, shas, manifest) if manifest else ''
         with studio.connect() as db:
             db.execute('BEGIN IMMEDIATE')
             db.execute('''INSERT INTO qa_reviews(review_id,request_id,project_id,task_id,artifact_id,artifact_revision,artifact_sha,canon_sha,brief_sha,
-                review_phase,requested_scopes,required_reviewers,review_round,artifact_text,canon_text,brief_text,status,created_at,updated_at)
-                VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',
+                review_phase,requested_scopes,required_reviewers,review_round,artifact_text,canon_text,brief_text,status,created_at,updated_at,
+                master_sha256,media_asset_id,qc_verdict,snapshot_hash,evidence_manifest,required_modalities,processing_rights,model_profiles,skill_profiles,stt_transcript)
+                VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',
                        (review_id, body.request_id, body.project_id, body.task_id, body.artifact_id, body.artifact_revision,
-                        sha(body.artifact_text) if body.artifact_text else '', sha(body.canon_text) if body.canon_text else '',
-                        sha(body.brief_text) if body.brief_text else '', body.review_phase, json.dumps(scopes), json.dumps(reviewers),
-                        body.review_round, body.artifact_text, body.canon_text, body.brief_text, 'AWAITING_VERDICTS', now, now))
+                        shas['artifact'], shas['canon'], shas['brief'], body.review_phase, json.dumps(scopes), json.dumps(reviewers),
+                        body.review_round, body.artifact_text, body.canon_text, body.brief_text, 'AWAITING_VERDICTS', now, now,
+                        (manifest.get('master') or {}).get('sha256', ''), body.media_asset_id,
+                        (manifest.get('qc') or {}).get('verdict', ''), frozen_hash,
+                        json.dumps(manifest, ensure_ascii=False) if manifest else '',
+                        json.dumps(list(body.required_modalities)), 1 if body.processing_rights_confirmed else 0,
+                        json.dumps(body.model_profiles, ensure_ascii=False), json.dumps(body.skill_profiles, ensure_ascii=False),
+                        body.stt_transcript))
         with studio.connect() as db:
             row = load(db, review_id)
         return {'review': _row_to_review(row), 'duplicate': False,
+                'media_status': manifest.get('status') if manifest else '',
+                'media_reason': manifest.get('reason') if manifest else '',
+                'snapshot_hash': frozen_hash,
                 'next_action': 'dispatch_isolated_packets_to_reviewers'}
 
     @app.get('/api/qa/reviews/{review_id}')
@@ -247,6 +370,13 @@ def register(app, studio):
         review = _row_to_review(row)
         if role not in review['required_reviewers']:
             raise HTTPException(403, 'Этот критик не участвует в ревью')
+        # Три раздельных пакета на один раунд и один хеш манифеста.
+        packet_id = sha(f"{review['review_id']}|{review['review_round']}|{review['snapshot_hash']}|{role}")
+        try:
+            model_profiles = json.loads(row['model_profiles']) if row['model_profiles'] else {}
+            skill_profiles = json.loads(row['skill_profiles']) if row['skill_profiles'] else {}
+        except (TypeError, ValueError):
+            model_profiles, skill_profiles = {}, {}
         payload = {
             'review_id': review['review_id'],
             'task_id': review['task_id'],
@@ -256,11 +386,21 @@ def register(app, studio):
             'review_round': review['review_round'],
             'requested_scopes': review['requested'],
             'role': role,
+            'packet_id': packet_id,
+            'snapshot_hash': review['snapshot_hash'],
             'artifact_text': row['artifact_text'],
             'canon_text': row['canon_text'],
             'brief_text': row['brief_text'],
             'trusted_revisions': {'artifact_sha': review['artifact_sha'], 'canon_sha': review['canon_sha'],
-                                  'brief_sha': review['brief_sha']},
+                                  'brief_sha': review['brief_sha'], 'master_sha256': review['master_sha256']},
+            'media': review['evidence_manifest'],
+            'model_profile': model_profiles.get(role),
+            'skill_profile': skill_profiles.get(role),
+            'stt_transcript': row['stt_transcript'] or '',
+            'evidence_policy': {
+                'stt_is_voice_evidence': False,
+                'note': 'Расшифровка речи — текстовый артефакт. Она не доказывает тембр, подачу или эмоцию.',
+            },
         }
         return payload
 

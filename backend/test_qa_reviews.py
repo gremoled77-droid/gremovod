@@ -167,7 +167,7 @@ class QaReviewsTests(unittest.TestCase):
         self.assertEqual(data['verdict']['overall'], 'BLOCKED')
         self.assertNotEqual(data['review_status'], 'CHANGES_REQUESTED')
 
-    def test_media_scope_stays_blocked_without_inspector(self):
+    def test_media_scope_stays_blocked_without_frozen_master(self):
         self.prepare()
         review = self.create(review_phase='FINAL_MEDIA', requested_scopes=['IMAGE'],
                              required_reviewers=['REVIEW-REQ', 'REVIEW-SYSTEM', 'REVIEW-CRAFT'],
@@ -176,7 +176,8 @@ class QaReviewsTests(unittest.TestCase):
                          evidence=[{'scope': 'IMAGE', 'evidence_type': 'image_observation', 'source_asset_id': 'asset-9'}])
         data = r.json()
         self.assertEqual(data['verdict']['scope_results']['IMAGE'], 'BLOCKED')
-        self.assertTrue(any('media inspector' in note for note in data['verdict']['notes']))
+        # Медиа не заморожено — сервер не знает доверенного источника для области.
+        self.assertTrue(any('не заморожено' in note or 'мастер' in note for note in data['verdict']['notes']))
 
     def test_second_verdict_of_the_same_critic_is_conflict(self):
         self.prepare()
