@@ -52,15 +52,22 @@ Workflow в n8n Cloud: `GremoVOD — приёмка через студию (ч�
 
 ## Публичный адрес студии
 
-Сейчас стоит quick-туннель `https://basin-drop-emerging-letters.trycloudflare.com` — адрес
-меняется при каждом перезапуске туннеля, это только для проверки связки. Постоянный адрес:
+Постоянный адрес: **`https://studio.grem.win`** — именованный туннель Cloudflare `gremovod-studio`,
+id `df5b9eda-c6a8-49c2-ac05-7bf3344a56a1`, DNS-запись `studio.grem.win` уже прописана в туннель.
 
-1. Домен в Cloudflare (в аккаунте сейчас ноль зон).
-2. Именованный туннель в аккаунте Cloudflare (`/accounts/{account_id}/cfd_tunnel`).
-3. DNS-запись CNAME на `<tunnel-id>.cfargotunnel.com` для `studio.<домен>`.
-4. `cloudflared tunnel run <tunnel-id>` на ПК, в конфиге туннеля — `service: http://127.0.0.1:<порт>`.
-5. В студии: `STUDIO_REMOTE_HOSTS=studio.<домен>`, и адрес обновить в узле
-   «Собрать запрос ревью» (там собирается `base`, остальные узлы берут его оттуда).
+На ПК:
+
+- конфиг туннеля: `C:\Users\BLOWKA\.cloudflared\config.yml` (ingress: `studio.grem.win` → `http://127.0.0.1:8011`);
+- запуск: `cloudflared tunnel run gremovod-studio`;
+- чтобы туннель поднимался сам: `cloudflared service install` (затем `cloudflared service start`);
+- в студии: `STUDIO_REMOTE_HOSTS=studio.grem.win` — иначе запрос с чужим Host отклоняется (403).
+
+В workflow адрес собирается в одном месте — узел «Собрать запрос ревью», остальные берут `base` оттуда.
+Адрес стенда на ПК (`127.0.0.1:8011`) и порт рабочей студии (`8000`) — разные вещи: рабочую студию
+на 8000 туннель не трогает.
+
+Если `studio.grem.win` не резолвится — ещё не разошлась делегация NS домена `grem.win`
+после регистрации. Это не ошибка контура: туннель и DNS-запись на стороне Cloudflare уже созданы.
 
 ## Чего контур ещё не умеет
 

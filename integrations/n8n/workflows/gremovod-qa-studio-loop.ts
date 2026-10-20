@@ -1,6 +1,6 @@
 import { workflow, node, trigger, newCredential, expr } from '@n8n/workflow-sdk';
 
-const BASE = 'https://basin-drop-emerging-letters.trycloudflare.com';
+const BASE = 'https://studio.grem.win';
 const PROJECT = '5b2e8e41-bc8a-4575-aec7-7ba5c2ef16d6';
 
 const start = trigger({
