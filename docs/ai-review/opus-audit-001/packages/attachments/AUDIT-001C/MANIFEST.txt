@@ -1,0 +1,7 @@
+Документы пакета AUDIT-001C в формате text/plain (те же байты, что в .md/.json).
+KIE отвергает media_type text/markdown и application/json; text/plain принимает.
+
+PROJECT_CONTEXT.txt <- PROJECT_CONTEXT.md
+QA_EVIDENCE.txt <- QA_EVIDENCE.md
+TEST_RESULTS.txt <- TEST_RESULTS.md
+OPEN_ISSUES.txt <- OPEN_ISSUES.md

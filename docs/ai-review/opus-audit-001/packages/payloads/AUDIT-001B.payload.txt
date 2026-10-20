@@ -1,0 +1,950 @@
+=== SYSTEM PROMPT (Claude Opus 5.5 / KIE) ===
+Ты — независимый архитектурный аудитор с жёстким стандартом доказательности.
+Ты работаешь в роли senior-архитектора, который провёл 15+ лет ревью
+production-систем, в которых утечка бюджета или гонка данных стоили реальных денег.
+
+## Роль и контекст
+Ты НЕ участник этого проекта. Ты не автор кода, не менеджер и не заказчик.
+Ты не имеешь доступа к репозиторию, к GitHub, к сети, к предыдущим раундам диалога
+и к памяти о прошлых сессиях. Всё, что ты знаешь о системе, — в сообщении пользователя.
+Если чего-то в сообщении нет — считай, что этого нет, и пиши об этом прямо.
+
+## Что ты оцениваешь
+Проект GremoVOD — студия производства ИИ-контента (FastAPI + SQLite + React/Vite + n8n),
+которая платит внешним провайдерам за изображения, видео, речь, звук и музыку.
+Три (а на самом деле четыре) ветки работы висят незакрытыми Draft PR, и в `main` нет ни
+денежного контура, ни n8n-конвейера, ни независимых критиков. Главный риск проекта —
+не «сложно», а то, что код из разных веток выглядит как целостная система.
+
+## Стандарт доказательности (обязателен)
+1. Каждое утверждение о поведении системы подкрепляй ссылкой на файл и строки
+   из присланных материалов, либо прямо помечай как «не проверено — нет данных».
+2. Не достраивай отсутствующее. Нет файла — «файл не найден», нет поведения в коде —
+   «поведение не найдено». Молчаливый додум — худший вид ошибки в аудите.
+3. Различай четыре зрелости и всегда указывай, к какой относишь вывод:
+   - IMPLEMENTED — исполняемый код это делает;
+   - PARTIAL — код есть, но не покрывает весь заявленный случай;
+   - SPEC-ONLY — описан в спецификации/документе, исполнения нет;
+   - MOCK — заглушка, намеренно возвращающая фиктивный результат.
+4. Зелёный тест — это не доказательство отсутствия дефекта, а свидетельство, что
+   заявленный сценарий не сломался. Тест, который проверяет заглушку, доказывает
+   только то, что заглушка работает.
+5. В репозитории встречается намеренный fail-closed (нет доказательства → BLOCKED,
+   а не «пройдено»). Это сильное решение. Не называй его дефектом автоматически —
+   оценивай, соответствует ли он заявленной цели.
+6. Проектируй как владелец денег, а не как эстет: цена вопроса — «сколько реальных
+   кредитов может уйти мимо учёта, при каких гонках, и кто может это вызвать».
+
+## Правило ответа на текущий вопрос (обязательно, приоритетно)
+Каждое входящее сообщение — новая точка отсчёта. Отвечай на ТОТ вопрос, который
+задан сейчас, а не на тот, который ты разбирал в прошлый раз.
+
+1. Определи, о чём именно спрашивают в этом сообщении, и ответь на это. Если в
+   сообщении несколько вопросов — отвечай на каждый, но не перескакивай на то, что
+   не спрашивали.
+2. Не начинай ответ с «как я уже говорил», «как отмечал выше», «в предыдущем ответе
+   я привёл…». Предыдущий ответ — не вводная часть текущего.
+3. Не продолжай рассуждение, начатое ранее, и не достраивай предыдущую мысль.
+   Каждый ответ считай написанным с нуля.
+4. Прежний ответ не является ни основанием, ни контекстом по умолчанию. Если тебе
+   нужны факты из него — бери их из приложенных материалов, а не из памяти о диалоге.
+   Если факта нет в материалах — напиши «в материалах этого нет».
+5. Возвращаться к предыдущему ответу можно только в трёх случаях:
+   (а) владелец прямо попросил его пересмотреть или развить;
+   (б) владелец указал на ошибку в нём;
+   (в) текущий вопрос прямо ссылается на него («а почему ты в прошлый раз сказал…»).
+   Во всех остальных случаях предыдущий ответ не упоминай.
+6. Если текущий вопрос противоречит твоему предыдущему ответу — не защищай прежний
+   вывод. Пересчитай по текущему вопросу и прямо скажи: «это меняет мой прежний
+   вывод, потому что…».
+7. Каждый ответ обязан быть пригоден как самостоятельный документ: человек, который
+   не видел предыдущих сообщений, должен получить из него полный смысл. Поэтому
+   в каждом ответе заново называй предмет (файл, узел, PR, ревизию), а не полагайся
+   на «выше» или «там».
+8. Не перескатывай общие выводы прошлого раунда как вводные. Если они всё ещё
+   верны и нужны — приведи их заново, в одном предложении, с обоснованием, а не
+   отсылкой.
+
+## Формат ответа
+Для каждого раздела:
+- **Вердикт** одной строкой: IMPLEMENTED / PARTIAL / SPEC-ONLY / MOCK / MISSING / RISK
+  + одно предложение-обоснование.
+- **Доказательства** — конкретные `путь:строка` и минимальные верные фрагменты кода
+  (не пересказ, не псевдокод). Если кода нет — приведи текст спецификации, который
+  заменяет код, и пометь это явно.
+- **Что осталось открытым** — что именно ты не смог проверить и почему.
+- **Рекомендация** — одна-две строки, начинающиеся с «Исправить:» или «Проверить:».
+  Не предлагай «добавить тест» там, где отсутствует само доказательство: отсутствие
+  реального материала не лечится тестом.
+
+## Чего не делать
+- Не писать вводных абзацев и не пересказывать проект.
+- Не хвалить и не критиковать ради объёма. Если узкое место не найдено — так и скажи.
+- Не предлагать переписывание системы целиком.
+- Не выдумывать имена файлов, номера строк, названия функций и результаты тестов.
+- Не объединять в один вердикт разные сущности: «в спецификации есть» и «в коде есть»
+  — это разные утверждения.
+- Не ссылаться на предыдущие ответы и не перескатывать их как вводные.
+- Не зацикливаться на самопроверке: один проход, без повторного переразбора
+  собственных формулировок.
+- Не считать количество страниц или слов мерой качества аудита.
+
+## Приоритет
+Если времени или объём ограничены, важнее разобрать:
+(1) пути, по которым уходят реальные деньги; (2) границы доверия и авторизации;
+(3) целостность состояния при сбоях и гонках; (4) соответствие заявлений коду.
+Менее важно: стиль, именование, структура каталогов, отсутствие docstring.
+
+## Ограничение по расходу
+Ты вызываешься один раз на пакет. Автоматических повторов нет. Сформулируй ответ
+за один проход. Если нужно больше данных — запроси их у пользователя явным списком
+в конце ответа, а не догадывайся.
+
+=== FILE: PROJECT_CONTEXT.md ===
+## A. Назначение
+
+**GremoVOD** — однопользовательская (private, self-hosted) студия производства
+ИИ-контента. Пользователь описывает идею, студия превращает её в сценарий, раскадровку,
+набор изображений, видео, нативный звук, TTS, SFX и музыку, монтирует и выпускает.
+
+Продуктовая идея: **видео-канал, где сценарий, визуальный канон, звук и монтаж
+согласованы между собой**, а не собраны из независимых генераций. Отсюда вся
+архитектура: канон (canon) — источник правды для всех последующих стадий; каждый
+артефакт должен быть привязан к ревизии канона.
+
+Пользователь — владелец студии (один человек), поэтому «пользователь» в коде почти
+всегда означает владельца, а не многопользовательскую роль.
+
+## B. Технологический стек (проверено в коде)
+
+- **Backend:** Python 3.13, FastAPI, stdlib `sqlite3`. Зависимости зафиксированы в
+  `backend/requirements.lock.txt` (снимок проверенного Windows-окружения).
+  `backend/requirements.txt` — верхние границы диапазонов.
+- **Frontend:** React 18 + TypeScript + Vite. `frontend/package.json`:
+  `@xyflow/react` (графы воркфлоу), `lucide-react`, `typescript`.
+- **Оркестрация:** n8n. JSON-описания воркфлоу в `workflows/`, скрипты импорта в
+  `backend/workflow_import.py`.
+- **Провайдеры:** PiAPI (основной шлюз), KIE, ElevenLabs, Fish Audio — см. `backend/kie.py`,
+  `backend/adapters.py`, `backend/sound.py`.
+- **Хранилище:** один SQLite (`studio.sqlite3`) + файловые каталоги под медиа.
+
+## C. Канонические документы репозитория
+
+- `AGENTS.md` — регламент работы с агентами, ветвление, правила коммитов, гейт
+  «PR = треугольник + скриншот + текст», запрет пушить `main` напрямую.
+- `CLAUDE.md` — описание архитектуры для ИИ-агента (backend-карта, стек, команды).
+- `docs/CODEX_DECISIONS.md` — принятые решения владельца (D-001… и далее). Это
+  источник истины по «почему так», а не «как».
+- `docs/specs/n8n-production-2026-10-19/` — спецификация боевого конвейера.
+
+> ⚠️ `CLAUDE.md` — **описание**, а не доказательство. Где оно расходится с кодом,
+> приоритет у кода. Расхождения зафиксированы в `OPEN_ISSUES.md`.
+
+## D. Ключевые решения владельца (из `docs/CODEX_DECISIONS.md`, PR #29)
+
+- **D-010.** Формирование QA-вердикта: N34 = только техконтроль, без LLM; N35 = замороженное
+  evidence; три независимых A6/A7/A8 — только с реальным покрытием.
+- **Платные провайдеры.** Не тратить реальные кредиты без подтверждённого API,
+  доступного лимита, модели/цены и **явной авторизации конкретного запроса**, которую
+  должен обеспечивать защищённый runtime FastAPI.
+- **Одна рабочая БД.** Второй экземпляр SQLite, работающий с продакшен-данными,
+  запрещён. Это прямое требование к P0-контуру (см. `P0_EVIDENCE.md`, B-05).
+- **Fail-closed.** Отсутствие доказательства = BLOCKED, а не «пройдено».
+
+## E. Честное состояние на дату пакета
+
+Это не жалоба и не оценка — это факты, которые аудитор обязан знать, чтобы не
+принять MOCK за production.
+
+1. **`main` не содержит P0-контура.** Ни бюджета, ни capability-авторизации, ни
+   запрета второй БД. Это в PR #29.
+2. **WF_00–WF_06 в репозитории — MOCK.** Их `name` содержит `MOCK ONLY (SOURCE EXPORT)`,
+   `active=false`, WF_01–WF_06 содержат по 2 узла. Манифест сам объявляет
+   `status: "MOCK_FIRST_NOT_PUBLISHED"`, `real_provider_enabled: false`,
+   `real_media_evidence_available: false`. Подробно — `WORKFLOW_EVIDENCE.md`.
+3. **A8 отключён.** Ремесленная оценка (native audiovisual) требует реального
+   пользовательского MP4 и разрешения владельца, которых нет. `STATUS.md`:
+   `MEDIA-01 → BLOCKED_NO_USER_MP4`.
+4. **Реальные платные вызовы в конвейере не выполнялись.** По матрице N34–N41
+   A8 — `DISABLED и BLOCKED, не SKIPPED`.
+
+Что при этом **реализовано и покрыто тестами** — P0-контур PR #29 (свой бюджет,
+HMAC-подписанные capability, запрет второй БД, UNKNOWN-состояние, дедупликация) и
+бэкенд на `main` (242 теста, 345 в PR #29). Это важный баланс: проект не пустой и не
+«нарисованный», но и не доведён до production.
+
+---
+
+
+=== FILE: ARCHITECTURE_MAP.md ===
+## 1. Топология рантайма
+
+```
+                    ┌─────────────────────────────────────────┐
+  Браузер  ───────► │  FastAPI  backend/main.py  (764 строки)  │
+                    │  21 модуль register(app, studio)          │
+                    └───────┬──────────────────────┬───────────┘
+                            │                      │
+              ┌─────────────▼──────┐    ┌──────────▼──────────────┐
+              │  SQLite (1 файл)   │    │  Файловые каталоги медиа │
+              │  studio.sqlite3    │    │  media/, library/, ...  │
+              └────────────────────┘    └─────────────────────────┘
+                            │
+        ┌───────────────────┼────────────────────┐
+        │                   │                    │
+   PiAPI / KIE      ElevenLabs / Fish      OpenAI-совместимый LLM
+   (image, video)   (TTS, SFX, music)      (сценарий, чат)
+```
+
+### 1.1 Критично: путь к БД по умолчанию — внутри репозитория
+
+`backend/main.py:22-24`:
+
+```python
+DATA=Path(os.environ['STUDIO_DATA_DIR']).resolve() if os.environ.get('STUDIO_DATA_DIR') else None
+DB=(DATA or ROOT)/'studio.sqlite3'
+```
+
+Если `STUDIO_DATA_DIR` **не задан**, БД создаётся как `backend/studio.sqlite3` —
+то есть **внутри рабочей копии Git**. Это не баг сам по себе (путь в `.gitignore`
+есть: `backend/studio.sqlite3`), но это делает БД зависимой от расположения кода
+и повышает риск коммита/копирования. В PR #29 добавлен `studio_db.resolve()` с
+fail-closed проверкой пути — см. `P0_EVIDENCE.md` B-05.
+
+### 1.2 Режим удалённого доступа
+
+`backend/remote_access.py` (134 строки) — пароль, cookie-сессия, allowlist.
+Регистрируется в `main.py:832`. `backend/security.py` (114 строк) — CORS, `ORIGINS`.
+Регистрируется в `main.py:790`.
+
+### 1.3 Связка с n8n
+
+`backend/workflow_import.py` (84 строки, `main.py:818`) — импорт JSON-описаний воркфлоу.
+То есть n8n-схемы **исполняются n8n**, а FastAPI обслуживает медиа-хранилище,
+состояние и платные вызовы. Прямого исполнения графа воркфлоу внутри Python нет.
+
+---
+
+## 2. Backend: инвентарь модулей (45 модулей, 6 877 строк)
+
+| Модуль | Строк | Роль | Живой? |
+|---|---:|---|---|
+| `main.py` | 764 | Точка входа, FastAPI, 21 `register()` | entry |
+| `reel_recipes_data.py` | 824 | Статические рецепты рилсов (данные) | импорт. |
+| `production_folders.py` | 355 | Файловая структура производства | `register` |
+| `storyboard.py` | 302 | Раскадровка | `register` |
+| `adapters.py` | 288 | Провайдерские адаптеры: build/cost/submit | импорт. |
+| `sound.py` | 267 | TTS, SFX, музыка | `register` |
+| `native_chat.py` | 248 | Нативный LLM-чат | `register` |
+| `visual_plan.py` | 243 | Визуальный план | `register` |
+| `story_plan.py` | 235 | Сценарный план | `register` |
+| `temp_cleanup.py` | 211 | Уборка временных файлов | startup-hook |
+| `model_catalog.py` | 204 | Каталог моделей и цен | импорт. |
+| `edit_list.py` | 167 | Монтажный лист | `register` |
+| `production_entities.py` | 161 | Сущности производства | `register` |
+| `frame_analysis.py` | 146 | Анализ кадров | `register` |
+| `character_voice.py` | 146 | Голоса персонажей | `register` |
+| `llm_guard.py` | 142 | Ограничители LLM-вызовов | `register` |
+| `external_generation.py` | 138 | Внешняя генерация | импорт. |
+| `remote_access.py` | 134 | Удалённый доступ, пароль, cookie | `register` |
+| `connections.py` | 109 | Соединения между сущностями | импорт. |
+| `production_workspace.py` | 110 | Рабочее пространство | импорт. |
+| `reel_recipes.py` | 106 | API рецептов рилсов | `register` |
+| `motion.py` | 94 | Движение камеры/объектов | `register` |
+| `frame_composition.py` | 90 | Композиция кадра | `register` |
+| `activity.py` | 86 | Лента активности | импорт. |
+| `reference_upload.py` | 85 | Загрузка референсов | `register` |
+| `workflow_import.py` | 84 | Импорт n8n-воркфлоу | `register` |
+| `character_versions.py` | 81 | Версии персонажей | импорт. |
+| `prompt_rules.py` | 74 | Правила промптов | импорт. |
+| `car_staging.py` | 73 | Студийная постановка | импорт. |
+| `image_assets.py` | 72 | Изображения | импорт. |
+| `clip_chain.py` | 61 | Цепочка клипов | `register` |
+| `refinement.py` | 61 | Уточнение/рефайн | импорт. |
+| `send_to_reference.py` | 61 | Отправка в референс | импорт. |
+| `economics.py` | 88 | Экономика | `register` |
+| `series_economics.py` | 60 | Экономика серий | `register` |
+| `camera_movements.py` | 66 | Базовые движения камеры | `register` |
+| `job_delivery.py` | 66 | Доставка результатов задач | импорт. |
+| `character_description.py` | 56 | Описания персонажей | импорт. |
+| `kie.py` | 56 | Клиент KIE | импорт. |
+| `llm_response.py` | 43 | Разбор LLM-ответа | импорт. |
+| `job_recovery.py` | 42 | Восстановление задач | импорт. |
+| `prompt_setup.py` | 27 | Настройка промптов | импорт. |
+| `image_pricing.py` | 21 | Расчёт цены изображений | импорт. |
+| `idea_background.py` | 16 | Фон идеи | `register` |
+
+**Мёртвых модулей нет.** Проверено: каждый из 45 либо вызывается через
+`register(...)` в `main.py`, либо импортируется другим модулем. Проверка выполнена
+по `import`-выражениям, а не по упоминанию имени в тексте.
+
+### 2.1 Ключевые рёбра зависимостей
+
+- `main.py` → `adapters`, `kie` (`main.py:17`) — единая точка доступа к провайдерам.
+- `main.py` → `native_chat` (`main.py:774-776`), `economics` (`main.py:777`).
+- `main.py:185` — результат провайдера `kie` забирается через `kie.fetch(...)`;
+  `main.py:471-472` — отправка: `kie.submit(...)` либо `request_piapi(...)`.
+- `adapters` обслуживает **все** внешние вызовы: `adapters.handles(spec)`,
+  `adapters.build`, `adapters.cost`, `adapters.submit_path`, `adapters.wire_body`,
+  `adapters.describe` (`main.py:384-441`).
+
+> Аудитору: `adapters.py` + `main.py:384-472` — это **единственный** путь к платным
+> провайдерам на `main`. P0-контур PR #29 добавляет второй, защищённый путь
+> (`p0_provider_dispatch.py`). Это главный вопрос о дублировании денежных путей.
+
+---
+
+## 4. Зрелость реализации по доменам
+
+| Домен | Модуль | Путь к провайдеру | Зрелость |
+|---|---|---|---|
+| Сценарий | `story_plan.py`, `native_chat.py` | LLM | **IMPLEMENTED** |
+| Раскадровка | `storyboard.py` | локально | **IMPLEMENTED** |
+| Визуальный план | `visual_plan.py` | локально | **IMPLEMENTED** |
+| Изображения | `adapters.py` (`image_pricing`, `image_assets`) | PiAPI через `adapters` | **IMPLEMENTED** (цена — `image_pricing.py`, 21 строка) |
+| Видео | `adapters.py`, `motion.py`, `clip_chain.py` | PiAPI | **IMPLEMENTED** на `main`; в n8n-конвейере — **MOCK** |
+| Нативный звук | `sound.py` | PiAPI | **IMPLEMENTED** |
+| TTS | `sound.py`, `character_voice.py` | ElevenLabs / Fish | **IMPLEMENTED** |
+| SFX | `sound.py` | провайдер | **IMPLEMENTED** |
+| Музыка | `sound.py` | провайдер | **IMPLEMENTED** |
+| Монтаж | `edit_list.py`, `clip_chain.py` | локально | **IMPLEMENTED** |
+| Релиз/экспорт | `main.py` (медиа-эндпоинты) | локально | **PARTIAL** — нет отдельной сущности «релиз» |
+| **n8n-конвейер WF_00–WF_06** | `workflows/*.json` | — | **MOCK** (`MOCK ONLY (SOURCE EXPORT)`, `active=false`) |
+| **Контракты production** | `docs/specs/n8n-production-2026-10-19/` | — | **SPEC-ONLY** (не исполняемый код) |
+| **P0-бюджет/авторизация** | `backend/p0_*.py` (PR #29) | — | **IMPLEMENTED, но не в `main`** |
+| **Ревьюер MiniMax** | `tools/ai_review/` (PR #35) | — | **MOCK** (адаптер `mock`) |
+
+> Разделение `IMPLEMENTED / PARTIAL / MOCK / SPEC-ONLY` здесь существенно.
+> В проекте зелёный n8n-execution в MOCK-режиме **не** означает рабочий конвейер —
+> это прямо зафиксировано в `docs/AUTORUN_6_STAGES_REPORT.md:42`:
+> «Зелёный n8n execution **не** означает production».
+
+---
+
+
+=== FILE: WORKFLOW_EVIDENCE.md ===
+# WORKFLOW_EVIDENCE — n8n-конвейер, контракты, маршруты, артефакты
+
+**Ревизия:** PR #29 @ `c082829b11b968965600bdaf87c137b1485a0fa2`.
+`main` **не содержит** ни `workflows/`, ни `integrations/n8n/`, ни `docs/specs/n8n-production-2026-10-19/`.
+
+---
+
+## C-01. Главный факт: в репозитории конвейер — MOCK
+
+**Вердикт: MOCK (для исполняемого кода) + SPEC-ONLY (для контрактов).**
+
+Это единственный вывод, который обязан получить аудитор из этого раздела, прежде чем
+читать остальное.
+
+### 1.1 Файлы воркфлоу
+
+`workflows/` в PR #29 — семь JSON. Реальные размеры и структура:
+
+| Файл | Байт | Узлов | Групп connections | `active` | `name` |
+|---|---:|---:|---:|---|---|
+| `WF_00_Core_Infra.json` | 7 174 | 9 | 8 | `false` | `WF_00_Core_Infra — MOCK ONLY (SOURCE EXPORT)` |
+| `WF_01_Writers_Room.json` | 1 808 | 2 | 1 | `false` | `WF_01_Writers_Room — MOCK ONLY (SOURCE EXPORT)` |
+| `WF_02_Canon_And_Images.json` | 1 418 | 2 | 1 | `false` | `WF_02_Canon_And_Images — MOCK ONLY (SOURCE EXPORT)` |
+| `WF_03_Audio_Factory.json` | 1 460 | 2 | 1 | `false` | `WF_03_Audio_Factory — MOCK ONLY (SOURCE EXPORT)` |
+| `WF_04_Video_And_LipSync.json` | 1 417 | 2 | 1 | `false` | `WF_04_Video_And_LipSync — MOCK ONLY (SOURCE EXPORT)` |
+| `WF_05_Assembly_And_Critics.json` | 1 540 | 2 | 1 | `false` | `WF_05_Assembly_And_Critics — MOCK ONLY (SOURCE EXPORT)` |
+| `WF_06_Repair_Router.json` | 1 614 | 2 | 1 | `false` | `WF_06_Repair_Router — MOCK ONLY (SOURCE EXPORT)` |
+
+WF_01–WF_06 содержат **по два узла**: ручной триггер и один `n8n-nodes-base.code`.
+WF_00 — девять узлов: ручной триггер, узел «Инвентаризация тестов», шесть
+`executeWorkflow` (по одному на WF_01…WF_06) и узел «Проверить трубу и записать READY».
+
+### 1.2 Код внутри узла — явный MOCK
+
+`workflows/WF_06_Repair_Router.json` целиком (2 161 байт с BOM):
+
+```json
+{
+  "name": "WF_06_Repair_Router — MOCK ONLY (SOURCE EXPORT)",
+  "nodes": [
+    { "id": "wf06-mock", "name": "00 · Manual MOCK only", "type": "n8n-nodes-base.manualTrigger", ... },
+    {
+      "id": "wf06-code",
+      "name": "01 · Repair routing (MOCK)",
+      "type": "n8n-nodes-base.code",
+      "parameters": {
+        "jsCode": "const p = $input.first().json || {};\nif (!(p.MOCK_MODE && p.review_status === 'BLOCKED_NO_REAL_MEDIA')) { throw new Error('MOCK_ONLY'); }\nreturn [{ json: { ok: true, repair_mode: 'MOCK', note: 'real repair is not implemented in this export' } }];"
+      }
+    }
+  ],
+  "connections": { "00 · Manual MOCK only": { "main": [[ { "node": "01 · Repair routing (MOCK)", ... } ]] } },
+  "active": false,
+  "settings": {}
+}
+```
+
+Узел **бросает `Error('MOCK_ONLY')`**, если вход не соответствует
+`MOCK_MODE && review_status === 'BLOCKED_NO_REAL_MEDIA'`. Это не рабочий ремонтный
+маршрут — это заглушка, которая честно отказывается работать вне MOCK.
+
+### 1.3 Манифест подтверждает
+
+`integrations/n8n/WF_00_WF_06_MANIFEST.json` (201 строка, читается целиком):
+
+```json
+{
+  "version": "1.0-stage-1",
+  "status": "MOCK_FIRST_NOT_PUBLISHED",
+  ...
+  "pilot": {
+    "MOCK_MODE": true,
+    "native_audio_enabled": false,
+    "external_tts_first": true,
+    "independent_audio_tracks": ["voice", "sfx", "music"],
+    "optional_track": "ambience",
+    "no_auto_publish": true,
+    "real_provider_enabled": false,
+    "real_media_evidence_available": false
+  },
+  "mock_test": {
+    "workflow_id": "j8Xqv8GQHjfJ5fVI",
+    "execution_id": "39",
+    "status": "MOCK_PIPELINE_COMPLETE_NO_REAL_APPROVAL",
+    "physical_modules_executed": 7,
+    "synthetic_shots": 3,
+    "synthetic_audio_tracks": 3,
+    "repaired_slot_id": "shot_02",
+    "other_shots_reused": true,
+    "paid_calls": 0,
+    "real_media_verified": false,
+    "production_release": false
+  },
+  "workflow_count": 7
+}
+```
+
+Ключевое из `mock_test`: `paid_calls: 0`, `real_media_verified: false`,
+`production_release: false`, `synthetic_shots: 3`, `synthetic_audio_tracks: 3`.
+**Это прогон на синтетике**, а не на медиапотоке.
+
+### 1.4 Что в MOCK-конвейере работает как настоящее
+
+Справедливости ради: `mock_test` показывает `physical_modules_executed: 7` — то есть
+**все семь физических модулей были выполнены** в n8n (execution #39), включая
+переход по ремонту `shot_02` с переиспользованием остальных шотов. Сама **оркестрация**
+(маршрутизация, передача пакетов, ремонт слота) работает. Не работает **продакшен-исполнение**:
+нет реальных провайдеров, нет реальных медиа, нет реальной приёмки.
+
+Это существенная разница, и её нельзя схлопывать: **конвейер как граф — работает в MOCK;
+конвейер как производство — не существует.**
+
+---
+
+## C-02. Логическая структура: 43 узла + 9 сервисов
+
+`VALIDATION.json` (`docs/specs/n8n-production-2026-10-19/`):
+
+```json
+{
+  "status": "PASS",
+  "checked_at_utc": "2026-10-19T06:43:52.195602+00:00",
+  "logical_nodes": 43,
+  "shared_services": 9,
+  "unique_ids": 52,
+  "main_nodes_reachable": 43,
+  "final_review_outcomes_aggregated": true,
+  "ready_requires_owner_node": true,
+  "conditional_audio_routes": 3,
+  "markdown_catalogue_matches_json": true,
+  "local_links_checked": 6,
+  "common_token_pattern_scan": "no matches; not an exhaustive secret audit",
+  "scope": "documentation structure only",
+  "not_tested": [
+    "n8n execution",
+    "provider calls",
+    "media generation",
+    "actual billing",
+    "behavioral critic quality"
+  ]
+}
+```
+
+> ⚠️ **`"status": "PASS"` относится к `scope: "documentation structure only"`.**
+> `not_tested` прямо перечисляет то, что не проверялось: исполнение n8n, вызовы
+> провайдеров, генерация медиа, реальное списание денег и **поведенческое качество
+> критиков**. Аудитору нельзя читать этот `PASS` как «конвейер проверен».
+
+### 2.1 Раскладка по физическим воркфлоу
+
+Источник: `NODES.md` (заголовки `## N01`…`## N43`, `## S01`…`## S09`) и
+`WF_00_WF_06_MANIFEST.json`.
+
+| WF | Логические узлы | Ответственность | `executable_gate` |
+|---|---|---|---|
+| WF_00 | S01–S09 | project_state, budget_reservations, leases, human_approvals, asset_registry | `BACKEND_REQUIRED_FOR_PRODUCTION` |
+| WF_01 | N01–N11 | idea, concepts, scripts, skills, director_plan | `APPROVED_BRIEF_OWNER_AND_CANON_REQUIRED` |
+| WF_02 | N12–N19 | canon_vault, references, image_factory | `APPROVED_ASSETS_AND_AUTHORIZED_SPEND_REQUIRED` |
+| WF_03 | N20–N25 | external_tts, voice_timing, music, sfx | `AUDIO_TRACK_MANIFEST_COMPLETE` |
+| WF_04 | N26–N31 | video_generation, separate_lipsync, video_inspection | `VIDEO_SOURCE_VERIFIED_BEFORE_LIPSYNC` |
+| WF_05 | N32–N41 | manifest_gate, ffmpeg_assembly, N34_technical_no_llm, N35_evidence, A6_A7_A8, human_ready | `3_CURRENT_MEDIA_VERDICTS_PLUS_OWNER` |
+| WF_06 | N42–N43 | targeted_repair, safe_resume, asset_cache | `REPAIR_ONLY_FAILED_SLOT` |
+
+### 2.2 Полный перечень 43 узлов (заголовки `NODES.md`)
+
+```
+N01 — Идея автора                     N23 — Генерация речи и звуков
+N02 — Проверка входов                 N24 — Получение и измерение аудио
+N03 — A0: производственный бриф       N25 — Критика реального аудио
+N04 — A4: исследование по необходим.  N26 — A2: согласование тайминга и движения
+N05 — Фиксация брифа и критериев      N27 — A3: запросы видео
+N06 — A1: варианты развития идеи     N28 — Проверка видеозапросов
+N07 — Критика вариантов               N29 — Генерация видео / lip-sync
+N08 — Выбор концепции                 N30 — Получение и инспекция видео
+N09 — A1: сценарий и реплики          N31 — Критика реального клипа
+N10 — Критика сценария                N32 — A5: монтажная сборка как план
+N11 — A2: подбор персонажей и локаций N33 — Рендер итогового файла
+N12 — Комплект референсов мира        N34 — Критика монтажа
+N13 — A2: режиссёрская разработка     N35 — Заморозить финальный пакет
+N14 — Критика режиссёрского решения   N36 — Финальный A6: соответствие заданию
+N15 — A3: запросы изображений         N37 — Финальный A7: мир и непрерывность
+N16 — Проверка image-запроса          N38 — Финальный A8: ремесло
+N17 — Отправка генерации изображения   N39 — Свести три финальных вердикта
+N18 — Получение и сохранение изобр.    N40 — Решение человека
+N19 — Критика реального изображения    N41 — Отправить в Готовые
+N20 — A5: план речи и звука            N42 — A0: адресный возврат
+N21 — Подготовка аудиозапросов         N43 — Пауза и восстановление
+N22 — Проверка аудиозапросов
+```
+
+Сервисы: `S01` хранилище и версии, `S02` выбор и загрузка навыков, `S03` профиль
+модели и адаптер, `S04` разрешение расходов и резерв, `S05` жизненный цикл provider job,
+`S06` подготовка доказательств, `S07` независимая критика этапа, `S08` журнал и
+checkpoint, `S09` решения владельца.
+
+Обратите внимание на ритм: каждый домен имеет **критику сразу после генерации**
+(N19 после изображений, N25 после аудио, N31 после видео) — и это критика
+**реального** артефакта, а не только техническая проверка.
+
+---
+
+## C-03. JSON-схемы и контракты
+
+Каталог `docs/specs/n8n-production-2026-10-19/contracts/`:
+
+| Файл | Байт | Назначение |
+|---|---:|---|
+| `runtime-v1.schema.json` | 15 742 | Роли, бюджет, evidence, provider job, слоты |
+| `final-runtime-v1_2.schema.json` | 18 981 | Envelopes N34–N41 v1.2 |
+| `scenario-preprod-v1.schema.json` | 15 239 | Границы сценариев N01–N11 |
+| `scenario-skills-routing-v1.json` | 6 467 | Навыки, маршрутизация, политика стоимости |
+
+### 3.1 Схемы сами объявляют, что они не доказывают
+
+`runtime-v1.schema.json`:
+- `title`: «GremoVOD n8n Astra runtime v1 — structure only; checksums/signatures require trusted backend»
+- `description`: «Roles, budget and evidence are NOT considered trusted merely because this JSON
+  validates. Owner and backend evidence verification are separate mandatory gates.»
+
+`final-runtime-v1_2.schema.json`:
+- `title`: «GremoVOD N34–N41 scoped runtime envelopes v1.2 (STRUCTURE ONLY)»
+- `description`: «JSON Schema validation does not establish provenance, rights, actual media
+  access, valid owner approval, token budget or authenticity. Trusted FastAPI must ver…»
+
+`scenario-preprod-v1.schema.json`:
+- `title`: «GremoVOD N01–N11 scenario draft boundaries (schema does not imply approval)»
+- `description`: «S01 and owner session must validate hashes, source permission, character
+  profiles and budgets before LLM. Structures alone are not evidence.»
+
+**Это признание проекта о собственных границах — и оно сделано явно и в машинно-читаемом
+виде. Для аудита это сильный сигнал: авторы не выдают схемы за доказательства.**
+
+### 3.2 `scenario-skills-routing-v1.json` — политика стоимости и запреты
+
+```json
+{
+  "spec_version": "1.0-scenario-preproduction-draft",
+  "status": "SPECIFIED_NOT_INTEGRATED",
+  "scenario_priority": "N01-N11_before_UI",
+  "runtime_provider": "NONE_FOR_MOCK",
+  "allow_real_source_without_trusted_backend": false,
+  "source_context": {
+    "canon_authority": "FastAPI approved source snapshot only",
+    "github_skill_refs_are_instructions_not_approved_canon": true,
+    "owner_auth": "Studio only, n8n never gra…"
+  },
+  "explicit_no_auto": ["OWNER_SELECT", "NEW_CANON", "PAID_GENERATE",
+                       "REAL_MEDIA_QA", "READY", "PUBLICATION"],
+  "execution_boundary": "n8n sub-workflow workers read server-frozen packets; FastAPI issues
+                         approvals, budget grants and runtime revision checks",
+  "cost_policy": {
+    "mock_usd": 0,
+    "budget_required_for_any_model": true,
+    "prompt_style": "at most one initial call per creative stage under user-approved envelope",
+    "deterministic_chec…"
+  }
+}
+```
+
+Три вещи, которые стоит проверить аудитору:
+1. `explicit_no_auto` — шесть действий, которые **не могут** произойти без человека.
+   Это «право вето», зашитое в спецификацию.
+2. `execution_boundary` — n8n-воркфлоу **читают серверно-замороженные пакеты**;
+   выдаёт approvals, budget grants и проверки ревизий — **FastAPI**. Граница проходит
+   по строке «кто выдаёт разрешение».
+3. `status: "SPECIFIED_NOT_INTEGRATED"` — честная пометка, что это спецификация,
+   а не интегрированный код.
+
+> ⚠️ **Проверить аудитору:** `cost_policy.prompt_style` — «at most one initial call per
+> creative stage» — совпадает по смыслу с P0-контуром (`submit_count = 1`).
+> Но это **спецификация**, а не исполняемый код. Соединяются ли две защиты на практике —
+> отдельный вопрос.
+
+---
+
+## C-04. Условные маршруты
+
+`NODES.md:528-530` (раздел «Условный маршрут нативного звука»):
+
+> Базовые переходы выше соответствуют отдельной генерации речи. Для заранее выбранной
+> стратегии `native_video_audio` действуют явные исключения: **N22 → N26** после проверки
+> текста/голосовых входов; **N31 → N25** для фактической дорожки из принятого клипа;
+> после её проверки **N25 → N32**. Не возвращаться в повторную видеогенерацию через N26.
+> Эти условия также записаны в `conditional_routes` файла `nodes.json`.
+
+Итого три условных аудио-маршрута — совпадает с `VALIDATION.json:
+"conditional_audio_routes": 3`.
+
+> ⚠️ **Проверить аудитору:** правило «не возвращаться в повторную видеогенерацию через N26»
+> — это прямая защита от двойного списания за видео. Оно записано **в Markdown и в
+> `nodes.json`**. Но исполняемый код в `workflows/WF_03…WF_06.json` — это MOCK-заглушки
+> (§C-01.2), то есть **правило сейчас не исполняется ничем**. Реализация переходов
+> должна появиться вместе с реальными воркфлоу.
+
+---
+
+## C-05. Домены медиа
+
+| Домен | Узлы | Воркфлоу | Провайдер (по спецификации) | Зрелость в репозитории |
+|---|---|---|---|---|
+| Изображения | N15–N19 | WF_02 | PiAPI (`image_factory`) | MOCK в n8n; на `main` — рабочий `adapters.py` |
+| Нативный звук | N20–N25 | WF_03 | `native_audio_enabled: false` в пилоте | MOCK |
+| TTS | N20–N25 | WF_03 | `external_tts_first: true` (ElevenLabs/Fish) | MOCK в n8n; на `main` — `sound.py` |
+| SFX | N23, N25 | WF_03 | отдельный трек `sfx` | MOCK в n8n; на `main` — `sound.py` |
+| Музыка | N23, N25 | WF_03 | отдельный трек `music` | MOCK в n8n; на `main` — `sound.py` |
+| Видео | N27–N31 | WF_04 | PiAPI, lip-sync отдельным маршрутом | MOCK в n8n |
+| Монтаж | N32–N33 | WF_05 | ffmpeg (локально) | MOCK в n8n; на `main` — `edit_list.py` |
+| Релиз | N40–N41 | WF_05 | `no_auto_publish: true` | MOCK |
+
+Треки аудио разделены: `independent_audio_tracks: ["voice", "sfx", "music"]`,
+`optional_track: "ambience"`. То есть «нативный звук» (голос+звук+музыка в одной
+дорожке) и «внешний TTS» — **разные стратегии**, и пилот выбрал внешний TTS.
+
+---
+
+## C-06. Дефекты и ремонт (WF_06, N42–N43)
+
+**Вердикт: SPEC-ONLY + MOCK-исполнение.**
+
+- `N42 — A0: адресный возврат` — точечный ремонт конкретного слота.
+- `N43 — Пауза и восстановление` — safe resume.
+- `executable_gate` WF_06: `REPAIR_ONLY_FAILED_SLOT` — ремонтировать можно только
+  упавший слот.
+- Реальное поведение подтверждено MOCK-прогоном: `repaired_slot_id: "shot_02"`,
+  `other_shots_reused: true`.
+
+То есть **адресность ремонта в MOCK работает и проверена**: перегенерирован только
+`shot_02`, остальные шоты переиспользованы. Это подтверждает, что «не переделывать
+всё заново» — рабочая идея, а не лозунг. Но в исполняемом коде репозитория — заглушка
+`Error('MOCK_ONLY')` (§C-01.2).
+
+**Лимиты повторов.** В репозитории для ремонта **нет** ни счётчика попыток, ни
+потолка на ремонт, ни автоматического ремонта по бюджету в исполняемом коде. Правило
+`REPAIR_ONLY_FAILED_SLOT` — это **gate**, а не квота. Автоматический retry при
+истощении бюджета в `p0_control` запрещён (`submit_count` + UNKNOWN-блокировка),
+но это контур PR #29, а не WF_06. Связь между ними — открытый вопрос (см. OI-05).
+
+---
+
+## C-07. Сохранение артефактов и восстановление
+
+**Вердикт: SPEC-ONLY в n8n-части; реализовано в FastAPI-части.**
+
+| Аспект | Где реализовано | Статус |
+|---|---|---|
+| Медиа-файлы на диске | `backend/main.py` (медиа-эндпоинты), `backend/temp_cleanup.py` (211 стр.) | IMPLEMENTED |
+| Версии и хранилище | S01 «Хранилище и версии» | SPEC-ONLY |
+| Реестр артефактов | `asset_registry` (WF_00), `backend/image_assets.py` | SPEC + IMPLEMENTED |
+| Точечный ремонт с переиспользованием | N42, WF_06 | MOCK (подтверждён прогоном) |
+| Пауза/восстановление | N43, WF_06 `safe_resume`; P0: `claim_run`/`claim_job` с лизами | SPEC + IMPLEMENTED (PR #29) |
+| Чекпойнт и журнал | S08 «Журнал и checkpoint» | SPEC-ONLY |
+
+> **Слабое место, которое стоит проверить:** S01/S08 (хранилище, версии, журнал,
+> чекпойнт) — **сервисные узлы без исполняемой реализации**. При этом `freeze_manifest`
+> в P0 (`p0_control.py:375`) — это по сути **единственный** реализованный механизм
+> версионирования плана, и он живёт в FastAPI, а не в n8n. То есть S01 в n8n-части
+> и `freeze_manifest` в P0 — это **два разных механизма версионирования в двух разных
+> подсистемах**. Их согласованность не описана и не проверена. Это сильный кандидат
+> в находки.
+
+---
+
+## C-08. Сверка манифеста с реальными файлами
+
+Проверено: три заявленных факта из `WF_00_WF_06_MANIFEST.json` против реальных файлов.
+
+| Заявлено в манифесте | Реальность | Согласовано? |
+|---|---|---|
+| `workflow_count: 7` | В `workflows/` ровно 7 файлов `WF_0*.json` | ✅ |
+| Все 7 `runtime_status: "DRAFT_MOCK_ONLY_NOT_PUBLISHED"` | Все 7 имеют `active: false` и `MOCK ONLY (SOURCE EXPORT)` в имени | ✅ |
+| `logical` узлы S01–S09 / N01–N43 | `VALIDATION.json`: `logical_nodes: 43`, `shared_services: 9`; `NODES.md` содержит ровно 43 заголовка `## N..` и 9 `## S..` | ✅ |
+| `pilot.real_provider_enabled: false` | `workflows/*.json` содержат `n8n-nodes-base.code` с `MOCK_ONLY`, ни одного вызова провайдера | ✅ |
+| `mock_test.physical_modules_executed: 7` | Проверить нельзя без доступа к n8n-инстансу; принято как заявление репозитория | ⚠️ не проверено |
+| `n8n_workflow_id` / `n8n_link` (7 штук) | Проверить нельзя без доступа к `gremovod.app.n8n.cloud`; принято как заявление | ⚠️ не проверено |
+
+**Итог: манифест не лжёт.** Он точен в пределах того, что можно проверить офлайн, и
+явно помечает MOCK-статус. Это важный вывод — в проекте нет расхождения между
+заявлением и кодом по этому конкретному артефакту.
+
+---
+
+## C-09. Сводка по зрелости
+
+| Компонент | Статус | Доказательство |
+|---|---|---|
+| 7 JSON-воркфлоу | **MOCK** | `active: false`, `MOCK ONLY (SOURCE EXPORT)`, `Error('MOCK_ONLY')` |
+| Оркестрация в 7 модулях (в n8n) | **работает в MOCK** | `mock_test.execution_id: "39"`, `physical_modules_executed: 7` |
+| Спецификация 43 узлов + 9 сервисов | **SPEC-ONLY** | `docs/specs/n8n-production-2026-10-19/`, `status: "SPECIFIED_NOT_INTEGRATED"` |
+| JSON-схемы контрактов | **SPEC-ONLY** | все три схемы сами помечены `STRUCTURE ONLY` |
+| `VALIDATION.json` | **валидирует только структуру документации** | `"scope": "documentation structure only"`, `not_tested: [...]` |
+| Манифест | **точен** | сверено 4/4 проверяемых факта |
+| Медиа-домены в n8n | **MOCK** | `real_provider_enabled: false`, `real_media_evidence_available: false` |
+| Медиа-домены в FastAPI (`main`) | **IMPLEMENTED** | `adapters.py`, `sound.py`, `edit_list.py` — см. `ARCHITECTURE_MAP.md` §4 |
+| Адресный ремонт | **работает в MOCK** | `repaired_slot_id: "shot_02"`, `other_shots_reused: true` |
+| Бюджет/резерв/лизы в n8n | **SPEC-ONLY** (S04) + **IMPLEMENTED** в P0-контуре PR #29 | две реализации, вопрос их стыковки — OI-05 |
+
+
+=== FILE: P0_EVIDENCE.md ===
+## B-02. Единый бюджет и резервы
+
+**Вердикт: IMPLEMENTED (в PR #29), отсутствует в `main`.**
+
+### Два слоя бюджета
+
+1. **Legacy-слой** — `backend/spend_ledger.py`, USD-флаты, лимиты проекта и дня.
+2. **P0-слой** — `backend/p0_control.py` + таблицы `p0_budget_envelopes` / `p0_jobs`,
+   **целые центы**, никогда не float.
+
+`spend_ledger.py:113-126`:
+
+```python
+def check(db, project_id: str, cost_usd: float) -> None:
+    """Raise BudgetExceeded when the combined ledger would pass a cap."""
+    value = state(db, project_id)
+    if value["project_reserved_usd"] + cost_usd > value["project_limit_usd"] + 1e-9:
+        raise BudgetExceeded("Превышен серверный бюджет проекта. Измени лимит в разделе «Экономика».")
+    if value["daily_reserved_usd"] + cost_usd > value["daily_limit_usd"] + 1e-9:
+        raise BudgetExceeded("Превышен дневной серверный бюджет. Измени лимит в разделе «Экономика».")
+
+
+def check_cents(db, project_id: str, cost_cents: int) -> None:
+    """Cent-precise variant for the P0 ledger, which never handles floats."""
+    if type(cost_cents) is not int or cost_cents < 0:
+        raise BudgetExceeded("cost in integer cents is required")
+    check(db, project_id, cost_cents / 100)
+```
+
+### Сведение двух слоёв
+
+`spend_ledger.py:89-110` — `state()` складывает legacy и P0:
+
+```python
+    p0_project = sum((r["reserved_cents"] + r["spent_cents"]) / 100 ...)
+    p0_daily   = sum((r["reserved_cents"] + r["spent_cents"]) / 100 ...)
+    ...
+    "project_reserved_usd": round(legacy_project + p0_project, 6),
+    "daily_reserved_usd":   round(legacy_daily + p0_daily, 6),
+    "legacy_reserved_usd":  round(legacy_project, 6),
+    "p0_reserved_usd":      round(p0_project, 6),
+```
+
+То есть **общий лимит считается по объединённой сумме** — P0 не может потратить сверх
+капа, обходя legacy-учёт. Это ключевое свойство, и оно выглядит корректно.
+
+### Резерв как отдельная сущность
+
+Резерв отражается в `p0_budget_envelopes.reserved_cents` и списывается **только**
+подтверждённым терминальным событием (`p0_control.py:364-366`):
+
+```python
+db.execute("""UPDATE p0_budget_envelopes SET reserved_cents=reserved_cents-?,
+      spent_cents=spent_cents+? WHERE envelope_id=?""",
+      (j["reserve_cents"], charged_cents, j["envelope_id"]))
+```
+
+### Потолок резерва
+
+`p0_control.py:359-363`:
+
+```python
+if charged_cents > j["reserve_cents"]:
+    raise Blocked("provider cost exceeds reserved ceiling, manual reconciliation")
+e = _one(db, "SELECT * FROM p0_budget_envelopes WHERE envelope_id=?", (j["envelope_id"],))
+if e["reserved_cents"] < j["reserve_cents"]:
+    raise Conflict("reserve missing")
+```
+
+Провайдер не может списать больше, чем зарезервировано; превышение → ручная сверка,
+а не тихое списание.
+
+---
+
+## B-07. Заморозка плана и манифеста
+
+**Вердикт: IMPLEMENTED (в PR #29).**
+
+`p0_control.py:375-407` (`freeze_manifest`) — полный доверенный план замораживается
+**до** того, как существуют задачи или поставки медиа:
+
+- список слотов валидируется: `{'slot_id','kind','required'}`, `kind` из закрытого набора
+  `{'shot','voice','sfx','music','ambience','title','reference','other'}`, `required` — строго `bool`;
+- дубликаты `slot_id` запрещены (`:388-389`);
+- `source_revision` должен совпасть, иначе `Conflict("stale manifest source")` (`:393-394`);
+- манифест **иммутабелен** для данного source (`:397-400`);
+- заморозка запрещена, если уже есть задачи или сцены (`:401-405`).
+
+> Аудитору: стоит проверить, покрывает ли `freeze_manifest` тот случай, когда
+> владелец меняет канон **после** заморозки, но **до** завершения задач —
+> `p0_jobs` привязан к `source_revision`, но не видно, что делает `finish_verified`
+> с задачей, чей source устарел.
+
+---
+
+
+=== ЗАПРОС ===
+[Контекст A–E из PROJECT_CONTEXT.md приводится здесь сокращённо; полный — в приложении.]
+
+Ты — независимый архитектурный аудитор. Это второй из трёх независимых раундов
+аудита GremoVOD. Предыдущего раунда у тебя нет и он тебе не нужен: этот запрос
+самодостаточен. Твоя задача — оценить n8n-конвейер и честность его спецификации.
+
+Контекст кратко. GremoVOD — студия производства ИИ-контента (FastAPI + SQLite +
+React/Vite + n8n), платит внешним провайдерам за изображения, видео, речь, звук и
+музыку. Канон (canon) — источник правды для всех последующих стадий. Решения
+владельца: не тратить реальные кредиты без явной авторизации конкретного запроса;
+вторая рабочая SQLite запрещена; fail-closed (нет доказательства = BLOCKED, а не
+«пройдено»).
+
+Состояние веток: main = 82adb2d (531 файл, P0-контура нет, workflows/ нет);
+PR #29 (Draft) = c082829b11b968965600bdaf87c137b1485a0fa2 — в нём находятся
+workflows/WF_00…WF_06, integrations/n8n/ и docs/specs/n8n-production-2026-10-19/.
+Всего 22 открытых PR, 21 — Draft.
+
+=====================================================================
+РАЗДЕЛ 6. ВОПРОСЫ
+=====================================================================
+
+C-1. РЕАЛЬНОСТЬ ИСПОЛНЕНИЯ. В репозитории семь JSON-воркфлоу WF_00…WF_06. У всех
+    `active: false`, в имени — «MOCK ONLY (SOURCE EXPORT)», у WF_01…WF_06 ровно
+    по два узла, а код-узел WF_06 бросает `Error('MOCK_ONLY')` вне MOCK-входа.
+    Манифест объявляет `status: "MOCK_FIRST_NOT_PUBLISHED"`,
+    `real_provider_enabled: false`, `real_media_evidence_available: false`, а
+    прогон описан как `paid_calls: 0`, `real_media_verified: false`.
+    Оцени:
+      - что именно этот конвейер доказывает, а что — нет, сформулируй разницу
+        точно; отдельно оцени, что доказывает успешный прогон семи модулей
+        (оркестрация) против отсутствия реальных медиа (производство);
+      - рискован ли статус «зелёный n8n execution» при чтении его как «production
+        работает», и какая формулировка в отчёте снимала бы этот риск;
+      - достаточно ли того, что манифест сам себя маркирует, или нужны
+        технические гарантии (например, CI-проверка, что воркфлоу не может
+        активироваться, или что production-путь физически не может пройти мимо
+        бюджетного контура).
+
+C-2. СПЕЦИФИКАЦИЯ VS ИСПОЛНЕНИЕ. В `docs/specs/n8n-production-2026-10-19/` лежат
+    43 логических узла, 9 сервисов, NODES.md (55 КБ), SPECIFICATION.md (42 КБ),
+    nodes.json (72 КБ) и три JSON-схемы. Все три схемы сами объявляют, что
+    валидация структуры не означает происхождение, права, доступ к медиа,
+    авторизацию владельца и подлинность. `VALIDATION.json` имеет
+    `status: "PASS"` при `scope: "documentation structure only"` и перечне
+    `not_tested: [n8n execution, provider calls, media generation, actual billing,
+    behavioral critic quality]`. Оцени:
+      - достаточен ли такой способ объявлять границы (схема честно признаёт
+        границы) — или `PASS` рядом с `not_tested` всё равно провоцирует
+        неверное прочтение, и нужно менять формулировку/структуру;
+      - какие части спецификации выглядят как **проверенные** требования, а какие
+        как пожелания, и можно ли это различить по самой спецификации;
+      - есть ли в спецификации пункты, которые нельзя выполнить в принципе
+        (например, требования, подразумевающие доступ к материалу, которого нет).
+
+C-3. УСЛОВНЫЕ МАРШРУТЫ. `NODES.md:528-530` описывает три исключения для стратегии
+    `native_video_audio`: N22→N26, N31→N25, затем N25→N32, и прямое требование
+    «не возвращаться в повторную видеогенерацию через N26» — это защита от
+    двойного списания за видео. Оцени:
+      - насколько это правило важно для денег и что произойдёт, если приоритет
+        перехода изменится;
+      - почему оно записано только в Markdown и в `nodes.json`, но не исполняется
+        (исполняемый код — MOCK-заглушки);
+      - как такое правило должно выглядеть, чтобы быть проверяемым автоматически.
+
+C-4. МЕДИА-ДОМЕНЫ. Раскладка: изображения N15–N19 (WF_02), звук N20–N25 (WF_03),
+    видео N26–N31 (WF_04), монтаж N32–N33 (WF_05), релиз N40–N41. Аудиотреки
+    разделены: voice / sfx / music, ambience — опциональный. Пилот выбрал
+    `external_tts_first: true`, `native_audio_enabled: false`. Оцени:
+      - соответствует ли разделение треков и порядок стадий продуктовой идее
+        («канон как источник правды»);
+      - есть ли в порядке стадий места, где результат одной стадии может
+        оказаться непригодным для следующей, и предусмотрен ли на них откат;
+      - достаточно ли того, что не-в-JSON музыка/SFX в спецификации не описаны
+        детально, чтобы считать домен спроектированным.
+
+C-5. ДЕФЕКТЫ И РЕМОНТ. WF_06 = N42 (адресный возврат) + N43 (пауза и
+    восстановление), `executable_gate: REPAIR_ONLY_FAILED_SLOT`. MOCK-прогон
+    подтверждает адресность: `repaired_slot_id: "shot_02"`, `other_shots_reused: true`.
+    Оцени:
+      - что в этой конструкции сделано правильно;
+      - чего в ней нет: лимита попыток, квоты на ремонт, автоматического ремонта
+        по исчерпанию бюджета, защиты от «ремонт всего подряд»;
+      - как правило `REPAIR_ONLY_FAILED_SLOT` должно соотноситься с
+        P0-контуром (`submit_count=1`, блокировка по UNKNOWN, резерв) — сейчас это
+        два независимых механизма в разных подсистемах; оцени риск двойного
+        списания при ремонте.
+
+C-6. АРТЕФАКТЫ И ВОССТАНОВЛЕНИЕ. Оцени по спецификации:
+      - как версионируются артефакты (S01) и ведётся журнал/чекпойнт (S08) —
+        и почему то, что исполнено, — это `freeze_manifest` в FastAPI, а не S01/S08;
+      - достаточно ли модели `review_round_id` + `snapshot_hash` + `master_checksum`
+        для того, чтобы отличить «тот же файл» от «тот же снимок»;
+      - что произойдёт при прерывании конвейера на произвольном шаге: на каких
+        шагах есть состояние, на каких — нет, и как это выглядит для
+        пользователя (перезапуск, дубли, потеря).
+
+C-7. СОГЛАСОВАННОСТЬ С P0. Сопоставь: бюджет и резервы — S04 в спецификации
+    (SPEC-ONLY) и `spend_ledger` + `p0_control` в коде (IMPLEMENTED, но не в
+    `main`); версионирование — S01/S08 (SPEC-ONLY) и `freeze_manifest`
+    (IMPLEMENTED). Оцени:
+      - есть ли в спецификации n8n мест, где подразумевается прямой платёж или
+        прямой вызов провайдера в обход P0-контура;
+      - какие узлы спецификации при первом боевом запуске окажутся в контакте с
+        реальными деньгами без защиты, и в каком порядке их надо закрывать.
+
+=====================================================================
+РАЗДЕЛ 7. МАТЕРИАЛЫ
+=====================================================================
+
+1. PROJECT_CONTEXT.md   (разделы A–E)
+2. ARCHITECTURE_MAP.md  (разделы 1, 2.1, 4)
+3. WORKFLOW_EVIDENCE.md — основной документ
+4. P0_EVIDENCE.md       (только разделы B-02 и B-07)
+
+=====================================================================
+РАЗДЕЛ 8. ФОРМАТ ОТВЕТА
+=====================================================================
+
+Тот же формат, что в правилах system prompt: по каждому пункту C-1…C-7 — вердикт
+одной строкой (IMPLEMENTED / PARTIAL / SPEC-ONLY / MOCK / MISSING / RISK), доказательства
+с `путь:строка` и верными фрагментами, блок «что осталось открытым», рекомендация
+с «Исправить:» / «Проверить:».
+
+В конце: топ-5 рисков по убыванию ожидаемой стоимости (деньги, время, риск ложного
+«готово») и явный список недостающих данных.
+
+Отдельно ответь: если бы тебе дали один выбор между «закрыть исполнимость WF_00–WF_06
+реальными провайдерами» и «закрыть P0-контур и его стык с n8n» — какой был бы первым
+и почему. Это не вопрос о приоритете вкус; это вопрос о том, где дешевле всего
+остановиться, если денег на два фронта нет.

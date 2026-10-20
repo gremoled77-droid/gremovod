@@ -1,0 +1,7 @@
+Документы пакета AUDIT-001B в формате text/plain (те же байты, что в .md/.json).
+KIE отвергает media_type text/markdown и application/json; text/plain принимает.
+
+PROJECT_CONTEXT.txt <- PROJECT_CONTEXT.md
+ARCHITECTURE_MAP.txt <- ARCHITECTURE_MAP.md
+WORKFLOW_EVIDENCE.txt <- WORKFLOW_EVIDENCE.md
+P0_EVIDENCE.txt <- P0_EVIDENCE.md
