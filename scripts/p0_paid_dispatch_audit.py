@@ -93,6 +93,7 @@ def enclosing_functions(path: Path):
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--markdown", action="store_true")
+    parser.add_argument("--out", help="write the report to this file (UTF-8)")
     args = parser.parse_args()
 
     rows = []
@@ -106,27 +107,37 @@ def main() -> int:
             rows.append((path.name, number, func, gated, snippet[:110]))
 
     if args.markdown:
-        print("# Инвентарь исходящих платных вызовов (backend/)")
-        print()
-        print("Сгенерировано `scripts/p0_paid_dispatch_audit.py`. Только чтение, "
-              "ничего не вызывается.")
-        print()
-        print("| Файл:строка | Функция | За P0-шлюзом | Строки |")
-        print("|---|---|---|---|")
+        lines = []
+        lines.append("# Инвентарь исходящих платных вызовов (backend/)")
+        lines.append("")
+        lines.append("Сгенерировано `scripts/p0_paid_dispatch_audit.py`. Только чтение, "
+                     "ничего не вызывается.")
+        lines.append("")
+        lines.append("| Файл:строка | Функция | За P0-шлюзом | Строки |")
+        lines.append("|---|---|---|---|")
         for name, number, func, gated, snippet in rows:
             mark = "да" if gated else "**нет**"
-            print(f"| `{name}:{number}` | `{func}` | {mark} | {snippet} |")
-        print()
-        print(f"Всего мест: {len(rows)}; за шлюзом: "
-              f"{sum(1 for r in rows if r[3])}; вне шлюза: "
-              f"{sum(1 for r in rows if not r[3])}.")
+            lines.append(f"| `{name}:{number}` | `{func}` | {mark} | {snippet} |")
+        lines.append("")
+        lines.append(f"Всего мест: {len(rows)}; за шлюзом: "
+                     f"{sum(1 for r in rows if r[3])}; вне шлюза: "
+                     f"{sum(1 for r in rows if not r[3])}.")
+        report = "\n".join(lines) + "\n"
     else:
+        out = []
         for name, number, func, gated, snippet in rows:
             mark = "GATED" if gated else "BYPASS"
-            print(f"{mark:7} {name}:{number}  {func}  |  {snippet}")
-        print()
-        print(f"total={len(rows)} gated={sum(1 for r in rows if r[3])} "
-              f"bypass={sum(1 for r in rows if not r[3])}")
+            out.append(f"{mark:7} {name}:{number}  {func}  |  {snippet}")
+        out.append("")
+        out.append(f"total={len(rows)} gated={sum(1 for r in rows if r[3])} "
+                   f"bypass={sum(1 for r in rows if not r[3])}")
+        report = "\n".join(out) + "\n"
+
+    if args.out:
+        Path(args.out).write_text(report, encoding="utf-8")
+        print(f"written: {args.out}")
+    else:
+        sys.stdout.write(report)
     return 0
 
 
