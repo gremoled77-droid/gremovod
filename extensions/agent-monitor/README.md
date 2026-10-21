@@ -1,5 +1,11 @@
 # GremoVOD Agent Monitor v1
 
+Новая bounded-эстафета: [установка и границы](../../docs/agent-handoff/AUTOMATIC_RELAY_2026-10-21.md).
+Соберите расширение из этой ветки и укажите `gremovodAgentMonitor.dispatcherDirectory`, совпадающий
+с `--state-dir` планировщика. Адаптер читает валидированные события `events.jsonl` и показывает STOP;
+сам журнал dispatcher не изменяет. Фазы показывают последнее наблюдение с временем, без heartbeat.
+Описание отсутствующего JSONL ниже относится к старому dispatcher v2; bounded job mode пишет его.
+
 Устанавливаемое VS Code extension: **GremoVOD: Open Agent Monitor**. Панель наблюдает за GitHub, существующим Python dispatcher v2 и локальной Git worktree. Backend Studio, n8n, Python-процесс и модельные API для работы монитора не нужны.
 
 ## Установка и запуск

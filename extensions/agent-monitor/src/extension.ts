@@ -297,7 +297,7 @@ export function activate(context: vscode.ExtensionContext) {
       own
     );
     const watcher = vscode.workspace.createFileSystemWatcher(
-      new vscode.RelativePattern(vscode.Uri.file(dispatcher), '{state.json,PR-*.md,PR-*.json}')
+        new vscode.RelativePattern(vscode.Uri.file(dispatcher), '{state.json,events.jsonl,STOP,PR-*.md,PR-*.json}')
     );
     let debounce: ReturnType<typeof setTimeout> | undefined;
     const changed = () => {

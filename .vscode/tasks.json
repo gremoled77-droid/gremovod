@@ -2,131 +2,46 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "GremoVOD: Codex feedback → MiniMax (GitHub PR)",
-      "type": "shell",
-      "command": "powershell.exe",
-      "args": [
-        "-NoProfile",
-        "-ExecutionPolicy",
-        "Bypass",
-        "-File",
-        "${workspaceFolder}/scripts/agent-handoff/Get-CodexReview.ps1",
-        "-PrNumber",
-        "${input:gremovodGaPr}"
-      ],
-      "options": {
-        "cwd": "${workspaceFolder}"
-      },
-      "presentation": {
-        "reveal": "always",
-        "panel": "dedicated"
-      },
+      "label": "GremoVOD: Inspect GitHub PR (no models)",
+      "type": "process",
+      "command": "${input:relayPython}",
+      "args": ["${workspaceFolder}/scripts/agent-handoff/dispatcher.py", "--pr", "${input:relayPr}"],
       "problemMatcher": []
     },
     {
-      "label": "GremoVOD: Watch Codex → MiniMax (safe)",
-      "type": "shell",
-      "command": "python",
-      "args": [
-        "${workspaceFolder}/scripts/agent-handoff/dispatcher.py",
-        "--pr",
-        "${input:gremovodGaPr}",
-        "--watch"
-      ],
-      "options": {
-        "cwd": "${workspaceFolder}"
-      },
-      "presentation": {
-        "reveal": "always",
-        "panel": "dedicated"
-      },
-      "isBackground": true,
+      "label": "GremoVOD: Plan bounded relay job (no models)",
+      "type": "process",
+      "command": "${input:relayPython}",
+      "args": ["${workspaceFolder}/scripts/agent-handoff/dispatcher.py", "--job", "${input:relayJob}", "--state-dir", "${input:relayState}"],
       "problemMatcher": []
     },
     {
-      "label": "GremoVOD: Локальное ревью Codex (detached worktree, read-only)",
-      "type": "shell",
-      "command": "python",
-      "args": [
-        "${workspaceFolder}/scripts/agent-handoff/dispatcher.py",
-        "--pr",
-        "${input:gremovodGaPr}",
-        "--codex-review",
-        "--codex-worktree",
-        "${input:gremovodCodexWorktree}"
-      ],
-      "options": {
-        "cwd": "${workspaceFolder}"
-      },
-      "presentation": {
-        "reveal": "always",
-        "panel": "dedicated"
-      },
+      "label": "GremoVOD: Advance already approved relay job",
+      "type": "process",
+      "command": "${input:relayPython}",
+      "args": ["${workspaceFolder}/scripts/agent-handoff/dispatcher.py", "--job", "${input:relayJob}", "--run", "--state-dir", "${input:relayState}"],
       "problemMatcher": []
     },
     {
-      "label": "GremoVOD: Раунд исправлений MiniMax (без commit и push)",
-      "type": "shell",
-      "command": "python",
-      "args": [
-        "${workspaceFolder}/scripts/agent-handoff/dispatcher.py",
-        "--pr",
-        "${input:gremovodGaPr}",
-        "--execute",
-        "--worktree",
-        "${input:gremovodMiniMaxWorktree}"
-      ],
-      "options": {
-        "cwd": "${workspaceFolder}"
-      },
-      "presentation": {
-        "reveal": "always",
-        "panel": "dedicated"
-      },
+      "label": "GremoVOD: Publish owner-attested local review JSON",
+      "type": "process",
+      "command": "${input:relayPython}",
+      "args": ["${workspaceFolder}/scripts/agent-handoff/dispatcher.py", "--job", "${input:relayJob}", "--publish-review", "${input:relayReview}", "--attest-local", "--state-dir", "${input:relayState}"],
       "problemMatcher": []
     },
     {
-      "label": "GremoVOD: Раунд исправлений MiniMax + commit + push (разрешено)",
-      "type": "shell",
-      "command": "python",
-      "args": [
-        "${workspaceFolder}/scripts/agent-handoff/dispatcher.py",
-        "--pr",
-        "${input:gremovodGaPr}",
-        "--execute",
-        "--allow-commit",
-        "--allow-push",
-        "--worktree",
-        "${input:gremovodMiniMaxWorktree}"
-      ],
-      "options": {
-        "cwd": "${workspaceFolder}"
-      },
-      "presentation": {
-        "reveal": "always",
-        "panel": "dedicated"
-      },
+      "label": "GremoVOD: STOP relay",
+      "type": "process",
+      "command": "${input:relayPython}",
+      "args": ["${workspaceFolder}/scripts/agent-handoff/dispatcher.py", "--stop", "--state-dir", "${input:relayState}"],
       "problemMatcher": []
     }
   ],
   "inputs": [
-    {
-      "id": "gremovodGaPr",
-      "type": "promptString",
-      "description": "Числовой номер GitHub Pull Request MiniMax (например, 1234; не GA-01)",
-      "default": ""
-    },
-    {
-      "id": "gremovodMiniMaxWorktree",
-      "type": "promptString",
-      "description": "Worktree MiniMax с веткой GA-задачи",
-      "default": "C:\\AI_Workflow_Studio\\.worktrees\\minimax"
-    },
-    {
-      "id": "gremovodCodexWorktree",
-      "type": "promptString",
-      "description": "Detached worktree Codex на head SHA PR (git worktree add --detach)",
-      "default": "C:\\AI_Workflow_Studio\\.worktrees\\codex-review"
-    }
+    {"id": "relayPython", "type": "promptString", "description": "Absolute Python interpreter, identical to job tests argv[0]", "default": "C:/AI_Workflow_Studio/.venv/Scripts/python.exe"},
+    {"id": "relayPr", "type": "promptString", "description": "Numeric GitHub PR number (read-only)", "default": "58"},
+    {"id": "relayJob", "type": "promptString", "description": "Absolute path to owner-reviewed relay job.json"},
+    {"id": "relayState", "type": "promptString", "description": "Persistent state directory outside both model worktrees"},
+    {"id": "relayReview", "type": "promptString", "description": "Structured JSON from local Codex; publication explicitly attests its provenance"}
   ]
 }

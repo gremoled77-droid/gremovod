@@ -1,5 +1,9 @@
 # GremoVOD — локальный диспетчер Codex ↔ MiniMax (эксперимент, v2)
 
+> Историческое описание v2. Для запуска используйте [bounded relay runbook](AUTOMATIC_RELAY_2026-10-21.md).
+> Старые `--execute` / `--codex-review` теперь блокируются без job policy и отдельного owner approval.
+> Структурированное локальное ревью выполняется обычным `codex exec --output-schema`, без подкоманды `review`.
+
 **Статус:** DRAFT / v2 поверх [PR #57](https://github.com/gremoled77-droid/gremovod/pull/57).
 Не включать unattended-раунды до приёмки Codex и явного согласия владельца на расход квоты MiniMax.
 

@@ -318,3 +318,14 @@ test('git adapter reads branch/head/status only; handles rename, no content or m
   assert.ok(calls.every(([c]) => c === 'git'));
   assert.equal(r.events.length, 1);
 });
+
+test('dispatcher structured journal phases reach the monitor and STOP is explicit', async t => {
+  const root = await temp(t);
+  const phase = make('relay-phase', {source: 'dispatcher', agent: 'MiniMax', event_type: 'fix_running', status: 'FIX_RUNNING'});
+  await fs.writeFile(path.join(root, 'events.jsonl'), JSON.stringify(phase) + '\n{invalid}\n');
+  await fs.writeFile(path.join(root, 'STOP'), 'owner stop');
+  const snapshot = await localSources(root);
+  assert.ok(snapshot.events.some(e => e.event_id === phase.event_id && e.status === 'FIX_RUNNING'));
+  assert.ok(snapshot.warnings.some(w => w.includes('STOP marker')));
+  assert.ok(snapshot.warnings.some(w => w.includes('invalid')));
+});

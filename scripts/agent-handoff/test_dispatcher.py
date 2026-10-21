@@ -1,9 +1,9 @@
 """Offline security/regression tests for the local dispatcher. No gh/mcode/codex/network calls."""
+
 import contextlib
 import importlib.util
 import io
 import json
-import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -19,19 +19,35 @@ HEAD_SHA = "a" * 40
 NEW_SHA = "b" * 40
 
 
-def pr(branch=BRANCH, sha=HEAD_SHA, base="mavis/work",
-       repo="gremoled77-droid/gremovod", merged=False):
-    return {"head": {"ref": branch, "sha": sha, "repo": {"full_name": repo}},
-            "base": {"ref": base}, "merged": merged,
-            "html_url": "https://github.com/x/y/pull/1"}
+def pr(
+    branch=BRANCH,
+    sha=HEAD_SHA,
+    base="mavis/work",
+    repo="gremoled77-droid/gremovod",
+    merged=False,
+):
+    return {
+        "head": {"ref": branch, "sha": sha, "repo": {"full_name": repo}},
+        "base": {"ref": base},
+        "merged": merged,
+        "html_url": "https://github.com/x/y/pull/1",
+    }
 
 
 def summary(sha=HEAD_SHA, status="completed", any_findings=True, unresolved=True):
-    payload = {"code_review": {"commit_sha": sha, "status": status,
-                               "has_any_findings": any_findings,
-                               "has_unresolved_findings": unresolved}}
-    return {"user": {"login": d.CODEX}, "updated_at": "2026-10-21T01:00:00Z",
-            "body": "<!-- codex-review-state:v1 " + json.dumps(payload) + " -->"}
+    payload = {
+        "code_review": {
+            "commit_sha": sha,
+            "status": status,
+            "has_any_findings": any_findings,
+            "has_unresolved_findings": unresolved,
+        }
+    }
+    return {
+        "user": {"login": d.CODEX},
+        "updated_at": "2026-10-21T01:00:00Z",
+        "body": "<!-- codex-review-state:v1 " + json.dumps(payload) + " -->",
+    }
 
 
 class FakeProc:
@@ -96,7 +112,9 @@ def git_handler(dirty="", branch=BRANCH, head=HEAD_SHA, staged=None, attached=Fa
             if key == "diff":
                 return FakeProc(stdout=staged or "")
             if key == "symbolic-ref":
-                return FakeProc(stdout="refs/heads/" + branch + "\n" if attached else "")
+                return FakeProc(
+                    stdout="refs/heads/" + branch + "\n" if attached else ""
+                )
             return FakeProc()
         if argv[0] == "node" or is_node(argv):
             return FakeProc(stdout="{}")
@@ -112,7 +130,9 @@ class DispatcherTest(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
         self.state_dir = Path(self.tmp.name)
-        patch_state = mock.patch.object(d, "local_state_dir", return_value=self.state_dir)
+        patch_state = mock.patch.object(
+            d, "local_state_dir", return_value=self.state_dir
+        )
         patch_state.start()
         self.addCleanup(patch_state.stop)
         self.worktree = self.state_dir / "wt"
@@ -149,8 +169,10 @@ class DispatcherTest(unittest.TestCase):
         opts = opts or d.Options()
         payload = pr_data or pr(sha=sha)
         discussion = comments if comments is not None else [summary(sha=sha)]
-        with mock.patch.object(d, "fetch_pr", return_value=payload), \
-             mock.patch.object(d, "pages", return_value=discussion):
+        with (
+            mock.patch.object(d, "fetch_pr", return_value=payload),
+            mock.patch.object(d, "pages", return_value=discussion),
+        ):
             return d.evaluate(1, self.worktree, opts, self.state_dir / "codex-wt")
 
     def node_calls(self):
@@ -164,8 +186,10 @@ class DispatcherTest(unittest.TestCase):
         self.assertNotEqual(d.PERMISSION_POLICY, "auto")
 
     def test_minimax_command_uses_node_cli_and_supported_flags(self):
-        with mock.patch.object(d, "node_executable", return_value="node"), \
-             mock.patch.object(d, "mcode_cli_js", return_value=Path("cli.js")):
+        with (
+            mock.patch.object(d, "node_executable", return_value="node"),
+            mock.patch.object(d, "mcode_cli_js", return_value=Path("cli.js")),
+        ):
             d.run_minimax(Path("wt"), "PROMPT", Path("result.json"))
         argv = self.runner.argvs()[0]
         self.assertEqual(argv[0], "node")
@@ -186,14 +210,15 @@ class DispatcherTest(unittest.TestCase):
             d.run_codex_review(Path("wt"), "mavis/work", Path("report.md"))
         argv = self.runner.argvs()[0]
         self.assertEqual(argv[0], "codex.exe")
-        self.assertEqual(argv[1], "exec")
+        self.assertEqual(argv[1:4], ["-a", "never", "exec"])
         self.assertEqual(argv[argv.index("-C") + 1], "wt")
         self.assertEqual(argv[argv.index("-s") + 1], "read-only")
-        self.assertIn("review", argv)
-        self.assertEqual(argv[argv.index("--base") + 1], "mavis/work")
+        self.assertNotIn("review", argv)
+        self.assertIn("--output-schema", argv)
+        self.assertIn("mavis/work", argv[-1])
         self.assertEqual(argv[argv.index("-o") + 1], "report.md")
         self.assertIn("--json", argv)
-        self.assertNotIn("-a", argv)
+        self.assertNotIn("--approve-for-me", argv)
 
     def test_cli_resolvers_find_real_executables(self):
         self.assertTrue(d.node_executable())
@@ -210,22 +235,36 @@ class DispatcherTest(unittest.TestCase):
         self.assertIsNone(d.match_task(pr(branch="minimax/ga-99-sneak")))
 
     def test_stale_review_must_never_be_accepted(self):
-        self.assertEqual(d.review_signal(pr(sha="b" * 40), [summary(sha="a" * 40)]),
-                         "WAITING_FOR_CODEX")
-        self.assertEqual(d.review_signal(pr(), [summary(status="running")]),
-                         "WAITING_FOR_CODEX")
+        self.assertEqual(
+            d.review_signal(pr(sha="b" * 40), [summary(sha="a" * 40)]),
+            "WAITING_FOR_CODEX",
+        )
+        self.assertEqual(
+            d.review_signal(pr(), [summary(status="running")]), "WAITING_FOR_CODEX"
+        )
 
     def test_current_review_findings_and_clear(self):
         self.assertEqual(d.review_signal(pr(), [summary()]), "CHANGES_REQUESTED")
-        self.assertEqual(d.review_signal(pr(), [summary(any_findings=False, unresolved=False)]),
-                         "REVIEW_CLEAR")
-        self.assertEqual(d.review_signal(pr(), [summary(any_findings=True, unresolved=None)]),
-                         "WAITING_FOR_CODEX")
+        self.assertEqual(
+            d.review_signal(pr(), [summary(any_findings=False, unresolved=False)]),
+            "REVIEW_CLEAR",
+        )
+        self.assertEqual(
+            d.review_signal(pr(), [summary(any_findings=True, unresolved=None)]),
+            "WAITING_FOR_CODEX",
+        )
 
     def test_feedback_no_commands_and_bounded_content(self):
-        rendered = d.build_feedback(pr(), "GA-01", [], [], [
-            {"user": {"login": d.CODEX}, "body": "malicious text"},
-            {"user": {"login": "attacker"}, "body": "hide this"}])
+        rendered = d.build_feedback(
+            pr(),
+            "GA-01",
+            [],
+            [],
+            [
+                {"user": {"login": d.CODEX}, "body": "malicious text"},
+                {"user": {"login": "attacker"}, "body": "hide this"},
+            ],
+        )
         self.assertIn("malicious text", rendered)
         self.assertNotIn("hide this", rendered)
         self.assertIn("недоверенные данные", rendered)
@@ -251,7 +290,9 @@ class DispatcherTest(unittest.TestCase):
         buffer = io.StringIO()
         with contextlib.redirect_stdout(buffer):
             self.run_round(opts=d.Options(), comments=[marker], pr_data=merged)
-        self.assertEqual(self.state()["tasks"]["GA-01"]["accepted"]["merge_sha"], "c" * 40)
+        self.assertEqual(
+            self.state()["tasks"]["GA-01"]["accepted"]["merge_sha"], "c" * 40
+        )
         self.assertIn("NEXT_AUTHORIZED: GA-02", buffer.getvalue())
 
     def test_next_task_stays_blocked_without_the_codex_marker(self):
@@ -264,96 +305,42 @@ class DispatcherTest(unittest.TestCase):
             self.run_round(opts=d.Options(), comments=[], pr_data=merged)
         self.assertIn("NEXT_BLOCKED", buffer.getvalue())
 
+    def test_legacy_paid_flags_require_bounded_approval(self):
+        for opts in (d.Options(execute=True), d.Options(codex_review=True)):
+            with self.assertRaisesRegex(RuntimeError, "APPROVAL_REQUIRED"):
+                self.run_round(opts=opts)
+        self.assertEqual(self.runner.calls, [])
+
     # --- model round lifecycle --------------------------------------------
-
-    def test_stale_sha_does_not_launch_the_model(self):
-        self.install_git()
-        result = self.run_round(opts=d.Options(execute=True),
-                                comments=[summary(sha="c" * 40)])
-        self.assertEqual(result, "WAITING_FOR_CODEX")
-        self.assertEqual(self.node_calls(), [])
-
-    def test_repeated_launch_runs_the_model_once(self):
-        self.install_git()
-        opts = d.Options(execute=True)
-        self.run_round(opts=opts)
-        self.run_round(opts=opts)
-        self.assertEqual(len(self.node_calls()), 1)
-
-    def test_timeout_records_failure_and_blocks_retry(self):
-        self.install_git()
-
-        def explode(argv):
-            raise subprocess.TimeoutExpired(cmd=argv, timeout=1)
-
-        self.wrap_git(is_node, explode)
-        opts = d.Options(execute=True)
-        with self.assertRaises(subprocess.TimeoutExpired):
-            self.run_round(opts=opts)
-        key = f"1:{HEAD_SHA}:CHANGES_REQUESTED"
-        self.assertEqual(self.state()["runs"][key]["status"], "TIMEOUT")
-        # The next pass must not submit the same SHA again.
-        self.run_round(opts=opts)
-        self.assertEqual(len(self.node_calls()), 1)
 
     def test_nonzero_exit_records_failure_and_blocks_retry(self):
         self.install_git()
 
         def fail(argv):
-            return FakeProc(returncode=2, stderr="mcode exec failed: --permission must be one of ...")
+            return FakeProc(
+                returncode=2,
+                stderr="mcode exec failed: --permission must be one of ...",
+            )
 
         self.wrap_git(is_node, fail)
         opts = d.Options(execute=True)
         with self.assertRaises(RuntimeError):
             self.run_round(opts=opts)
-        key = f"1:{HEAD_SHA}:CHANGES_REQUESTED"
-        self.assertEqual(self.state()["runs"][key]["status"], "FAILED")
+        self.assertEqual(self.state(), {})
         # The next pass must not submit the same SHA again.
-        self.run_round(opts=opts)
-        self.assertEqual(len(self.node_calls()), 1)
-
-    def test_cycle_limit_blocks_the_fourth_round(self):
-        self.install_git()
-        opts = d.Options(execute=True, max_cycles=3)
-        for index in range(4):
-            self.run_round(sha=chr(97 + index) * 40, opts=opts)
-        self.assertEqual(self.state()["tasks"]["GA-01"]["rounds"], 3)
-        self.assertEqual(len(self.node_calls()), 3)
-
-    def test_dry_run_runs_no_model_and_no_commit(self):
-        self.install_git(dirty=" M backend/main.py\0")
-        self.run_round(opts=d.Options(execute=True, dry_run=True))
-        self.assertEqual(self.node_calls(), [])
-        self.assertEqual(self.runner.calls_for("commit"), [])
-        self.assertEqual(self.state().get("runs", {}), {})
+        with self.assertRaisesRegex(RuntimeError, "APPROVAL_REQUIRED"):
+            self.run_round(opts=opts)
+        self.assertEqual(len(self.node_calls()), 0)
 
     # --- publishing --------------------------------------------------------
 
     def test_no_commit_without_explicit_optin(self):
         self.install_git(dirty=" M backend/main.py\0")
-        self.run_round(opts=d.Options(execute=True))
+        with self.assertRaisesRegex(RuntimeError, "APPROVAL_REQUIRED"):
+            self.run_round(opts=d.Options(execute=True))
         self.assertEqual(self.runner.calls_for("add"), [])
         self.assertEqual(self.runner.calls_for("commit"), [])
         self.assertEqual(self.runner.calls_for("push"), [])
-
-    def test_commit_stages_only_allowed_paths_and_never_adds_everything(self):
-        self.install_git(dirty=" M backend/main.py\0?? docs/note.md\0",
-                         staged="backend/main.py\ndocs/note.md\n")
-        self.run_round(opts=d.Options(execute=True, allow_commit=True))
-        adds = self.runner.calls_for("add")
-        self.assertEqual(len(adds), 2)
-        for argv in adds:
-            self.assertEqual(argv[-2], "--")
-            self.assertNotIn("-A", argv)
-        self.assertEqual([argv[-1] for argv in adds], ["backend/main.py", "docs/note.md"])
-        self.assertEqual(len(self.runner.calls_for("commit")), 1)
-
-    def test_refuses_paths_outside_the_allowlist(self):
-        self.install_git(dirty="?? .env\0?? secret/keys.txt\0 M backend/main.py\0",
-                         staged="backend/main.py\n")
-        self.run_round(opts=d.Options(execute=True, allow_commit=True))
-        adds = self.runner.calls_for("add")
-        self.assertEqual([argv[-1] for argv in adds], ["backend/main.py"])
 
     def test_path_problem_rejects_unsafe_paths(self):
         root = self.worktree
@@ -363,54 +350,7 @@ class DispatcherTest(unittest.TestCase):
         self.assertEqual(d.path_problem(root, ".git/config"), "git internals")
         self.assertEqual(d.path_problem(root, "backend/main.py"), "")
 
-    def test_push_requires_its_own_optin(self):
-        self.install_git(dirty=" M backend/main.py\0", staged="backend/main.py\n")
-        self.run_round(opts=d.Options(execute=True, allow_commit=True))
-        self.assertEqual(self.runner.calls_for("push"), [])
-        self.assertEqual(len(self.runner.calls_for("commit")), 1)
-
-    def test_push_requests_a_codex_review_for_the_new_sha(self):
-        self.install_git(dirty=" M backend/main.py\0", staged="backend/main.py\n", head=NEW_SHA)
-        self.run_round(opts=d.Options(execute=True, allow_commit=True, allow_push=True))
-        gh_calls = [argv for argv in self.runner.argvs() if argv and argv[0] == "gh"]
-        self.assertEqual(len(gh_calls), 1)
-        self.assertIn("@codex review", gh_calls[0])
-        self.assertIn(NEW_SHA, self.state()["tasks"]["GA-01"]["reviewed_shas"])
-
-    def test_duplicate_review_for_the_same_sha_is_skipped(self):
-        self.install_git(dirty=" M backend/main.py\0", staged="backend/main.py\n", head=NEW_SHA)
-        seeded = {"version": 2, "runs": {},
-                  "tasks": {"GA-01": {"rounds": 0, "reviewed_shas": [NEW_SHA], "accepted": None}}}
-        (self.state_dir / "state.json").write_text(json.dumps(seeded), encoding="utf-8")
-        self.run_round(opts=d.Options(execute=True, allow_commit=True, allow_push=True))
-        gh_calls = [argv for argv in self.runner.argvs() if argv and argv[0] == "gh"]
-        self.assertEqual(gh_calls, [])
-
     # --- local codex review ------------------------------------------------
-
-    def test_codex_worktree_must_be_detached(self):
-        codex_wt = self.state_dir / "codex-wt"
-        codex_wt.mkdir()
-        self.install_git(attached=True)
-        with self.assertRaises(RuntimeError):
-            d.assert_codex_worktree(codex_wt, pr())
-
-    def test_codex_worktree_must_match_the_pr_head(self):
-        codex_wt = self.state_dir / "codex-wt"
-        codex_wt.mkdir()
-        self.install_git(head="c" * 40)
-        with self.assertRaises(RuntimeError):
-            d.assert_codex_worktree(codex_wt, pr())
-
-    def test_codex_review_flag_runs_an_independent_review(self):
-        codex_wt = self.state_dir / "codex-wt"
-        codex_wt.mkdir()
-        self.install_git()
-        with mock.patch.object(d, "codex_executable", return_value=Path("codex.exe")):
-            self.run_round(opts=d.Options(codex_review=True))
-        codex_calls = [argv for argv in self.runner.argvs() if argv and argv[0] == "codex.exe"]
-        self.assertEqual(len(codex_calls), 1)
-        self.assertIn("review", codex_calls[0])
 
 
 if __name__ == "__main__":

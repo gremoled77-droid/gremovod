@@ -2,7 +2,7 @@ import {execFile} from 'node:child_process';
 import {promisify} from 'node:util';
 import {readdir, readFile, realpath, stat} from 'node:fs/promises';
 import {basename, dirname, isAbsolute, join, relative, delimiter} from 'node:path';
-import {AgentEvent, CODEX, Detail, REPO, event, redact, safeUrl} from './events';
+import {AgentEvent, CODEX, Detail, Journal, REPO, event, redact, safeUrl} from './events';
 
 const exec = promisify(execFile);
 export type Run = (command: string, args: string[], cwd?: string) => Promise<string>;
@@ -393,6 +393,20 @@ export async function localSources(
     );
   }
   try {
+    const journalPath = join(root, 'events.jsonl');
+    const actual = await realpath(journalPath);
+    if (actual.toLowerCase() !== journalPath.toLowerCase()) throw Error('Unsafe dispatcher journal path');
+    const journal = new Journal(journalPath);
+    await journal.load();
+    result.events.push(...journal.events);
+    result.warnings.push(...journal.warnings.map(w => `Dispatcher journal: ${w}`));
+  } catch (e: any) {
+    if (e.code !== 'ENOENT') result.warnings.push('Dispatcher journal: unreadable/unsafe events.jsonl');
+  }
+  try {
+    if ((await stat(join(root, 'STOP'))).isFile()) result.warnings.push('Automation stopped by owner (STOP marker).');
+  } catch { /* No owner stop marker. */ }
+  try {
     const names = (await readdir(root)).filter(n => /^PR-/.test(n));
     for (const name of names.slice(0, 200)) {
       const file = await allowedReport(root, join(root, name));
@@ -409,8 +423,8 @@ export async function localSources(
       const e = event(
         {
           timestamp: info.mtime.toISOString(),
-          source: codex ? 'codex-cli-report' : name.endsWith('.json') ? 'minimax-report' : 'dispatcher',
-          agent: codex ? 'Codex CLI' : name.endsWith('.json') ? 'MiniMax' : 'Dispatcher',
+          source: codex ? 'codex-cli-report' : name.endsWith('-result.json') ? 'minimax-report' : 'dispatcher',
+          agent: codex ? 'Codex CLI' : name.endsWith('-result.json') ? 'MiniMax' : 'Dispatcher',
           task_id: taskId(text),
           pr_number: Number(/^PR-(\d+)/.exec(name)![1]),
           commit_sha: fullSha,

@@ -1,0 +1,116 @@
+{
+  "kind": "MOCK_MODELS_AND_GITHUB_REAL_LOCAL_GIT_AND_TESTS",
+  "captured_at": "2026-10-21T14:38:14.360980+00:00",
+  "live_model_calls": 0,
+  "subscription_quota_used": false,
+  "mock_calls": {
+    "codex": 2,
+    "minimax": 1,
+    "github_request": 0
+  },
+  "initial_head": "0f1a30d3140b094189e3ee157d3078078c82cc8a",
+  "fixed_head": "7fe80451627260762e8fd4e685a9169d10dec405",
+  "local_bare_remote": true,
+  "commits": "1",
+  "committed_paths": [
+    "tests/agent_handoff_smoke/value.py"
+  ],
+  "protected_test_unchanged": true,
+  "terminal_phase": "CLEAR_WAITING_OWNER",
+  "repeated_terminal_tick_no_new_models": true,
+  "test_reports": [
+    {
+      "head_sha": "0f1a30d3140b094189e3ee157d3078078c82cc8a",
+      "scope": "working_tree_at_head",
+      "baseline": true,
+      "at": "2026-10-21T14:38:10.985021+00:00",
+      "outcomes": [
+        {
+          "argv": [
+            "C:\\AI_Workflow_Studio\\.venv\\Scripts\\python.exe",
+            "-m",
+            "unittest",
+            "discover",
+            "-s",
+            "tests/agent_handoff_smoke",
+            "-p",
+            "test_*.py"
+          ],
+          "returncode": 1,
+          "expected_failure_verified": true
+        }
+      ]
+    },
+    {
+      "head_sha": "0f1a30d3140b094189e3ee157d3078078c82cc8a",
+      "scope": "working_tree_at_head",
+      "baseline": false,
+      "at": "2026-10-21T14:38:11.704308+00:00",
+      "outcomes": [
+        {
+          "argv": [
+            "C:\\AI_Workflow_Studio\\.venv\\Scripts\\python.exe",
+            "-m",
+            "unittest",
+            "discover",
+            "-s",
+            "tests/agent_handoff_smoke",
+            "-p",
+            "test_*.py"
+          ],
+          "returncode": 0,
+          "expected_failure_verified": null
+        }
+      ]
+    },
+    {
+      "head_sha": "7fe80451627260762e8fd4e685a9169d10dec405",
+      "scope": "working_tree_at_head",
+      "baseline": false,
+      "at": "2026-10-21T14:38:14.236522+00:00",
+      "outcomes": [
+        {
+          "argv": [
+            "C:\\AI_Workflow_Studio\\.venv\\Scripts\\python.exe",
+            "-m",
+            "unittest",
+            "discover",
+            "-s",
+            "tests/agent_handoff_smoke",
+            "-p",
+            "test_*.py"
+          ],
+          "returncode": 0,
+          "expected_failure_verified": null
+        }
+      ]
+    }
+  ],
+  "phases": [
+    "REVIEW_RUNNING",
+    "REVIEW_READY",
+    "REPRODUCING",
+    "REPRODUCED",
+    "FIX_RUNNING",
+    "MINIMAX_RETURNED",
+    "FILES_MODIFIED",
+    "TESTING",
+    "TESTS_PASSED",
+    "COMMITTING",
+    "COMMITTED",
+    "PUSHING",
+    "PUSHED",
+    "AWAITING_REVIEW",
+    "REVIEW_RUNNING",
+    "REVIEW_READY",
+    "TESTING",
+    "TESTS_PASSED",
+    "CLEAR_WAITING_OWNER"
+  ],
+  "limits": {
+    "max_cycles": 3,
+    "max_minimax_calls": 3,
+    "max_codex_calls": 4
+  },
+  "live_evidence": "PENDING_EXPLICIT_OWNER_APPROVAL"
+}

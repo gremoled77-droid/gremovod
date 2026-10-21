@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "repo": "gremoled77-droid/gremovod",
+  "pr_number": 1,
+  "task_id": "SMOKE-20261021",
+  "branch": "minimax/relay-smoke-20261021",
+  "base": "feature/codex-minimax-relay",
+  "worktree": "C:/GremoVOD/relay-smoke-developer",
+  "review_worktree": "C:/GremoVOD/relay-smoke-reviewer",
+  "review_source": "local-codex",
+  "allowed_paths": ["tests/agent_handoff_smoke/value.py"],
+  "verification_paths": ["tests/agent_handoff_smoke/test_value.py"],
+  "tests": [["C:/Python313/python.exe", "-m", "unittest", "discover", "-s", "tests/agent_handoff_smoke", "-p", "test_*.py"]],
+  "max_cycles": 1,
+  "expected_failure": "AssertionError: -4 != 0",
+  "max_minimax_calls": 1,
+  "max_codex_calls": 2,
+  "minimax_timeout_seconds": 120,
+  "codex_timeout_seconds": 180,
+  "test_timeout_seconds": 30,
+  "max_steps": 8
+}
