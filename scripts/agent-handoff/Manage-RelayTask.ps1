@@ -46,7 +46,7 @@ $arguments = '"' + $controller + '" --job "' + $jobPath + '" --run --state-dir "
 $timeLimit = [TimeSpan]::FromSeconds($policy.codex_timeout_seconds + $policy.minimax_timeout_seconds +
     2 * $policy.test_timeout_seconds * $policy.tests.Count + 120)
 $plan = [pscustomobject]@{TaskName = $TaskName; Execute = $pythonPath; Arguments = $arguments;
-    IntervalSeconds = 60; MultipleInstances = 'IgnoreNew'; Enabled = [bool]$Enable;
+    IntervalSeconds = 300; ExpiresAfterHours = 2; MultipleInstances = 'IgnoreNew'; Enabled = [bool]$Enable;
     LogonType = 'Interactive'; RunLevel = 'Limited'; TimeLimit = $timeLimit.ToString();
     Approval = 'Separate --arm owner approval required; no model calls during installation'}
 $plan
@@ -56,7 +56,7 @@ if ($PSCmdlet.ShouldProcess($TaskName, 'Register bounded dispatcher schedule (di
         throw 'Task exists. Refusing to overwrite a task owned by another session.'
     }
     $scheduledAction = New-ScheduledTaskAction -Execute $pythonPath -Argument $arguments -WorkingDirectory (Split-Path $controller -Parent)
-    $trigger = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(1) -RepetitionInterval (New-TimeSpan -Minutes 1)
+    $trigger = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(1) -RepetitionInterval (New-TimeSpan -Minutes 5) -RepetitionDuration (New-TimeSpan -Hours 2)
     $principal = New-ScheduledTaskPrincipal -UserId ([Security.Principal.WindowsIdentity]::GetCurrent().Name) -LogonType Interactive -RunLevel Limited
     $settings = New-ScheduledTaskSettingsSet -MultipleInstances IgnoreNew -ExecutionTimeLimit $timeLimit -StartWhenAvailable
     $task = New-ScheduledTask -Action $scheduledAction -Trigger $trigger -Principal $principal -Settings $settings -Description 'GremoVOD bounded existing dispatcher; no merge, no production, explicit quota approval.'

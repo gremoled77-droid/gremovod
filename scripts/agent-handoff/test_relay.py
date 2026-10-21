@@ -109,6 +109,7 @@ class RelayTest(unittest.TestCase):
             ),
             mock.patch.object(d, "pages", side_effect=self.github_pages),
             mock.patch.object(d, "assert_remote"),
+            mock.patch.object(d, "subscription_preflight"),
         ]
         for patch in self.patches:
             patch.start()
@@ -648,6 +649,114 @@ class RelayTest(unittest.TestCase):
             d.dispatcher_lock(self.state_dir),
         ):
             self.fail("second writer acquired state lock")
+
+    def test_six_launch_budget_is_shared_between_jobs(self):
+        self.arm()
+        d.save_state(
+            self.state_dir / "state.json",
+            {
+                "runs": {},
+                "tasks": {},
+                "jobs": {
+                    "earlier": {
+                        "codex_calls": 4,
+                        "minimax_calls": 2,
+                        "phase": "CLEAR_WAITING_OWNER",
+                        "pr_number": 70,
+                    }
+                },
+            },
+        )
+        with self.assertRaisesRegex(RuntimeError, "SESSION_MODEL_LIMIT"):
+            self.tick()
+        self.assertEqual(sum(self.model_calls.values()), 0)
+
+    def test_an_unfinished_different_pr_blocks_launch(self):
+        self.arm()
+        d.save_state(
+            self.state_dir / "state.json",
+            {
+                "runs": {},
+                "tasks": {},
+                "jobs": {
+                    "other": {
+                        "codex_calls": 1,
+                        "minimax_calls": 0,
+                        "phase": "AWAITING_REVIEW",
+                        "pr_number": 999,
+                    }
+                },
+            },
+        )
+        with self.assertRaisesRegex(RuntimeError, "OTHER_PR_ACTIVE"):
+            self.tick()
+        self.assertEqual(sum(self.model_calls.values()), 0)
+
+    def test_owner_report_stops_and_is_not_submitted_twice(self):
+        self.arm()
+        self.tick()
+        self.tick()
+        with mock.patch.object(d, "gh", return_value={"id": 123}) as api:
+            d.finish_job(self.job, self.state_dir, "CLEAR_WAITING_OWNER")
+            d.finish_job(self.job, self.state_dir, "CLEAR_WAITING_OWNER")
+        self.assertEqual(api.call_count, 1)
+        self.assertTrue((self.state_dir / "STOP").exists())
+
+    def test_a_busy_dispatcher_is_never_stopped_by_another_tick(self):
+        with (
+            d.dispatcher_lock(self.state_dir),
+            mock.patch.object(
+                sys,
+                "argv",
+                [
+                    "dispatcher.py",
+                    "--job",
+                    str(self.path),
+                    "--state-dir",
+                    str(self.state_dir),
+                    "--run",
+                ],
+            ),
+        ):
+            self.assertEqual(d.main(), 0)
+        self.assertFalse((self.state_dir / "STOP").exists())
+        self.assertEqual(sum(self.model_calls.values()), 0)
+
+    def test_subscription_preflight_rejects_api_and_accepts_account_only(self):
+        self.patches[6].stop()
+        with (
+            mock.patch.object(
+                d,
+                "read_json",
+                return_value={"auth_mode": "apikey", "OPENAI_API_KEY": "synthetic"},
+            ),
+            self.assertRaisesRegex(RuntimeError, "SUBSCRIPTION_REQUIRED"),
+        ):
+            d.subscription_preflight("Codex")
+        with mock.patch.object(
+            d,
+            "read_json",
+            return_value={"auth_mode": "chatgpt", "tokens": {"synthetic": True}},
+        ):
+            d.subscription_preflight("Codex")
+        for source, accepted in (("api_key", False), ("token_plan", True)):
+            result = subprocess.CompletedProcess(
+                [],
+                0,
+                json.dumps(
+                    {
+                        "minimaxModelSource": source,
+                        "providers": [{"providerId": "minimax_oauth", "active": True}],
+                    }
+                ),
+                "",
+            )
+            with mock.patch.object(d.subprocess, "run", return_value=result):
+                if accepted:
+                    d.subscription_preflight("MiniMax")
+                else:
+                    with self.assertRaisesRegex(RuntimeError, "SUBSCRIPTION_REQUIRED"):
+                        d.subscription_preflight("MiniMax")
 
     def test_stop_before_tick_spends_nothing(self):
         self.arm()

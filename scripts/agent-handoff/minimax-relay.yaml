@@ -1,0 +1,29 @@
+# Narrow runtime tool set: dispatcher owns testing and Git operations.
+agents:
+  default:
+    persona:
+      enabled: false
+    tools: [read, write, edit, grep, glob]
+    builtinTools: []
+    skills: []
+    features:
+      mavis: false
+      delegation: false
+      webSearch: false
+memory:
+  enabled: false
+  proactive: false
+askUser:
+  enabled: false
+skills:
+  external:
+    enabled: false
+skillEvolve:
+  enabled: false
+beta:
+  autoMemory: false
+  skillEvolve: false
+  browserBridge: false
+  browserUseTooling: false
+  mcodeTools: false
+  codexOAuth: false

@@ -47,6 +47,8 @@ MCODE_TIMEOUT_S = 3600
 MCODE_MAX_STEPS = 40
 CODEX_REVIEW_TIMEOUT_S = 1800
 MAX_CYCLES_DEFAULT = 3
+MAX_SESSION_MODEL_CALLS = 6
+MINIMAX_SUBSCRIPTION_MODEL = "minimax/MiniMax-M3.1-Flash"
 # Only these trees may ever be staged by the dispatcher. `git add -A` is never used.
 STAGE_ALLOWLIST = ("backend/", "frontend/", "docs/", "scripts/", "tests/", "tools/")
 SECRET_NAMES = (
@@ -479,6 +481,10 @@ def run_minimax(
         node_executable(),
         str(mcode_cli_js()),
         "exec",
+        "--model",
+        MINIMAX_SUBSCRIPTION_MODEL,
+        "--config",
+        str(Path(__file__).with_name("minimax-relay.yaml")),
         "--cwd",
         str(worktree),
         "--permission",
@@ -523,6 +529,11 @@ def run_codex_review(
         "-a",
         "never",
         "exec",
+        "--ignore-user-config",
+        "-m",
+        "gpt-6.1-sol",
+        "-c",
+        'forced_login_method="chatgpt"',
         "-C",
         str(codex_worktree),
         "-s",
@@ -937,6 +948,9 @@ def controller_digest():
         [
             hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
             hashlib.sha256(schema.read_bytes()).hexdigest(),
+            hashlib.sha256(
+                Path(__file__).with_name("minimax-relay.yaml").read_bytes()
+            ).hexdigest(),
         ]
     )
 
@@ -1149,6 +1163,9 @@ def run_process(argv, cwd, timeout, directory):
             "PYTHONDONTWRITEBYTECODE": "1",
             "GIT_OPTIONAL_LOCKS": "0",
             "GH_PROMPT_DISABLED": "1",
+            "GIT_CONFIG_COUNT": "1",
+            "GIT_CONFIG_KEY_0": "safe.directory",
+            "GIT_CONFIG_VALUE_0": str(cwd),
         }
     )
     with tempfile.TemporaryFile() as output, tempfile.TemporaryFile() as errors:
@@ -1351,6 +1368,53 @@ def sync_reviewer(job, sha):
     git_out(reviewer, "checkout", "--detach", "--quiet", sha)
 
 
+def check_session_budget(state):
+    calls = 0
+    for record in state.get("jobs", {}).values():
+        for name in ("codex_calls", "minimax_calls"):
+            value = record.get(name, 0)
+            if type(value) is not int or value < 0:
+                raise RuntimeError("STATE_INVALID: session model counter")
+            calls += value
+    if calls >= MAX_SESSION_MODEL_CALLS:
+        raise RuntimeError(
+            "SESSION_MODEL_LIMIT: six total launches, no automatic reset"
+        )
+    return calls
+
+
+def subscription_preflight(agent):
+    if agent == "Codex":
+        auth = read_json(Path.home() / ".codex" / "auth.json")
+        if (
+            auth.get("auth_mode") != "chatgpt"
+            or auth.get("OPENAI_API_KEY")
+            or not auth.get("tokens")
+        ):
+            raise RuntimeError("SUBSCRIPTION_REQUIRED: Codex ChatGPT login only")
+    else:
+        result = subprocess.run(
+            [node_executable(), str(mcode_cli_js()), "provider", "list", "--json"],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            timeout=45,
+            check=False,
+        )
+        if result.returncode:
+            raise RuntimeError(
+                "SUBSCRIPTION_UNVERIFIED: MiniMax account status unavailable"
+            )
+        status = json.loads(result.stdout)
+        if status.get("minimaxModelSource") != "token_plan" or not any(
+            item.get("providerId") == "minimax_oauth" and item.get("active")
+            for item in status.get("providers", [])
+        ):
+            raise RuntimeError(
+                "SUBSCRIPTION_REQUIRED: MiniMax token_plan only, no API/custom fallback"
+            )
+
+
 def obtain_local_review(job, pr, directory, state, record):
     sha = pr["head"]["sha"]
     path = review_path(job, directory, sha)
@@ -1372,6 +1436,8 @@ def obtain_local_review(job, pr, directory, state, record):
     sync_reviewer(job, sha)
     check_head(job, sha, pr["base"]["sha"])
     approval_for(job, directory)
+    check_session_budget(state)
+    subscription_preflight("Codex")
     raw = directory / f"PR-{job['pr_number']}-{sha[:12]}-codex-review.json"
     prompt = (
         f"Review only PR #{job['pr_number']} in {REPO}, exact HEAD {sha}, base {pr['base']['sha']}. "
@@ -1432,6 +1498,8 @@ def execute_job_round(job, pr, packet, approval, directory, state, record):
     ensure_worktree(job, sha)
     check_head(job, sha, approval["base_sha"])
     approval_for(job, directory)
+    check_session_budget(state)
+    subscription_preflight("MiniMax")
     inbox = directory / f"PR-{job['pr_number']}-{sha[:12]}-feedback.json"
     atomic_json(inbox, packet)
     result_path = directory / f"PR-{job['pr_number']}-{sha[:12]}-feedback-result.json"
@@ -1575,10 +1643,23 @@ def evaluate_job(job, directory):
             "minimax_calls": 0,
         },
     )
+    record.update(
+        pr_number=job["pr_number"],
+        task_id=job["task_id"],
+        review_source=job["review_source"],
+    )
     if record["phase"] in ("HALTED", "STOPPED", "CLEAR_WAITING_OWNER"):
         return record["phase"]
     sha = record["sha"]
     try:
+        if any(
+            other.get("pr_number") not in (None, job["pr_number"])
+            and other.get("phase") not in ("HALTED", "STOPPED", "CLEAR_WAITING_OWNER")
+            for other in state["jobs"].values()
+        ):
+            raise RuntimeError(
+                "OTHER_PR_ACTIVE: finish the current PR before another job"
+            )
         task_record(state, job["task_id"])
         for name in ("codex_calls", "minimax_calls"):
             if type(record.get(name)) is not int or record[name] < 0:
@@ -1599,6 +1680,11 @@ def evaluate_job(job, directory):
         if packet is None:
             transition(job, directory, state, record, "WAITING_GITHUB", sha)
             return "WAITING_GITHUB"
+        record["last_review"] = {
+            "head_sha": sha,
+            "producer": packet["producer"],
+            "verdict": packet["review"]["verdict"],
+        }
         transition(
             job,
             directory,
@@ -1659,6 +1745,71 @@ def evaluate_job(job, directory):
             reason=code if re.fullmatch(r"[A-Z_]{1,80}", code) else "EXECUTION_ERROR",
         )
         raise
+
+
+def finish_job(job, directory, outcome):
+    """One bounded owner report; an uncertain POST is not automatically submitted again."""
+    try:
+        state = load_state(directory / "state.json")
+        record = state.get("jobs", {}).get(digest(job), {})
+        summary = {
+            "pr": job["pr_number"],
+            "task": job["task_id"],
+            "outcome": outcome,
+            "head_sha": record.get("sha"),
+            "reason": record.get("reason"),
+            "last_independent_review": record.get("last_review"),
+            "codex_launches": record.get("codex_calls", 0),
+            "minimax_launches": record.get("minimax_calls", 0),
+            "fix_iterations": state.get("tasks", {})
+            .get(job["task_id"], {})
+            .get("rounds", 0),
+            "session_model_launches": sum(
+                r.get("codex_calls", 0) + r.get("minimax_calls", 0)
+                for r in state.get("jobs", {}).values()
+            ),
+            "tests": [
+                read_json(p)
+                for p in sorted(directory.glob(f"PR-{job['pr_number']}-*tests.json"))
+            ],
+            "owner_decision": "Review exact-SHA evidence; no automatic ACCEPT or merge.",
+        }
+        report = directory / f"PR-{job['pr_number']}-owner-report.json"
+        atomic_json(report, summary)
+        if record.get("owner_report"):
+            return
+        record["owner_report"] = "submission_unknown"
+        save_state(directory / "state.json", state)
+        response = gh(
+            "api",
+            "--method",
+            "POST",
+            f"repos/{REPO}/issues/{job['pr_number']}/comments",
+            "-f",
+            "body=## Bounded Codex / MiniMax relay stopped\n\n```json\n"
+            + json.dumps(summary, ensure_ascii=False, indent=2)
+            + "\n```\n\nNo merge, force-push or production change was authorized.",
+        )
+        if not response.get("id"):
+            raise RuntimeError(
+                "REPORT_SUBMISSION_UNKNOWN: inspect GitHub, do not repost"
+            )
+        record["owner_report"] = response["id"]
+        save_state(directory / "state.json", state)
+    except (
+        RuntimeError,
+        ValueError,
+        OSError,
+        TypeError,
+        KeyError,
+        subprocess.TimeoutExpired,
+    ):
+        print(
+            "OWNER_REPORT_UNCONFIRMED: inspect local state/report; never auto-repost",
+            file=sys.stderr,
+        )
+    finally:
+        (directory / "STOP").write_text(utc_now(), encoding="utf-8")
 
 
 def main():
@@ -1801,7 +1952,21 @@ def main():
                         f"REVIEW_PUBLISHED: {packet['review_id']} exact HEAD {pr['head']['sha']}"
                     )
                 elif a.run:
-                    print(evaluate_job(job, directory))
+                    try:
+                        outcome = evaluate_job(job, directory)
+                    except (
+                        RuntimeError,
+                        ValueError,
+                        TypeError,
+                        KeyError,
+                        OSError,
+                        subprocess.TimeoutExpired,
+                    ):
+                        finish_job(job, directory, "STOPPED_WITH_ERROR")
+                        raise
+                    print(outcome)
+                    if outcome in ("HALTED", "STOPPED", "CLEAR_WAITING_OWNER"):
+                        finish_job(job, directory, outcome)
                 else:
                     pr = job_pr(job)
                     print(
