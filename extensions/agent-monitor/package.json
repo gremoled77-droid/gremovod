@@ -1,0 +1,83 @@
+{
+  "name": "gremovod-agent-monitor",
+  "displayName": "GremoVOD Agent Monitor",
+  "description": "Read-only Codex / MiniMax / GitHub observation panel",
+  "version": "0.1.0",
+  "publisher": "gremovod",
+  "license": "UNLICENSED",
+  "engines": {
+    "vscode": "^1.95.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/gremoled77-droid/gremovod.git"
+  },
+  "main": "./dist/extension.js",
+  "activationEvents": [
+    "onCommand:gremovodAgentMonitor.open"
+  ],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": false
+    },
+    "virtualWorkspaces": false
+  },
+  "contributes": {
+    "commands": [
+      {
+        "command": "gremovodAgentMonitor.open",
+        "title": "GremoVOD: Open Agent Monitor"
+      }
+    ],
+    "configuration": {
+      "title": "GremoVOD Agent Monitor",
+      "properties": {
+        "gremovodAgentMonitor.pullRequests": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "default": [
+            58,
+            59
+          ],
+          "maxItems": 10,
+          "scope": "resource",
+          "description": "PR numbers to observe in gremoled77-droid/gremovod."
+        },
+        "gremovodAgentMonitor.dispatcherDirectory": {
+          "type": "string",
+          "default": "",
+          "scope": "machine",
+          "description": "Dispatcher state/report directory. Empty uses LOCALAPPDATA/GremoVOD/agent-dispatcher."
+        },
+        "gremovodAgentMonitor.pollSeconds": {
+          "type": "integer",
+          "default": 120,
+          "minimum": 60,
+          "maximum": 3600,
+          "description": "GitHub polling interval; errors use exponential backoff."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "tsc -p .",
+    "vscode:prepublish": "npm run build",
+    "test": "npm run build && node --test test/core.test.cjs",
+    "test:host": "npm run build && node test/run-host.cjs",
+    "package": "vsce package --no-dependencies --allow-missing-repository --out gremovod-agent-monitor-0.1.0.vsix"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/vscode": "^1.95.0",
+    "@vscode/test-electron": "^2.5.0",
+    "@vscode/vsce": "^3.0.0",
+    "playwright": "^1.50.0",
+    "typescript": "^5.7.0"
+  }
+}

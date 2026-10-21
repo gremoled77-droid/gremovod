@@ -1,0 +1,13 @@
+src/**
+test/**
+node_modules/**
+.test-host/**
+.vscode-test/**
+test-results/**
+tsconfig.json
+package-lock.json
+*.vsix
+evidence/**
+.vscode/**
+*.log
+.gitignore

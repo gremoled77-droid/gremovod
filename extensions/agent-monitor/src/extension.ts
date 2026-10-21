@@ -1,0 +1,287 @@
+import * as vscode from 'vscode';
+import {createHash, randomBytes} from 'node:crypto';
+import {join} from 'node:path';
+import {homedir, tmpdir} from 'node:os';
+import {AgentEvent, Detail, Filter, Journal, filterEvents, redact, safeUrl} from './events';
+import {PullState, allowedReport, cliPresence, gitSource, github, localSources} from './sources';
+
+export function html(webview: vscode.Webview, uri: vscode.Uri) {
+  const nonce = randomBytes(24).toString('hex');
+  const resource = (name: string) => webview.asWebviewUri(vscode.Uri.joinPath(uri, 'media', name));
+  return `<!doctype html><html lang="ru"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource}; script-src 'nonce-${nonce}'; connect-src 'none'; img-src 'none'; base-uri 'none'; form-action 'none';">
+  <link rel="stylesheet" href="${resource('monitor.css')}"><title>GremoVOD Agent Monitor</title></head><body>
+  <header><div><p class="eyebrow">GREMOVOD / OBSERVABILITY</p><h1>Agent Monitor <span>v1 · read-only</span></h1></div><button id="refresh">↻ Refresh</button></header>
+  <p id="freshness" role="status" aria-live="polite">Подключение источников…</p><div id="warnings" role="status"></div>
+  <section id="overview" class="overview" aria-label="Состояние конвейера"></section>
+  <section class="agents"><article><p class="eyebrow">DEVELOPER</p><h2>MiniMax</h2><dl id="minimax"></dl></article><article><p class="eyebrow">REVIEWER</p><h2>Codex</h2><dl id="codex"></dl></article></section>
+  <section class="history"><div class="section-title"><h2>Временная шкала</h2><span id="count"></span></div>
+  <form id="filters"><label>Агент<select id="agent"><option value="">Все</option></select></label><label>Задача<select id="task"><option value="">Все</option></select></label><label>PR<select id="pr"><option value="">Все</option></select></label><label>Статус<select id="status"><option value="">Все</option></select></label><label>От<input id="from" type="datetime-local"></label><label>До<input id="to" type="datetime-local"></label><label class="search">Поиск<input id="search" type="search" placeholder="Текст, тип события или SHA"></label><button type="reset">Сбросить</button></form>
+  <div class="table-wrap"><table><thead><tr><th>Время / источник</th><th>Агент / задача</th><th>Событие</th><th>PR / SHA</th></tr></thead><tbody id="timeline"></tbody></table></div><button id="more">Показать ещё</button></section>
+  <section class="handoff"><div class="section-title"><h2>Handoff Log</h2><div><button id="copy" disabled>Копировать текст</button> <button id="open" disabled>Открыть источник</button></div></div><p id="detail-meta">Выберите событие в шкале.</p><pre id="detail">Задание, ответ, замечания и причина остановки отображаются только при наличии источника.</pre></section>
+  <footer>Наблюдения из источников ≠ подтверждение работы процесса. Модели и команды исполнения здесь не запускаются.</footer>
+  <script nonce="${nonce}" src="${resource('monitor.js')}"></script></body></html>`;
+}
+
+export function activate(context: vscode.ExtensionContext) {
+  let panel: vscode.WebviewPanel | undefined;
+  let latest: any;
+  let details: Record<string, Detail> = {};
+  let disposed = false;
+  let journal: Journal;
+  const disposables: vscode.Disposable[] = [];
+  let busy = false,
+    pending = false,
+    nextGitHub = 0,
+    failures = 0;
+  let generation = 0,
+    lastAttempt = 0;
+  let pulls: PullState[] = [];
+  let githubStatus = 'Not connected';
+  let lastGitHub: string | null = null;
+  let filter: Filter = {};
+  let visible = 200;
+  const send = () => {
+    if (!panel || !latest || !journal) return;
+    const all = journal.events;
+    const matches = filterEvents(all, filter);
+    panel.webview.postMessage({
+      ...latest,
+      type: 'snapshot',
+      events: matches.slice(-visible).reverse(),
+      count: matches.length,
+      shown: Math.min(matches.length, visible),
+      observed: journal.ids.size,
+      retained: all.length,
+      choices: {
+        agent: [...new Set(all.map(e => e.agent))],
+        task: [...new Set(all.map(e => e.task_id).filter(Boolean))],
+        pr: [...new Set(all.map(e => e.pr_number).filter(Boolean))],
+        status: [...new Set(all.map(e => e.status))],
+      },
+    });
+  };
+  let root = '',
+    dispatcher = '';
+  async function refresh() {
+    if (disposed) return;
+    if (busy) {
+      pending = true;
+      return;
+    }
+    busy = true;
+    const activeGeneration = generation;
+    try {
+      const local = await localSources(dispatcher);
+      const git = await gitSource(root);
+      let remoteEvents: AgentEvent[] = [];
+      const warnings = [...local.warnings, ...git.warnings, ...journal.warnings];
+      const cfg = vscode.workspace.getConfiguration('gremovodAgentMonitor', vscode.Uri.file(root));
+      if (Date.now() >= nextGitHub) {
+        lastAttempt = Date.now();
+        const seconds = Math.max(60, Math.min(3600, Number(cfg.get('pollSeconds', 120)) || 120));
+        try {
+          const numbers = cfg.get<number[]>('pullRequests', [58, 59]);
+          if (!Array.isArray(numbers) || numbers.length > 10) throw Error('Invalid PR configuration');
+          const remote = await github(numbers);
+          if (disposed || generation !== activeGeneration) return;
+          pulls = remote.pulls;
+          remoteEvents = remote.events;
+          details = {...details, ...remote.details};
+          warnings.push(...remote.warnings);
+          failures = 0;
+          lastGitHub = new Date().toISOString();
+          githubStatus = 'Connected';
+          try {
+            await context.workspaceState.update('agentMonitor.lastPulls', {pulls, at: lastGitHub});
+          } catch {
+            warnings.push('VS Code snapshot cache could not be saved; event journal remains independent.');
+          }
+        } catch (error: any) {
+          failures++;
+          githubStatus = 'Not connected / cached observations';
+          const detail = redact(error?.stderr || error?.message || 'Unknown error').slice(0, 300);
+          warnings.push(
+            `GitHub refresh failed: ${detail}. Check gh authentication/network/rate limits. Cached events remain visible.`
+          );
+        }
+        nextGitHub = Date.now() + Math.min(3600000, seconds * 1000 * 2 ** Math.min(failures, 5));
+      }
+      if (disposed || generation !== activeGeneration) return;
+      details = {...details, ...local.details};
+      const localEvents = local.events.map(e => {
+        const task = e.task_id ?? pulls.find(p => p.number === e.pr_number)?.task;
+        return task
+          ? {
+              ...e,
+              task_id: task,
+              correlation_id: `${task}:PR-${e.pr_number ?? 'unknown'}:${e.commit_sha ?? 'unknown'}`,
+            }
+          : e;
+      });
+      await journal.add([...localEvents, ...git.events, ...remoteEvents]);
+      if (disposed || generation !== activeGeneration) return;
+      const ids = new Set(journal.events.map(e => e.event_id));
+      for (const id of Object.keys(details)) if (!ids.has(id)) delete details[id];
+      latest = {
+        updated: new Date().toISOString(),
+        githubStatus,
+        lastGitHub,
+        nextGitHub: new Date(nextGitHub).toISOString(),
+        pulls,
+        warnings,
+        local: {rounds: local.rounds, lastRun: local.lastRun, connected: local.connected},
+        git: {branch: redact(git.branch), worktree: root, changed: git.changed},
+        cli: await cliPresence(),
+        journal: journal.path,
+        lastEvent: journal.events.at(-1)?.timestamp ?? null,
+      };
+      send();
+    } catch {
+      panel?.webview.postMessage({
+        type: 'error',
+        message:
+          'Не удалось обновить монитор. Проверьте доступ к локальному журналу; исходники и state.json не изменялись.',
+      });
+    } finally {
+      busy = false;
+      if (pending && !disposed) {
+        pending = false;
+        void refresh();
+      }
+    }
+  }
+  const command = vscode.commands.registerCommand('gremovodAgentMonitor.open', async () => {
+    if (!vscode.workspace.isTrusted) {
+      vscode.window.showWarningMessage('Agent Monitor requires a trusted workspace.');
+      return;
+    }
+    if (panel) {
+      panel.reveal();
+      return;
+    }
+    generation++;
+    root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? '';
+    if (!root) {
+      vscode.window.showInformationMessage('Откройте локальную папку проекта для Agent Monitor.');
+      return;
+    }
+    disposed = false;
+    filter = {};
+    visible = 200;
+    nextGitHub = 0;
+    failures = 0;
+    details = {};
+    const saved = context.workspaceState.get<{pulls: PullState[]; at: string}>('agentMonitor.lastPulls');
+    pulls = saved?.pulls ?? [];
+    lastGitHub = saved?.at ?? null;
+    githubStatus = 'Not connected / cached observations';
+    dispatcher =
+      vscode.workspace.getConfiguration('gremovodAgentMonitor').get<string>('dispatcherDirectory', '') ||
+      join(
+        process.env.LOCALAPPDATA ||
+          (process.platform === 'win32' ? tmpdir() : join(homedir(), '.local', 'share')),
+        'GremoVOD',
+        'agent-dispatcher'
+      );
+    const key = createHash('sha256').update(root).digest('hex').slice(0, 16);
+    journal = new Journal(join(context.globalStorageUri.fsPath, key, 'events.jsonl'));
+    await journal.load();
+    panel = vscode.window.createWebviewPanel(
+      'gremovodAgentMonitor',
+      'GremoVOD Agent Monitor',
+      vscode.ViewColumn.One,
+      {
+        enableScripts: true,
+        localResourceRoots: [vscode.Uri.joinPath(context.extensionUri, 'media')],
+        retainContextWhenHidden: true,
+        enableCommandUris: false,
+      }
+    );
+    panel.webview.html = html(panel.webview, context.extensionUri);
+    panel.webview.onDidReceiveMessage(
+      async (m: any) => {
+        if (!m || typeof m !== 'object' || typeof m.type !== 'string') return;
+        if (m.type === 'ready') {
+          send();
+          return;
+        }
+        if (m.type === 'refresh') {
+          if (!failures && Date.now() - lastAttempt > 15000) nextGitHub = 0;
+          void refresh();
+          return;
+        }
+        if (m.type === 'filter') {
+          const f: Filter = {};
+          for (const k of ['agent', 'task', 'pr', 'status', 'from', 'to', 'search'] as const)
+            if (typeof m.filter?.[k] === 'string') f[k] = m.filter[k].slice(0, 200);
+          filter = f;
+          visible = 200;
+          send();
+          return;
+        }
+        if (m.type === 'more') {
+          visible = Math.min(5000, visible + 200);
+          send();
+          return;
+        }
+        if (typeof m.id !== 'string') return;
+        const e = journal.events.find(e => e.event_id === m.id);
+        if (!e) return;
+        const d = details[e.event_id];
+        if (m.type === 'detail')
+          panel?.webview.postMessage({
+            type: 'detail',
+            id: e.event_id,
+            text: d?.text ?? `${e.summary}\n\nПолный текст недоступен в этом снимке. Откройте источник.`,
+            meta: `${e.source} · ${e.timestamp} · ${e.correlation_id}`,
+            canOpen: !!(safeUrl(d?.url ?? e.payload_ref) || d?.file),
+          });
+        else if (m.type === 'copy') await vscode.env.clipboard.writeText(redact(d?.text ?? e.summary));
+        else if (m.type === 'open') {
+          const url = safeUrl(d?.url ?? e.payload_ref);
+          if (url) await vscode.env.openExternal(vscode.Uri.parse(url));
+          else if (d?.file && (await allowedReport(dispatcher, d.file))) {
+            // Open the redacted snapshot, never the raw report containing arbitrary secrets.
+            const doc = await vscode.workspace.openTextDocument({content: d.text, language: 'plaintext'});
+            await vscode.window.showTextDocument(doc, {preview: true, viewColumn: vscode.ViewColumn.Beside});
+          }
+        }
+      },
+      undefined,
+      disposables
+    );
+    const watcher = vscode.workspace.createFileSystemWatcher(
+      new vscode.RelativePattern(vscode.Uri.file(dispatcher), '{state.json,PR-*.md,PR-*.json}')
+    );
+    let debounce: ReturnType<typeof setTimeout> | undefined;
+    const changed = () => {
+      clearTimeout(debounce);
+      debounce = setTimeout(() => void refresh(), 200);
+    };
+    watcher.onDidChange(changed);
+    watcher.onDidCreate(changed);
+    watcher.onDidDelete(changed);
+    const timer = setInterval(() => void refresh(), 30000);
+    disposables.push(watcher, {
+      dispose: () => {
+        clearInterval(timer);
+        clearTimeout(debounce);
+      },
+    });
+    panel.onDidDispose(() => {
+      disposed = true;
+      panel = undefined;
+      for (const d of disposables.splice(0)) d.dispose();
+    });
+    await refresh();
+  });
+  context.subscriptions.push(command, {
+    dispose: () => {
+      disposed = true;
+      panel?.dispose();
+      for (const d of disposables.splice(0)) d.dispose();
+    },
+  });
+  return {getSnapshot: () => latest, getEvents: () => journal?.events ?? [], close: () => panel?.dispose()};
+}

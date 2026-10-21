@@ -1,0 +1,6 @@
+dist/
+node_modules/
+*.vsix
+.test-host/
+.vscode-test/
+test-results/
