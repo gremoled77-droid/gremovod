@@ -1,10 +1,11 @@
 # GA-03 · Release gate: импорт → техническая проверка → решение владельца
 
-**Дата:** 2026-10-21
+**Дата:** 2026-10-21 · **ревизия 2** (переработка по замечаниям Codex к модели выпуска MP4)
 **Ветка:** `minimax/ga-03-release-acceptance`
 **База:** `origin/mavis/work` @ `57cac59`
 **Worktree:** `.worktrees/ga-03-release`
-**Статус:** план подготовлен. Runtime не изменён. Merge не выполнялся.
+**Предыдущий HEAD:** `0dd0c22` (ревизия 1) — этот документ заменяет его содержимое
+**Статус:** план обновлён. Runtime **не изменён**. Merge не выполнялся. Платные вызовы не выполнялись. Канон не изменён.
 
 **Основание:** D3 из [решений владельца D1–D4](https://github.com/gremoled77-droid/gremovod/blob/decisions/beta-d1-d4-20261021/docs/decisions/2026-10-21-beta-acceptance-D1-D4.md)
 (`OWNER_APPROVED`) и GA-03 из [бэклога](https://github.com/gremoled77-droid/gremovod/blob/audit/global-acceptance-20261021/docs/audits/global-acceptance-2026-10-21/06_MINIMAX_TASK_BACKLOG.md).
@@ -17,81 +18,135 @@
 
 ---
 
-## 1. Текущие состояния выпуска — фактическая карта
+## 0. Ревизия 2: что изменилось и почему
+
+Замечания Codex по модели выпуска MP4 сведены в таблицу «замечание → где закрыто».
+Каждое закрытие — конкретным разделом ниже, а не общим ответом.
+
+| # | Замечание Codex | Где закрыто | Суть изменения |
+|---|---|---|---|
+| 1 | Уточнить роль N35 `freeze_media`: какие подтверждения обязательны для локального выпуска по D3, включая права на обработку | §2 | N35 переиспользуется **вызовом функции**, а не отдельным контуром. Таблица обязательных подтверждений для `APPROVED`; права на обработку — обязательны и подтверждаются владельцем в момент решения |
+| 2 | Не строить вторую систему QA; использовать существующие N34/N35 | §2.4 | Явно назван запрет: gate не мерит файл, не заводит вердиктов и не переопределяет модальности. Gate добавляет **ровно одно** сравнение, которого нет в N35 |
+| 3 | Явный сценарий `REJECTED`: владелец отклоняет неудачный MP4 **без предварительного `PASS_TECHNICAL`** | §3, §4.2 | Два разных пути решения: строгий `APPROVED` и всегда записываемый `REJECTED` (fail-safe) |
+| 4 | Ручные кнопки «Утвердить» / «Отклонить» с отображением версии и SHA-256 | §6 | Спецификация UI: две кнопки, показ `project_revision`, `version_id`, полного SHA-256; approve несёт `expected_master_sha256` |
+| 5 | Машинный токен не должен утверждать выпуск; локальная сессия ≠ идентификация человека | §4.3 | Явный guard `MACHINE_TOKEN_FORBIDDEN` внутри маршрута (не только префикс пути) + явный `owner_id` в решении с проверкой и fail-closed |
+| 6 | Какие изменения проекта аннулируют утверждение; косметика не должна ломать процесс | §5 | Инвариант «равенство `projects.revision`» **заменён** якорем содержимого; дана матрица инвалидации с обоснованием по каждой строке |
+| 7 | Тесты: MP4 после QC, отказ владельца, потеря файла, старая ревизия, повторное открытие | §7 | 28 негативных сценариев + 3 позитивных; каждый пункт замечания отображается в конкретный ID |
+| 8 | Порядок интеграции после GA-04 | §8 | GA-04 сливается первым (guard читает манифест из **базового** коммита); область `ga-03` сверена с манифестом — все нужные файлы разрешены, `main.py`/`security.py` — **не** разрешены |
+
+**Что в ревизии 1 было неверно и исправлено:**
+
+1. Утверждение «машинный токен получит 401 — обеспечивается middleware `security.py:182`» — **неточно**. Middleware пропускает запрос с валидным bearer-токеном вовсе, если путь входит в `ALLOWED_PREFIXES`; для `/api/projects/...` он не входит, поэтому запрос падает на проверке сессии — но только если сессии нет. Запрос **с валидной сессией и валидным машинным токеном проходит middleware целиком**. Теперь защита явная и в маршруте (§4.3).
+2. Инвариант 5 «`release_artifacts.project_revision == projects.revision`» — **сломан по существу**. Триггер `AFTER UPDATE OF state,title` (`backend/main.py:55`) срабатывает на каждом сохранении проекта, а `save_project` (`backend/main.py:105`) всегда переписывает и `title`, и `state` ⇒ `revision` растёт даже на пустом сохранении. Строгое равенство обнуляло бы утверждение после **любого** сохранения проекта — ровно та «косметика ломает процесс», на которую указывает Codex. Заменено якорем содержимого (§5).
+3. Таблица `release_approvals` переименована в `release_decisions`: решение теперь двух видов (`APPROVED` / `REJECTED`), и имя совпадает с прецедентом пилота (`integrations/n8n/pilot_state_sqlite.py:81-85`).
+4. N35 больше не «остаётся отдельным контуром» — он становится **исполняемым контрактом** внутри gate, иначе подтверждение прав на обработку и покрытия модальностей негде взять (§2).
+
+---
+
+## 1. Проверенная карта фактов
+
+Все ссылки ниже сверены с кодом ветки на `0dd0c22`.
 
 ### 1.1 Что есть
 
 | Слой | Место | Факт |
 |---|---|---|
 | Импорт мастера | `backend/release_artifacts.py:94-147` `persist_release_artifact` | Пишет `release_artifacts.status = 'ready'` **безусловно** (`:141`) |
-| Модель артефакта | `backend/release_artifacts.py:13-27` `ReleaseArtifact` | Поля `status`, `project_revision`, `version_id`, `library_asset_id` есть, но `status` **нигде не читается** |
-| Таблица артефактов | `backend/release_artifacts.py:154-168` | `release_artifacts(id, project_id, project_revision, version_id, library_asset_id, title, filename, mime_type, width, height, duration, status, created_at)` |
+| Модель артефакта | `backend/release_artifacts.py:13-27` `ReleaseArtifact` | Поля `status`, `project_revision`, `version_id`, `library_asset_id` есть. Значение `status` отдаётся клиенту в ответе листинга (`artifact_record`, `:30-33`), но **ни один участок логики его не читает**: все обращения к таблице — `SELECT *` в `media_qc.py:275, 379`, `release_artifacts.py:143, 176` — не обращаются к `status` |
+| Таблица артефактов | `backend/release_artifacts.py:154-169` | `release_artifacts(id, project_id, project_revision, version_id, library_asset_id, title, filename, mime_type, width, height, duration, status, created_at)` + индекс по проекту |
+| Конкуренция при импорте | `backend/release_artifacts.py:123-128` | 409 `PROJECT_REVISION_CONFLICT`, если `projects.revision != project_revision` |
 | Техническая проверка N34 | `backend/media_qc.py:413-457` | `release_artifact_qc(artifact_id PK, project_id, master_sha256, verdict, reason, checks, measurements, observations, signature, created_at)` |
-| Вердикты N34 | `backend/media_qc.py:239-240` | `PASS_TECHNICAL` / `FAIL` / `BLOCKED` |
-| Хеш мастера | `backend/media_qc.py:31-40` `sha256_file` | Единственная реализация хеша, используется и N34, и N35 |
-| Факты о мастере | `backend/media_qc.py:370-410` `master_facts` | **Уже единый источник истины:** `exists`, `path`, живой `sha256`, `qc_verdict`, `measurements`, `observations`, `reason` |
-| Заморозка N35 | `backend/qa_reviews.py:46-98` `freeze_media` | Требует `PASS_TECHNICAL` + `processing_rights` + покрытие модальностей → `CONFIRMED` / `PARTIAL` / `BLOCKED` |
-| Статус ревью | `backend/qa_reviews.py:223-240` `review_status` | `AWAITING_VERDICTS` / `CHANGES_REQUESTED` / `BLOCKED` / `TEXT_PRECHECK_PASSED_AWAITING_OWNER` / `AWAITING_OWNER_APPROVAL`. **«Решение о выпуске не принимается»** |
-| Колонки заморозки | `backend/qa_reviews.py:39-43` `FREEZE_COLUMNS` | `master_sha256`, `media_asset_id`, `qc_verdict`, `snapshot_hash`, `evidence_manifest`, … |
-| UI | `frontend/src/StageSummary.tsx:121-170` `ReleaseSummary` | `{releaseArtifacts.length} финальных MP4` (`:158`) — считает **все** импорты, без статуса и без QC |
+| Вердикты N34 | `backend/media_qc.py:27, 214-240` | `PASS_TECHNICAL` / `FAIL` / `BLOCKED` |
+| Запись QC | `backend/media_qc.py:294-319` `_store` | `ON CONFLICT(artifact_id) DO UPDATE` — одна строка QC на артефакт, привязана к `master_sha256` |
+| Хеш мастера | `backend/media_qc.py:31-40` `sha256_file` | Единственная реализация хеша; используется и N34, и N35 |
+| Факты о мастере | `backend/media_qc.py:370-410` `master_facts` | **Единый источник истины:** `exists`, `path`, живой `sha256`, `qc_verdict`, `measurements`, `observations`, `reason` |
+| Заморозка N35 | `backend/qa_reviews.py:46-98` `freeze_media` | Контракт: мастер в библиотеке + `PASS_TECHNICAL` + `processing_rights_confirmed` + покрытие `required_modalities` → `CONFIRMED` / `PARTIAL` / `BLOCKED` |
+| Вызов N35 | `backend/qa_reviews.py:326` | Сегодня вызывается **только** из `create_review` — то есть через пакет ревью с платными критиками, которых по D3 в бете нет |
+| Статус ревью | `backend/qa_reviews.py:223-240` `review_status` | `AWAITING_VERDICTS` / `CHANGES_REQUESTED` / `BLOCKED` / `TEXT_PRECHECK_PASSED_AWAITING_OWNER` / `AWAITING_OWNER_APPROVAL`. «Решение о выпуске не принимается» |
+| Колонки заморозки | `backend/qa_reviews.py:39-43` `FREEZE_COLUMNS` | `master_sha256`, `media_asset_id`, `qc_verdict`, `snapshot_hash`, `evidence_manifest`, `processing_rights`, … |
+| Сессия владельца | `backend/security.py:18, 162-189` | `LAUNCH_TOKEN = secrets.token_urlsafe(32)` — **один токен на процесс**, общий для всех вкладок; сессия не идентифицирует конкретного человека |
+| Границы машинного доступа | `backend/service_auth.py:24, 62-70` | `ALLOWED_PREFIXES = ('/api/qa/', '/api/n8n/spend/')`; `machine_ok()` истинно только если путь входит в префиксы |
+| Признак машинного вызова | `backend/security.py:180` | `request.state.service_scopes = service_auth.identify(request)[0]` — заполняется при **любом** валидном bearer-токене, независимо от пути |
+| Ревизия проекта | `backend/main.py:51-56` | Триггер `AFTER UPDATE OF state,title` ⇒ `revision = OLD.revision+1` |
+| Сохранение проекта | `backend/main.py:96-108` | `INSERT … ON CONFLICT DO UPDATE SET title=…, state=…, updated_at=…` — переписываются **всегда**, поэтому триггер срабатывает на каждом сохранении |
+| Денежные одобрения | `backend/main.py:58` | `generation_approvals(job_id, estimated_usd, max_cost_usd, approved_at, price_basis)` — про деньги (`backend/spend_ledger.py:61`, `backend/security.py:156`), **не переиспользуется** |
+| UI | `frontend/src/StageSummary.tsx:121-170` `ReleaseSummary` | `{releaseArtifacts.length} финальных MP4` (`:158`) — считает **все** импорты; строка артефакта (`:162-168`) показывает только `title`, `project_revision`, `version_id` — **ни хеша, ни состояния, ни кнопок** |
+| Прецедент пилота | `integrations/n8n/pilot_state_sqlite.py:76-89, 297-317` | `release_decisions(decision_id, run_id, snapshot_sha, owner_id, kind)`; `owner_ready()` требует `owner_session_verified`, непустой `owner_id`, совпадение снапшота, коллизию ключа → `Conflict` |
+| Фикстура тестов | `backend/test_n35_freeze.py:25-74`, `backend/test_media_qc.py::sample_mp4` | temp-БД, патчи `DB/LIBRARY_ROOT/MEDIA`, браузерная сессия, `sample_mp4`, импорт мастера, прогон N34, переключение на машинный токен |
 
 ### 1.2 Чего нет
 
 | Отсутствует | Доказательство |
 |---|---|
-| Персистентного **решения владельца** | Поиск `owner_approv\|owner_decision\|OWNER_APPROV` по `backend/*.py`: единственное совпадение — строка статуса `AWAITING_OWNER_APPROVAL` в `qa_reviews.py:238-240`. Ни одна таблица и ни один маршрут не фиксируют решение. `p0_control.create_envelope(owner_decision_ref=…)` — про денежные конверты P0, не про выпуск, и модуль не подключён |
-| Состояния `technical_pass` | `release_artifacts.status` никогда не читается: grep по `status.*release_artifact\|release_artifacts.*status` даёт 0 совпадений в `backend/` |
-| Состояния `owner_approved` | Нет таблицы, нет маршрута, нет поля |
-| Привязки решения к хешу | `release_approvals`-подобной таблицы нет; `generation_approvals` — про деньги (`job_id, estimated_usd, max_cost_usd, approved_at, price_basis`, `backend/main.py:58`), не переиспользуется |
-| Второго QC-контура | **Не нужно** — N34/N35 уже дают всё: `release_artifact_qc.master_sha256` + `verdict`, `master_facts()` |
+| Персистентного **решения владельца** | Поиск `owner_approv\|owner_decision\|OWNER_APPROV` по `backend/*.py`: единственное совпадение — строка статуса `AWAITING_OWNER_APPROVAL` (`qa_reviews.py:238-240`). Ни одна таблица и ни один маршрут не фиксируют решение |
+| Состояния `technical_pass` | `release_artifacts.status` не читается ни в одном условии: все выборки — `SELECT *` (`media_qc.py:275, 379`, `release_artifacts.py:143, 176`) без обращения к `status` |
+| Состояния `owner_approved` и `REJECTED` | Нет таблицы, нет маршрута, нет поля |
+| Привязки решения к хешу и к содержимому | Таблицы `release_decisions`-подобной нет; `generation_approvals` — про деньги |
+| Идентификации владельца как человека | В `backend/` нет ни одного понятия «владелец студии»: `LAUNCH_TOKEN` — токен сессии процесса. Понятия `owner_id` в студии нет; есть только `owner_id` в **пилоте n8n** и `character_owner` (несвязанное) |
+| Второго QC-контура | **Не нужен** — N34/N35 дают всё нужное |
 
-### 1.3 Готовый, но не подключённый образец решения владельца
+### 1.3 Готовый образец решения владельца (пилот n8n)
 
-`integrations/n8n/pilot_state_sqlite.py:76-89, 297-317` — пилот n8n уже содержит
-ровно ту state machine, которой не хватает студии:
+`integrations/n8n/pilot_state_sqlite.py:76-89, 297-317` содержит ту же state machine, которой не хватает студии, включая **требуемое проверкой Codex поле `owner_id`** в `release_decisions` и проверку «решение относится к тому же снапшоту» (`Conflict('stale owner decision')`).
 
-```
-validated_final_rounds(run_id, snapshot_sha, master_checksum, status, provenance)
-release_decisions(decision_id, run_id, snapshot_sha, owner_id, kind)
-ready(run_id PK, snapshot_sha, decision_id UNIQUE)
-```
-
-и функцию `owner_ready(...)` с проверками: `owner_session_verified is True`,
-`gate_result == 'AWAITING_OWNER_APPROVAL'`, `current_snapshot == snapshot_sha`
-(иначе `Conflict('stale owner decision')`), наличие доверенного вердикта
-`provenance='trusted_backend_verified'`, коллизия ключа решения → `Conflict`,
-уже `READY` с другим решением → `Conflict`.
-
-**Но использовать его как есть нельзя:** это отдельная SQLite-БД (запрещено
-правилом «одна БД студии», `backend/studio_db.py:1-14`), модуль не подключён к
-FastAPI (`backend/main.py:943-1011` — `pilot_state_sqlite` в списке регистраций
-нет) и не содержит N34/N35. Поэтому берём **его семантику** (guards и конфликты),
-а данные переносим в студийную БД.
+**Использовать как есть нельзя:** это отдельная SQLite-БД (запрещено правилом «одна БД студии», `backend/studio_db.py:1-14`), модуль не подключён к FastAPI (`backend/main.py:943-1011` — `pilot_state_sqlite` в списке регистраций нет) и не содержит N34/N35. Поэтому берём **его семантику** (guards, конфликты, `owner_id`), а данные переносим в студийную БД.
 
 ---
 
-## 2. Что переиспользуется без изменений
+## 2. Роль N34/N35 в локальном выпуске по D3
 
-| Актив | Точное место | Как используется |
+### 2.1 Проблема, которую надо решить
+
+`freeze_media` сегодня достижим только через `POST /api/qa/reviews` (`qa_reviews.py:326`), то есть через пакет ревью с тремя платными критиками. По D3 платные критики в первую бету **не входят**. Значит:
+
+- либо gate не сможет использовать контракт N35 вовсе → подтверждение прав на обработку и покрытия модальностей взять негде;
+- либо gate реализует проверку прав и модальностей заново → это **вторая система QA**, что прямо запрещено D3.
+
+**Решение:** `freeze_media` — обычная функция `(studio, body)`, а не часть HTTP-контура. Gate вызывает **её саму**, не копируя её логику. `backend/qa_reviews.py` при этом **не меняется** (файл входит в область `ga-03`, но правки не требуются).
+
+### 2.2 Что именно подтверждает N35 (дословно по коду)
+
+`qa_reviews.py:46-98`, в порядке проверок:
+
+| # | Условие | Код | При невыполнении |
+|---|---|---|---|
+| 1 | Медиа задано как `media_asset_id`, а не только URL | `:60-65` | `BLOCKED` — «медиа доступно только по неподтверждённому URL» / «мастер не указан» |
+| 2 | Мастер существует в библиотеке | `:71-73` | `BLOCKED` — `facts['reason']` («файл мастера отсутствует») |
+| 3 | N34 дал `PASS_TECHNICAL` | `:74-76` | `BLOCKED` — «техническая проверка N34 не пройдена» |
+| 4 | `processing_rights_confirmed` истинно | `:77-79` | `BLOCKED` — «право на обработку контента не подтверждено» |
+| 5 | Все `required_modalities` покрыты мастером | `:80-96` | `PARTIAL` — «в мастере нет аудиодорожки» / «в мастере нет видеопотока» |
+
+Покрытие модальностей вычисляется из **измерений N34**, а не заново: `VIDEO`/`IMAGE` → есть `width` и `height`, `AUDIO` → есть `audio_codec` (`:80-91`).
+
+### 2.3 Обязательные подтверждения для локального выпуска по D3
+
+| Подтверждение N35 | Обязательно для `APPROVED`? | Обоснование |
 |---|---|---|
-| `sha256_file()` | `backend/media_qc.py:31` | Единый хеш мастера для QC, решения и чтения |
-| `master_facts()` | `backend/media_qc.py:370-410` | Единый источник истины: живой хеш + вердикт QC + измерения |
-| `release_artifact_qc` | `backend/media_qc.py:417-428` | Факт технической проверки, уже привязан к `master_sha256` |
-| `verdict()` N34 | `backend/media_qc.py:214-240` | `PASS_TECHNICAL` / `FAIL` / `BLOCKED` — вердикт не переизобретаем |
-| `freeze_media()` N35 | `backend/qa_reviews.py:46-98` | Показывает, что медиа подтверждается только при `PASS_TECHNICAL`; **остаётся отдельным контуром** |
-| `review_status()` | `backend/qa_reviews.py:223-240` | Готовый `AWAITING_OWNER_APPROVAL` — источник для информационного поля read model |
-| `persist_release_artifact()` | `backend/release_artifacts.py:94-147` | Импорт и привязка к `project_revision` (`:120-133`) — не переписывается |
-| Конфликт ревизии | `backend/release_artifacts.py:123-128` | Тот же 409 `PROJECT_REVISION_CONFLICT` применим к решению владельца |
-| Локальная сессия владельца | `backend/security.py:162-189` | Машинные токены допустимы только для `/api/qa/` и `/api/n8n/spend/` (`service_auth.ALLOWED_PREFIXES`), поэтому маршрут под `/api/projects/...` **автоматически только для сессии владельца** |
-| Ревизия проекта | `backend/main.py:55-56` | Триггер `AFTER UPDATE OF state,title` → `revision = OLD+1` |
-| Фикстура тестов | `backend/test_n35_freeze.py:25-74`, `backend/test_media_qc.py` `sample_mp4` | Готовый каркас: temp-каталог, патчи `DB/LIBRARY_ROOT/MEDIA`, браузерная сессия, импорт мастера, прогон N34 |
+| Мастер лежит в библиотеке | **да** | Нет файла — нечего выпускать |
+| N34 `PASS_TECHNICAL` | **да** | D3: «локальный технический QC и ручное утверждение итогового MP4»; QC и решение привязаны к одному хешу |
+| **Право на обработку подтверждено владельцем** | **да** | N35 `:77-79`; это и есть «права на обработку», которых требовал Codex. Подтверждает **владелец в момент решения**, а не клиентский флаг из UI |
+| Модальность `VIDEO` покрыта | **да** | Выпуск — MP4; без видеопотока файл не является выпуском (сам импорт это уже проверяет, `release_artifacts.py:52-56`, но N35 делает это единым контрактом) |
+| Модальность `AUDIO` покрыта | **нет** (по умолчанию) | Владелец может выпустить мастер без звука. Включается флагом; включать по умолчанию — значит блокировать легитимный выпуск |
+| Три платных LLM-критика | **нет** | D3 прямо: «Обязательные три платных LLM-критика в первую бету не входят» |
+| Художественная оценка | **нет и никогда автоматически** | Бэклог GA-03, «Запрещено»: автоматически утверждать канон/художественное качество |
+
+### 2.4 Что gate имеет право делать, а что — нет
+
+**Gate не мерит.** Он не запускает ffprobe/ffmpeg, не вычисляет новые измерения, не вводит новых вердиктов и не переопределяет правила модальностей. Всё, что касается «сам файл в порядке», приходит из двух существующих источников: `media_qc.master_facts` и `qa_reviews.freeze_media`.
+
+**Gate добавляет ровно одно сравнение сверх N35:**
+
+> `release_artifact_qc.master_sha256 == sha256_file(library_file)` — «QC не устарел».
+
+Это сравнение **не покрыто** контрактом N35: `master_facts` (`media_qc.py:370-410`) возвращает живой `sha256` и *сохранённый* `qc_verdict` независимо друг от друга, поэтому подмена файла после QC дала бы `qc_verdict='PASS_TECHNICAL'` при другом хеше. Без этого сравнения «QC и решение привязаны к одному и тому же хешу» (D3) не выполнялось бы.
+
+**Запрещено** (проверяется ревью): дублировать логику `freeze_media`, заводить вторую таблицу фактов о медиа, считать «свою» QC-оценку, отдавать клиенту флаг решения.
 
 ---
 
-## 3. Минимальная state machine
+## 3. State machine
 
-**Серверная, вычисляемая.** Клиент не присылает ни одного булева флага: все три
-состояния выводятся из сохранённых фактов при чтении.
+**Серверная, вычисляемая.** Клиент не присылает ни одного булева флага состояния: всё выводится из сохранённых фактов при чтении.
 
 ```
                     импорт MP4 в библиотеку
@@ -99,244 +154,448 @@ FastAPI (`backend/main.py:943-1011` — `pilot_state_sqlite` в списке р�
                               ▼
                     ┌──────────────────┐
                     │     IMPORTED     │  release_artifacts.status='imported'
-                    └────────┬─────────┘  файл в библиотеке, хеш известен
+                    └────────┬─────────┘  файл в библиотеке, живой хеш известен
                              │
               N34: PASS_TECHNICAL и хеш совпал
                              │
                              ▼
                     ┌──────────────────┐
                     │  TECHNICAL_PASS  │  release_artifact_qc.verdict='PASS_TECHNICAL'
-                    └────────┬─────────┘  и qc.master_sha256 == живой sha256 файла
+                    └────────┬─────────┘  и qc.master_sha256 == живой sha256
                              │
-              решение владельца, тот же хеш + та же ревизия
+              решение владельца: тот же хеш + то же содержимое
                              │
-                             ▼
-                    ┌──────────────────┐
-                    │  OWNER_APPROVED  │  release_approvals: master_sha256 + project_revision
-                    └──────────────────┘  (решение живо, пока хеш и ревизия те же)
+              ┌──────────────┴──────────────┐
+              ▼                             ▼
+    ┌──────────────────┐          ┌──────────────────┐
+    │  OWNER_APPROVED  │          │    REJECTED     │  решение владельца:
+    └──────────────────┘          └──────────────────┘  «файл непригоден»
+    решение живо, пока:                всегда записывается,
+    жив хеш == утверждённый,            даже без PASS_TECHNICAL
+    содержимое == утверждённое,
+    последнее решение == APPROVED
 ```
 
-Любое состояние, кроме `OWNER_APPROVED`, **не является выпуском**. Переходы только
-вперёд; решение владельца отзывается новым решением (новый `decision_id`), запись
-не удаляется.
+**Про `REJECTED` (замечание Codex №3).** D3 требует разнести `imported`, `technical_pass`, `owner_approved`. `REJECTED` — **не четвёртый релизный статус**, а явный отрицательный результат того же решения владельца; он добавлен, чтобы у владельца был легальный способ сказать «этот MP4 плохой», не дожидаясь `PASS_TECHNICAL`. Реализация: `REJECTED` — это решение, а не отдельный «статус выпуска»; в read model он отражается и в `state`, и в `decision` (§4.1).
 
-**Инварианты (нарушение любого → gate не может быть `OWNER_APPROVED`):**
+**Переходы только вперёд по фактам, решение переигрывается новым решением** (новая `decision_id`), записи не удаляются. Последнее решение по артефакту определяет текущее состояние.
 
-1. `sha256_file(library_file) == release_artifact_qc.master_sha256` — файл не менялся после N34.
-2. `release_artifact_qc.verdict == 'PASS_TECHNICAL'`.
-3. `release_approvals.master_sha256 == sha256_file(library_file)` — файл не менялся после решения.
-4. `release_approvals.project_revision == release_artifacts.project_revision` — решение относится к той же версии проекта, что и импорт.
-5. `release_artifacts.project_revision == projects.revision` — проект не менялся после импорта (правило 5 — **решение владельца**, см. §9).
+### 3.1 Инварианты `OWNER_APPROVED`
+
+Нарушение любого → `blocked_reason`, а **не** `OWNER_APPROVED`.
+
+| # | Инвариант | Кто проверяет | Код отказа |
+|---|---|---|---|
+| 1 | Живой `sha256_file(library_file) == release_artifact_qc.master_sha256` | gate (единственное своё сравнение) | `QC_STALE` |
+| 2 | `release_artifact_qc.verdict == 'PASS_TECHNICAL'` | N35 `freeze_media` | `QC_NOT_PASSED` |
+| 3 | Мастер в библиотеке | N35 `freeze_media` | `MASTER_FILE_MISSING` |
+| 4 | Право на обработку подтверждено владельцем | N35 `freeze_media` | `PROCESSING_RIGHTS_NOT_CONFIRMED` |
+| 5 | `VIDEO` покрыта мастером | N35 `freeze_media` | `MEDIA_NOT_CONFIRMED` |
+| 6 | `release_decisions.master_sha256 ==` живой хеш | gate | `MASTER_CHANGED` |
+| 7 | `release_decisions.content_sha256 ==` канонический хеш `projects.state` | gate | `CONTENT_CHANGED` |
+| 8 | Последнее решение по артефакту — `APPROVED` | gate | — |
+
+Инварианты 2–5 покрыты N35; 1, 6, 7, 8 — контракт решения. Подробности §4.2, §5.
 
 ---
 
-## 4. Проверка совпадения SHA, QC и owner approval
+## 4. Решение владельца: API и полномочия
 
-### 4.1 Вычисляемый read model (сервер)
+### 4.1 Read model (сервер, вычисляемый)
 
 ```python
 # backend/release_gate.py  (новый модуль, без HTTP-обвязки)
-def release_gate(studio, project_id, artifact_id) -> dict:
+def release_gate(studio, project_id: str, artifact_id: str) -> dict:
     """Состояние выпуска, вычисленное сервером. Ничего не доверяет клиенту."""
-    facts = media_qc.master_facts(studio, project_id, artifact_id)   # media_qc.py:370
-    qc = _qc_record_or_none(studio, project_id, artifact_id)         # media_qc.py:322
-    approval = _latest_approval(studio, project_id, artifact_id)     # новая таблица
-    ...
 ```
 
 Возвращаемая структура (одна на артефакт):
 
 ```json
 {
-  "state": "IMPORTED | TECHNICAL_PASS | OWNER_APPROVED",
-  "master_sha256": "<живой хеш файла>",
+  "state": "IMPORTED | TECHNICAL_PASS | REJECTED | OWNER_APPROVED",
+  "master_sha256": "<живой хеш файла; '' если файла нет>",
   "qc_verdict": "PASS_TECHNICAL | FAIL | BLOCKED | ''",
   "qc_reason": "…",
-  "approved_at": "… | null",
+  "content_sha256": "<канонический хеш projects.state>",
+  "project_revision": 3,
+  "version_id": "… | null",
+  "decision": "APPROVED | REJECTED | ''",
+  "decided_at": "… | null",
+  "owner_id": "… | null",
+  "processing_rights": true,
+  "media_status": "CONFIRMED | PARTIAL | BLOCKED | ''",
+  "media_reason": "… | null",
   "blocked_reason": "… | null"
 }
 ```
 
-`state` вычисляется строго по инвариантам §3. Любой сбой инварианта даёт
-`blocked_reason` с человекочитаемой причиной, а **не** `OWNER_APPROVED`.
+`state` вычисляется строго по инвариантам §3.1. Любой сбой даёт `blocked_reason` с человекочитаемой причиной.
 
-### 4.2 Решение владельца
+### 4.2 Маршрут решения
 
-Маршрут: `POST /api/projects/{project_id}/release-artifacts/{artifact_id}/approval`
+`POST /api/projects/{project_id}/release-artifacts/{artifact_id}/decision`
 
-Тело: `{"decision": "APPROVED" | "REJECTED", "note": "…", "expected_master_sha256": "<hex>"}`
+Тело:
 
-Порядок проверок (fail-closed, каждая даёт свой код):
+```json
+{
+  "decision": "APPROVED | REJECTED",
+  "note": "…",
+  "expected_master_sha256": "<hex>",
+  "owner_id": "…",
+  "processing_rights_confirmed": true,
+  "required_modalities": ["VIDEO"]
+}
+```
+
+`expected_master_sha256` обязателен для `APPROVED` и необязателен для `REJECTED`. `owner_id` обязателен для обоих (§4.3).
+
+#### Путь `APPROVED` — строгий, порядок проверок (fail-closed)
 
 | # | Проверка | Отказ |
 |---|---|---|
-| 1 | Сессия владельца (не машинный токен) | 401 — обеспечивается middleware `security.py:182` |
-| 2 | Артефакт принадлежит проекту | 404 (`media_qc._artifact`, `media_qc.py:273`) |
-| 3 | Файл существует в библиотеке | 409 `MASTER_FILE_MISSING` |
-| 4 | `expected_master_sha256 == sha256_file(file)` | 409 `MASTER_CHANGED` — **клиент утверждает именно этот файл** |
-| 5 | `release_artifact_qc.verdict == 'PASS_TECHNICAL'` | 409 `QC_NOT_PASSED` |
-| 6 | `qc.master_sha256 == sha256_file(file)` | 409 `QC_STALE` — файл менялся после проверки |
-| 7 | `release_artifacts.project_revision == projects.revision` | 409 `PROJECT_REVISION_CONFLICT` (тот же код, что `release_artifacts.py:123-128`) |
-| 8 | Запись решения с `master_sha256` + `project_revision` | — |
+| 1 | Запрос не от машинного токена | 403 `MACHINE_TOKEN_FORBIDDEN` (§4.3) |
+| 2 | Владелец идентифицирован и совпадает с настроенным | 409 `OWNER_ID_MISMATCH` / 409 `OWNER_ID_NOT_CONFIGURED` |
+| 3 | Артефакт принадлежит проекту | 404 (`media_qc._artifact`, `media_qc.py:273`) |
+| 4 | Владелец подтвердил право на обработку | 409 `PROCESSING_RIGHTS_NOT_CONFIRMED` |
+| 5 | Мастер существует в библиотеке | 409 `MASTER_FILE_MISSING` (N35 `freeze_media`) |
+| 6 | N34 дал `PASS_TECHNICAL` | 409 `QC_NOT_PASSED` (N35) |
+| 7 | `expected_master_sha256 == sha256_file(file)` | 409 `MASTER_CHANGED` — **клиент утверждает именно этот файл** |
+| 8 | `qc.master_sha256 == sha256_file(file)` | 409 `QC_STALE` — файл менялся после проверки |
+| 9 | `VIDEO` покрыта мастером | 409 `MEDIA_NOT_CONFIRMED` (N35) |
+| 10 | `canonical_sha256(projects.state)` совпадает с текущим | 409 `CONTENT_CHANGED` |
+| 11 | Запись решения: `master_sha256` + `content_sha256` + `owner_id` + `project_revision` | — |
 
-**Клиентский `expected_master_sha256` обязателен.** Это то, что связывает решение
-с конкретным файлом: UI показывает хеш, владелец подтверждает именно его. Без
-этого поля сервер всё равно проверит хеш, но решение нельзя было бы отличить от
-«утвердили что-то другое».
+Порядок 4–9 повторяет порядок `freeze_media`; проверка 8 — единственное, чего в N35 нет.
 
-### 4.3 Новая таблица (одна)
+#### Путь `REJECTED` — всегда записываемый
+
+| # | Проверка | Отказ |
+|---|---|---|
+| 1 | Запрос не от машинного токена | 403 `MACHINE_TOKEN_FORBIDDEN` |
+| 2 | Владелец идентифицирован | 409 `OWNER_ID_MISMATCH` / 409 `OWNER_ID_NOT_CONFIGURED` |
+| 3 | Артефакт принадлежит проекту | 404 |
+| 4 | `note` непустой | 400 |
+
+**Дальше — ничего.** Отклонение не требует `PASS_TECHNICAL`, не требует прав на обработку и не требует наличия файла. Если файл на месте и клиент прислал `expected_master_sha256`, расхождение фиксируется как `MASTER_CHANGED` в записи, но **не мешает записать отказ**. Если файла нет — `master_sha256` записывается пустым, решение всё равно фиксируется.
+
+**Почему так.** Отказ — fail-safe: он может только **снять** разрешение, никогда не выдать его. Поэтому блокировать отказ невыполненным QC было бы ошибкой: неудачный MP4, которому N34 не дал `PASS_TECHNICAL`, нельзя было бы отклонить — артефакт «зависал» бы навсегда.
+
+**Что даёт `REJECTED`:** `state='REJECTED'`, `decision='REJECTED'`, артефакт **не является выпуском** и не считается финальным MP4 в UI. Новое `APPROVED` (после нового QC) переигрывает отказ; обе записи остаются в истории.
+
+### 4.3 Полномочия: машинный токен и идентификация владельца
+
+**Замечание Codex №5 — две отдельные проблемы.**
+
+**(а) Машинный токен не должен утверждать выпуск.**
+
+Факт кода: `service_auth.machine_ok` (`service_auth.py:62-70`) истинно только для путей из `ALLOWED_PREFIXES = ('/api/qa/', '/api/n8n/spend/')` (`:24`). Поэтому `/api/projects/...` машинным токеном **не открывается** — но это **побочный эффект списка префиксов, а не гарантия**. Две дыры:
+
+1. Middleware (`security.py:179-183`) при валидном bearer-токене **пропускает запрос целиком**, минуя проверку сессии. Значит запрос «машинный токен + браузерная сессия» на `/api/projects/...` пройдёт и дойдёт до обработчика. Префикс тут ни при чём.
+2. Если в `ALLOWED_PREFIXES` когда-нибудь добавят `/api/projects/`, машинный токен молча получит право утверждать выпуск.
+
+**Фикс:** в самом маршруте решения — явная проверка `request.state.service_scopes` (её уже заполняет `security.py:180`, менять `security.py` не нужно и нельзя — §8):
+
+```python
+if request.state.service_scopes:
+    raise HTTPException(403, {'code': 'MACHINE_TOKEN_FORBIDDEN',
+                              'message': 'Машинный токен не может принимать решение о выпуске'})
+```
+
+Ожидаемые коды: **только bearer-токен, без сессии** → 401 (middleware, `security.py:182-183`); **bearer + сессия** → 403 `MACHINE_TOKEN_FORBIDDEN`. Оба случая обязательны отдельными тестами (§7, N14/N15).
+
+**(б) Локальная сессия ≠ идентификация конкретного человека.**
+
+Факт кода: `LAUNCH_TOKEN` (`security.py:18`) — один случайный токен на процесс студии; он общий для всех вкладок и всех, кто открыл студию на этой машине. Он доказывает «запрос пришёл из локальной браузерной сессии», но не «решение принял владелец». Идентификатора владельца в студии нет вообще (§1.2).
+
+**Фикс:** решение обязано нести **явный** `owner_id`, а сервер — сверять его с настроенным владельцем студии:
+
+- настроен владелец (`GREMOVOD_OWNER_ID` в окружении студии) и `owner_id` совпадает → решение принимается, `owner_id` пишется в запись;
+- `owner_id` не совпадает → 409 `OWNER_ID_MISMATCH`;
+- владелец **не настроен** → 409 `OWNER_ID_NOT_CONFIGURED` (fail-closed: первое решение невозможно, пока владелец явно не заявил, кто он).
+
+Дополнительно в запись решения кладётся `owner_session_fingerprint` — **только для аудита**, не как идентичность.
+
+Это ровно то, что требует Codex, и это прецедент пилота: `release_decisions.owner_id` (`pilot_state_sqlite.py:81-85`) + проверка `not owner_id` → `Blocked` (`:298`).
+
+**Граница честности.** Это атрибуция решения, а не криптографическая аутентификация человека: студия локальная, и требовать пароль/PIN в бету не предлагается (§9, вопрос 2). Отдельный вход владельца — вопрос для владельца, а не техническая деталь реализации.
+
+### 4.4 Таблица решения (одна новая)
 
 ```sql
-CREATE TABLE IF NOT EXISTS release_approvals (
+CREATE TABLE IF NOT EXISTS release_decisions (
     decision_id TEXT PRIMARY KEY,
     artifact_id TEXT NOT NULL REFERENCES release_artifacts(id) ON DELETE CASCADE,
     project_id TEXT NOT NULL,
-    master_sha256 TEXT NOT NULL,
-    project_revision INTEGER NOT NULL,
-    decision TEXT NOT NULL,            -- APPROVED | REJECTED
-    note TEXT NOT NULL,
+    master_sha256 TEXT NOT NULL DEFAULT '',      -- '' = файл отсутствовал на момент решения
+    content_sha256 TEXT NOT NULL DEFAULT '',     -- якорь утверждённого содержимого
+    project_revision INTEGER NOT NULL,           -- ревизия проекта на момент решения (справочно)
+    decision TEXT NOT NULL,                      -- APPROVED | REJECTED
+    owner_id TEXT NOT NULL,
+    owner_session_fingerprint TEXT NOT NULL DEFAULT '',
+    processing_rights_confirmed INTEGER NOT NULL DEFAULT 0,
+    qc_verdict TEXT NOT NULL DEFAULT '',
+    note TEXT NOT NULL DEFAULT '',
     created_at TEXT NOT NULL
 );
-CREATE INDEX IF NOT EXISTS release_approvals_artifact
-    ON release_approvals(artifact_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS release_decisions_artifact
+    ON release_decisions(artifact_id, created_at DESC);
 ```
 
-Одна строка — одно решение; история не удаляется. Последнее решение по артефакту
-определяет текущее состояние.
+Одна строка — одно решение; история не удаляется; последнее решение по артефакту определяет состояние. Название `release_decisions` совпадает с прецедентом пилота.
 
-### 4.4 Что НЕ входит в gate
-
-- **Три платных критика** (`qa_reviews`, роли `REVIEW-REQ/REVIEW-SYSTEM/REVIEW-CRAFT`) —
-  по D3 в первую бету не входят и **не являются предусловием** approval. Их состояние
-  (`review_status`, `AWAITING_OWNER_APPROVAL`) показывается в read model как
-  **информационное** поле `qa_state`, но не блокирует.
-- Это прямо расходится с `pilot_state_sqlite.owner_ready` (`:298`), где
-  `gate_result == 'AWAITING_OWNER_APPROVAL'` — предусловие. Для пилота без
-  платных критиков этот гейт недостижим, поэтому копировать его условие нельзя.
-- Канон не меняется, художественная оценка не автоматизируется.
+`release_artifacts.status` при импорте меняется `'ready'` → `'imported'` (`release_artifacts.py:141`). Read model от этой колонки **не зависит**: старые базы хранят `'ready'`, и такие артефакты читаются как `IMPORTED` по отсутствию QC и решения.
 
 ---
 
-## 5. Отрицательные тесты
+## 5. Что аннулирует утверждение
 
-Опора на фикстуру `backend/test_n35_freeze.py:25-74` (temp-БД, браузерная сессия,
-`sample_mp4`, импорт мастера, прогон N34).
+**Замечание Codex №6.** «Изменение самого MP4 или утверждённого содержимого обязательно снимает approval; косметические правки не должны автоматически ломать весь процесс без обоснования.»
+
+### 5.1 Почему прежний инвариант не годился
+
+Прежняя формулировка — «`release_artifacts.project_revision == projects.revision`» — ломала утверждение **при любом сохранении проекта**:
+
+- триггер `project_revision AFTER UPDATE OF state,title` (`backend/main.py:55`) срабатывает на `UPDATE OF state,title`;
+- `save_project` (`backend/main.py:105`) переписывает **и** `title`, **и** `state` при каждом сохранении — даже если значения не изменились;
+- ⇒ `revision` растёт на каждом сохранении проекта, включая пустое и включая правку только заголовка.
+
+Счётчик `revision` — это токен оптимистической конкуренции (`base_revision` во фронтенде, 409 при импорте, `release_artifacts.py:123-128`), а **не сигнал о содержании**. Использовать его как якорь выпуска — значит ломать процесс без обоснования.
+
+### 5.2 Якорь содержимого
+
+Вместо счётчика — якорь содержимого:
+
+```
+content_sha256 = sha256( json.dumps(json.loads(projects.state), sort_keys=True, ensure_ascii=False) )
+```
+
+- считается по **сырой** сохранённой колонке `projects.state`, **не** по результату `production_folders.shared_characters` (`main.py:94`), который применяется только при чтении для отображения и меняется от побочных эффектов синхронизации персонажей;
+- `sort_keys=True` — чтобы перестановка ключей JSON (косметика) не меняла хеш;
+- `title` в якорь **не входит** — переименование проекта не должно снимать утверждение.
+
+Якорь записывается в момент решения и пересчитывается при каждом чтении.
+
+### 5.3 Матрица инвалидации
+
+| # | Изменение | Утверждение | Чем ловится | Обоснование |
+|---|---|---|---|---|
+| 1 | Изменились байты MP4 | **снимается** | инвариант 6 (`MASTER_CHANGED`) + инвариант 1 (`QC_STALE`) | Утверждённого файла больше нет. Обязательно по замечанию Codex |
+| 2 | N34 перепрогнан и дал не `PASS_TECHNICAL` для того же хеша | **снимается** | инвариант 2 (N35) | Техническое условие перестало выполняться |
+| 3 | Изменилось утверждённое содержимое: `content_sha256` ≠ сохранённому | **снимается** | инвариант 7 (`CONTENT_CHANGED`) | MP4 больше не соответствует утверждённому содержимому. Обязательно по замечанию Codex |
+| 4 | Файл мастера пропал с диска | **снимается** | инвариант 3 (`MASTER_FILE_MISSING`) | Файла, который утверждали, нет |
+| 5 | Изменился только `projects.title` | **сохраняется** | title не входит в якорь | Косметика: оснований ломать процесс нет |
+| 6 | Косметическая правка внутри `projects.state` (перестановка ключей, подпись, метки папок) | **сохраняется** | канонический хеш не меняется | Изменение не затронуло утверждённое содержимое |
+| 7 | Вырос `projects.revision` (любое сохранение проекта, в т.ч. пустое) | **сохраняется** | revision не является якорем | Счётчик — токен конкуренции, а не сигнал о содержании |
+| 8 | Импортирован другой артефакт / принято решение по другому артефакту | **сохраняется** | решения привязаны к `artifact_id` | Решение относится к своему артефакту |
+| 9 | Последнее решение — `REJECTED` | `state='REJECTED'` | инвариант 8 | Явный отрицательный выбор владельца |
+
+**Стоимость строгости.** Переутверждение — одно действие: мастер и факты QC не изменились, обновляется только якорь содержимого. Поэтому строгость правила 3 не «ломает процесс», а делает его явным: UI показывает причину («утверждённое содержимое изменилось — нужно подтвердить заново») и предлагает кнопку «Утвердить» с тем же хешем.
+
+**Что осталось открытым** (влияет на строку 3): считать ли изменением содержимого правку **нерелевантной** части `projects.state` — например, добавление следующего эпизода в проект. Рекомендация и альтернатива — §9, вопрос 1.
+
+### 5.4 Что остаётся от `project_revision`
+
+`release_artifacts.project_revision` и 409 `PROJECT_REVISION_CONFLICT` при импорте (`release_artifacts.py:123-128`) **сохраняются** — это защита от гонки «проект изменился, пока готовили импорт». Но как якорь выпуска они не используются: в решении `project_revision` хранится справочно.
+
+---
+
+## 6. Ручной путь в UI
+
+**Замечание Codex №4.** Спецификация, без реализации в этой ветке.
+
+### 6.1 Что показывается
+
+В строке артефакта (`frontend/src/StageSummary.tsx:162-168`) добавляются:
+
+| Элемент | Источник | Зачем |
+|---|---|---|
+| Состояние gate | `gate.state` | Видно, что артефакт ещё не выпуск |
+| **Полный SHA-256** мастера | `gate.master_sha256` | Владелец утверждает конкретные байты; хеш копируется из буфера обмена |
+| Версия проекта | `artifact.project_revision` | Уже показывается — оставить и сделать частью подтверждения |
+| Версия промпта | `artifact.version_id` | Уже показывается, если есть |
+| Право на обработку | чекбокс «право на обработку подтверждаю» | Обязательное подтверждение N35 (§2.3) |
+| Причина блокировки | `gate.blocked_reason` | Почему «Утвердить» недоступно |
+
+### 6.2 Кнопки
+
+**«Утвердить»** → `POST .../decision`, тело:
+
+```json
+{"decision":"APPROVED","expected_master_sha256":"<тот хеш, что показан на экране>",
+ "owner_id":"<настроенный владелец>","processing_rights_confirmed":true,
+ "required_modalities":["VIDEO"],"note":"<необязательно>"}
+```
+
+Кнопка **недоступна** (с причиной), если gate не может дать `OWNER_APPROVED`: нет QC, QC не `PASS_TECHNICAL`, QC устарел, файл отсутствует, право на обработку не подтверждено, содержимое изменилось, последнее решение — `REJECTED`.
+
+**«Отклонить»** → `POST .../decision`, тело:
+
+```json
+{"decision":"REJECTED","note":"<обязательно, не пусто>","owner_id":"<настроенный владелец>"}
+```
+
+Кнопка **всегда доступна**, даже если MP4 не проходил QC и даже если файл пропал. Это и есть требование замечания №3: отклонить плохой MP4 можно, не дожидаясь `PASS_TECHNICAL`.
+
+### 6.3 Счётчики
+
+`StageSummary.tsx:158` — `{releaseArtifacts.length} финальных MP4` заменяется на:
+
+- **«финальных MP4»** — только `gate.state === 'OWNER_APPROVED'`;
+- отдельной строкой — «импортировано, ждёт приёмки: N» (`IMPORTED` + `TECHNICAL_PASS` + `REJECTED`).
+
+Ни один импорт без решения **не называется финальным MP4** нигде в UI.
+
+### 6.4 Что показывать не надо
+
+`qa_state` (`AWAITING_OWNER_APPROVAL` и прочие из `qa_reviews.review_status`) в бету **не показывается**: платные критики по D3 не входят, и UI не должен обещать процесс, которого нет (§9, вопрос 5).
+
+---
+
+## 7. Тесты
+
+Опора на фикстуру `backend/test_n35_freeze.py:25-74` (temp-БД, браузерная сессия, `sample_mp4`, импорт мастера, прогон N34, переключение на машинный токен). Новый файл — `backend/test_release_gate.py`; часть маршрутов и таблицы — в `backend/test_release_artifacts.py`.
+
+### 7.1 Импорт, QC, решения
 
 | # | Сценарий | Ожидание | Точка проверки |
 |---|---|---|---|
-| N1 | Импорт без QC | `state='IMPORTED'`, `qc_verdict=''`, `blocked_reason='техническая проверка не проводилась'` | read model |
-| N2 | QC `FAIL` | `state='IMPORTED'`, `blocked_reason` про `FAIL`; approval → 409 `QC_NOT_PASSED` | `media_qc.verdict` |
-| N3 | QC `BLOCKED` | то же, что N2 | |
-| N4 | Чужой SHA: файл изменён после N34 | `state` не `OWNER_APPROVED`; approval → 409 `QC_STALE` | `sha256_file` vs `qc.master_sha256` |
-| N5 | Чужой SHA: `expected_master_sha256` не совпадает | 409 `MASTER_CHANGED` | проверка №4 |
-| N6 | Изменённая ревизия проекта после импорта | approval → 409 `PROJECT_REVISION_CONFLICT` | `projects.revision` |
-| N7 | Нет owner approval | `state` ≤ `TECHNICAL_PASS`, `approved_at=null` | read model |
-| N8 | Файл мастера пропал с диска | `state='IMPORTED'`, `blocked_reason='файл мастера отсутствует'`; approval → 409 `MASTER_FILE_MISSING` | `master_facts` |
-| N9 | Approval посторонний/машинный токен | 401 | `security.py:182` + `service_auth` |
-| N10 | Решение по чужому артефакту/проекту | 404 | `_artifact` |
-| N11 | `REJECTED` | `state` ≤ `TECHNICAL_PASS`, решение зафиксировано, `approved_at=null` | новая таблица |
-| N12 | Повторное открытие проекта и старые артефакты | старые импорты читаются, `state='IMPORTED'`, решение не «протухает» молча | `master_facts` |
-| N13 | Файл изменён **после** approval | `state` перестаёт быть `OWNER_APPROVED`, `blocked_reason` про изменение файла | инвариант 3 |
-| N14 | Решение, принятое для старой ревизии, после роста `projects.revision` | `state` перестаёт быть `OWNER_APPROVED` | инвариант 5 |
-| N15 | UI не показывает «финальный MP4» для неодобренного | счётчик одобренных ≠ счётчик импортов | `StageSummary.tsx` |
+| N1 | Импорт без QC | `state='IMPORTED'`, `qc_verdict=''`, `blocked_reason` про невыполненную проверку | read model |
+| N2 | QC `FAIL` | `state='IMPORTED'`, `media_status='BLOCKED'`; approve → 409 `QC_NOT_PASSED` | N35 |
+| N3 | QC `BLOCKED` | то же, что N2 | N35 |
+| N4 | Файл изменён после N34 (чужая ревизия QC) | approve → 409 `QC_STALE`; `state` ≠ `OWNER_APPROVED` | инвариант 1 |
+| N5 | `expected_master_sha256` не совпадает с живым | 409 `MASTER_CHANGED` | инвариант 6 |
+| N6 | Решение по чужому артефакту / чужому проекту | 404 | `_artifact` |
+| N7 | Нет решения владельца | `state` ≤ `TECHNICAL_PASS`, `decision=''`, `decided_at=null` | read model |
+| N8 | **Позитив:** `PASS_TECHNICAL` + права + `VIDEO` + верный хеш + `owner_id` | `state='OWNER_APPROVED'`, `decided_at` заполнен, `owner_id` записан | полный путь |
+| N9 | **`REJECTED` без `PASS_TECHNICAL`** | решение записано, `state='REJECTED'`, `approved_at` пуст; approve после этого невозможен без нового решения | путь `REJECTED` |
+| N10 | **`REJECTED` при пропавшем файле** | решение записано, `master_sha256=''` | путь `REJECTED` |
+| N11 | Новое `APPROVED` поверх `REJECTED` | `state='OWNER_APPROVED'`, обе записи в истории | таблица решений |
+| N12 | Право на обработку не подтверждено | approve → 409 `PROCESSING_RIGHTS_NOT_CONFIRMED` | инвариант 4 |
+| N13 | В мастере нет видеопотока | approve → 409 `MEDIA_NOT_CONFIRMED` | инвариант 5 |
 
-Плюс обязательные **позитивные** тесты: правильный хеш + `PASS_TECHNICAL` + approval
-→ `OWNER_APPROVED`; повторное открытие сохраняет состояние.
+### 7.2 Полномочия
+
+| # | Сценарий | Ожидание | Точка проверки |
+|---|---|---|---|
+| N14 | **Машинный токен без сессии** | 401 | middleware `security.py:182-183` |
+| N15 | **Машинный токен вместе с браузерной сессией** | **403 `MACHINE_TOKEN_FORBIDDEN`** | явный guard §4.3(а) |
+| N16 | `owner_id` не совпадает с настроенным | 409 `OWNER_ID_MISMATCH` | §4.3(б) |
+| N17 | Владелец не настроен | 409 `OWNER_ID_NOT_CONFIGURED` (fail-closed) | §4.3(б) |
+
+### 7.3 Аннулирование и косметика
+
+| # | Сценарий | Ожидание | Точка проверки |
+|---|---|---|---|
+| N18 | **MP4 изменён после approval** | `state` ≠ `OWNER_APPROVED`, `blocked_reason` про изменение файла | инвариант 6 |
+| N19 | **Утверждённое содержимое изменено** (`projects.state`) | `state` ≠ `OWNER_APPROVED`, `blocked_reason` про содержимое | инвариант 7 |
+| N20 | **Изменён только `projects.title`** | **утверждение сохраняется** | якорь содержимого |
+| N21 | Перестановка ключей в `projects.state` | **утверждение сохраняется** (канонический хеш) | `sort_keys=True` |
+| N22 | **`projects.revision` вырос** (любое сохранение, в т.ч. пустое) | **утверждение сохраняется** | revision не якорь |
+| N23 | QC перепрогнан и дал `FAIL` для того же хеша | утверждение снимается | инвариант 2 |
+| N24 | **Решение по старой ревизии содержимого** (содержимое успело измениться) | `state` ≠ `OWNER_APPROVED` | инвариант 7 (следствие N19) |
+
+### 7.4 Прочее
+
+| # | Сценарий | Ожидание | Точка проверки |
+|---|---|---|---|
+| N25 | **Файл мастера пропал** | `state='IMPORTED'`, `blocked_reason` про отсутствие файла; approve → 409 `MASTER_FILE_MISSING`; **reject → записывается** | N35 + путь `REJECTED` |
+| N26 | **Повторное открытие проекта и старые артефакты** | старые импорты читаются, решения не «протухают» молча, состояние пересчитывается из фактов, а не из кэша | read model |
+| N27 | UI считает финальными только `OWNER_APPROVED` | счётчик одобренных ≠ счётчик импортов | `StageSummary.tsx` |
+| N28 | Старые базы со `status='ready'` | read model не зависит от колонки, читаются как `IMPORTED` | `release_artifacts.py:141` |
+
+### 7.5 Позитивные сценарии
+
+| # | Сценарий | Ожидание |
+|---|---|---|
+| P1 | Верный хеш + `PASS_TECHNICAL` + права + `VIDEO` + `owner_id` + решение | `OWNER_APPROVED` |
+| P2 | Повторное открытие проекта | то же `decision_id`, то же состояние |
+| P3 | Косметическое сохранение проекта после утверждения | утверждение сохраняется |
+
+**Обязательная проверка для каждого негативного сценария:** тест обязан падать на ревизии 1 (до исправления) и проходить на ревизии 2. Набор без «красного» прогона не считается проверкой.
 
 ---
 
-## 6. Технический план для Codex
+## 8. Файлы, область и порядок интеграции после GA-04
 
-### 6.1 Файлы и минимальные изменения
+**Замечание Codex №8.**
+
+### 8.1 Файлы и минимальные изменения
 
 | Файл | Изменение | Объём |
 |---|---|---|
-| `backend/release_gate.py` | **НОВЫЙ.** `release_gate(studio, project_id, artifact_id) -> dict`, `approve_release(...)`, `STATE_*` константы. Только чтение фактов + запись решения. Без FastAPI | ~140 строк |
-| `backend/release_artifacts.py` | `status` при импорте: `'ready'` → `'imported'` (`:141`); в `artifact_record()` (`:30-33`) добавить поле `gate`; маршрут `POST .../approval`; `CREATE TABLE release_approvals` в `setup()` (`:151-169`) | ~60 строк |
-| `backend/test_release_gate.py` | **НОВЫЙ.** N1–N15 + позитивные, на фикстуре `test_n35_freeze` | ~260 строк |
-| `frontend/src/StageSummary.tsx` | `useReleaseArtifacts` (`:41-57`) → тип `ReleaseArtifact` получает `gate`; счётчик `:158` — только `OWNER_APPROVED`; строка артефакта показывает состояние и префикс хеша | ~40 строк |
-| `frontend/src/releaseGate.test.mjs` | **НОВЫЙ.** Проверка подсчёта одобренных (без React: чистая функция счётчика) | ~50 строк |
+| `backend/release_gate.py` | **НОВЫЙ.** `release_gate(studio, project_id, artifact_id) -> dict`, `decide_release(studio, project_id, artifact_id, body, request) -> dict`, `STATE_*` константы, адаптер к N35. Только чтение фактов + запись решения. Без FastAPI | ~200 строк |
+| `backend/release_artifacts.py` | `status` при импорте: `'ready'` → `'imported'` (`:141`); в `artifact_record()` (`:30-33`) добавить поле `gate`; маршрут `POST .../decision`; `CREATE TABLE release_decisions` в `setup()` (`:151-169`); явный guard машинного токена и проверка `owner_id` | ~90 строк |
+| `backend/test_release_gate.py` | **НОВЫЙ.** N1–N28 + P1–P3 на фикстуре `test_n35_freeze` | ~340 строк |
+| `backend/test_release_artifacts.py` | **НОВЫЙ.** Маршрут решения, таблица, `status='imported'`, чтение `gate` | ~140 строк |
+| `frontend/src/StageSummary.tsx` | `useReleaseArtifacts` (`:41-57`) → тип `ReleaseArtifact` получает `gate`; счётчик `:158` — только `OWNER_APPROVED`; строка артефакта: состояние, полный SHA-256, версия, кнопки «Утвердить»/«Отклонить», чекбокс права на обработку | ~90 строк |
+| `frontend/src/releaseGate.test.mjs` | **НОВЫЙ.** Подсчёт одобренных и проверка формирования payload решения (чистые функции, без React) | ~70 строк |
 
-**Не трогать:** `backend/media_qc.py` (всё нужное уже есть), `backend/qa_reviews.py`
-(контур N35 не меняется), `backend/main.py` (регистрация уже есть —
-`release_artifacts.register` в `main.py:967`), `db/schema.sql`, канон, `canon/`,
-`skills/`, n8n-workflow'и, тарифы, промпты.
+**Не трогать:** `backend/media_qc.py` (всё нужное уже есть), `backend/qa_reviews.py` (контур N35 не меняется — он **вызывается**), `backend/main.py`, `backend/security.py`, `db/schema.sql`, канон, `canon/`, `skills/`, n8n-workflow'и, тарифы, промпты.
 
-### 6.2 Порядок работ
+### 8.2 Порядок работ
 
-1. **`backend/release_gate.py`** — чистая логика чтения и вычисления состояния.
-   Тест на фикстуре: N1, N2, N3, N7, N8, N12, позитив.
-2. **`backend/release_artifacts.py`** — таблица `release_approvals`, маршрут approval,
-   `gate` в ответе листинга, `status='imported'`. Тесты: N4–N6, N9–N11, N13, N14.
-3. **`frontend/src/StageSummary.tsx`** + `frontend/src/releaseGate.test.mjs` — N15.
-4. Прогнать полный набор: `python -X utf8 -m unittest discover -s backend -p "test_*.py"`,
-   `npm test`, `npx tsc --noEmit`, `npx vite build`.
+1. **`backend/release_gate.py`** — вычисление состояния + вызов N35 + адаптер. Тесты: N1, N2, N3, N7, N13, N25, N26, P1, P2.
+2. **`backend/release_artifacts.py`** — таблица `release_decisions`, маршрут решения, `gate` в ответе листинга, `status='imported'`, guard машинного токена, `owner_id`. Тесты: N4–N6, N9–N12, N14–N24, N28.
+3. **`frontend/src/StageSummary.tsx`** + **`frontend/src/releaseGate.test.mjs`** — N27.
+4. Прогнать полный набор: `python -X utf8 -m unittest discover -s backend -p "test_*.py"`, `npm test`, `npx tsc --noEmit`, `npx vite build`.
 
-### 6.3 Критерии готовности (DoD)
+### 8.3 Порядок интеграции после GA-04
+
+**GA-04 (PR #62) сливается в `mavis/work` первым.** Причина: `tools/minimax_task_scopes.json` и `tools/check_agent_scope.py` живут в ветке GA-04 и **ещё не в `mavis/work`**. Guard читает манифест **из базового коммита** (`origin/<base>`), а не из head ветки, — то есть он начинает работать только когда манифест уже в базе.
+
+Проверенная сверка области `ga-03` (манифест на ветке GA-04) — **все нужные файлы уже разрешены**, правки манифеста не требуются:
+
+| Файл из плана | В области `ga-03`? |
+|---|---|
+| `backend/release_gate.py` | да |
+| `backend/release_artifacts.py` | да |
+| `backend/media_qc.py` | да |
+| `backend/qa_reviews.py` | да |
+| `backend/test_release_gate.py` | да |
+| `backend/test_release_artifacts.py` | да |
+| `backend/test_media_qc.py` | да |
+| `backend/test_qa_reviews.py` | да |
+| `frontend/src/StageSummary.tsx` | да |
+| `frontend/src/releaseGate.test.mjs` | да |
+| `docs/audits/ga-03-release-gate.md` (этот документ) | да — `common_allow: ["docs/"]` |
+
+**Не разрешены и потому не трогаются:** `backend/main.py`, `backend/security.py`. Практическое следствие: явный guard машинного токена и проверку `owner_id` **нельзя** выносить в `security.py` — они живут в `backend/release_artifacts.py` / `backend/release_gate.py` и используют `request.state.service_scopes`, который уже заполняет `security.py:180`.
+
+**Итоговая последовательность:**
+
+1. Слить **GA-04** в `mavis/work` → guard областей начинает работать.
+2. Из нового SHA `mavis/work` — ветка GA-03 с runtime-реализацией и тестами.
+3. Отдельное решение владельца по спорным пунктам §9.
+4. D5 (выбор настоящего MP4 и снапшота) → локальный E2E: CapCut → MP4 → N34 → N35 → ручное решение с фиксацией хеша.
+
+### 8.4 Критерии готовности (DoD)
 
 1. `release_artifacts.status` при импорте — `'imported'`; ни один путь не называет импорт выпуском.
-2. Read model возвращает `state` из трёх значений и `blocked_reason` с причиной отказа.
-3. `OWNER_APPROVED` достижим **только** при выполнении всех пяти инвариантов §3.
-4. Approval отклоняется с конкретным кодом (`MASTER_CHANGED` / `QC_NOT_PASSED` / `QC_STALE` / `PROJECT_REVISION_CONFLICT` / `MASTER_FILE_MISSING`), а не общим 400.
-5. Решение хранит `master_sha256` и `project_revision`; при изменении файла или ревизии состояние перестаёт быть `OWNER_APPROVED` (N13, N14).
-6. UI: «финальных MP4» считает только `OWNER_APPROVED`; импорты без одобрения видны отдельно и не названы финальными.
-7. Все N1–N15 и позитивные тесты зелёные; полный набор backend и frontend зелёный.
-8. Ни один новый маршрут не вызывает платного провайдера; `n8n` не затронут; канон не изменён.
-9. Ветка — `minimax/ga-03-release-acceptance` от зафиксированного SHA `mavis/work`; runtime-код меняется только в перечисленных файлах.
-
-### 6.4 Отрицательные сценарии, которые Codex обязан повторить сам
-
-- N1–N7, N13, N14 — воспроизвести на синтетическом MP4, без платных вызовов.
-- Изменить байт в файле мастера после N34 → gate перестаёт быть `OWNER_APPROVED` (N4/N13).
-- Сохранить проект (`POST /api/projects` увеличивает `revision`) → approval отклоняется (N6/N14).
-- Проверить, что машинный токен не может вызвать approval (N9).
-- Проверить в UI, что неодобренный импорт не называется финальным MP4 (N15).
-
----
-
-## 7. Риски
-
-| Риск | Оценка | Митигация |
-|---|---|---|
-| Правило 5 (строгое равенство `projects.revision`) слишком строго: любое сохранение проекта после импорта обнуляет approval | **высокая** | Решение владельца (§9). Альтернатива: хранить ревизию импорта и не сравнивать с текущей, тогда approval переживает косметические правки, но не переживает смену канона — тогда нужен отдельный `canon_sha`-якорь из `qa_reviews` |
-| Release gate станет «второй системой QA», если добавить свои проверки медиа | средняя | Gate **не мерит** файл: он только читает `release_artifact_qc` и `master_facts`. Никаких новых измерений, никаких новых вердиктов |
-| Approval без привязки к хешу превращается в «владелец нажал кнопку» | средняя | `expected_master_sha256` обязателен (проверка №4) и хранится в решении |
-| `release_artifacts.status` на старых базах остаётся `'ready'` | низкая | Read model не зависит от этой колонки; при переводе на `'imported'` старые строки читаются как `IMPORTED` по отсутствию QC |
-| UI продолжит называть импорты финальными | низкая | Счётчик и подпись переводятся на `gate.state`; N15 |
-| Зависимость от GA-04 (манифест областей) | средняя | Ветка GA-03 — `minimax/ga-03-*`: пока манифест не слит в `mavis/work`, scope guard не в силе и ветка не ограничена. После merge GA-04 область `ga-03` уже объявлена в `tools/minimax_task_scopes.json` |
-
----
-
-## 8. Зависимость от GA-04 (обнаружено при проверке)
-
-Манифест областей (`tools/minimax_task_scopes.json`) появился в ветке GA-04
-(`minimax/ga-04-studio-offline-ci`, PR #62) и **ещё не слит в `mavis/work`**.
-Следствие: scope guard пока не ограничивает ветку `minimax/ga-03-*` — и это
-правильное поведение, а не дыра. Исправлено в GA-04 (`2d00dca`): области вводятся
-в силу только когда манифест есть; ветка, созданная раньше манифеста, не
-блокируется за собственные файлы.
-
-**Рекомендация владельцу:** слить GA-04 раньше GA-03, иначе область GA-03 не
-будет защищена, а ветка GA-03 не попадёт под проверку областей.
+2. Read model отдаёт `state` из четырёх значений и `blocked_reason`.
+3. `OWNER_APPROVED` достижим **только** при выполнении всех восьми инвариантов §3.1.
+4. `REJECTED` записывается **без** `PASS_TECHNICAL`, без прав на обработку и без наличия файла.
+5. Решение отклоняется конкретным кодом, а не общим 400.
+6. Машинный токен не может принять решение ни при каких сочетаниях заголовков (401/403).
+7. Решение содержит `owner_id`; без настроенного владельца решение невозможно (fail-closed).
+8. Изменение файла, вердикта QC или утверждённого содержимого снимает `OWNER_APPROVED`; изменение заголовка проекта, перестановка ключей и рост `projects.revision` — **не снимает**.
+9. UI: «финальных MP4» считает только `OWNER_APPROVED`; импорты без одобрения видны отдельно и не названы финальными; видны полный SHA-256 и версия.
+10. Все N1–N28 и P1–P3 зелёные; полный набор backend и frontend зелёный.
+11. Ни один новый маршрут не вызывает платного провайдера; `n8n` не затронут; канон не изменён; `media_qc.py` и `qa_reviews.py` не изменялись.
 
 ---
 
 ## 9. Открытые вопросы владельцу
 
-1. **Правило 5 — строгое или мягкое?** Если ревизия проекта после импорта обнуляет
-   approval, то любая правка проекта после импорта мастера потребует нового решения.
-   Вариант A (рекомендую для пилота): approval привязан к `master_sha256` +
-   `project_revision` импорта, а текущая `projects.revision` **не** сравнивается —
-   тогда approval переживает косметические правки проекта, но не переживает
-   изменение мастера. Вариант B: строгое сравнение с текущей ревизией.
-2. **Нужна ли кнопка отзыва решения** (кроме нового `REJECTED`)? `pilot_state_sqlite`
-   отзыва не имеет — решение переигрывается новым.
-3. **Показывать ли `qa_state` (`AWAITING_OWNER_APPROVAL` и т. п.) в UI** рядом с
-   gate-состоянием, учитывая, что платные критики в первую бету не входят?
-4. **Кто такой «владелец» в терминах API?** Сейчас это локальная сессия студии
-   (`LAUNCH_TOKEN`, `backend/security.py:194`). Нужен ли явный `owner_id` в решении
-   (как `release_decisions.owner_id` у пилота) для будущей мульти-пользовательской
-   студии, или сейчас достаточно факта «решение принял владелец локальной сессии»?
+Спорные пункты, которые меняют реализацию. Рекомендации даны, но решение — за владельцем.
+
+1. **Гранулярность якоря содержимого.** Рекомендую: `content_sha256` = канонический хеш всего `projects.state`; любое изменение содержимого снимает утверждение, переутверждение — одно действие. Альтернатива: якорь только на «релизную» часть состояния — тогда добавление следующего эпизода не снимет утверждение, но нужен определённый ключ подложки и отдельное решение о структуре. **Влияет на строку 3 матрицы §5.3.**
+2. **Идентификация владельца: насколько строго.** Рекомендую: явный `owner_id` + сверка с настроенным владельцем, fail-closed при отсутствии настройки; без пароля/PIN. Альтернатива: дополнительно требовать повторный ввод (PIN/пароль) перед `APPROVED` — это отдельный вход в студию, заметно больше работы. Нужно ли требовать его в бету?
+3. **Обязательность `AUDIO`.** Рекомендую: для `APPROVED` обязателен `VIDEO`, `AUDIO` — по требованию владельца (по умолчанию выключено), чтобы не блокировать беззвучный мастер. Нужно ли требовать `AUDIO` всегда?
+4. **Отзыв решения.** Рекомендую: отдельной сущности «отозвано» нет — отзыв это новое `REJECTED` (или новое `APPROVED` поверх `REJECTED`). Нужна ли отдельная сущность «отозвано» с отметкой времени?
+5. **`qa_state` в UI.** Рекомендую: в бету не показывать (платные критики по D3 не входят). Показывать ли рядом с gate-состоянием, когда платные критики войдут?
+6. **Кто и когда утверждает.** Нужна ли роль «владелец» как отдельный вход (PIN) или достаточно явного `owner_id` при локальной сессии?
 
 ---
 
