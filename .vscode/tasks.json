@@ -42,6 +42,71 @@
       },
       "isBackground": true,
       "problemMatcher": []
+    },
+    {
+      "label": "GremoVOD: Локальное ревью Codex (detached worktree, read-only)",
+      "type": "shell",
+      "command": "python",
+      "args": [
+        "${workspaceFolder}/scripts/agent-handoff/dispatcher.py",
+        "--pr",
+        "${input:gremovodGaPr}",
+        "--codex-review",
+        "--codex-worktree",
+        "${input:gremovodCodexWorktree}"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "GremoVOD: Раунд исправлений MiniMax (без commit и push)",
+      "type": "shell",
+      "command": "python",
+      "args": [
+        "${workspaceFolder}/scripts/agent-handoff/dispatcher.py",
+        "--pr",
+        "${input:gremovodGaPr}",
+        "--execute",
+        "--worktree",
+        "${input:gremovodMiniMaxWorktree}"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "GremoVOD: Раунд исправлений MiniMax + commit + push (разрешено)",
+      "type": "shell",
+      "command": "python",
+      "args": [
+        "${workspaceFolder}/scripts/agent-handoff/dispatcher.py",
+        "--pr",
+        "${input:gremovodGaPr}",
+        "--execute",
+        "--allow-commit",
+        "--allow-push",
+        "--worktree",
+        "${input:gremovodMiniMaxWorktree}"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      },
+      "problemMatcher": []
     }
   ],
   "inputs": [
@@ -50,6 +115,18 @@
       "type": "promptString",
       "description": "Числовой номер GitHub Pull Request MiniMax (например, 1234; не GA-01)",
       "default": ""
+    },
+    {
+      "id": "gremovodMiniMaxWorktree",
+      "type": "promptString",
+      "description": "Worktree MiniMax с веткой GA-задачи",
+      "default": "C:\\AI_Workflow_Studio\\.worktrees\\minimax"
+    },
+    {
+      "id": "gremovodCodexWorktree",
+      "type": "promptString",
+      "description": "Detached worktree Codex на head SHA PR (git worktree add --detach)",
+      "default": "C:\\AI_Workflow_Studio\\.worktrees\\codex-review"
     }
   ]
 }
