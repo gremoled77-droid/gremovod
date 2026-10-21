@@ -124,6 +124,26 @@ python scripts\agent-handoff\dispatcher.py --pr 58 --execute --allow-commit --al
 * Модель получает запрет на `git add/commit/push` — публикацией занимается диспетчер.
 * `--watch` требует открытой PowerShell-сессии; для фоновой работы нужен планировщик Windows.
 
+## Проверки без запуска моделей
+
+Офлайн-проверки не вызывают `mcode` и `codex` в рабочем режиме: внешние процессы
+подменены, а настоящие CLI проверяются только через `--help` (квота не расходуется).
+
+```powershell
+cd C:\Users\BLOWKA\Documents\Minimax\_wt\gremovod-dispatcher-v2
+& 'C:\AI_Workflow_Studio\.venv\Scripts\python.exe' -m pytest scripts/agent-handoff/test_dispatcher.py -q
+& 'C:\AI_Workflow_Studio\.venv\Scripts\python.exe' -X utf8 -m unittest discover -s scripts/agent-handoff -p "test_dispatcher.py"
+& 'C:\AI_Workflow_Studio\.venv\Scripts\python.exe' -m ruff check scripts/agent-handoff/
+```
+
+Что покрыто: реальные CLI-контракты (`mcode exec --help`, `codex exec --help`,
+`codex exec review --help` — сверяются с argv диспетчера), запрет повторного запуска
+того же `PR:SHA:status`, лимит трёх раундов, безопасный staging поштучно с проверкой
+allowlist, сохранение `state.json` при аварийном завершении процесса и mock-сквозной
+тест MiniMax → Codex → MiniMax без единого вызова модели.
+
+Живой `--execute` в этих проверках не используется.
+
 ## Приёмка Codex
 
 Проверить: изоляцию worktree, mock внешних `gh/mcode/codex`, маркер review и точное совпадение SHA, пагинацию комментариев, чистую worktree, allowlist путей, отсутствие `git add -A`, dedupe, таймауты и аварийные коды возврата, ровно один запуск на `PR:SHA:status`, лимит трёх раундов, запрет повторного ревью того же SHA, отсутствие перехода GA-01 → GA-02 без accept-записи и маркера. Затем один реальный GA-PR **без `--execute`**.

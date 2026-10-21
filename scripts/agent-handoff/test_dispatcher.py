@@ -413,5 +413,234 @@ class DispatcherTest(unittest.TestCase):
         self.assertIn("review", codex_calls[0])
 
 
+class RealCliContractTest(unittest.TestCase):
+    """The dispatcher's argv must match the CLI that is actually installed.
+
+    Only `--help` is executed: no model is invoked, no quota is spent and no
+    repository is touched. The test is skipped when a CLI is not installed.
+    """
+
+    def mcode_help(self):
+        try:
+            node, cli = d.node_executable(), d.mcode_cli_js()
+        except RuntimeError as exc:
+            self.skipTest(f"MiniMax Code CLI is not installed: {exc}")
+        proc = subprocess.run([node, str(cli), "exec", "--help"], check=False, capture_output=True,
+                              text=True, encoding="utf-8", errors="replace", timeout=120)
+        self.assertEqual(proc.returncode, 0, proc.stderr[:400])
+        return proc.stdout
+
+    def codex_help(self, *args):
+        try:
+            exe = d.codex_executable()
+        except RuntimeError as exc:
+            self.skipTest(f"Codex CLI is not installed: {exc}")
+        proc = subprocess.run([str(exe), "exec", *args, "--help"], check=False, capture_output=True,
+                              text=True, encoding="utf-8", errors="replace", timeout=120)
+        self.assertEqual(proc.returncode, 0, proc.stderr[:400])
+        return proc.stdout
+
+    def test_minimax_flags_exist_in_the_installed_cli(self):
+        help_text = self.mcode_help()
+        for flag in ("--cwd", "--permission", "--prompt-mode", "--output-format", "--timeout", "--max-steps"):
+            self.assertIn(flag, help_text, f"{flag} is not offered by the installed mcode CLI")
+        self.assertIn("-o", help_text, "mcode exec must accept -o for the result file")
+
+    def test_permission_policy_is_documented_by_the_installed_cli(self):
+        help_text = self.mcode_help()
+        line = next(line for line in help_text.splitlines() if "--permission" in line)
+        self.assertIn(d.PERMISSION_POLICY, line, "the configured permission policy must be a documented one")
+        self.assertNotIn("auto", line, "the installed CLI does not accept the internal 'auto' spelling")
+
+    def test_codex_flags_exist_in_the_installed_cli(self):
+        exec_help = self.codex_help()
+        for flag in ("-C", "-s", "--approve-for-me", "--json", "-o"):
+            self.assertIn(flag, exec_help, f"{flag} is not offered by codex exec")
+        review_help = self.codex_help("review")
+        for flag in ("--base", "-o", "--json"):
+            self.assertIn(flag, review_help, f"{flag} is not offered by codex exec review")
+        self.assertIn("review", exec_help, "codex exec must expose the review subcommand")
+
+
+class FakeRepo:
+    """Small stateful git model for the end-to-end dispatcher run."""
+
+    def __init__(self, branch=BRANCH, head=HEAD_SHA):
+        self.branch = branch
+        self.head = head
+        self.next_head = head
+        self.staged = []
+        self.added = []
+        self.committed = []
+        self.pushed = []
+        self.dirty = []
+
+    def handler(self, argv):
+        if not argv:
+            return None
+        if argv[0] == "gh":
+            return FakeProc(stdout="{}")
+        if is_node(argv):
+            return FakeProc(stdout="{}")
+        if argv[0] != "git":
+            return None
+        key = argv[3] if len(argv) > 3 else ""
+        if key == "status":
+            mode = argv[4] if len(argv) > 4 else ""
+            if mode == "--porcelain=v1":
+                return FakeProc(stdout="".join(" M " + path + "\0" for path in self.dirty))
+            return FakeProc(stdout="")
+        if key == "branch":
+            return FakeProc(stdout=self.branch + "\n")
+        if key == "rev-parse":
+            return FakeProc(stdout=self.head + "\n")
+        if key == "diff":
+            return FakeProc(stdout="".join(path + "\n" for path in self.staged))
+        if key == "add":
+            self.added.append(argv[-1])
+            self.staged.append(argv[-1])
+            return FakeProc()
+        if key == "commit":
+            self.committed.append(argv[-1])
+            self.head = self.next_head
+            self.staged = []
+            return FakeProc()
+        if key == "push":
+            self.pushed.append(argv[-1])
+            return FakeProc()
+        if key == "symbolic-ref":
+            return FakeProc(stdout="")
+        return FakeProc()
+
+
+class DispatcherEndToEndTest(unittest.TestCase):
+    """MiniMax → Codex → MiniMax loop with every external call mocked.
+
+    No model is invoked: the CLI processes are replaced by recorded fakes and the git
+    calls are answered by a small stateful repository model.
+    """
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.state_dir = Path(self.tmp.name)
+        patch_state = mock.patch.object(d, "local_state_dir", return_value=self.state_dir)
+        patch_state.start()
+        self.addCleanup(patch_state.stop)
+        self.worktree = self.state_dir / "wt"
+        self.worktree.mkdir()
+        self.codex_wt = self.state_dir / "codex-wt"
+        self.codex_wt.mkdir()
+        self.repo = FakeRepo()
+        self.runner = FakeRunner()
+        self.runner.handler = self.repo.handler
+        patch_run = mock.patch.object(d.subprocess, "run", self.runner)
+        patch_run.start()
+        self.addCleanup(patch_run.stop)
+        self.summary = summary()
+
+    def state(self):
+        path = self.state_dir / "state.json"
+        if not path.exists():
+            return {}
+        return json.loads(path.read_text(encoding="utf-8"))
+
+    def pages_for(self, endpoint):
+        if "issues" in endpoint:
+            return [self.summary]
+        return []
+
+    def round(self, sha, findings=True, opts=None, next_head=None):
+        """Run one dispatcher round for a PR head SHA.
+
+        `next_head` is the SHA the model round is expected to publish; the commit
+        of the round moves the repository to it.
+        """
+        self.repo.head = sha
+        self.repo.next_head = next_head or sha
+        self.summary = summary(sha=sha, any_findings=findings, unresolved=findings)
+        opts = opts or d.Options(execute=True, allow_commit=True, allow_push=True, codex_review=True)
+        with mock.patch.object(d, "fetch_pr", return_value=pr(sha=sha)), \
+             mock.patch.object(d, "pages", side_effect=self.pages_for), \
+             mock.patch.object(d, "codex_executable", return_value=Path("codex.exe")):
+            return d.evaluate(1, self.worktree, opts, self.codex_wt)
+
+    def model_calls(self):
+        return [argv for argv in self.runner.argvs() if is_node(argv)]
+
+    def codex_calls(self):
+        return [argv for argv in self.runner.argvs() if argv and argv[0] == "codex.exe"]
+
+    def test_full_loop_minimax_codex_minimax_without_calling_a_model(self):
+        """Two rounds of findings, then a clear review: the loop stops on its own."""
+        self.repo.dirty = ["backend/main.py"]
+        third = "c" * 40
+        self.assertEqual(self.round(HEAD_SHA, next_head=NEW_SHA), "CHANGES_REQUESTED")
+        self.assertEqual(self.round(NEW_SHA, next_head=third), "CHANGES_REQUESTED")
+        self.assertEqual(self.round(third, findings=False), "REVIEW_CLEAR")
+        # One MiniMax round per round with findings, none for the clear review.
+        self.assertEqual(len(self.model_calls()), 2)
+        self.assertEqual(len(self.codex_calls()), 3)
+        # Every round published its own commit and push.
+        self.assertEqual(len(self.repo.committed), 2)
+        self.assertEqual(len(self.repo.pushed), 2)
+        # The staged set is exactly the allowed path; `git add -A` is never used.
+        self.assertEqual(self.repo.added, ["backend/main.py", "backend/main.py"])
+        self.assertFalse(any("add" in argv and "-A" in argv for argv in self.runner.argvs()))
+        state = self.state()
+        self.assertEqual(state["tasks"]["GA-01"]["rounds"], 2)
+        # Every SHA that reached a Codex review is recorded: the two published heads
+        # and the head whose review came back clear.
+        self.assertEqual(state["tasks"]["GA-01"]["reviewed_shas"], [HEAD_SHA, NEW_SHA, third])
+        self.assertEqual(sorted(state["runs"]), sorted(["1:" + HEAD_SHA + ":CHANGES_REQUESTED",
+                                                        "1:" + NEW_SHA + ":CHANGES_REQUESTED"]))
+        # A Codex review was requested for each published SHA.
+        gh_calls = [argv for argv in self.runner.argvs() if argv and argv[0] == "gh"]
+        self.assertEqual(len(gh_calls), 2)
+        for argv in gh_calls:
+            self.assertIn("@codex review", argv)
+
+    def test_loop_stops_at_three_rounds(self):
+        """The fourth round with findings is refused: the budget is three cycles."""
+        self.repo.dirty = ["backend/main.py"]
+        heads = (HEAD_SHA, NEW_SHA, "c" * 40)
+        for index, sha in enumerate(heads):
+            self.round(sha, next_head="d" * 40 if index == 2 else sha)
+        self.assertEqual(len(self.model_calls()), 3)
+        self.assertEqual(self.state()["tasks"]["GA-01"]["rounds"], 3)
+        # A fourth round must not reach the model.
+        self.round("d" * 40, next_head="e" * 40)
+        self.assertEqual(len(self.model_calls()), 3, "the cycle limit must stop the fourth round")
+        self.assertEqual(self.state()["tasks"]["GA-01"]["rounds"], 3)
+
+    def test_the_same_sha_is_never_reviewed_twice(self):
+        """A repeated head SHA must not start a second model round for the same review."""
+        self.repo.dirty = ["backend/main.py"]
+        self.round(HEAD_SHA, next_head=NEW_SHA)
+        self.assertEqual(len(self.model_calls()), 1)
+        self.round(HEAD_SHA, next_head=NEW_SHA)
+        self.assertEqual(len(self.model_calls()), 1, "the same SHA must not launch the model again")
+        self.assertEqual(self.state()["tasks"]["GA-01"]["rounds"], 1)
+
+    def test_state_survives_a_crash_and_blocks_a_second_launch(self):
+        """A crash between the launch record and the result must not re-trigger the model."""
+        self.repo.dirty = ["backend/main.py"]
+        crash = OSError("the dispatcher process was killed")
+        self.runner.handler = lambda argv: crash if (argv and is_node(argv)) else self.repo.handler(argv)
+        with self.assertRaises(OSError):
+            self.round(HEAD_SHA)
+        state = self.state()
+        key = "1:" + HEAD_SHA + ":CHANGES_REQUESTED"
+        self.assertIn(key, state["runs"], "the launch record must survive the crash")
+        self.assertEqual(state["runs"][key]["status"], "LAUNCHED")
+        self.assertEqual(state["tasks"]["GA-01"]["rounds"], 1)
+        # A second attempt with the same SHA must not call the model again.
+        calls_before = len(self.model_calls())
+        self.runner.handler = self.repo.handler
+        self.round(HEAD_SHA)
+        self.assertEqual(len(self.model_calls()), calls_before, "a crashed launch must not be repeated")
+        self.assertEqual(self.state()["tasks"]["GA-01"]["rounds"], 1)
+
+
 if __name__ == "__main__":
     unittest.main()
