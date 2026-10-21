@@ -8,8 +8,12 @@ from backend import llm_guard, main, security, test_smoke
 
 REPLY = {'choices': [{'message': {'role': 'assistant', 'content': 'Готово.'}}],
          'usage': {'prompt_tokens': 120, 'completion_tokens': 40}}
+# Провайдер сообщил нулевое потребление полным набором счётчиков: доказательство есть.
 EMPTY_BUT_PAID = {'choices': [{'message': {'role': 'assistant', 'content': ''}}],
-                  'usage': {'total_tokens': 0}}
+                  'usage': {'total_tokens': 0, 'prompt_tokens': 0, 'completion_tokens': 0}}
+# Провайдер прислал только total_tokens=0: остальных счётчиков нет, доказательства нет.
+ZERO_UNPROVEN = {'choices': [{'message': {'role': 'assistant', 'content': ''}}],
+                 'usage': {'total_tokens': 0}}
 
 
 class MoneyBoundaryTests(unittest.TestCase):
@@ -139,12 +143,20 @@ class MoneyBoundaryTests(unittest.TestCase):
         row = self.call_row('money-broken-1')
         self.assertEqual(row['status'], 'submission_unknown')
         self.assertEqual(row['usd'], quote['estimated_usd'])
-        # Провайдер явно сообщил нулевое потребление: резерв освобождается.
+        # Провайдер явно сообщил нулевое потребление полным набором счётчиков: резерв освобождается.
         body2, quote2 = self.quote()
         response2, _ = self.chat(body2, quote2, 'money-zero-1', reply=EMPTY_BUT_PAID)
         self.assertEqual(response2.status_code, 502)
         row2 = self.call_row('money-zero-1')
         self.assertEqual((row2['status'], row2['usd']), ('failed', 0))
+        # Одного total_tokens=0 недостаточно: обязательных счётчиков нет, нулевое
+        # потребление не доказано — резерв удерживается до ручной сверки.
+        body3, quote3 = self.quote()
+        response3, _ = self.chat(body3, quote3, 'money-zero-unproven-1', reply=ZERO_UNPROVEN)
+        self.assertEqual(response3.status_code, 502)
+        row3 = self.call_row('money-zero-unproven-1')
+        self.assertEqual(row3['status'], 'submission_unknown')
+        self.assertEqual(row3['usd'], quote3['estimated_usd'])
 
     def test_reconcile_releases_or_confirms_unknown_call(self):
         self.prepare()
