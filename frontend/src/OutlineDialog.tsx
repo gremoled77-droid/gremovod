@@ -62,7 +62,7 @@ export default function OutlineDialog({
   const estimate = () =>
     run(async () => {
       if (!context.brief.trim()) throw Error('Сначала впиши задание ролика на экране «Идея»');
-      const q = await estimateLlm(context.projectId, MODEL, messages());
+      const q = await estimateLlm(context.projectId, MODEL, messages(), 'editorial');
       setQuote(q);
       setCard(null);
       setApproved(false);

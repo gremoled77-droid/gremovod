@@ -58,7 +58,7 @@ export default function WorldFromBrief({
       if (!brief.trim()) throw Error('Сначала впиши задание ролика');
       const pid = projectId || (ensureProject ? await ensureProject() : '');
       if (!pid) throw Error('Нет проекта для учёта расходов');
-      const q = await estimateLlm(pid, MODEL, messages);
+      const q = await estimateLlm(pid, MODEL, messages, 'editorial');
       setQuote(q);
       setCard(null);
       setApproved(false);

@@ -281,9 +281,32 @@ def reference_of(registry, route, usage):
             'rate_snapshot_id': snapshot_id(ref.provider or '', ref.model or '', ref.rate_as_of or '')}
 
 
+def route_is_fit(registry, route, allow_free=False):
+    """Маршрут пригоден для вызова: тем же гейтом, что у адаптера (backend/llm_adapters.py).
+
+    Непригодный маршрут в цепочку не попадает: иначе студия получила бы 400 там, где
+    сегодня работает совместимый вызов по проверенным ценам PiAPI.
+    """
+    if is_legacy_route(route):
+        return True
+    entry = registry.entry(route.provider, route.model)
+    if entry is None or not entry.enabled:
+        return False
+    if entry.opt_in and not allow_free:
+        return False
+    if llm_gateway.is_free_entry(entry):
+        return True
+    if entry.input_per_mtok is None or entry.output_per_mtok is None:
+        return False
+    return bool(entry.verified_at)
+
+
 def resolve_route(registry, provider, model, allow_free=False):
     """Маршрут выбирается через шлюз. Старый клиент с provider='piapi' получает совместимый маршрут по старым ценам."""
     route = llm_gateway.select_route(registry, task=model, mode='manual', allow_free=allow_free)
+    if route is not None and not route_is_fit(registry, route, allow_free):
+        # маршрут реестра адаптер бы отверг: берём совместимый маршрут по старым ценам
+        route = None
     if route is not None:
         if provider in GATEWAY_PROVIDERS and provider != route.provider:
             raise HTTPException(400, 'Провайдер не соответствует модели: маршрут ' + route.provider + '/' + route.model)
@@ -345,6 +368,9 @@ def plan_chain(registry, task, allow_free=False):
     Бесплатный маршрут — подтверждённо нулевой тариф (флаг free или тариф 0/0). Платный маршрут
     по оптину тоже платный: он занимает единственное платное место цепочки, а не встаёт перед ним
     вторым платным маршрутом (две платные попытки на один запрос не делается).
+
+    Платный маршрут без подтверждённого вживую тарифа в цепочку не берётся: адаптер такому
+    маршруту отказал бы до сети, и вызов из студии упал бы с 400 вместо совместимого маршрута.
     """
     chain = []
     paid = None
@@ -361,6 +387,8 @@ def plan_chain(registry, task, allow_free=False):
                 continue
             if entry.input_per_mtok is None or entry.output_per_mtok is None:
                 continue
+            if not entry.verified_at:
+                continue
             if paid is None:
                 paid = entry.route()
         if paid is not None:
@@ -371,7 +399,12 @@ def plan_chain(registry, task, allow_free=False):
 
 
 def plan_routes(registry, body, mode, allow_free):
-    """Маршруты вызова: ручной режим — маршрут по модели, автоматический — цепочка по роли задачи."""
+    """Маршруты вызова: ручной режим — маршрут по модели, автоматический — цепочка по роли задачи.
+
+    В автоматическом режиме клиент провайдера не называет: реестр сам выбирает маршрут по задаче.
+    Реестр не дал пригодной цепочки — вызов идёт по совместимому маршруту (проверенные цены PiAPI),
+    а не падает с 400: включение шлюза не должно выключать LLM-вызовы в студии.
+    """
     model = str(getattr(body, 'model', '') or '')
     provider = str(getattr(body, 'provider', '') or '').strip().lower()
     if mode == 'auto':
@@ -379,6 +412,10 @@ def plan_routes(registry, body, mode, allow_free):
         chain = plan_chain(registry, task, allow_free)
         if chain:
             return chain
+        if provider in GATEWAY_PROVIDERS:
+            return []
+        route = resolve_route(registry, '', model, allow_free)
+        return [route] if route is not None else []
     route = resolve_route(registry, provider, model, allow_free)
     return [route] if route is not None else []
 

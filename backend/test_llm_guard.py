@@ -821,5 +821,132 @@ class NetworkGuardTests(unittest.TestCase):
             server.close()
 
 
+class LlmRouteReachabilityTests(unittest.TestCase):
+    """Маршруты реестра достижимы из окна студии: окно задаёт задачу, маршрут выбирает сервер.
+
+    Реестр без пригодной цепочки — вызов идёт по совместимому маршруту (проверенные цены PiAPI),
+    а не падает с 400: включение шлюза не должно выключать LLM-вызовы в студии.
+    """
+
+    setUp = test_smoke.StudioSmokeTests.setUp
+    tearDown = test_smoke.StudioSmokeTests.tearDown
+
+    def prepare(self):
+        main.PIAPI_KEY_FILE.write_text('test-key', encoding='utf-8')
+        self.pid = self.client.post('/api/projects', json={'title': 'LLM', 'state': {}}).json()['id']
+        self.messages = [{'role': 'system', 'content': 'Перепиши в промпт'}, {'role': 'user', 'content': 'Грэм подмигивает'}]
+
+    def registry(self, *rates):
+        tmp = tempfile.mkdtemp(prefix='llm-reach-registry-')
+        self.addCleanup(shutil.rmtree, tmp, ignore_errors=True)
+        path = Path(tmp) / 'llm_gateway.prices.json'
+        path.write_text(json.dumps(registry_config(*rates)), encoding='utf-8')
+        return llm_gateway.load_registry(str(path))
+
+    def estimate(self, model, **extra):
+        body = {'project_id': self.pid, 'model': model, 'messages': self.messages, 'max_tokens': 500, **extra}
+        r = self.client.post('/api/llm/estimate', json=body)
+        self.assertEqual(r.status_code, 200, r.text)
+        return body, r.json()
+
+    def chat_body(self, body, quote, request_id, **extra):
+        # окно студии провайдера не передаёт: маршрут выбирает сервер
+        return {'project_id': self.pid, 'model': body['model'], 'messages': self.messages,
+                'max_tokens': body['max_tokens'], 'approved': True, 'quote_token': quote['quote_token'],
+                'max_cost_usd': quote['estimated_usd'], 'request_id': request_id, **extra}
+
+    def rows(self):
+        with main.connect() as db:
+            return [dict(r) for r in db.execute('SELECT * FROM llm_calls ORDER BY created_at, id').fetchall()]
+
+    def test_registry_without_a_fit_chain_calls_the_compatible_route(self):
+        """Маршрут реестра включён, но тариф не подтверждён вживую: адаптер отказал бы — студия идёт по PiAPI."""
+        self.prepare()
+        registry = self.registry(rate('kie', 'claude-haiku-5-5', role='editorial', input=0.06, output=0.3,
+                                      verified_at=None))
+        with patch.object(llm_guard, 'current_registry', return_value=registry), \
+                patch.object(main, 'request_piapi', AsyncMock(return_value=REPLY)) as legacy:
+            body, quote = self.estimate('gpt-5.6-luna', route_mode='auto', task='editorial')
+            r = self.client.post('/api/llm/chat', json=self.chat_body(body, quote, 'reach-fallback',
+                                                                       route_mode='auto', task='editorial'))
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertEqual(legacy.await_count, 1)
+        row = self.rows()[0]
+        self.assertEqual((row['execution_provider'], row['execution_model']), ('piapi', 'gpt-5.6-luna'))
+        self.assertEqual(row['route_mode'], 'auto')
+
+    def test_window_with_a_registry_route_calls_that_route(self):
+        """Включённый маршрут реестра под задачу — вызов идёт по нему, а не по совместимому."""
+        self.prepare()
+        registry = self.registry(rate('kie', 'claude-haiku-5-5', role='editorial', input=0.06, output=0.3))
+        result = ProviderResult(ok=True, text='Ответ по реестру', usage=Usage(1000, 200), error_kind=None,
+                                 charged_possible=False, provider_request_id='req-kie')
+        with patch.object(llm_guard, 'current_registry', return_value=registry), \
+                patch.object(llm_adapters, 'complete', AsyncMock(return_value=result)) as adapter, \
+                patch.object(main, 'request_piapi',
+                             AsyncMock(side_effect=AssertionError('вызов ушёл в совместимый транспорт'))) as legacy:
+            body, quote = self.estimate('gpt-5.6-luna', route_mode='auto', task='editorial')
+            r = self.client.post('/api/llm/chat', json=self.chat_body(body, quote, 'reach-registry',
+                                                                       route_mode='auto', task='editorial'))
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertEqual(adapter.await_count, 1)
+        legacy.assert_not_called()
+        row = self.rows()[0]
+        self.assertEqual((row['execution_provider'], row['execution_model']), ('kie', 'claude-haiku-5-5'))
+        self.assertEqual(row['route_mode'], 'auto')
+
+    def test_auto_chain_calls_routes_in_order_and_pays_once(self):
+        """Цепочка идёт по очереди, без параллельных вызовов, и делает одну платную попытку."""
+        self.prepare()
+        registry = self.registry(rate('kie', 'claude-haiku-5-5', role='editorial', input=0.06, output=0.3),
+                                 rate('openrouter', 'minimax/minimax-m3.1-flash:free', role='editorial',
+                                      input=0, output=0, free=True, opt_in=True))
+        events = []
+
+        async def fake_complete(route, *args, **kwargs):
+            events.append('start:' + route.provider)
+            if route.provider == 'openrouter':
+                events.append('end:openrouter')
+                return ProviderResult(ok=False, text='', usage=Usage(None, None, estimated=True),
+                                      error_kind='http_401', charged_possible=False, provider_request_id=None)
+            events.append('end:' + route.provider)
+            return ProviderResult(ok=True, text='Платный ответ', usage=Usage(1000, 200), error_kind=None,
+                                  charged_possible=False, provider_request_id='req-paid')
+
+        with patch.object(llm_guard, 'current_registry', return_value=registry), \
+                patch.object(llm_adapters, 'complete', AsyncMock(side_effect=fake_complete)):
+            body, quote = self.estimate('gpt-5.6-luna', route_mode='auto', task='editorial', allow_free=True)
+            r = self.client.post('/api/llm/chat', json=self.chat_body(body, quote, 'reach-chain',
+                                                                       route_mode='auto', task='editorial',
+                                                                       allow_free=True))
+        self.assertEqual(r.status_code, 200, r.text)
+        # вызовы идут по очереди (не параллельно), и платная попытка одна
+        self.assertEqual(events, ['start:openrouter', 'end:openrouter', 'start:kie', 'end:kie'])
+        rows = self.rows()
+        self.assertEqual([row['execution_provider'] for row in rows], ['openrouter', 'kie'])
+        paid = [row for row in rows if row['execution_provider'] == 'kie']
+        self.assertEqual(len(paid), 1)
+
+    def test_old_client_without_new_fields_works_as_before(self):
+        """Старый клиент с provider='piapi' и без новых полей: прежний маршрут, одна попытка."""
+        self.prepare()
+        registry = self.registry(rate('kie', 'claude-haiku-5-5', role='editorial', input=0.06, output=0.3))
+        with patch.object(llm_guard, 'current_registry', return_value=registry), \
+                patch.object(main, 'request_piapi', AsyncMock(return_value=REPLY)) as legacy, \
+                patch.object(llm_adapters, 'complete',
+                             AsyncMock(side_effect=AssertionError('вызов ушёл в HTTP-адаптер'))) as adapter:
+            body, quote = self.estimate('gpt-5.6-luna')
+            payload = {'provider': 'piapi', 'project_id': self.pid, 'model': body['model'],
+                       'messages': self.messages, 'max_tokens': body['max_tokens'], 'approved': True,
+                       'quote_token': quote['quote_token'], 'max_cost_usd': quote['estimated_usd'],
+                       'request_id': 'reach-old-client'}
+            r = self.client.post('/api/llm/chat', json=payload)
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertEqual(legacy.await_count, 1)
+        adapter.assert_not_called()
+        row = self.rows()[0]
+        self.assertEqual((row['execution_provider'], row['route_mode']), ('piapi', 'manual'))
+
+
 if __name__ == '__main__':
     unittest.main()

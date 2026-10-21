@@ -140,7 +140,7 @@ export default function IdeaBrief({
     if (!projectId) return setError('Сначала сохрани проект');
     setBusy(true);
     try {
-      const q = await estimateLlm(projectId, model, messages());
+      const q = await estimateLlm(projectId, model, messages(), 'editorial');
       setQuote(q);
       setCard(null);
       setApproved(false);

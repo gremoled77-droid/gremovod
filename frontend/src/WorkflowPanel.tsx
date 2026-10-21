@@ -37,6 +37,10 @@ import {useNodePrices} from './workflowPrices';
 import {LLM_MAX_TOKENS, LLM_MODELS} from './llmPricing';
 import {missingAssetIds} from './workflowLibrary';
 
+/** Роль работы LLM-узлов в реестре маршрутов: короткие однотипные промпты — самый простой маршрут.
+ * Провайдера клиент не задаёт: маршрут выбирает сервер по реестру владельца. */
+const LLM_TASK = 'simple';
+
 type Graph = {nodes: Node[]; edges: Edge[]};
 type Lib = {
   id: string;
@@ -708,6 +712,9 @@ export default function WorkflowPanel({
                 {role: 'user', content: input},
               ],
               max_tokens: LLM_MAX_TOKENS,
+              route_mode: 'auto',
+              task: LLM_TASK,
+              allow_free: true,
             }),
           })
         );
@@ -774,6 +781,9 @@ export default function WorkflowPanel({
                 model: step.model,
                 messages,
                 max_tokens: LLM_MAX_TOKENS,
+                route_mode: 'auto',
+                task: LLM_TASK,
+                allow_free: true,
               }),
             })
           );
@@ -784,7 +794,6 @@ export default function WorkflowPanel({
               method: 'POST',
               headers: {'Content-Type': 'application/json'},
               body: JSON.stringify({
-                provider: 'piapi',
                 project_id: projectId,
                 model: step.model,
                 max_tokens: LLM_MAX_TOKENS,
@@ -793,6 +802,9 @@ export default function WorkflowPanel({
                 quote_token: quote.quote_token,
                 max_cost_usd: quote.estimated_usd,
                 request_id: crypto.randomUUID(),
+                route_mode: 'auto',
+                task: LLM_TASK,
+                allow_free: true,
               }),
             })
           );
