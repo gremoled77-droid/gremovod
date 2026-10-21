@@ -1262,7 +1262,7 @@ export default function WorkflowPanel({
               <h2>Запустить всё: платные узлы</h2>
               <ol>
                 {review.llmSteps.map(s => {
-                  const money = approvalMoney(review.cards[s.nodeId], review.cards[s.nodeId]?.actual?.max_cost_usd);
+                  const money = approvalMoney(review.cards[s.nodeId], limit);
                   return (
                     <li key={s.nodeId}>
                       LLM {LLM_MODELS[s.model]?.label || s.model} · текст

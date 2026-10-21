@@ -14,16 +14,16 @@
 C:\AI_Workflow_Studio\.venv\Scripts\python.exe -X utf8 -m unittest discover -s backend -p "test_*.py"
 ```
 
-Вывод:
+Вывод (после круга F2):
 
 ```
 ----------------------------------------------------------------------
-Ran 360 tests in 133.973s
+Ran 359 tests in 121.415s
 
 OK
 ```
 
-Полный прогон выполнялся трижды (до и после правки документации): 103.917 с, 121.961 с и 114.604 с — все **OK**, результат одинаковый. После ремонтного круга F1 — **360 тестов, OK, 133.973 с** (добавлено 7 тестов на находки ревью; регрессий нет).
+Полный прогон выполнялся трижды (до и после правки документации): 103.917 с, 121.961 с и 114.604 с — все **OK**, результат одинаковый. После ремонтного круга F1 — **360 тестов, OK, 133.973 с** (добавлено 7 тестов на находки ревью; регрессий нет). После круга F2 — **359 тестов, OK, 121.415 с**: дублирующий тест на отказ по исчерпанному лимиту проекта удалён, его сценарий слит с переименованным и усиленным `test_agent_job_is_refused_when_the_project_limit_is_exhausted_even_with_a_free_route`; кода бэкенда F2 не менял, новых серверных тестов не добавлено — правка окна подтверждения проверяется фронтенд-тестом.
 
 Состояние на старте таска 06 было **349 тестов, OK**. Стало 353: добавлен новый файл `backend/test_budget_breakdown.py` (4 теста). Регрессий нет.
 
@@ -110,14 +110,14 @@ npm test
 ```
 
 ```
-ℹ tests 118
+ℹ tests 119
 ℹ suites 0
-ℹ pass 118
+ℹ pass 119
 ℹ fail 0
 ℹ cancelled 0
 ℹ skipped 0
 ℹ todo 0
-ℹ duration_ms 9916.9052
+ℹ duration_ms 7659.2059
 ```
 
 ```
@@ -128,18 +128,18 @@ npm run build      # tsc --noEmit && vite build
 ✓ 1876 modules transformed.
 dist/index.html                          0.54 kB │ gzip:   0.36 kB
 dist/assets/StoryboardDemo-n5wXCZ3v.css  5.43 kB │ gzip:   1.80 kB
-dist/assets/index-kXYFNmIR.css        129.95 kB │ gzip:  24.09 kB
-dist/assets/StoryboardDemo-CYnf64hg.js  19.50 kB │ gzip:   7.20 kB
-dist/assets/WorkflowPanel-DsX2I2Ua.js 221.63 kB │ gzip:  72.06 kB
-dist/assets/index-Bnrz3GQM.js         652.02 kB │ gzip: 196.82 kB
-✓ built in 4.51s
+dist/assets/index-kXYFNmIR.css           129.95 kB │ gzip:  24.09 kB
+dist/assets/StoryboardDemo-xhqnFN10.js   19.50 kB │ gzip:   7.20 kB
+dist/assets/WorkflowPanel-DD0iF_Nr.js    221.55 kB │ gzip:  72.05 kB
+dist/assets/index-CE7gtYXJ.js            652.13 kB │ gzip: 196.85 kB
+✓ built in 4.74s
 ```
 
 В логе сборки — 6 файлов `dist` (плюс каталог `dist/assets`), а не 3: сборка отдаёт отдельные чанки `StoryboardDemo` и `WorkflowPanel`.
 
-Состояние на старте таска 06: 115 pass, сборка успешна. После изменений таска 06 — то же (115 pass, сборка успешна). После ремонтного круга F1 — **118 pass, сборка успешна**. Типизация (`tsc --noEmit`) проходит: новых полей сводки в типах панелей и в `llmDisplay.ts` согласованы.
+Состояние на старте таска 06: 115 pass, сборка успешна. После изменений таска 06 — то же (115 pass, сборка успешна). После ремонтного круга F1 — **118 pass, сборка успешна**. После круга F2 — **119 pass, сборка успешна** (добавлен тест окна подтверждения: под «Максимальный одобренный расход» показывается лимит владельца, а не оценка узла). Типизация (`tsc --noEmit`) проходит: новых полей сводки в типах панелей и в `llmDisplay.ts` согласованы.
 
-Отдельный файл: `node --experimental-strip-types --test src/llmDisplay.test.mjs` — чистые функции карточки и сводки (`budgetLines` уже покрыта существующим тестом; новых чистых функций таск 06 не добавлял).
+Отдельный файл: `node --experimental-strip-types --test src/llmDisplay.test.mjs` — чистые функции карточки и сводки (`budgetLines` уже покрыта существующим тестом; новых чистых функций таск 06 не добавлял). В круге F2 добавлена чистая функция `ownerLimitUsd()` (разбор лимита владельца из выбора), а `approvalMoney()` переведена с числа-оценки узла на лимит владельца: `frontend/src/WorkflowPanel.tsx` передаёт в неё значение выбора лимита, а не `actual.max_cost_usd`.
 
 ---
 
@@ -158,12 +158,12 @@ dist/assets/index-Bnrz3GQM.js         652.02 kB │ gzip: 196.82 kB
 
 | Проверка | Результат |
 |---|---|
-| `unittest discover -s backend -p "test_*.py"` | 360 тестов, OK (прогоны: 103.917 / 121.961 / 114.604 с на таске 06; 133.973 с после ремонта F1) |
+| `unittest discover -s backend -p "test_*.py"` | 359 тестов, OK (прогоны: 103.917 / 121.961 / 114.604 с на таске 06; 133.973 с после ремонта F1; 121.415 с после круга F2) |
 | `unittest backend.test_budget_breakdown` (до реализации) | 4 теста, FAILED (errors=4) — `KeyError: 'actual_cost_usd'` |
 | `unittest backend.test_budget_breakdown` (после реализации) | 4 теста, OK, 1.479 с |
 | Две обязательные ситуации (3 теста) | OK, 1.092 с |
-| `npm test` | 118 pass / 0 fail, 9.9 с (на таске 06 было 115 pass) |
-| `npm run build` | успешно, 4.51 с, 1876 модулей, 6 файлов `dist` в логе |
+| `npm test` | 119 pass / 0 fail, 7.7 с (на таске 06 было 115 pass, после F1 — 118) |
+| `npm run build` | успешно, 4.74 с, 1876 модулей, 6 файлов `dist` в логе |
 | Живые платные вызовы | не выполнялись (нужно одобрение владельца) |
 | Живая сверка тарифов | не выполнялась |
 | Ручная проверка панелей в браузере | не выполнялась (студия не перезапускалась) |

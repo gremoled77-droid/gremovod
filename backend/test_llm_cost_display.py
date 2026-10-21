@@ -334,28 +334,24 @@ class AgentCallTests(GatewayCase):
         self.assertEqual(blocked.status_code, 400)
         self.assertIn('бюджет', blocked.text.lower())
 
-    def test_agent_job_is_refused_when_the_limit_is_exhausted_and_the_fallback_is_free(self):
+    def test_agent_job_is_refused_when_the_project_limit_is_exhausted_even_with_a_free_route(self):
         pid = self.agent_project()
-        # лимит проекта исчерпан, а единственный нулевой тариф резерв не держит:
-        # работа агента не должна проходить с нулевым резервом
+        # лимит проекта исчерпан, а в реестре рядом с платным маршрутом есть бесплатный 0/0:
+        # работа агента не проходит, потому что лимит кончился, а не потому что тарифа нет
         priceless = {'provider': 'kie', 'model': 'gpt-6-luna', 'role': 'simple', 'input': None, 'output': None}
         registry = self.registry(rate(**priceless), rate(**OPENROUTER), rate(**MINIMAX))
         self.client.put('/api/budgets/limits', json={'project_usd': 0.0000001, 'daily_usd': 2})
         with patch.object(llm_guard, 'current_registry', return_value=registry):
-            created = self.client.post('/api/chatgpt/jobs', json=self.agent_body(pid, 'agent-limit-free-0001'))
+            created = self.client.post('/api/chatgpt/jobs', json=self.agent_body(pid, 'agent-limit-free-route-0001'))
         self.assertEqual(created.status_code, 400)
         self.assertIn('бюджет', created.text.lower())
+        # отказ по лимиту, а не по отсутствию тарифа: тарифы в реестре есть
+        self.assertNotIn('тариф', created.text.lower())
+        # работа не уходит воркеру
         self.worker_has_no_job()
-
-    def test_agent_job_is_refused_when_the_project_limit_is_exhausted(self):
-        pid = self.agent_project()
-        registry = self.registry(rate(**KIE), rate(**MINIMAX))
-        self.client.put('/api/budgets/limits', json={'project_usd': 0.0000001, 'daily_usd': 2})
-        with patch.object(llm_guard, 'current_registry', return_value=registry):
-            created = self.client.post('/api/chatgpt/jobs', json=self.agent_body(pid, 'agent-limit-project-0001'))
-        self.assertEqual(created.status_code, 400)
-        self.assertIn('бюджет', created.text.lower())
-        self.worker_has_no_job()
+        # резерв под неподтверждённое списание держит платный маршрут, а не бесплатный 0/0
+        reserve = llm_gateway.agent_reserve(registry, None, None, llm_gateway.agent_estimate_usage('{}', ''))
+        self.assertGreater(reserve, 0)
 
     def test_agent_job_is_refused_when_the_daily_limit_is_exhausted(self):
         pid = self.agent_project()

@@ -219,13 +219,23 @@ export function maxApprovedLine(limitUsd: number | null | undefined): string {
   return `Максимальный одобренный расход: ${smallUsd(limitUsd)}`;
 }
 
+/** Лимит владельца из выбора (LimitPicker) — число, или null, если потолок не выбран.
+ *
+ * Пустая строка — это не ноль: невыбранный лимит не превращается в одобренные $0. */
+export function ownerLimitUsd(limit: string | null | undefined): number | null {
+  const raw = (limit ?? '').trim();
+  if (!raw) return null;
+  const amount = Number(raw);
+  return Number.isFinite(amount) ? amount : null;
+}
+
 /** Деньги окна подтверждения платного вызова в зафиксированном порядке. */
 export type ApprovalMoney = {
   /** Тарифный ориентир: первым его видит владелец. */
   reference: string;
   /** Ожидаемый реальный платёж по тарифу исполнителя. */
   expectedPayment: string;
-  /** Максимальный одобренный расход исполняющего API. */
+  /** Максимальный одобренный расход — потолок, выбранный владельцем. */
   maxApproved: string;
   /** Все три строки в том порядке, в котором они идут до согласия. */
   lines: string[];
@@ -233,12 +243,14 @@ export type ApprovalMoney = {
 
 /** Деньги окна подтверждения: ориентир, ожидаемый реальный платёж, максимальный одобренный расход.
  *
+ * limitValue — значение выбора лимита владельцем (строка LimitPicker), а не оценка узла: под
+ * «Максимальный одобренный расход» владелец видит тот потолок, который он реально одобряет.
  * Порядок зафиксирован здесь, а не в разметке: владелец обязан увидеть ориентир первым, а обе
  * суммы — до согласия (R49). */
-export function approvalMoney(card: LlmCard, limitUsd: number | null | undefined): ApprovalMoney {
+export function approvalMoney(card: LlmCard, limitValue: string | null | undefined): ApprovalMoney {
   const reference = referenceLine(card);
   const expectedPayment = expectedPaymentLine(card);
-  const maxApproved = maxApprovedLine(limitUsd);
+  const maxApproved = maxApprovedLine(ownerLimitUsd(limitValue));
   return {reference, expectedPayment, maxApproved, lines: [reference, expectedPayment, maxApproved]};
 }
 

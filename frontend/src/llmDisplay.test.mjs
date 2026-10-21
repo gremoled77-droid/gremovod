@@ -97,13 +97,26 @@ test('до согласия видны ожидаемый реальный пл�
 });
 
 test('деньги окна подтверждения: ориентир первым, обе суммы — до согласия', () => {
-  const money = approvalMoney(card(), 0.5);
+  const money = approvalMoney(card(), '0.5');
   assert.equal(money.lines.length, 3);
   assert.equal(money.reference, referenceLine(card()));
   assert.equal(money.expectedPayment, 'Ожидаемый реальный платёж: $0.000300');
   assert.equal(money.maxApproved, 'Максимальный одобренный расход: $0.5000');
   assert.deepEqual(money.lines, [money.reference, money.expectedPayment, money.maxApproved]);
   assert.ok(money.lines[0].startsWith('По тарифу Kie.ai'));
+});
+
+test('под «Максимальный одобренный расход» лимит владельца, а не оценка узла', () => {
+  const estimate = card({actual: {cost_usd: null, status: 'estimated', max_cost_usd: 0.0003}});
+  const money = approvalMoney(estimate, '5');
+  // ожидаемый реальный платёж — оценка узла...
+  assert.equal(money.expectedPayment, 'Ожидаемый реальный платёж: $0.000300');
+  // ...а одобренный потолок — тот лимит, который владелец реально одобряет
+  assert.equal(money.maxApproved, 'Максимальный одобренный расход: $5.0000');
+  assert.ok(!money.maxApproved.includes('$0.000300'));
+  assert.deepEqual(money.lines, [money.reference, money.expectedPayment, money.maxApproved]);
+  // лимит не выбран — потолок не показывается, нуля не выдумывается
+  assert.equal(approvalMoney(estimate, '').maxApproved, 'Максимальный одобренный расход: не задан');
 });
 
 test('экспозиция LLM подписана и не путается с фактически потраченным', () => {
