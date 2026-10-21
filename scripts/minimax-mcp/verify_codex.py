@@ -9,6 +9,7 @@ import subprocess
 import threading
 import time
 import uuid
+from importlib.metadata import version
 from pathlib import Path
 
 from bridge import Child, now
@@ -137,7 +138,8 @@ def main():
     (home / "config.toml").write_text(
         'model_provider = "offline"\nmodel = "offline"\n'
         '[model_providers.offline]\nname = "Offline verification"\n'
-        'base_url = "http://127.0.0.1:9/v1"\nwire_api = "responses"\nrequires_openai_auth = false\n',
+        'base_url = "http://127.0.0.1:9/v1"\nwire_api = "responses"\nrequires_openai_auth = false\n'
+        + f'\n[projects.{json.dumps(str(root))}]\ntrust_level = "trusted"\n',
         encoding="utf-8",
     )
     env = {
@@ -174,6 +176,14 @@ def main():
         "head_sha": sha,
         "pr_number": policy["pr_number"],
         "model_turns": 0,
+        "mcp_sdk_version": version("mcp"),
+        "source_sha256": {
+            p.relative_to(root).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest()
+            for p in sorted((root / "scripts/minimax-mcp").rglob("*"))
+            if p.is_file()
+            and p.suffix in {".py", ".txt"}
+            and "__pycache__" not in p.parts
+        },
         "codex_version": subprocess.check_output(
             [str(args.codex), "--version"], env=env
         )

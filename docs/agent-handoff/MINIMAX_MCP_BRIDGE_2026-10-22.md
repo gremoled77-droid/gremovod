@@ -137,7 +137,7 @@ From this separate worktree, using a locally installed Python 3.13:
 py -3.13 -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r scripts\minimax-mcp\requirements.txt
 .\.venv\Scripts\python.exe -X utf8 -m unittest discover -s scripts\minimax-mcp -p test_bridge.py -v
-.\.venv\Scripts\python.exe scripts\minimax-mcp\configure.py --pr <BRIDGE_PR_NUMBER>
+.\.venv\Scripts\python.exe scripts\minimax-mcp\configure.py --pr 72
 ```
 
 The default policy is disabled. The generator refuses an existing config/state; it
@@ -146,7 +146,8 @@ Its `--mode mock` option is only for a fresh standalone offline installation.
 Generated paths are absolute and local, so the config is intentionally untracked.
 
 Trust this project in the Codex UI if desired, then `codex mcp list --json`.
-The verifier instead uses process-local trust in an isolated temporary Codex home;
+The verifier instead writes trust into its isolated temporary Codex home's config
+before loading project settings (CLI `-c` trust alone did not load them in 0.160.0);
 it does not modify global trust/config or copy authentication:
 
 ```powershell
@@ -210,4 +211,14 @@ missing CLI/auth/approval; junction/hardlink/foreign file/secret input rejection
 mocked live command contract and API-provider refusal.
 SDK 1.28.0 with current pydantic-settings emits an `IncompleteFieldDefinitionWarning`
 on stderr about its lifespan type. Protocol/schema tests still pass; stdout stays MCP.
-Codex-client verification evidence will be added after the first exact-commit check.
+Codex 0.160.0 also detected the actual project registration and discovered all four
+tools through App Server, received `MODELS_DISABLED`, then obtained a successful
+mock result through `mcpServer/tool/call` with the exact source SHA. No `turn/start`
+was sent. Global config and the disabled project policy remained unchanged.
+Published proof: [Codex MCP evidence](evidence/minimax-mcp-codex-offline.json).
+The report binds its input commit and hashes the Bridge source files; adding this
+evidence afterward does not change those verified executable bytes.
+
+[Draft PR #72](https://github.com/gremoled77-droid/gremovod/pull/72) is stacked on #69.
+The live-path restriction to proposals is intentional: this does not replace the
+dispatcher's code-fix/test/commit/push cycle or authorize autonomous GA execution.
