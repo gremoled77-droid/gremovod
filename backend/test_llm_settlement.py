@@ -13,6 +13,7 @@
 """
 import asyncio
 import json
+import time
 import unittest
 from unittest.mock import AsyncMock, patch
 
@@ -171,6 +172,33 @@ class LlmSettlementTests(unittest.TestCase):
         self.assertEqual(second.status_code, 409, second.text)
         self.assertEqual(call.await_count, 1)
 
+    def call_id(self, request_id):
+        with main.connect() as db:
+            return db.execute('SELECT id FROM llm_calls WHERE request_id=?', (request_id,)).fetchone()['id']
+
+    def test_reconcile_failure_of_plain_call_releases_the_whole_reserve(self):
+        """Обычный вызов без подтверждённой части: сверка «не списал» снимает весь резерв.
+
+        Разделение частей не должно ломать старый контракт одиночного вызова.
+        """
+        self.prepare()
+        quote = self.quote()
+        body = {'provider': 'piapi', 'project_id': self.pid, 'model': 'gpt-5.6-luna', 'messages': self.messages,
+                'max_tokens': 500, 'approved': True, 'quote_token': quote['quote_token'],
+                'max_cost_usd': quote['estimated_usd'], 'request_id': 'ga01-recon-single-1'}
+        with patch.object(main, 'request_piapi', AsyncMock(side_effect=main.HTTPException(502, 'таймаут'))):
+            self.client.post('/api/llm/chat', json=body)
+        row = self.call_row('ga01-recon-single-1')
+        self.assertEqual(row['status'], 'submission_unknown')
+        response = self.client.post(f'/api/llm/calls/{self.call_id("ga01-recon-single-1")}/reconcile',
+                                    json={'outcome': 'failed', 'note': 'проверил у провайдера: списания нет', 'approved': True})
+        self.assertEqual(response.status_code, 200, response.text)
+        after = self.call_row('ga01-recon-single-1')
+        self.assertEqual((after['status'], after['usd']), ('failed', 0))
+        # Повторная сверка — отказ: исход уже решён.
+        self.assertEqual(self.client.post(f'/api/llm/calls/{self.call_id("ga01-recon-single-1")}/reconcile',
+                                          json={'outcome': 'done', 'note': 'ещё раз', 'approved': True}).status_code, 409)
+
 
 class AgentsSettlementTests(unittest.TestCase):
     """Прогон агентов: три роли — один резерв, факт по каждой роли считается отдельно."""
@@ -276,6 +304,164 @@ class AgentsSettlementTests(unittest.TestCase):
         self.assertEqual((row['input_tokens'], row['output_tokens']), (360, 120))
 
 
+class AgentsReconcileTests(unittest.TestCase):
+    """P1 ревью Codex: сверка неопределённой части не обнуляет подтверждённые расходы.
+
+    Прогон агентов — один платный вызов на три роли. Роли с достоверным usage дают факт,
+    проблемная роль оставляет резерв. Сверка освобождает резерв, но подтверждённое
+    остаётся в счёте: иначе сверка одной неоплаченной роли стирает оплату остальных.
+    """
+
+    setUp = test_smoke.StudioSmokeTests.setUp
+    tearDown = test_smoke.StudioSmokeTests.tearDown
+
+    def prepare(self):
+        main.PIAPI_KEY_FILE.write_text('test-key', encoding='utf-8')
+        self.pid = self.client.post('/api/projects', json={'title': 'GA-01 reconcile', 'state': {}}).json()['id']
+        self.body = {'project_id': self.pid, 'brief': 'Грэм едет ночью', 'model': 'gpt-5.6-luna', 'provider': '',
+                     'target_models': ['seedream-5-pro']}
+
+    def run_agents(self, request_id, outcomes):
+        """outcomes: список (content, usage) по ролям."""
+        quote = self.client.post('/api/agents/estimate', json=self.body).json()
+        with patch.object(main, 'agent_completion', AsyncMock(side_effect=outcomes)):
+            r = self.client.post('/api/agents/run', json={**self.body, 'approved': True, 'quote_token': quote['quote_token'],
+                                                          'max_cost_usd': quote['estimated_usd'], 'request_id': request_id})
+        return r, quote
+
+    def spend_row(self):
+        """Только поля, которые были в журнале до разделения: регресс падает и на старой схеме."""
+        with main.connect() as db:
+            return db.execute('SELECT id,status,usd FROM llm_calls').fetchone()
+
+    def split_row(self):
+        with main.connect() as db:
+            return db.execute('SELECT id,status,usd,confirmed_usd,input_tokens,output_tokens,note FROM llm_calls').fetchone()
+
+    def confirmed_for(self, tokens_in, tokens_out):
+        price_in, price_out = llm_guard.price_of('gpt-5.6-luna')
+        return round((tokens_in * price_in + tokens_out * price_out) / 1_000_000, 6)
+
+    def reconcile(self, call_id, body):
+        return self.client.post(f'/api/llm/calls/{call_id}/reconcile', json={**body, 'approved': True})
+
+    def test_reconcile_failure_keeps_confirmed_spend_of_the_other_roles(self):
+        """Сверка «провайдер не списал» по одной роли не стирает оплату подтверждённых ролей."""
+        self.prepare()
+        good = {'prompt_tokens': 120, 'completion_tokens': 40}
+        r, _ = self.run_agents('ga01-recon-1', [('Сцена.', good), ('Континуитет.', {}), ('Промпты.', good)])
+        self.assertEqual(r.status_code, 200, r.text)
+        confirmed = self.confirmed_for(240, 80)
+        before = self.spend_row()
+        self.assertEqual(before['status'], 'submission_unknown')
+        self.assertGreater(before['usd'], confirmed, 'резерв неопределённой роли должен удерживаться')
+        response = self.reconcile(before['id'], {'outcome': 'failed', 'note': 'у провайдера по второй роли списания нет'})
+        self.assertEqual(response.status_code, 200, response.text)
+        payload = response.json()
+        self.assertEqual(payload['confirmed_usd'], confirmed)
+        self.assertEqual(payload['usd'], confirmed)
+        after = self.spend_row()
+        self.assertEqual(after['usd'], confirmed, 'подтверждённые расходы остальных ролей не должны обнуляться')
+        self.assertGreaterEqual(after['usd'], 0)
+        self.assertEqual(self.split_row()['confirmed_usd'], confirmed)
+        with main.connect() as db:
+            self.assertAlmostEqual(llm_guard.spent(db, self.pid)[0], confirmed, places=6)
+
+    def test_confirmed_part_counts_each_role_with_its_own_usage(self):
+        """Подтверждённая часть — сумма по каждой роли со своим usage, а не по первой попавшейся."""
+        self.prepare()
+        first = {'prompt_tokens': 100, 'completion_tokens': 50}
+        third = {'prompt_tokens': 200, 'completion_tokens': 60}
+        r, _ = self.run_agents('ga01-recon-2', [('Сцена.', first), ('Континуитет.', {'prompt_tokens': -5, 'completion_tokens': 10}),
+                                                   ('Промпты.', third)])
+        self.assertEqual(r.status_code, 200, r.text)
+        row = self.split_row()
+        self.assertEqual(row['confirmed_usd'], self.confirmed_for(300, 110))
+        self.assertEqual((row['input_tokens'], row['output_tokens']), (300, 110))
+
+    def test_repeat_reconcile_is_rejected_and_changes_nothing(self):
+        """Повторная сверка отклоняется: сумма не может списаться второй раз."""
+        self.prepare()
+        good = {'prompt_tokens': 120, 'completion_tokens': 40}
+        r, _ = self.run_agents('ga01-recon-3', [('Сцена.', good), ('Континуитет.', {}), ('Промпты.', good)])
+        self.assertEqual(r.status_code, 200, r.text)
+        confirmed = self.confirmed_for(240, 80)
+        row = self.spend_row()
+        first = self.reconcile(row['id'], {'outcome': 'failed', 'note': 'списания по второй роли нет'})
+        self.assertEqual(first.status_code, 200, first.text)
+        amount = self.spend_row()['usd']
+        self.assertEqual(amount, confirmed)
+        again = self.reconcile(row['id'], {'outcome': 'done', 'usd': 0.5, 'note': 'повторная сверка'})
+        self.assertEqual(again.status_code, 409, again.text)
+        self.assertEqual(self.spend_row()['usd'], amount, 'повторная сверка не должна менять сумму')
+
+    def test_reconcile_zero_never_zeroes_confirmed_part(self):
+        """Ноль в сверке не обнуляет подтверждённое и не даёт отрицательной суммы."""
+        self.prepare()
+        good = {'prompt_tokens': 120, 'completion_tokens': 40}
+        r, _ = self.run_agents('ga01-recon-4', [('Сцена.', good), ('Континуитет.', {}), ('Промпты.', good)])
+        self.assertEqual(r.status_code, 200, r.text)
+        confirmed = self.confirmed_for(240, 80)
+        response = self.reconcile(self.spend_row()['id'], {'outcome': 'done', 'usd': 0, 'note': 'проверил, провайдер не списал'})
+        self.assertEqual(response.status_code, 200, response.text)
+        after = self.spend_row()
+        self.assertEqual(after['usd'], confirmed)
+        self.assertGreaterEqual(after['usd'], 0)
+
+    def test_reconcile_total_cost_never_goes_below_confirmed(self):
+        """Названная стоимость вызова ниже подтверждённого не уменьшает доказанный факт."""
+        self.prepare()
+        good = {'prompt_tokens': 120, 'completion_tokens': 40}
+        r, _ = self.run_agents('ga01-recon-5', [('Сцена.', good), ('Континуитет.', {}), ('Промпты.', good)])
+        self.assertEqual(r.status_code, 200, r.text)
+        confirmed = self.confirmed_for(240, 80)
+        response = self.reconcile(self.spend_row()['id'], {'outcome': 'done', 'usd': round(confirmed / 2, 6),
+                                                           'note': 'назвал сумму меньше подтверждённого'})
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(self.spend_row()['usd'], confirmed)
+
+    def test_reconcile_unconfirmed_amount_adds_to_confirmed(self):
+        """Стоимость неопределённой части добавляется к подтверждённой, а не заменяет её."""
+        self.prepare()
+        good = {'prompt_tokens': 120, 'completion_tokens': 40}
+        r, _ = self.run_agents('ga01-recon-6', [('Сцена.', good), ('Континуитет.', {}), ('Промпты.', good)])
+        self.assertEqual(r.status_code, 200, r.text)
+        confirmed = self.confirmed_for(240, 80)
+        response = self.reconcile(self.spend_row()['id'], {'outcome': 'done', 'unconfirmed_usd': 0.001,
+                                                           'note': 'у провайдера по второй роли 0.001'})
+        self.assertEqual(response.status_code, 200, response.text)
+        after = self.spend_row()
+        self.assertEqual(after['usd'], round(confirmed + 0.001, 6))
+        self.assertEqual(self.split_row()['confirmed_usd'], confirmed)
+
+    def test_usd_and_unconfirmed_usd_together_are_rejected(self):
+        """Две суммы сразу — неоднозначно: такой запрос не принимается."""
+        self.prepare()
+        good = {'prompt_tokens': 120, 'completion_tokens': 40}
+        r, _ = self.run_agents('ga01-recon-7', [('Сцена.', good), ('Континуитет.', {}), ('Промпты.', good)])
+        self.assertEqual(r.status_code, 200, r.text)
+        response = self.reconcile(self.spend_row()['id'], {'outcome': 'done', 'usd': 0.01, 'unconfirmed_usd': 0.01,
+                                                           'note': 'две суммы сразу'})
+        self.assertEqual(response.status_code, 422, response.text)
+        self.assertEqual(self.spend_row()['status'], 'submission_unknown')
+
+    def test_unknown_part_is_reported_separately(self):
+        """В отчёте и журнале подтверждённое и неопределённое видны раздельно."""
+        self.prepare()
+        good = {'prompt_tokens': 120, 'completion_tokens': 40}
+        r, _ = self.run_agents('ga01-recon-8', [('Сцена.', good), ('Континуитет.', {}), ('Промпты.', good)])
+        self.assertEqual(r.status_code, 200, r.text)
+        confirmed = self.confirmed_for(240, 80)
+        row = self.split_row()
+        with main.connect() as db:
+            report = llm_guard.summary(db, {self.pid})
+        self.assertEqual(report['confirmed_usd'], confirmed)
+        self.assertAlmostEqual(report['unknown_usd'], row['usd'] - confirmed, places=6)
+        self.assertEqual(report['unknown_calls'], 1)
+        calls = self.client.get('/api/llm/calls').json()
+        self.assertEqual(calls[0]['confirmed_usd'], confirmed)
+
+
 class TaskSettlementTests(unittest.TestCase):
     """Денежная часть задания MiniMax.
 
@@ -322,6 +508,26 @@ class TaskSettlementTests(unittest.TestCase):
     def call_row(self):
         with main.connect() as db:
             return db.execute('SELECT status,usd,estimated_usd,note FROM llm_calls WHERE id=?', (self.CALL_ID,)).fetchone()
+
+    def test_task_reserve_writes_a_row_the_current_schema_accepts(self):
+        """Резерв задания пишется в текущую схему журнала, подтверждённая часть — 0.
+
+        Журнал разделён на подтверждённое и неопределённое: запись резерва обязана
+        попадать в колонки, которые сейчас есть, иначе задание падает на записи.
+        """
+        self.prepare()
+        with main.connect() as db:
+            db.execute('INSERT INTO llm_tasks(id,project_id,revision,model,spec,estimated_usd,status,permit_expires,result,valid,created_at,expires_at)'
+                       ' VALUES(?,?,?,?,?,?,?,?,?,?,?,?)',
+                       (self.TASK_ID, self.pid, 'rev-1', 'minimax-m2.1', json.dumps({}), self.ESTIMATED_USD, 'permitted',
+                        int(time.time()) + 600, None, None, main.now(), int(time.time()) + 3600))
+        with patch.object(llm_guard, 'task_request_id', lambda row: self.REQUEST_ID, create=True):
+            call_id = llm_guard.reserve_minimax_task(main, self.row, 'rev-1')
+        with main.connect() as db:
+            row = db.execute('SELECT status,usd,confirmed_usd FROM llm_calls WHERE id=?', (call_id,)).fetchone()
+        self.assertEqual(row['status'], 'reserved')
+        self.assertEqual(row['usd'], self.ESTIMATED_USD)
+        self.assertEqual(row['confirmed_usd'], 0)
 
     def test_task_timeout_keeps_reserve_without_no_charge_evidence(self):
         """Таймаут после отправки не доказывает, что деньги не списаны: резерв держится."""

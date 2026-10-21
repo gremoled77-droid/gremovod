@@ -858,15 +858,17 @@ async def run_agents(body:AgentRunRequest,x_api_key:str|None=Header(default=None
         (tokens_in,tokens_out),unknown=agent_spend(role_tokens,role_estimates)
         confirmed=round((tokens_in*price_in+tokens_out*price_out)/1_000_000,6)
         llm_guard.settle_call(sys.modules[__name__], call_id, 'submission_unknown', round(confirmed+unknown,6),
-                              f'прервано после ролей: {len(role_tokens)}: {exc}', tokens=(tokens_in,tokens_out))
+                              f'прервано после ролей: {len(role_tokens)}: {exc}', tokens=(tokens_in,tokens_out),
+                              confirmed_usd=confirmed)
         raise
     (tokens_in,tokens_out),unknown=agent_spend(role_tokens,role_estimates)
     confirmed=round((tokens_in*price_in+tokens_out*price_out)/1_000_000,6)
     if unknown>0:
         # Роль без достоверного usage: её резерв удерживается, сумма не подтверждена.
+        # Подтверждённая часть пишется отдельно: её нельзя обнулить сверкой резерва.
         llm_guard.settle_call(sys.modules[__name__], call_id, 'submission_unknown', round(confirmed+unknown,6),
                               f'ролей: {len(role_tokens)}, без достоверного usage: {sum(1 for pair in role_tokens if pair[0] is None)}',
-                              tokens=(tokens_in,tokens_out))
+                              tokens=(tokens_in,tokens_out), confirmed_usd=confirmed)
     else:
         llm_guard.settle_call(sys.modules[__name__], call_id, 'done', round(confirmed,6), f'ролей: {len(role_tokens)}', tokens=(tokens_in,tokens_out))
     run_id=uuid.uuid4().hex

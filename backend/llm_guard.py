@@ -10,13 +10,14 @@
 import hashlib
 import json
 import math
+import sqlite3
 import time
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Literal
 
 from fastapi import Header, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from backend.model_catalog import LLM_MODELS, llm_spec, llm_resolve, llm_wire_model
 from backend import spend_ledger
@@ -194,15 +195,17 @@ def spent(db, project_id):
 def summary(db, projects=None):
     """Расход на LLM по таблице llm_calls: вызовов, USD, по моделям, за сегодня (МСК). projects=None — вся студия.
 
-    В счёт входят вызовы с неопределённым исходом: их резерв держится до сверки."""
+    В счёт входят вызовы с неопределённым исходом: их резерв держится до сверки.
+    Подтверждённая часть и неопределённый остаток считаются раздельно."""
     from backend.security import MOSCOW
     today = datetime.now(MOSCOW).date().isoformat()
     out = {'calls': 0, 'usd': 0.0, 'estimated_usd': 0.0, 'today_usd': 0.0, 'by_model': {},
-           'unknown_calls': 0, 'unknown_usd': 0.0, 'over_estimate_calls': 0, 'over_estimate_usd': 0.0}
+           'unknown_calls': 0, 'unknown_usd': 0.0, 'confirmed_usd': 0.0, 'over_estimate_calls': 0, 'over_estimate_usd': 0.0}
     try:
-        rows = db.execute(f"SELECT project_id,model,status,usd,estimated_usd,created_at FROM llm_calls WHERE {HOLDING_SQL}", HOLDING_STATUSES).fetchall()
+        rows = db.execute(f"SELECT id,project_id,model,status,usd,estimated_usd,created_at FROM llm_calls WHERE {HOLDING_SQL}", HOLDING_STATUSES).fetchall()
     except Exception:  # таблица появляется при запуске сервера
         return out
+    confirmed_map = confirmed_by_call(db)
     for r in rows:
         if projects is not None and r['project_id'] not in projects:
             continue
@@ -211,16 +214,18 @@ def summary(db, projects=None):
         out['estimated_usd'] += r['estimated_usd']
         if datetime.fromisoformat(r['created_at']).astimezone(MOSCOW).date().isoformat() == today:
             out['today_usd'] += r['usd']
+        confirmed = confirmed_map.get(r['id'], 0.0)
+        out['confirmed_usd'] += confirmed
         if r['status'] == 'submission_unknown':
             out['unknown_calls'] += 1
-            out['unknown_usd'] += r['usd']
+            out['unknown_usd'] += max(0.0, round(r['usd'] - confirmed, 6))
         if r['usd'] > r['estimated_usd']:
             out['over_estimate_calls'] += 1
             out['over_estimate_usd'] += r['usd'] - r['estimated_usd']
         item = out['by_model'].setdefault(r['model'], {'calls': 0, 'usd': 0.0})
         item['calls'] += 1
         item['usd'] += r['usd']
-    for key in ('usd', 'estimated_usd', 'today_usd', 'unknown_usd', 'over_estimate_usd'):
+    for key in ('usd', 'estimated_usd', 'today_usd', 'unknown_usd', 'confirmed_usd', 'over_estimate_usd'):
         out[key] = round(out[key], 6)
     for item in out['by_model'].values():
         item['usd'] = round(item['usd'], 6)
@@ -233,12 +238,70 @@ def check_budget(db, project_id, cost):
     security.check_budget(db, project_id, cost)
 
 
+def split_held(held_usd, confirmed_usd):
+    """Разделить удерживаемую сумму вызова: (подтверждённый факт, неопределённый остаток).
+
+    Подтверждённое — доказанный факт (usage провайдера). Сверка неопределённой части его
+    не уменьшает. Остаток не бывает отрицательным и не может съесть подтверждённое.
+    """
+    confirmed = max(0.0, round(float(confirmed_usd or 0.0), 6))
+    unknown = max(0.0, round(float(held_usd or 0.0) - confirmed, 6))
+    return confirmed, unknown
+
+
+def confirmed_from_tokens(model, tokens_in, tokens_out):
+    """Подтверждённая часть по записанным токенам: 0, если модель или токены неизвестны.
+
+    Нужен для старой базы: там подтверждённая часть не хранилась отдельной колонкой.
+    """
+    if tokens_in is None or tokens_out is None:
+        return 0.0
+    prices = PRICES.get(model)
+    if prices is None:
+        return 0.0
+    price_in, price_out = prices
+    usd = (tokens_in * price_in + tokens_out * price_out) / 1_000_000
+    if not math.isfinite(usd) or usd < 0:
+        return 0.0
+    return round(usd, 6)
+
+
+def confirmed_column(db):
+    """Есть ли в базе разделение подтверждённого и неопределённого (в старой базе нет)."""
+    try:
+        return 'confirmed_usd' in {r['name'] for r in db.execute('PRAGMA table_info(llm_calls)')}
+    except sqlite3.Error:
+        return False
+
+
+def confirmed_by_call(db):
+    """Подтверждённая часть по каждому вызову: {} если колонки ещё нет (старой базе)."""
+    try:
+        return {r['id']: max(0.0, round(float(r['confirmed_usd'] or 0.0), 6))
+                for r in db.execute('SELECT id,confirmed_usd FROM llm_calls')}
+    except sqlite3.Error:
+        return {}
+
+
 class Reconcile(BaseModel):
-    """Ручная сверка вызова с неопределённым исходом."""
+    """Ручная сверка вызова с неопределённым исходом.
+
+    `usd` — фактическая стоимость вызова целиком (подтверждённая и неопределённая части
+    вместе). `unconfirmed_usd` — фактическая стоимость только неопределённой части.
+    Указывать можно одно из двух. Подтверждённая часть хранится отдельно и этой
+    сверкой не уменьшается: освобождается только неопределённый остаток.
+    """
     outcome: str = Field(pattern='^(done|failed)$')
     usd: float | None = Field(default=None, ge=0, le=1000, allow_inf_nan=False)
+    unconfirmed_usd: float | None = Field(default=None, ge=0, le=1000, allow_inf_nan=False)
     note: str = Field(min_length=3, max_length=500)
     approved: bool = False
+
+    @model_validator(mode='after')
+    def one_amount(self):
+        if self.usd is not None and self.unconfirmed_usd is not None:
+            raise ValueError('Укажи либо usd (стоимость вызова целиком), либо unconfirmed_usd (стоимость неопределённой части)')
+        return self
 
 
 def canonical_json(value):
@@ -384,7 +447,7 @@ def reserve_minimax_task(studio, row, revision):
         ).rowcount
         if changed != 1:
             raise HTTPException(409, 'Разрешение уже использовано или задание запущено')
-        db.execute('INSERT INTO llm_calls VALUES(?,?,?,?,?,?,?,?,?,?)',
+        db.execute('INSERT INTO llm_calls(id,request_id,project_id,model,status,usd,estimated_usd,input_tokens,output_tokens,created_at,confirmed_usd) VALUES(?,?,?,?,?,?,?,?,?,?,0)',
                    (call_id, call_request_id, row['project_id'], row['model'], 'reserved', row['estimated_usd'], row['estimated_usd'], None, None, studio.now()))
     return call_id
 
@@ -433,13 +496,13 @@ async def execute_minimax_task(studio, task_id, body, key):
         refused = isinstance(exc, HTTPException) and getattr(exc, 'status_code', 500) < 500
         with studio.connect() as db:
             if refused:
-                db.execute("UPDATE llm_calls SET status='failed',usd=0,note=? WHERE id=?",
+                db.execute("UPDATE llm_calls SET status='failed',usd=0,confirmed_usd=0,note=? WHERE id=?",
                            (f'отказ провайдера: {exc.detail}', call_id))
             elif value is not None and _not_charged(value):
-                db.execute("UPDATE llm_calls SET status='failed',usd=0,note=? WHERE id=?",
+                db.execute("UPDATE llm_calls SET status='failed',usd=0,confirmed_usd=0,note=? WHERE id=?",
                            ('провайдер сообщил нулевое потребление', call_id))
             else:
-                db.execute("UPDATE llm_calls SET status='submission_unknown',note=? WHERE id=?",
+                db.execute("UPDATE llm_calls SET status='submission_unknown',confirmed_usd=0,note=? WHERE id=?",
                            (f'исход неизвестен: {exc}', call_id))
             db.execute("UPDATE llm_tasks SET status='failed' WHERE id=?", (task_id,))
         raise
@@ -466,11 +529,11 @@ async def execute_minimax_task(studio, task_id, body, key):
     )
     with studio.connect() as db:
         if status == 'done':
-            db.execute("UPDATE llm_calls SET status='done',usd=?,input_tokens=?,output_tokens=? WHERE id=?",
-                       (actual_usd, tokens_in, tokens_out, call_id))
+            db.execute("UPDATE llm_calls SET status='done',usd=?,confirmed_usd=?,input_tokens=?,output_tokens=? WHERE id=?",
+                       (actual_usd, actual_usd, tokens_in, tokens_out, call_id))
         else:
             # Достоверного usage нет: подтверждать нечего. Резерв держится до сверки.
-            db.execute("UPDATE llm_calls SET status='submission_unknown',usd=?,note=? WHERE id=?",
+            db.execute("UPDATE llm_calls SET status='submission_unknown',usd=?,confirmed_usd=0,note=? WHERE id=?",
                        (actual_usd, reason, call_id))
         db.execute("UPDATE llm_tasks SET status='done',result=?,valid=? WHERE id=?",
                    (canonical_json(result.model_dump(mode='json')), 1 if valid else 0, task_id))
@@ -490,6 +553,15 @@ def register(app, studio):
                 revision TEXT NOT NULL,created_at TEXT NOT NULL,FOREIGN KEY(task_id) REFERENCES llm_tasks(id) ON DELETE CASCADE)''')
             if 'note' not in {r['name'] for r in db.execute('PRAGMA table_info(llm_calls)')}:
                 db.execute('ALTER TABLE llm_calls ADD COLUMN note TEXT')
+            if 'confirmed_usd' not in {r['name'] for r in db.execute('PRAGMA table_info(llm_calls)')}:
+                # Разделение подтверждённого и неопределённого. Старая база хранила только
+                # сумму: подтверждённую часть восстанавливаем по записанным токенам.
+                db.execute('ALTER TABLE llm_calls ADD COLUMN confirmed_usd REAL')
+                db.execute("UPDATE llm_calls SET confirmed_usd=usd WHERE status='done'")
+                db.execute("UPDATE llm_calls SET confirmed_usd=0 WHERE status IN ('reserved','failed')")
+                for old in db.execute("SELECT id,model,input_tokens,output_tokens FROM llm_calls WHERE status='submission_unknown'").fetchall():
+                    db.execute('UPDATE llm_calls SET confirmed_usd=? WHERE id=?',
+                               (confirmed_from_tokens(old['model'], old['input_tokens'], old['output_tokens']), old['id']))
 
     @app.post('/api/llm/estimate')
     def estimate(body: Estimate):
@@ -601,17 +673,26 @@ def register(app, studio):
         if status:
             where.append('status=?')
             args.append(status)
-        sql = 'SELECT id,request_id,project_id,model,status,usd,estimated_usd,input_tokens,output_tokens,note,created_at FROM llm_calls'
-        if where:
-            sql += ' WHERE ' + ' AND '.join(where)
-        sql += ' ORDER BY created_at DESC LIMIT 200'
         with studio.connect() as db:
+            columns = 'id,request_id,project_id,model,status,usd,estimated_usd,input_tokens,output_tokens,note,created_at'
+            if confirmed_column(db):
+                columns += ',confirmed_usd'
+            sql = f'SELECT {columns} FROM llm_calls'
+            if where:
+                sql += ' WHERE ' + ' AND '.join(where)
+            sql += ' ORDER BY created_at DESC LIMIT 200'
             rows = db.execute(sql, args).fetchall()
         return [dict(r) for r in rows]
 
     @app.post('/api/llm/calls/{call_id}/reconcile')
     def reconcile(call_id: str, body: Reconcile):
-        """Сверка неопределённого вызова: подтвердить факт или снять резерв с записью причины."""
+        """Сверка неопределённого вызова: подтвердить факт или снять резерв с записью причины.
+
+        Подтверждённая часть (confirmed_usd) — уже доказанный факт: сверка неопределённой
+        части её не обнуляет. Освобождается только неопределённый остаток, подтверждённое
+        остаётся в счёте. Повторная сверка отклоняется: исход уже решён и сумма не может
+        списаться второй раз.
+        """
         if not body.approved:
             raise HTTPException(400, 'Нужно подтверждение сверки: она меняет учёт расхода')
         with studio.connect() as db:
@@ -621,14 +702,32 @@ def register(app, studio):
                 raise HTTPException(404, 'Вызов не найден')
             if row['status'] != 'submission_unknown':
                 raise HTTPException(409, 'Сверка доступна только для вызова с неопределённым исходом')
+            confirmed, unknown = split_held(row['usd'], row['confirmed_usd'] if confirmed_column(db) else 0)
             if body.outcome == 'failed':
-                db.execute("UPDATE llm_calls SET status='failed',usd=0,note=? WHERE id=?", (body.note, call_id))
-                result = {'status': 'failed', 'usd': 0.0}
+                # Провайдер ничего не списал по неопределённой части: резерв снимается,
+                # подтверждённые списания остаются в счёте.
+                held = confirmed
+                status = 'done' if confirmed > 0 else 'failed'
+            elif body.unconfirmed_usd is not None:
+                held = round(confirmed + body.unconfirmed_usd, 6)
+                status = 'done'
+            elif body.usd is not None:
+                # Оператор назвал стоимость вызова целиком: ниже подтверждённого не опускаемся.
+                held = max(confirmed, round(body.usd, 6))
+                status = 'done'
             else:
-                usd = row['usd'] if body.usd is None else round(body.usd, 6)
-                db.execute("UPDATE llm_calls SET status='done',usd=?,note=? WHERE id=?", (usd, body.note, call_id))
-                result = {'status': 'done', 'usd': usd}
-        return {'id': call_id, **result, 'note': body.note, 'estimated_usd': row['estimated_usd']}
+                held = round(confirmed + unknown, 6)
+                status = 'done'
+            held = max(0.0, round(held, 6))
+            note = body.note
+            if body.outcome == 'failed' and confirmed > 0:
+                note = f'{body.note} (неопределённый резерв снят, подтверждённая часть {confirmed} сохранена)'
+            db.execute('UPDATE llm_calls SET status=?,usd=?,confirmed_usd=?,note=? WHERE id=?',
+                       (status, held, confirmed, note, call_id))
+            result = {'status': status, 'usd': held, 'confirmed_usd': confirmed,
+                      'unknown_usd': round(held - confirmed, 6),
+                      'released_usd': max(0.0, round(float(row['usd'] or 0.0) - held, 6))}
+        return {'id': call_id, **result, 'note': note, 'estimated_usd': row['estimated_usd']}
 
 
 def _not_charged(value):
@@ -643,14 +742,24 @@ def _not_charged(value):
     return tokens is not None and tokens == (0, 0)
 
 
-def settle_call(studio, call_id, status, usd, note=None, tokens=None):
-    """Записать судьбу вызова: сколько денег он удерживает и почему."""
+def settle_call(studio, call_id, status, usd, note=None, tokens=None, confirmed_usd=None):
+    """Записать судьбу вызова: сколько денег он удерживает, сколько из них подтверждено и почему.
+
+    `confirmed_usd` — доказанная фактом часть (достоверный usage провайдера). Для статуса
+    'done' она равна всей сумме, для неопределённого исхода — только подтверждённой части:
+    остальное удерживается до ручной сверки и не может обнулить подтверждённое.
+    """
+    held = max(0.0, round(float(usd), 6))
+    confirmed = held if confirmed_usd is None and status == 'done' else float(confirmed_usd or 0.0)
+    confirmed = max(0.0, round(confirmed, 6))
+    held = max(held, confirmed)
     with studio.connect() as db:
         if tokens:
-            db.execute('UPDATE llm_calls SET status=?,usd=?,note=COALESCE(?,note),input_tokens=?,output_tokens=? WHERE id=?',
-                       (status, usd, note, tokens[0], tokens[1], call_id))
+            db.execute('UPDATE llm_calls SET status=?,usd=?,confirmed_usd=?,note=COALESCE(?,note),input_tokens=?,output_tokens=? WHERE id=?',
+                       (status, held, confirmed, note, tokens[0], tokens[1], call_id))
         else:
-            db.execute('UPDATE llm_calls SET status=?,usd=?,note=COALESCE(?,note) WHERE id=?', (status, usd, note, call_id))
+            db.execute('UPDATE llm_calls SET status=?,usd=?,confirmed_usd=?,note=COALESCE(?,note) WHERE id=?',
+                       (status, held, confirmed, note, call_id))
 
 
 def resolve_provider(model, provider=''):
@@ -681,7 +790,7 @@ def reserve_call(studio, project_id, model, request_id, cost):
         if db.execute('SELECT 1 FROM llm_calls WHERE request_id=?', (request_id,)).fetchone():
             raise HTTPException(409, 'Этот запрос уже отправлялся. Проверь результат, повтор платного вызова не выполняется автоматически.')
         check_budget(db, project_id, cost)
-        db.execute('INSERT INTO llm_calls(id,request_id,project_id,model,status,usd,estimated_usd,input_tokens,output_tokens,created_at) VALUES(?,?,?,?,?,?,?,?,?,?)',
+        db.execute('INSERT INTO llm_calls(id,request_id,project_id,model,status,usd,estimated_usd,input_tokens,output_tokens,created_at,confirmed_usd) VALUES(?,?,?,?,?,?,?,?,?,?,0)',
                    (call_id, request_id, project_id, model, 'reserved', cost, cost, None, None, studio.now()))
     return call_id
 
