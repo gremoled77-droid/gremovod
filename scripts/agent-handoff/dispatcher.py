@@ -208,7 +208,11 @@ def task_record(state, task):
 
 
 def fetch_pr(number):
-    return gh("api", f"repos/{REPO}/pulls/{number}")
+    pr = gh("api", f"repos/{REPO}/pulls/{number}")
+    # GitHub may keep pull.base.sha at PR creation after the base branch advances.
+    base = gh("api", f"repos/{REPO}/git/ref/heads/{pr['base']['ref']}")
+    pr["base"]["sha"] = base["object"]["sha"]
+    return pr
 
 
 def match_task(pr):

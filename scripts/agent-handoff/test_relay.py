@@ -629,6 +629,18 @@ class RelayTest(unittest.TestCase):
         )
         d.assert_remote(self.job)
 
+    def test_fetch_pr_refreshes_cached_base_sha_from_branch_ref(self):
+        self.patches[0].stop()
+        pr = self.fetch_pr(7001)
+        with mock.patch.object(
+            d, "gh", side_effect=[pr, {"object": {"sha": "b" * 40}}]
+        ) as api:
+            current = d.fetch_pr(7001)
+        self.assertEqual(current["base"]["sha"], "b" * 40)
+        self.assertIn(
+            "git/ref/heads/feature/codex-minimax-relay", api.call_args.args[1]
+        )
+
     def test_lock_blocks_another_writer(self):
         with (
             d.dispatcher_lock(self.state_dir),

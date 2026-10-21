@@ -53,7 +53,7 @@ See [scheduler preflight](evidence/relay-scheduler-preflight.json),
 [mock summary](evidence/relay-mock-summary.json), [mock phases](evidence/relay-mock-events.jsonl)
 and [installation/runbook](AUTOMATIC_RELAY_2026-10-21.md).
 
-Verified before approval: 35 relay tests, 15 compatibility tests, 25 monitor tests/TypeScript build,
+Verified before approval: 36 relay tests, 15 compatibility tests, 25 monitor tests/TypeScript build,
 Ruff, clean diff checks, real disabled task registration and STOP. Models/GitHub were mocked in the
 relay E2E; local Git and independent tests were real. No new browser/VS Code UI walkthrough was run for
 this journal-only monitor adapter; adapter tests verify event ingestion and STOP.

@@ -13,7 +13,7 @@ not integrated into production Studio. The test PR targets this relay branch.
 | PR #57 Dispatcher v1 | Only the official GitHub bot marker on exact HEAD is an actionable review signal. Finishing an IDE conversation creates no such marker. | Add explicit local publication and signed source-specific receipts. No reading hidden VS Code chat storage. |
 | PR #59 Dispatcher v2 | Local review writes Markdown but `evaluate` still waits for GitHub. A foreground hourly watch ends with its process. | Bounded job mode consumes local JSON independently; Task Scheduler runs a tick every minute. |
 | v2 fixes | Model success/text is not independent test evidence; post-push review worktree is not updated. | Reproduce a frozen regression before the fix; independently test after it; detach reviewer at the new owned SHA. |
-| v2 CLI/lifecycle | `gh pr comment` returns a URL but the helper JSON-decodes every result; detached `symbolic-ref` has exit 1; corrupt state resets counters. | Review trigger uses JSON REST; strict worktree checks; corrupt state blocks. |
+| v2 CLI/lifecycle | `gh pr comment` returns a URL but the helper JSON-decodes every result; detached `symbolic-ref` has exit 1; corrupt state resets counters. GitHub can retain an old PR base SHA after its branch advances. | Review trigger uses JSON REST; strict worktree checks; corrupt state blocks; base SHA is refreshed from the branch ref. |
 | PR #60 monitor | It reads legacy snapshots/reports; no dispatcher phase journal exists. | Emit `events.jsonl`; read it through the existing validated AgentEvent parser and watcher, with STOP warning. |
 
 Inspected heads on 2026-10-21: #56 `2ff006a4e09f7427b4eefba3df7f6a2427150f3e`,
