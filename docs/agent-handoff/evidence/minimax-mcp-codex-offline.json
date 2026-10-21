@@ -1,0 +1,105 @@
+{
+  "at": "2026-10-21T22:12:11.006355+00:00",
+  "head_sha": "b9d57204ef59526dbb5419a249688d21dd03f6fd",
+  "pr_number": 72,
+  "model_turns": 0,
+  "mcp_sdk_version": "1.28.0",
+  "source_sha256": {
+    "scripts/minimax-mcp/bridge.py": "46020c9b08c232d04ca2eaaaadbdd5d3ac1663c74f7776eece2958b5642704c3",
+    "scripts/minimax-mcp/configure.py": "ac852914eb937a4aed19dfa7743798ba8b778b5438ccef852878b66250cbf090",
+    "scripts/minimax-mcp/fixtures/value.py": "a7b02092aabf5cdfcff236b7eb00fc1405cb67904e2b8119824a0aa90d844ee0",
+    "scripts/minimax-mcp/mock_worker.py": "941d503ccf7cda9b6f3996207fc63be63a5df14c958ecfe65efe2d5f2ca95ee7",
+    "scripts/minimax-mcp/requirements.txt": "5d3ca0aa89228dcfd0acd4b9683dd1148752643b7bb2ac2fd5b7e6f0300b357c",
+    "scripts/minimax-mcp/server.py": "e0d83c35316dc1a6b677c8d44b20cfc0a967e003b66395ddc9fee704b47e0a46",
+    "scripts/minimax-mcp/test_bridge.py": "fd4bb3c429c40f9e6a3e3b63103b440889139655a8327d5e9f29fc6528dc3e2a",
+    "scripts/minimax-mcp/verify_codex.py": "b9d594036a71d71f7c5bf03f05db65c437f3fe260d86b267275df5f66ef46f26"
+  },
+  "codex_version": "codex-cli 0.160.0",
+  "registered": [
+    "minimax_bridge"
+  ],
+  "runs": [
+    {
+      "mode": "disabled",
+      "tools": [
+        "minimax_cancel",
+        "minimax_execute",
+        "minimax_result",
+        "minimax_status"
+      ],
+      "result": {
+        "error": "MODELS_DISABLED"
+      },
+      "methods": [
+        "initialize",
+        "thread/start",
+        "mcpServerStatus/list",
+        "mcpServer/tool/call",
+        "mcpServer/tool/call"
+      ]
+    },
+    {
+      "mode": "mock",
+      "tools": [
+        "minimax_cancel",
+        "minimax_execute",
+        "minimax_result",
+        "minimax_status"
+      ],
+      "result": {
+        "request_id": "codex_offline",
+        "request_digest": "4d27e2c7d7119c506fe44a8aac7e905dfcdc4461f49fcf7e5e1997a11ac6fd9c",
+        "pr_number": 72,
+        "head_sha": "b9d57204ef59526dbb5419a249688d21dd03f6fd",
+        "status": "SUCCEEDED",
+        "started_at": "2026-10-21T22:12:13.811461+00:00",
+        "exit_code": 0,
+        "stdout": "{\"mock\": true, \"head_sha\": \"b9d57204ef59526dbb5419a249688d21dd03f6fd\", \"files\": [\"scripts/minimax-mcp/fixtures/value.py\"], \"proposal\": \"No files changed; offline fixture completed.\"}\r\n",
+        "stderr": "",
+        "mock": true,
+        "result_sha": "b9d57204ef59526dbb5419a249688d21dd03f6fd",
+        "finished_at": "2026-10-21T22:12:14.801081+00:00",
+        "error": null
+      },
+      "methods": [
+        "initialize",
+        "thread/start",
+        "mcpServerStatus/list",
+        "mcpServer/tool/call",
+        "mcpServer/tool/call",
+        "mcpServer/tool/call",
+        "mcpServer/tool/call",
+        "mcpServer/tool/call",
+        "mcpServer/tool/call",
+        "mcpServer/tool/call",
+        "mcpServer/tool/call",
+        "mcpServer/tool/call",
+        "mcpServer/tool/call",
+        "mcpServer/tool/call",
+        "mcpServer/tool/call",
+        "mcpServer/tool/call",
+        "mcpServer/tool/call",
+        "mcpServer/tool/call",
+        "mcpServer/tool/call",
+        "mcpServer/tool/call",
+        "mcpServer/tool/call",
+        "mcpServer/tool/call",
+        "mcpServer/tool/call",
+        "mcpServer/tool/call"
+      ]
+    }
+  ],
+  "global_config_unchanged": true,
+  "project_policy_unchanged": true,
+  "live_minimax_launches": 0,
+  "offline_unittest": {
+    "tests": 33,
+    "failures": 0,
+    "errors": 0,
+    "source_head_sha": "b9d57204ef59526dbb5419a249688d21dd03f6fd",
+    "command": "python -X utf8 -m unittest discover -s scripts/minimax-mcp -p test_bridge.py -q"
+  },
+  "dispatcher_diff_from_fcac8fd": "empty",
+  "installed_project_mode": "disabled",
+  "installed_project_calls_reserved": 0
+}
