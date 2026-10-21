@@ -15,12 +15,13 @@ const sources = require('../dist/sources');
 const tick = () => new Promise(r => setImmediate(r));
 const empty = () => ({events: [], details: {}, warnings: []});
 
-async function fakeEnvironment(name, remote, local) {
+async function fakeEnvironment(t, name, remote, local) {
   const panels = [],
     watchers = [],
     timers = [];
   let command;
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'agent-monitor-resilience-'));
+  t.after(() => fs.rm(root, {recursive: true, force: true}));
   const uri = p => ({fsPath: p, toString: () => p});
   const vscode = {
     Uri: {
@@ -136,12 +137,13 @@ async function fakeEnvironment(name, remote, local) {
   };
 }
 
-test('local state is published while the GitHub poll is still pending', async () => {
+test('local state is published while the GitHub poll is still pending', async t => {
   let release,
     calls = 0;
   const gate = new Promise(r => (release = r));
   let connected = false;
   const env = await fakeEnvironment(
+    t,
     'slow-github',
     async () => {
       calls++;
@@ -166,8 +168,8 @@ test('local state is published while the GitHub poll is still pending', async ()
   env.close();
 });
 
-test('a second open joins the running one instead of creating a rival panel', async () => {
-  const env = await fakeEnvironment('double-open', async () => ({...empty(), pulls: []}));
+test('a second open joins the running one instead of creating a rival panel', async t => {
+  const env = await fakeEnvironment(t, 'double-open', async () => ({...empty(), pulls: []}));
   await Promise.all([env.open(), env.open()]);
   for (let i = 0; i < 200 && !env.api.getSnapshot(); i++) await tick();
   assert.equal(env.panels.length, 1, 'a double open must not create a second panel');
@@ -180,8 +182,8 @@ test('a second open joins the running one instead of creating a rival panel', as
   env.close();
 });
 
-test('closing the panel releases its resources and a new open gets a working panel', async () => {
-  const env = await fakeEnvironment('reopen', async () => ({...empty(), pulls: []}));
+test('closing the panel releases its resources and a new open gets a working panel', async t => {
+  const env = await fakeEnvironment(t, 'reopen', async () => ({...empty(), pulls: []}));
   await env.open();
   for (let i = 0; i < 200 && !env.api.getSnapshot(); i++) await tick();
   assert.ok(env.api.getSnapshot(), 'the first panel publishes');
