@@ -196,8 +196,12 @@ class Child:
                 finally:
                     thread.Close()
         except BaseException:
-            self.kill()
+            # Assignment can fail before the Job owns the still-suspended root.
+            self.process.kill()
             self.process.wait(timeout=5)
+            for pipe in (self.process.stdin, self.process.stdout, self.process.stderr):
+                pipe.close()
+            self.close()
             raise
 
     def kill(self):
@@ -288,32 +292,41 @@ class Bridge:
             raise
 
     def save(self):
-        temp = checked_path(self.directory / "state.tmp")
-        temp.write_text(json.dumps(self.state, indent=2), encoding="utf-8")
-        os.replace(temp, checked_path(self.directory / "state.json"))
+        try:
+            temp = checked_path(self.directory / "state.tmp")
+            temp.write_text(json.dumps(self.state, indent=2), encoding="utf-8")
+            os.replace(temp, checked_path(self.directory / "state.json"))
+        except OSError:
+            self.state["halted"] = True
+            raise
 
     def event(self, record):
         # Never journal prompts, file contents, provider output, paths, or credentials.
-        with open(
-            checked_path(self.directory / "events.jsonl"), "a", encoding="utf-8"
-        ) as handle:
-            handle.write(
-                json.dumps(
-                    {
-                        k: record.get(k)
-                        for k in (
-                            "request_id",
-                            "pr_number",
-                            "head_sha",
-                            "status",
-                            "error",
-                            "exit_code",
-                        )
-                    }
-                    | {"at": now()}
+        try:
+            with open(
+                checked_path(self.directory / "events.jsonl"), "a", encoding="utf-8"
+            ) as handle:
+                handle.write(
+                    json.dumps(
+                        {
+                            k: record.get(k)
+                            for k in (
+                                "request_id",
+                                "pr_number",
+                                "head_sha",
+                                "status",
+                                "error",
+                                "exit_code",
+                            )
+                        }
+                        | {"at": now()}
+                    )
+                    + "\n"
                 )
-                + "\n"
-            )
+        except OSError:
+            self.state["halted"] = True
+            self.save()
+            raise
 
     def git(self, *args):
         git = self.config.get("git") or shutil.which(

@@ -85,6 +85,61 @@ class Fixture(unittest.TestCase):
 
 
 class BridgeTests(Fixture):
+    def test_state_write_failure_halts_before_launch(self):
+        service = self.make()
+        with (
+            patch("bridge.os.replace", side_effect=OSError("synthetic disk failure")),
+            patch("bridge.Child") as child,
+            self.assertRaises(OSError),
+        ):
+            self.execute(service)
+        child.assert_not_called()
+        self.assertTrue(service.status()["halted"])
+
+    def test_journal_failure_persists_halt_before_launch(self):
+        service = self.make()
+        with (
+            patch(
+                "bridge.open",
+                side_effect=OSError("synthetic journal failure"),
+                create=True,
+            ),
+            patch("bridge.Child") as child,
+            self.assertRaises(OSError),
+        ):
+            self.execute(service)
+        child.assert_not_called()
+        self.assertTrue(
+            json.loads((service.directory / "state.json").read_text())["halted"]
+        )
+
+    @unittest.skipUnless(os.name == "nt", "Windows Job Object")
+    def test_job_assignment_failure_leaves_no_suspended_child(self):
+        original = subprocess.Popen
+        started = []
+
+        def spawn(*args, **kwargs):
+            process = original(*args, **kwargs)
+            started.append(process)
+            return process
+
+        with (
+            patch("bridge.subprocess.Popen", side_effect=spawn),
+            patch(
+                "win32job.AssignProcessToJobObject",
+                side_effect=OSError("synthetic assignment failure"),
+            ),
+            self.assertRaises(OSError),
+        ):
+            Child(
+                [sys.executable, "-I", str(HERE / "mock_worker.py")],
+                self.repo,
+                isolated_environment(self.root / "child", self.root / "profile"),
+            )
+        self.assertEqual(len(started), 1)
+        self.assertIsNotNone(started[0].poll())
+        self.assertTrue(started[0].stdin.closed)
+
     def test_child_creation(self):
         child = Child(
             [sys.executable, "-I", str(HERE / "mock_worker.py")],

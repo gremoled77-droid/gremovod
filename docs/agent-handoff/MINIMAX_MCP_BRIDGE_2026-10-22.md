@@ -203,11 +203,13 @@ autonomous GA task, merge or deployment is part of this proof.
 
 ## Verification record
 
-Initial full offline suite: **30 tests pass**, including official SDK initialize,
+Full offline suite: **33 tests pass**, including official SDK initialize,
 four tools and schema checks; real mock subprocess, numeric exit 23 and stderr
 redaction; timeout/cancellation and Windows descendant termination; dedupe/single lock;
 restart and budgets; environment/home/config isolation; source SHA before/after;
 missing CLI/auth/approval; junction/hardlink/foreign file/secret input rejection;
+cleanup after failed Windows Job assignment before the suspended child can run;
+state/journal write failures stopping before launch;
 mocked live command contract and API-provider refusal.
 SDK 1.28.0 with current pydantic-settings emits an `IncompleteFieldDefinitionWarning`
 on stderr about its lifespan type. Protocol/schema tests still pass; stdout stays MCP.
