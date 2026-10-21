@@ -1,17 +1,21 @@
 {
-  "at": "2026-10-21T09:24:10.612Z",
-  "host": "1.142.0",
-  "github": "Not connected / cached observations",
+  "at": "2026-10-21T10:51:24.372Z",
+  "host": "1.143.0",
+  "githubInitial": "Connected",
+  "githubAfterReopen": "Connected",
   "pr": 58,
+  "warningsAfterReopen": [
+    "Dispatcher: Not connected (state.json missing)"
+  ],
   "review": {
-    "status": "Changes requested",
+    "status": "Stale SHA",
     "sha": "9b6a610a6b1afcb4e24b869649a387b7b6d5e8bf",
     "p0": 0,
-    "p1": 1,
+    "p1": 0,
     "p2": 0,
     "url": "https://github.com/gremoled77-droid/gremovod/pull/58#issuecomment-6311060215"
   },
-  "events": 10,
+  "events": 13,
   "fixtureEvents": 1,
   "screenshotsContain": "Live GitHub observations only; local watcher fixture added after screenshots",
   "passed": [
