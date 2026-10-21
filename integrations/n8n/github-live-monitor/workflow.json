@@ -1,0 +1,745 @@
+{
+  "name": "GremoVOD — GitHub Live Monitor",
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "nodes": [
+    {
+      "id": "GitHub Trigger",
+      "type": "n8n-nodes-base.githubTrigger",
+      "typeVersion": 1,
+      "name": "GitHub Trigger",
+      "parameters": {
+        "owner": {
+          "__rl": true,
+          "mode": "name",
+          "value": "gremoled77-droid"
+        },
+        "repository": {
+          "__rl": true,
+          "mode": "name",
+          "value": "gremovod"
+        },
+        "events": [
+          "push",
+          "pull_request",
+          "pull_request_review",
+          "pull_request_review_comment",
+          "issue_comment",
+          "check_run",
+          "check_suite",
+          "status"
+        ],
+        "options": {
+          "insecureSSL": false
+        }
+      },
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "id": "Verify Event",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "name": "Verify Event",
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "'use strict';\n\nconst REPOSITORY = 'gremoled77-droid/gremovod';\nconst BOT = 'chatgpt-codex-connector[bot]';\nconst SHA = /^[a-f0-9]{40}$/;\nconst login = value => typeof value === 'string' && /^[a-zA-Z0-9[\\]_-]{1,100}$/.test(value) ? value : 'UNKNOWN';\nconst sha = value => typeof value === 'string' && SHA.test(value) ? value : null;\nconst escapeHtml = value => String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');\n\nfunction verify(input) {\n  const h = input.headers || {};\n  const body = input.body;\n  if (!body || body.repository?.full_name !== REPOSITORY) throw new Error('REPOSITORY_REJECTED');\n  if (!/^[a-z_]+$/.test(h['x-github-event'] || '')) throw new Error('EVENT_REJECTED');\n  if (!/^[a-zA-Z0-9-]{1,100}$/.test(h['x-github-delivery'] || '')) throw new Error('DELIVERY_REJECTED');\n  const number = body.pull_request?.number || (body.issue?.pull_request && body.issue.number) || body.check_run?.pull_requests?.[0]?.number || body.check_suite?.pull_requests?.[0]?.number;\n  if (number && (!Number.isSafeInteger(number) || number <= 0)) throw new Error('PR_REJECTED');\n  return { ...input, snapshot_url: `https://api.github.com/repos/${REPOSITORY}${number ? `/pulls/${number}` : ''}` };\n}\n\nfunction normalize(input, snapshot, now = new Date().toISOString()) {\n  verify(input);\n  const b = input.body;\n  const type = input.headers['x-github-event'];\n  const action = b.action || '';\n  const pr = b.pull_request || (b.issue?.pull_request ? b.issue : null) || b.check_run?.pull_requests?.[0] || b.check_suite?.pull_requests?.[0] || null;\n  const number = pr?.number || null;\n  const current = snapshot?.number === number && snapshot?.base?.repo?.full_name === REPOSITORY && sha(snapshot?.head?.sha);\n  const head = sha(b.pull_request?.head?.sha) || current;\n  const item = b.review || b.comment;\n  const actor = login(item?.user?.login || b.sender?.login);\n  const event = {\n    event_id: `github:${input.headers['x-github-delivery']}`,\n    received_at: now,\n    github_delivery_id: input.headers['x-github-delivery'],\n    event_type: type,\n    action,\n    repository: REPOSITORY,\n    actor,\n    pr_number: number,\n    task_id: (String(snapshot?.title || pr?.title || '').match(/\\bGA-\\d{2}\\b/) || [null])[0],\n    head_sha: head || null,\n    review_status: 'UNKNOWN',\n    severity: 'INFO',\n    summary: '',\n    source_url: `https://github.com/${REPOSITORY}${number ? `/pull/${number}` : ''}`,\n    kind: '',\n    route: 'digest',\n    evidence_id: '',\n  };\n  if (type === 'push' && !b.deleted && sha(b.after)) {\n    event.kind = 'COMMIT'; event.head_sha = b.after;\n    event.source_url = `https://github.com/${REPOSITORY}/commit/${b.after}`;\n  } else if (type === 'pull_request' && ['opened', 'reopened', 'synchronize', 'ready_for_review', 'closed', 'labeled'].includes(action)) {\n    event.kind = { opened: 'PR_OPENED', reopened: 'PR_REOPENED', synchronize: 'PR_UPDATED', ready_for_review: 'PR_READY', closed: b.pull_request.merged === true ? 'PR_MERGED' : 'PR_CLOSED', labeled: '' }[action];\n    if (event.kind === 'PR_READY' && (b.pull_request.draft || !current || snapshot.draft)) event.kind = '';\n    const block = ['security-blocked', 'financial-blocked', 'dispatcher-stopped'];\n    if (action === 'labeled' && b.sender?.login === 'gremoled77-droid' && block.includes(b.label?.name)) {\n      event.kind = b.label.name.toUpperCase().replace(/-/g, '_'); event.severity = 'P1';\n    }\n    if (event.kind && action !== 'labeled') event.severity = 'NORMAL';\n    // A new commit is evidence of an update, never evidence that findings were fixed.\n  } else if (['pull_request_review', 'pull_request_review_comment', 'issue_comment'].includes(type) && item?.user?.login === BOT && item.user.type === 'Bot' && number && ['submitted', 'created', 'edited'].includes(action)) {\n    const reviewed = sha(item.commit_id);\n    const text = String(item.body || '');\n    event.evidence_id = String(item.id || '');\n    if (Number.isSafeInteger(item.id) && item.id > 0) {\n      const anchor = type === 'pull_request_review' ? 'pullrequestreview-' : type === 'issue_comment' ? 'issuecomment-' : 'discussion_r';\n      event.source_url += `#${anchor}${item.id}`;\n    }\n    if (reviewed && current && reviewed !== current) {\n      event.kind = 'STALE_REVIEW'; event.review_status = 'STALE'; event.head_sha = reviewed;\n    } else if (reviewed && current && reviewed === current) {\n      event.head_sha = reviewed;\n      const severity = (text.match(/\\bP[012]\\b/g) || []).sort()[0];\n      if (severity) {\n        event.kind = 'CODEX_FINDING'; event.severity = severity; event.review_status = 'FINDINGS';\n      } else if (type === 'pull_request_review' && action === 'submitted' && ['approved', 'changes_requested', 'commented'].includes(item.state?.toLowerCase())) {\n        event.kind = 'CODEX_REVIEW_COMPLETED'; event.severity = 'NORMAL'; event.review_status = item.state.toUpperCase();\n      }\n    } else {\n      // Issue comments have no authoritative commit_id, including edited comments.\n      event.kind = 'CODEX_COMMENT_UNCORRELATED';\n    }\n    if (!event.kind) event.kind = 'CODEX_STATUS_UNKNOWN';\n  } else if (type === 'check_run' || type === 'check_suite' || type === 'status') {\n    const check = b.check_run || b.check_suite || b;\n    event.head_sha = sha(check.head_sha || b.sha);\n    event.evidence_id = String(check.id || check.context || '');\n    const status = type === 'status' ? b.state : check.status === 'completed' ? check.conclusion : check.status;\n    if (['failure', 'timed_out', 'action_required', 'cancelled', 'startup_failure', 'error'].includes(status)) {\n      event.kind = 'CI_FAILED'; event.severity = 'P1';\n    } else if (status === 'success') event.kind = 'CI_PASSED';\n    const codex = type === 'check_run' && check.app?.slug === 'chatgpt-codex-connector';\n    if (codex) {\n      const correlated = current && current === event.head_sha;\n      event.kind = !correlated ? 'CODEX_STATUS_UNKNOWN' : status === 'in_progress' ? 'CODEX_REVIEW_STARTED' : check.status === 'completed' ? 'CODEX_REVIEW_COMPLETED' : 'CODEX_STATUS_UNKNOWN';\n      event.review_status = !correlated ? 'UNKNOWN' : status === 'in_progress' ? 'STARTED' : check.status === 'completed' ? 'COMPLETED' : 'UNKNOWN';\n      event.severity = 'NORMAL';\n    }\n  }\n  if (!event.kind) return null;\n  if (event.kind !== 'CODEX_COMMENT_UNCORRELATED' && event.kind !== 'CODEX_STATUS_UNKNOWN' && !event.head_sha) return null;\n  event.route = ['P0', 'P1', 'NORMAL'].includes(event.severity) ? 'immediate' : 'digest';\n  event.summary = `${event.kind}${number ? ` PR #${number}` : ''}${event.head_sha ? ` @${event.head_sha.slice(0, 12)}` : ''}${event.review_status !== 'UNKNOWN' ? ` ${event.review_status}` : ''}`;\n  const identity = ['CODEX_FINDING', 'CI_FAILED', 'CI_PASSED', 'CODEX_COMMENT_UNCORRELATED'].includes(event.kind) ? event.evidence_id : '';\n  event.semantic_key = JSON.stringify([REPOSITORY, number, event.head_sha, event.kind, event.review_status, event.severity, identity]);\n  return event;\n}\n\nfunction journal(event) {\n  return { event_id: event.event_id, delivery_id: event.github_delivery_id, semantic_key: event.semantic_key, event_json: JSON.stringify(event), status: 'PENDING', message_id: '', error_code: '' };\n}\n\nfunction plan(rows, now = Date.now()) {\n  // shortcut: Data Table lacks semantic uniqueness; enable only with a verified single sender.\n  const sent = new Set(rows.filter(r => ['SENDING', 'SENT', 'UNKNOWN', 'FAILED'].includes(r.status)).map(r => r.semantic_key));\n  const deliveries = new Set(rows.filter(r => ['SENDING', 'SENT', 'UNKNOWN', 'FAILED'].includes(r.status)).map(r => r.delivery_id));\n  const pending = [];\n  for (const row of [...rows].sort((a, b) => a.id - b.id)) {\n    if (row.status !== 'PENDING' || sent.has(row.semantic_key) || deliveries.has(row.delivery_id)) continue;\n    const e = JSON.parse(row.event_json);\n    if (e.repository !== REPOSITORY || e.semantic_key !== row.semantic_key) throw new Error('JOURNAL_REJECTED');\n    sent.add(row.semantic_key); deliveries.add(row.delivery_id);\n    pending.push({ row, e });\n  }\n  const urgent = pending.find(p => ['P0', 'P1'].includes(p.e.severity));\n  const immediate = urgent || pending.find(p => p.e.route === 'immediate');\n  const selected = immediate ? [immediate] : pending.filter(p => now - Date.parse(p.e.received_at) >= 300000).slice(0, 15);\n  if (!selected.length) return [];\n  const text = selected.map(p => `${p.e.severity} | ${p.e.summary}\\n${p.e.source_url}`).join('\\n\\n');\n  return [{ row_ids: selected.map(p => p.row.id), semantic_keys: selected.map(p => p.row.semantic_key), text: escapeHtml(text), count: selected.length }];\n}\n\nfunction telegramOutcome(response) {\n  const id = response?.result?.message_id ?? response?.message_id;\n  if (Number.isSafeInteger(id) && id > 0 && response?.ok !== false) return { status: 'SENT', message_id: String(id), error_code: '' };\n  const code = response?.error_code;\n  if (code === 429) return { status: 'FAILED', message_id: '', error_code: 'RATE_LIMIT_CONFIRMED_RETRY_AFTER_OWNER_RECONCILIATION' };\n  if ([400, 401, 403].includes(code)) return { status: 'FAILED', message_id: '', error_code: `TELEGRAM_${code}` };\n  return { status: 'UNKNOWN', message_id: '', error_code: 'DELIVERY_UNKNOWN_NO_AUTO_RETRY' };\n}\n\n\nreturn $input.all().map(i => ({json: verify(i.json)}));"
+      },
+      "onError": "continueErrorOutput",
+      "position": [
+        200,
+        0
+      ]
+    },
+    {
+      "id": "Current GitHub Snapshot",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "name": "Current GitHub Snapshot",
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.snapshot_url }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "githubApi",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 1000,
+      "onError": "continueRegularOutput",
+      "position": [
+        400,
+        0
+      ]
+    },
+    {
+      "id": "Normalize Event",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "name": "Normalize Event",
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "'use strict';\n\nconst REPOSITORY = 'gremoled77-droid/gremovod';\nconst BOT = 'chatgpt-codex-connector[bot]';\nconst SHA = /^[a-f0-9]{40}$/;\nconst login = value => typeof value === 'string' && /^[a-zA-Z0-9[\\]_-]{1,100}$/.test(value) ? value : 'UNKNOWN';\nconst sha = value => typeof value === 'string' && SHA.test(value) ? value : null;\nconst escapeHtml = value => String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');\n\nfunction verify(input) {\n  const h = input.headers || {};\n  const body = input.body;\n  if (!body || body.repository?.full_name !== REPOSITORY) throw new Error('REPOSITORY_REJECTED');\n  if (!/^[a-z_]+$/.test(h['x-github-event'] || '')) throw new Error('EVENT_REJECTED');\n  if (!/^[a-zA-Z0-9-]{1,100}$/.test(h['x-github-delivery'] || '')) throw new Error('DELIVERY_REJECTED');\n  const number = body.pull_request?.number || (body.issue?.pull_request && body.issue.number) || body.check_run?.pull_requests?.[0]?.number || body.check_suite?.pull_requests?.[0]?.number;\n  if (number && (!Number.isSafeInteger(number) || number <= 0)) throw new Error('PR_REJECTED');\n  return { ...input, snapshot_url: `https://api.github.com/repos/${REPOSITORY}${number ? `/pulls/${number}` : ''}` };\n}\n\nfunction normalize(input, snapshot, now = new Date().toISOString()) {\n  verify(input);\n  const b = input.body;\n  const type = input.headers['x-github-event'];\n  const action = b.action || '';\n  const pr = b.pull_request || (b.issue?.pull_request ? b.issue : null) || b.check_run?.pull_requests?.[0] || b.check_suite?.pull_requests?.[0] || null;\n  const number = pr?.number || null;\n  const current = snapshot?.number === number && snapshot?.base?.repo?.full_name === REPOSITORY && sha(snapshot?.head?.sha);\n  const head = sha(b.pull_request?.head?.sha) || current;\n  const item = b.review || b.comment;\n  const actor = login(item?.user?.login || b.sender?.login);\n  const event = {\n    event_id: `github:${input.headers['x-github-delivery']}`,\n    received_at: now,\n    github_delivery_id: input.headers['x-github-delivery'],\n    event_type: type,\n    action,\n    repository: REPOSITORY,\n    actor,\n    pr_number: number,\n    task_id: (String(snapshot?.title || pr?.title || '').match(/\\bGA-\\d{2}\\b/) || [null])[0],\n    head_sha: head || null,\n    review_status: 'UNKNOWN',\n    severity: 'INFO',\n    summary: '',\n    source_url: `https://github.com/${REPOSITORY}${number ? `/pull/${number}` : ''}`,\n    kind: '',\n    route: 'digest',\n    evidence_id: '',\n  };\n  if (type === 'push' && !b.deleted && sha(b.after)) {\n    event.kind = 'COMMIT'; event.head_sha = b.after;\n    event.source_url = `https://github.com/${REPOSITORY}/commit/${b.after}`;\n  } else if (type === 'pull_request' && ['opened', 'reopened', 'synchronize', 'ready_for_review', 'closed', 'labeled'].includes(action)) {\n    event.kind = { opened: 'PR_OPENED', reopened: 'PR_REOPENED', synchronize: 'PR_UPDATED', ready_for_review: 'PR_READY', closed: b.pull_request.merged === true ? 'PR_MERGED' : 'PR_CLOSED', labeled: '' }[action];\n    if (event.kind === 'PR_READY' && (b.pull_request.draft || !current || snapshot.draft)) event.kind = '';\n    const block = ['security-blocked', 'financial-blocked', 'dispatcher-stopped'];\n    if (action === 'labeled' && b.sender?.login === 'gremoled77-droid' && block.includes(b.label?.name)) {\n      event.kind = b.label.name.toUpperCase().replace(/-/g, '_'); event.severity = 'P1';\n    }\n    if (event.kind && action !== 'labeled') event.severity = 'NORMAL';\n    // A new commit is evidence of an update, never evidence that findings were fixed.\n  } else if (['pull_request_review', 'pull_request_review_comment', 'issue_comment'].includes(type) && item?.user?.login === BOT && item.user.type === 'Bot' && number && ['submitted', 'created', 'edited'].includes(action)) {\n    const reviewed = sha(item.commit_id);\n    const text = String(item.body || '');\n    event.evidence_id = String(item.id || '');\n    if (Number.isSafeInteger(item.id) && item.id > 0) {\n      const anchor = type === 'pull_request_review' ? 'pullrequestreview-' : type === 'issue_comment' ? 'issuecomment-' : 'discussion_r';\n      event.source_url += `#${anchor}${item.id}`;\n    }\n    if (reviewed && current && reviewed !== current) {\n      event.kind = 'STALE_REVIEW'; event.review_status = 'STALE'; event.head_sha = reviewed;\n    } else if (reviewed && current && reviewed === current) {\n      event.head_sha = reviewed;\n      const severity = (text.match(/\\bP[012]\\b/g) || []).sort()[0];\n      if (severity) {\n        event.kind = 'CODEX_FINDING'; event.severity = severity; event.review_status = 'FINDINGS';\n      } else if (type === 'pull_request_review' && action === 'submitted' && ['approved', 'changes_requested', 'commented'].includes(item.state?.toLowerCase())) {\n        event.kind = 'CODEX_REVIEW_COMPLETED'; event.severity = 'NORMAL'; event.review_status = item.state.toUpperCase();\n      }\n    } else {\n      // Issue comments have no authoritative commit_id, including edited comments.\n      event.kind = 'CODEX_COMMENT_UNCORRELATED';\n    }\n    if (!event.kind) event.kind = 'CODEX_STATUS_UNKNOWN';\n  } else if (type === 'check_run' || type === 'check_suite' || type === 'status') {\n    const check = b.check_run || b.check_suite || b;\n    event.head_sha = sha(check.head_sha || b.sha);\n    event.evidence_id = String(check.id || check.context || '');\n    const status = type === 'status' ? b.state : check.status === 'completed' ? check.conclusion : check.status;\n    if (['failure', 'timed_out', 'action_required', 'cancelled', 'startup_failure', 'error'].includes(status)) {\n      event.kind = 'CI_FAILED'; event.severity = 'P1';\n    } else if (status === 'success') event.kind = 'CI_PASSED';\n    const codex = type === 'check_run' && check.app?.slug === 'chatgpt-codex-connector';\n    if (codex) {\n      const correlated = current && current === event.head_sha;\n      event.kind = !correlated ? 'CODEX_STATUS_UNKNOWN' : status === 'in_progress' ? 'CODEX_REVIEW_STARTED' : check.status === 'completed' ? 'CODEX_REVIEW_COMPLETED' : 'CODEX_STATUS_UNKNOWN';\n      event.review_status = !correlated ? 'UNKNOWN' : status === 'in_progress' ? 'STARTED' : check.status === 'completed' ? 'COMPLETED' : 'UNKNOWN';\n      event.severity = 'NORMAL';\n    }\n  }\n  if (!event.kind) return null;\n  if (event.kind !== 'CODEX_COMMENT_UNCORRELATED' && event.kind !== 'CODEX_STATUS_UNKNOWN' && !event.head_sha) return null;\n  event.route = ['P0', 'P1', 'NORMAL'].includes(event.severity) ? 'immediate' : 'digest';\n  event.summary = `${event.kind}${number ? ` PR #${number}` : ''}${event.head_sha ? ` @${event.head_sha.slice(0, 12)}` : ''}${event.review_status !== 'UNKNOWN' ? ` ${event.review_status}` : ''}`;\n  const identity = ['CODEX_FINDING', 'CI_FAILED', 'CI_PASSED', 'CODEX_COMMENT_UNCORRELATED'].includes(event.kind) ? event.evidence_id : '';\n  event.semantic_key = JSON.stringify([REPOSITORY, number, event.head_sha, event.kind, event.review_status, event.severity, identity]);\n  return event;\n}\n\nfunction journal(event) {\n  return { event_id: event.event_id, delivery_id: event.github_delivery_id, semantic_key: event.semantic_key, event_json: JSON.stringify(event), status: 'PENDING', message_id: '', error_code: '' };\n}\n\nfunction plan(rows, now = Date.now()) {\n  // shortcut: Data Table lacks semantic uniqueness; enable only with a verified single sender.\n  const sent = new Set(rows.filter(r => ['SENDING', 'SENT', 'UNKNOWN', 'FAILED'].includes(r.status)).map(r => r.semantic_key));\n  const deliveries = new Set(rows.filter(r => ['SENDING', 'SENT', 'UNKNOWN', 'FAILED'].includes(r.status)).map(r => r.delivery_id));\n  const pending = [];\n  for (const row of [...rows].sort((a, b) => a.id - b.id)) {\n    if (row.status !== 'PENDING' || sent.has(row.semantic_key) || deliveries.has(row.delivery_id)) continue;\n    const e = JSON.parse(row.event_json);\n    if (e.repository !== REPOSITORY || e.semantic_key !== row.semantic_key) throw new Error('JOURNAL_REJECTED');\n    sent.add(row.semantic_key); deliveries.add(row.delivery_id);\n    pending.push({ row, e });\n  }\n  const urgent = pending.find(p => ['P0', 'P1'].includes(p.e.severity));\n  const immediate = urgent || pending.find(p => p.e.route === 'immediate');\n  const selected = immediate ? [immediate] : pending.filter(p => now - Date.parse(p.e.received_at) >= 300000).slice(0, 15);\n  if (!selected.length) return [];\n  const text = selected.map(p => `${p.e.severity} | ${p.e.summary}\\n${p.e.source_url}`).join('\\n\\n');\n  return [{ row_ids: selected.map(p => p.row.id), semantic_keys: selected.map(p => p.row.semantic_key), text: escapeHtml(text), count: selected.length }];\n}\n\nfunction telegramOutcome(response) {\n  const id = response?.result?.message_id ?? response?.message_id;\n  if (Number.isSafeInteger(id) && id > 0 && response?.ok !== false) return { status: 'SENT', message_id: String(id), error_code: '' };\n  const code = response?.error_code;\n  if (code === 429) return { status: 'FAILED', message_id: '', error_code: 'RATE_LIMIT_CONFIRMED_RETRY_AFTER_OWNER_RECONCILIATION' };\n  if ([400, 401, 403].includes(code)) return { status: 'FAILED', message_id: '', error_code: `TELEGRAM_${code}` };\n  return { status: 'UNKNOWN', message_id: '', error_code: 'DELIVERY_UNKNOWN_NO_AUTO_RETRY' };\n}\n\n\nconst input = $('Verify Event').first().json;\nconst event = normalize(input, $input.first().json);\nreturn [{json: event || {kind: ''}}];"
+      },
+      "onError": "continueErrorOutput",
+      "position": [
+        600,
+        0
+      ]
+    },
+    {
+      "id": "Event Filter",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.3,
+      "name": "Event Filter",
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "strict",
+            "leftValue": ""
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.kind }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "position": [
+        800,
+        0
+      ]
+    },
+    {
+      "id": "Prepare Event Journal",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "name": "Prepare Event Journal",
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "'use strict';\n\nconst REPOSITORY = 'gremoled77-droid/gremovod';\nconst BOT = 'chatgpt-codex-connector[bot]';\nconst SHA = /^[a-f0-9]{40}$/;\nconst login = value => typeof value === 'string' && /^[a-zA-Z0-9[\\]_-]{1,100}$/.test(value) ? value : 'UNKNOWN';\nconst sha = value => typeof value === 'string' && SHA.test(value) ? value : null;\nconst escapeHtml = value => String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');\n\nfunction verify(input) {\n  const h = input.headers || {};\n  const body = input.body;\n  if (!body || body.repository?.full_name !== REPOSITORY) throw new Error('REPOSITORY_REJECTED');\n  if (!/^[a-z_]+$/.test(h['x-github-event'] || '')) throw new Error('EVENT_REJECTED');\n  if (!/^[a-zA-Z0-9-]{1,100}$/.test(h['x-github-delivery'] || '')) throw new Error('DELIVERY_REJECTED');\n  const number = body.pull_request?.number || (body.issue?.pull_request && body.issue.number) || body.check_run?.pull_requests?.[0]?.number || body.check_suite?.pull_requests?.[0]?.number;\n  if (number && (!Number.isSafeInteger(number) || number <= 0)) throw new Error('PR_REJECTED');\n  return { ...input, snapshot_url: `https://api.github.com/repos/${REPOSITORY}${number ? `/pulls/${number}` : ''}` };\n}\n\nfunction normalize(input, snapshot, now = new Date().toISOString()) {\n  verify(input);\n  const b = input.body;\n  const type = input.headers['x-github-event'];\n  const action = b.action || '';\n  const pr = b.pull_request || (b.issue?.pull_request ? b.issue : null) || b.check_run?.pull_requests?.[0] || b.check_suite?.pull_requests?.[0] || null;\n  const number = pr?.number || null;\n  const current = snapshot?.number === number && snapshot?.base?.repo?.full_name === REPOSITORY && sha(snapshot?.head?.sha);\n  const head = sha(b.pull_request?.head?.sha) || current;\n  const item = b.review || b.comment;\n  const actor = login(item?.user?.login || b.sender?.login);\n  const event = {\n    event_id: `github:${input.headers['x-github-delivery']}`,\n    received_at: now,\n    github_delivery_id: input.headers['x-github-delivery'],\n    event_type: type,\n    action,\n    repository: REPOSITORY,\n    actor,\n    pr_number: number,\n    task_id: (String(snapshot?.title || pr?.title || '').match(/\\bGA-\\d{2}\\b/) || [null])[0],\n    head_sha: head || null,\n    review_status: 'UNKNOWN',\n    severity: 'INFO',\n    summary: '',\n    source_url: `https://github.com/${REPOSITORY}${number ? `/pull/${number}` : ''}`,\n    kind: '',\n    route: 'digest',\n    evidence_id: '',\n  };\n  if (type === 'push' && !b.deleted && sha(b.after)) {\n    event.kind = 'COMMIT'; event.head_sha = b.after;\n    event.source_url = `https://github.com/${REPOSITORY}/commit/${b.after}`;\n  } else if (type === 'pull_request' && ['opened', 'reopened', 'synchronize', 'ready_for_review', 'closed', 'labeled'].includes(action)) {\n    event.kind = { opened: 'PR_OPENED', reopened: 'PR_REOPENED', synchronize: 'PR_UPDATED', ready_for_review: 'PR_READY', closed: b.pull_request.merged === true ? 'PR_MERGED' : 'PR_CLOSED', labeled: '' }[action];\n    if (event.kind === 'PR_READY' && (b.pull_request.draft || !current || snapshot.draft)) event.kind = '';\n    const block = ['security-blocked', 'financial-blocked', 'dispatcher-stopped'];\n    if (action === 'labeled' && b.sender?.login === 'gremoled77-droid' && block.includes(b.label?.name)) {\n      event.kind = b.label.name.toUpperCase().replace(/-/g, '_'); event.severity = 'P1';\n    }\n    if (event.kind && action !== 'labeled') event.severity = 'NORMAL';\n    // A new commit is evidence of an update, never evidence that findings were fixed.\n  } else if (['pull_request_review', 'pull_request_review_comment', 'issue_comment'].includes(type) && item?.user?.login === BOT && item.user.type === 'Bot' && number && ['submitted', 'created', 'edited'].includes(action)) {\n    const reviewed = sha(item.commit_id);\n    const text = String(item.body || '');\n    event.evidence_id = String(item.id || '');\n    if (Number.isSafeInteger(item.id) && item.id > 0) {\n      const anchor = type === 'pull_request_review' ? 'pullrequestreview-' : type === 'issue_comment' ? 'issuecomment-' : 'discussion_r';\n      event.source_url += `#${anchor}${item.id}`;\n    }\n    if (reviewed && current && reviewed !== current) {\n      event.kind = 'STALE_REVIEW'; event.review_status = 'STALE'; event.head_sha = reviewed;\n    } else if (reviewed && current && reviewed === current) {\n      event.head_sha = reviewed;\n      const severity = (text.match(/\\bP[012]\\b/g) || []).sort()[0];\n      if (severity) {\n        event.kind = 'CODEX_FINDING'; event.severity = severity; event.review_status = 'FINDINGS';\n      } else if (type === 'pull_request_review' && action === 'submitted' && ['approved', 'changes_requested', 'commented'].includes(item.state?.toLowerCase())) {\n        event.kind = 'CODEX_REVIEW_COMPLETED'; event.severity = 'NORMAL'; event.review_status = item.state.toUpperCase();\n      }\n    } else {\n      // Issue comments have no authoritative commit_id, including edited comments.\n      event.kind = 'CODEX_COMMENT_UNCORRELATED';\n    }\n    if (!event.kind) event.kind = 'CODEX_STATUS_UNKNOWN';\n  } else if (type === 'check_run' || type === 'check_suite' || type === 'status') {\n    const check = b.check_run || b.check_suite || b;\n    event.head_sha = sha(check.head_sha || b.sha);\n    event.evidence_id = String(check.id || check.context || '');\n    const status = type === 'status' ? b.state : check.status === 'completed' ? check.conclusion : check.status;\n    if (['failure', 'timed_out', 'action_required', 'cancelled', 'startup_failure', 'error'].includes(status)) {\n      event.kind = 'CI_FAILED'; event.severity = 'P1';\n    } else if (status === 'success') event.kind = 'CI_PASSED';\n    const codex = type === 'check_run' && check.app?.slug === 'chatgpt-codex-connector';\n    if (codex) {\n      const correlated = current && current === event.head_sha;\n      event.kind = !correlated ? 'CODEX_STATUS_UNKNOWN' : status === 'in_progress' ? 'CODEX_REVIEW_STARTED' : check.status === 'completed' ? 'CODEX_REVIEW_COMPLETED' : 'CODEX_STATUS_UNKNOWN';\n      event.review_status = !correlated ? 'UNKNOWN' : status === 'in_progress' ? 'STARTED' : check.status === 'completed' ? 'COMPLETED' : 'UNKNOWN';\n      event.severity = 'NORMAL';\n    }\n  }\n  if (!event.kind) return null;\n  if (event.kind !== 'CODEX_COMMENT_UNCORRELATED' && event.kind !== 'CODEX_STATUS_UNKNOWN' && !event.head_sha) return null;\n  event.route = ['P0', 'P1', 'NORMAL'].includes(event.severity) ? 'immediate' : 'digest';\n  event.summary = `${event.kind}${number ? ` PR #${number}` : ''}${event.head_sha ? ` @${event.head_sha.slice(0, 12)}` : ''}${event.review_status !== 'UNKNOWN' ? ` ${event.review_status}` : ''}`;\n  const identity = ['CODEX_FINDING', 'CI_FAILED', 'CI_PASSED', 'CODEX_COMMENT_UNCORRELATED'].includes(event.kind) ? event.evidence_id : '';\n  event.semantic_key = JSON.stringify([REPOSITORY, number, event.head_sha, event.kind, event.review_status, event.severity, identity]);\n  return event;\n}\n\nfunction journal(event) {\n  return { event_id: event.event_id, delivery_id: event.github_delivery_id, semantic_key: event.semantic_key, event_json: JSON.stringify(event), status: 'PENDING', message_id: '', error_code: '' };\n}\n\nfunction plan(rows, now = Date.now()) {\n  // shortcut: Data Table lacks semantic uniqueness; enable only with a verified single sender.\n  const sent = new Set(rows.filter(r => ['SENDING', 'SENT', 'UNKNOWN', 'FAILED'].includes(r.status)).map(r => r.semantic_key));\n  const deliveries = new Set(rows.filter(r => ['SENDING', 'SENT', 'UNKNOWN', 'FAILED'].includes(r.status)).map(r => r.delivery_id));\n  const pending = [];\n  for (const row of [...rows].sort((a, b) => a.id - b.id)) {\n    if (row.status !== 'PENDING' || sent.has(row.semantic_key) || deliveries.has(row.delivery_id)) continue;\n    const e = JSON.parse(row.event_json);\n    if (e.repository !== REPOSITORY || e.semantic_key !== row.semantic_key) throw new Error('JOURNAL_REJECTED');\n    sent.add(row.semantic_key); deliveries.add(row.delivery_id);\n    pending.push({ row, e });\n  }\n  const urgent = pending.find(p => ['P0', 'P1'].includes(p.e.severity));\n  const immediate = urgent || pending.find(p => p.e.route === 'immediate');\n  const selected = immediate ? [immediate] : pending.filter(p => now - Date.parse(p.e.received_at) >= 300000).slice(0, 15);\n  if (!selected.length) return [];\n  const text = selected.map(p => `${p.e.severity} | ${p.e.summary}\\n${p.e.source_url}`).join('\\n\\n');\n  return [{ row_ids: selected.map(p => p.row.id), semantic_keys: selected.map(p => p.row.semantic_key), text: escapeHtml(text), count: selected.length }];\n}\n\nfunction telegramOutcome(response) {\n  const id = response?.result?.message_id ?? response?.message_id;\n  if (Number.isSafeInteger(id) && id > 0 && response?.ok !== false) return { status: 'SENT', message_id: String(id), error_code: '' };\n  const code = response?.error_code;\n  if (code === 429) return { status: 'FAILED', message_id: '', error_code: 'RATE_LIMIT_CONFIRMED_RETRY_AFTER_OWNER_RECONCILIATION' };\n  if ([400, 401, 403].includes(code)) return { status: 'FAILED', message_id: '', error_code: `TELEGRAM_${code}` };\n  return { status: 'UNKNOWN', message_id: '', error_code: 'DELIVERY_UNKNOWN_NO_AUTO_RETRY' };\n}\n\n\nreturn $input.all().map(i => ({json: {...journal(i.json), status: $execution.mode === 'production' ? 'PENDING' : 'TEST_ONLY'}}));"
+      },
+      "position": [
+        1000,
+        0
+      ]
+    },
+    {
+      "id": "Event Journal",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "name": "Event Journal",
+      "parameters": {
+        "resource": "row",
+        "operation": "insert",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "GremoVOD_GitHub_Live_Monitor_Events"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "event_id": "={{ $json.event_id }}",
+            "delivery_id": "={{ $json.delivery_id }}",
+            "semantic_key": "={{ $json.semantic_key }}",
+            "event_json": "={{ $json.event_json }}",
+            "status": "={{ $json.status }}",
+            "message_id": "={{ $json.message_id }}",
+            "error_code": "={{ $json.error_code }}"
+          },
+          "schema": [
+            {
+              "id": "event_id",
+              "displayName": "event_id",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "delivery_id",
+              "displayName": "delivery_id",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "semantic_key",
+              "displayName": "semantic_key",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "event_json",
+              "displayName": "event_json",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "message_id",
+              "displayName": "message_id",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "error_code",
+              "displayName": "error_code",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            }
+          ]
+        }
+      },
+      "position": [
+        1200,
+        0
+      ]
+    },
+    {
+      "id": "Digest Schedule",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.4,
+      "name": "Digest Schedule",
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "seconds",
+              "secondsInterval": 30
+            }
+          ]
+        }
+      },
+      "position": [
+        1400,
+        0
+      ]
+    },
+    {
+      "id": "Load Event Journal",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "name": "Load Event Journal",
+      "parameters": {
+        "resource": "row",
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "GremoVOD_GitHub_Live_Monitor_Events"
+        },
+        "returnAll": true
+      },
+      "position": [
+        1600,
+        0
+      ]
+    },
+    {
+      "id": "Deduplicate and Severity Router",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "name": "Deduplicate and Severity Router",
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "'use strict';\n\nconst REPOSITORY = 'gremoled77-droid/gremovod';\nconst BOT = 'chatgpt-codex-connector[bot]';\nconst SHA = /^[a-f0-9]{40}$/;\nconst login = value => typeof value === 'string' && /^[a-zA-Z0-9[\\]_-]{1,100}$/.test(value) ? value : 'UNKNOWN';\nconst sha = value => typeof value === 'string' && SHA.test(value) ? value : null;\nconst escapeHtml = value => String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');\n\nfunction verify(input) {\n  const h = input.headers || {};\n  const body = input.body;\n  if (!body || body.repository?.full_name !== REPOSITORY) throw new Error('REPOSITORY_REJECTED');\n  if (!/^[a-z_]+$/.test(h['x-github-event'] || '')) throw new Error('EVENT_REJECTED');\n  if (!/^[a-zA-Z0-9-]{1,100}$/.test(h['x-github-delivery'] || '')) throw new Error('DELIVERY_REJECTED');\n  const number = body.pull_request?.number || (body.issue?.pull_request && body.issue.number) || body.check_run?.pull_requests?.[0]?.number || body.check_suite?.pull_requests?.[0]?.number;\n  if (number && (!Number.isSafeInteger(number) || number <= 0)) throw new Error('PR_REJECTED');\n  return { ...input, snapshot_url: `https://api.github.com/repos/${REPOSITORY}${number ? `/pulls/${number}` : ''}` };\n}\n\nfunction normalize(input, snapshot, now = new Date().toISOString()) {\n  verify(input);\n  const b = input.body;\n  const type = input.headers['x-github-event'];\n  const action = b.action || '';\n  const pr = b.pull_request || (b.issue?.pull_request ? b.issue : null) || b.check_run?.pull_requests?.[0] || b.check_suite?.pull_requests?.[0] || null;\n  const number = pr?.number || null;\n  const current = snapshot?.number === number && snapshot?.base?.repo?.full_name === REPOSITORY && sha(snapshot?.head?.sha);\n  const head = sha(b.pull_request?.head?.sha) || current;\n  const item = b.review || b.comment;\n  const actor = login(item?.user?.login || b.sender?.login);\n  const event = {\n    event_id: `github:${input.headers['x-github-delivery']}`,\n    received_at: now,\n    github_delivery_id: input.headers['x-github-delivery'],\n    event_type: type,\n    action,\n    repository: REPOSITORY,\n    actor,\n    pr_number: number,\n    task_id: (String(snapshot?.title || pr?.title || '').match(/\\bGA-\\d{2}\\b/) || [null])[0],\n    head_sha: head || null,\n    review_status: 'UNKNOWN',\n    severity: 'INFO',\n    summary: '',\n    source_url: `https://github.com/${REPOSITORY}${number ? `/pull/${number}` : ''}`,\n    kind: '',\n    route: 'digest',\n    evidence_id: '',\n  };\n  if (type === 'push' && !b.deleted && sha(b.after)) {\n    event.kind = 'COMMIT'; event.head_sha = b.after;\n    event.source_url = `https://github.com/${REPOSITORY}/commit/${b.after}`;\n  } else if (type === 'pull_request' && ['opened', 'reopened', 'synchronize', 'ready_for_review', 'closed', 'labeled'].includes(action)) {\n    event.kind = { opened: 'PR_OPENED', reopened: 'PR_REOPENED', synchronize: 'PR_UPDATED', ready_for_review: 'PR_READY', closed: b.pull_request.merged === true ? 'PR_MERGED' : 'PR_CLOSED', labeled: '' }[action];\n    if (event.kind === 'PR_READY' && (b.pull_request.draft || !current || snapshot.draft)) event.kind = '';\n    const block = ['security-blocked', 'financial-blocked', 'dispatcher-stopped'];\n    if (action === 'labeled' && b.sender?.login === 'gremoled77-droid' && block.includes(b.label?.name)) {\n      event.kind = b.label.name.toUpperCase().replace(/-/g, '_'); event.severity = 'P1';\n    }\n    if (event.kind && action !== 'labeled') event.severity = 'NORMAL';\n    // A new commit is evidence of an update, never evidence that findings were fixed.\n  } else if (['pull_request_review', 'pull_request_review_comment', 'issue_comment'].includes(type) && item?.user?.login === BOT && item.user.type === 'Bot' && number && ['submitted', 'created', 'edited'].includes(action)) {\n    const reviewed = sha(item.commit_id);\n    const text = String(item.body || '');\n    event.evidence_id = String(item.id || '');\n    if (Number.isSafeInteger(item.id) && item.id > 0) {\n      const anchor = type === 'pull_request_review' ? 'pullrequestreview-' : type === 'issue_comment' ? 'issuecomment-' : 'discussion_r';\n      event.source_url += `#${anchor}${item.id}`;\n    }\n    if (reviewed && current && reviewed !== current) {\n      event.kind = 'STALE_REVIEW'; event.review_status = 'STALE'; event.head_sha = reviewed;\n    } else if (reviewed && current && reviewed === current) {\n      event.head_sha = reviewed;\n      const severity = (text.match(/\\bP[012]\\b/g) || []).sort()[0];\n      if (severity) {\n        event.kind = 'CODEX_FINDING'; event.severity = severity; event.review_status = 'FINDINGS';\n      } else if (type === 'pull_request_review' && action === 'submitted' && ['approved', 'changes_requested', 'commented'].includes(item.state?.toLowerCase())) {\n        event.kind = 'CODEX_REVIEW_COMPLETED'; event.severity = 'NORMAL'; event.review_status = item.state.toUpperCase();\n      }\n    } else {\n      // Issue comments have no authoritative commit_id, including edited comments.\n      event.kind = 'CODEX_COMMENT_UNCORRELATED';\n    }\n    if (!event.kind) event.kind = 'CODEX_STATUS_UNKNOWN';\n  } else if (type === 'check_run' || type === 'check_suite' || type === 'status') {\n    const check = b.check_run || b.check_suite || b;\n    event.head_sha = sha(check.head_sha || b.sha);\n    event.evidence_id = String(check.id || check.context || '');\n    const status = type === 'status' ? b.state : check.status === 'completed' ? check.conclusion : check.status;\n    if (['failure', 'timed_out', 'action_required', 'cancelled', 'startup_failure', 'error'].includes(status)) {\n      event.kind = 'CI_FAILED'; event.severity = 'P1';\n    } else if (status === 'success') event.kind = 'CI_PASSED';\n    const codex = type === 'check_run' && check.app?.slug === 'chatgpt-codex-connector';\n    if (codex) {\n      const correlated = current && current === event.head_sha;\n      event.kind = !correlated ? 'CODEX_STATUS_UNKNOWN' : status === 'in_progress' ? 'CODEX_REVIEW_STARTED' : check.status === 'completed' ? 'CODEX_REVIEW_COMPLETED' : 'CODEX_STATUS_UNKNOWN';\n      event.review_status = !correlated ? 'UNKNOWN' : status === 'in_progress' ? 'STARTED' : check.status === 'completed' ? 'COMPLETED' : 'UNKNOWN';\n      event.severity = 'NORMAL';\n    }\n  }\n  if (!event.kind) return null;\n  if (event.kind !== 'CODEX_COMMENT_UNCORRELATED' && event.kind !== 'CODEX_STATUS_UNKNOWN' && !event.head_sha) return null;\n  event.route = ['P0', 'P1', 'NORMAL'].includes(event.severity) ? 'immediate' : 'digest';\n  event.summary = `${event.kind}${number ? ` PR #${number}` : ''}${event.head_sha ? ` @${event.head_sha.slice(0, 12)}` : ''}${event.review_status !== 'UNKNOWN' ? ` ${event.review_status}` : ''}`;\n  const identity = ['CODEX_FINDING', 'CI_FAILED', 'CI_PASSED', 'CODEX_COMMENT_UNCORRELATED'].includes(event.kind) ? event.evidence_id : '';\n  event.semantic_key = JSON.stringify([REPOSITORY, number, event.head_sha, event.kind, event.review_status, event.severity, identity]);\n  return event;\n}\n\nfunction journal(event) {\n  return { event_id: event.event_id, delivery_id: event.github_delivery_id, semantic_key: event.semantic_key, event_json: JSON.stringify(event), status: 'PENDING', message_id: '', error_code: '' };\n}\n\nfunction plan(rows, now = Date.now()) {\n  // shortcut: Data Table lacks semantic uniqueness; enable only with a verified single sender.\n  const sent = new Set(rows.filter(r => ['SENDING', 'SENT', 'UNKNOWN', 'FAILED'].includes(r.status)).map(r => r.semantic_key));\n  const deliveries = new Set(rows.filter(r => ['SENDING', 'SENT', 'UNKNOWN', 'FAILED'].includes(r.status)).map(r => r.delivery_id));\n  const pending = [];\n  for (const row of [...rows].sort((a, b) => a.id - b.id)) {\n    if (row.status !== 'PENDING' || sent.has(row.semantic_key) || deliveries.has(row.delivery_id)) continue;\n    const e = JSON.parse(row.event_json);\n    if (e.repository !== REPOSITORY || e.semantic_key !== row.semantic_key) throw new Error('JOURNAL_REJECTED');\n    sent.add(row.semantic_key); deliveries.add(row.delivery_id);\n    pending.push({ row, e });\n  }\n  const urgent = pending.find(p => ['P0', 'P1'].includes(p.e.severity));\n  const immediate = urgent || pending.find(p => p.e.route === 'immediate');\n  const selected = immediate ? [immediate] : pending.filter(p => now - Date.parse(p.e.received_at) >= 300000).slice(0, 15);\n  if (!selected.length) return [];\n  const text = selected.map(p => `${p.e.severity} | ${p.e.summary}\\n${p.e.source_url}`).join('\\n\\n');\n  return [{ row_ids: selected.map(p => p.row.id), semantic_keys: selected.map(p => p.row.semantic_key), text: escapeHtml(text), count: selected.length }];\n}\n\nfunction telegramOutcome(response) {\n  const id = response?.result?.message_id ?? response?.message_id;\n  if (Number.isSafeInteger(id) && id > 0 && response?.ok !== false) return { status: 'SENT', message_id: String(id), error_code: '' };\n  const code = response?.error_code;\n  if (code === 429) return { status: 'FAILED', message_id: '', error_code: 'RATE_LIMIT_CONFIRMED_RETRY_AFTER_OWNER_RECONCILIATION' };\n  if ([400, 401, 403].includes(code)) return { status: 'FAILED', message_id: '', error_code: `TELEGRAM_${code}` };\n  return { status: 'UNKNOWN', message_id: '', error_code: 'DELIVERY_UNKNOWN_NO_AUTO_RETRY' };\n}\n\n\nreturn plan($input.all().map(i => i.json)).map(json => ({json}));"
+      },
+      "position": [
+        1800,
+        0
+      ]
+    },
+    {
+      "id": "Owner Approval Gate",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "name": "Owner Approval Gate",
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const OWNER_APPROVED = false;\nconst SIGNATURE_BOUNDARY_CONFIRMED = false;\nconst SERIAL_SENDER_CONFIRMED = false;\nconst CHAT_ID = '';\nif (!OWNER_APPROVED || !SIGNATURE_BOUNDARY_CONFIRMED || !SERIAL_SENDER_CONFIRMED || !/^-?\\d+$/.test(CHAT_ID)) return [];\nreturn $input.all().map(i => ({json: {...i.json, chat_id: CHAT_ID}}));"
+      },
+      "position": [
+        2000,
+        0
+      ]
+    },
+    {
+      "id": "Expand Delivery Claim",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "name": "Expand Delivery Claim",
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "return $input.first().json.row_ids.map(row_id => ({json: {row_id}}));"
+      },
+      "position": [
+        2200,
+        0
+      ]
+    },
+    {
+      "id": "Mark SENDING",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "name": "Mark SENDING",
+      "parameters": {
+        "resource": "row",
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "GremoVOD_GitHub_Live_Monitor_Events"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $json.row_id }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "status": "SENDING"
+          },
+          "schema": [
+            {
+              "id": "status",
+              "displayName": "status",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            }
+          ]
+        }
+      },
+      "position": [
+        2400,
+        0
+      ]
+    },
+    {
+      "id": "Build Single Notification",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "name": "Build Single Notification",
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const selected = $('Owner Approval Gate').first().json;\nconst ids = $input.all().map(i => Number(i.json.id));\nif (ids.length !== selected.row_ids.length || selected.row_ids.some(id => !ids.includes(id))) throw new Error('INCOMPLETE_CLAIM_NO_SEND');\nreturn [{json: selected}];"
+      },
+      "position": [
+        2600,
+        0
+      ]
+    },
+    {
+      "id": "Telegram Notification",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "name": "Telegram Notification",
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "={{ $json.chat_id }}",
+        "text": "={{ $json.text }}",
+        "additionalFields": {
+          "parse_mode": "HTML",
+          "disable_web_page_preview": true,
+          "appendAttribution": false
+        }
+      },
+      "retryOnFail": false,
+      "onError": "continueRegularOutput",
+      "position": [
+        2800,
+        0
+      ]
+    },
+    {
+      "id": "Record Delivery Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "name": "Record Delivery Result",
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "'use strict';\n\nconst REPOSITORY = 'gremoled77-droid/gremovod';\nconst BOT = 'chatgpt-codex-connector[bot]';\nconst SHA = /^[a-f0-9]{40}$/;\nconst login = value => typeof value === 'string' && /^[a-zA-Z0-9[\\]_-]{1,100}$/.test(value) ? value : 'UNKNOWN';\nconst sha = value => typeof value === 'string' && SHA.test(value) ? value : null;\nconst escapeHtml = value => String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');\n\nfunction verify(input) {\n  const h = input.headers || {};\n  const body = input.body;\n  if (!body || body.repository?.full_name !== REPOSITORY) throw new Error('REPOSITORY_REJECTED');\n  if (!/^[a-z_]+$/.test(h['x-github-event'] || '')) throw new Error('EVENT_REJECTED');\n  if (!/^[a-zA-Z0-9-]{1,100}$/.test(h['x-github-delivery'] || '')) throw new Error('DELIVERY_REJECTED');\n  const number = body.pull_request?.number || (body.issue?.pull_request && body.issue.number) || body.check_run?.pull_requests?.[0]?.number || body.check_suite?.pull_requests?.[0]?.number;\n  if (number && (!Number.isSafeInteger(number) || number <= 0)) throw new Error('PR_REJECTED');\n  return { ...input, snapshot_url: `https://api.github.com/repos/${REPOSITORY}${number ? `/pulls/${number}` : ''}` };\n}\n\nfunction normalize(input, snapshot, now = new Date().toISOString()) {\n  verify(input);\n  const b = input.body;\n  const type = input.headers['x-github-event'];\n  const action = b.action || '';\n  const pr = b.pull_request || (b.issue?.pull_request ? b.issue : null) || b.check_run?.pull_requests?.[0] || b.check_suite?.pull_requests?.[0] || null;\n  const number = pr?.number || null;\n  const current = snapshot?.number === number && snapshot?.base?.repo?.full_name === REPOSITORY && sha(snapshot?.head?.sha);\n  const head = sha(b.pull_request?.head?.sha) || current;\n  const item = b.review || b.comment;\n  const actor = login(item?.user?.login || b.sender?.login);\n  const event = {\n    event_id: `github:${input.headers['x-github-delivery']}`,\n    received_at: now,\n    github_delivery_id: input.headers['x-github-delivery'],\n    event_type: type,\n    action,\n    repository: REPOSITORY,\n    actor,\n    pr_number: number,\n    task_id: (String(snapshot?.title || pr?.title || '').match(/\\bGA-\\d{2}\\b/) || [null])[0],\n    head_sha: head || null,\n    review_status: 'UNKNOWN',\n    severity: 'INFO',\n    summary: '',\n    source_url: `https://github.com/${REPOSITORY}${number ? `/pull/${number}` : ''}`,\n    kind: '',\n    route: 'digest',\n    evidence_id: '',\n  };\n  if (type === 'push' && !b.deleted && sha(b.after)) {\n    event.kind = 'COMMIT'; event.head_sha = b.after;\n    event.source_url = `https://github.com/${REPOSITORY}/commit/${b.after}`;\n  } else if (type === 'pull_request' && ['opened', 'reopened', 'synchronize', 'ready_for_review', 'closed', 'labeled'].includes(action)) {\n    event.kind = { opened: 'PR_OPENED', reopened: 'PR_REOPENED', synchronize: 'PR_UPDATED', ready_for_review: 'PR_READY', closed: b.pull_request.merged === true ? 'PR_MERGED' : 'PR_CLOSED', labeled: '' }[action];\n    if (event.kind === 'PR_READY' && (b.pull_request.draft || !current || snapshot.draft)) event.kind = '';\n    const block = ['security-blocked', 'financial-blocked', 'dispatcher-stopped'];\n    if (action === 'labeled' && b.sender?.login === 'gremoled77-droid' && block.includes(b.label?.name)) {\n      event.kind = b.label.name.toUpperCase().replace(/-/g, '_'); event.severity = 'P1';\n    }\n    if (event.kind && action !== 'labeled') event.severity = 'NORMAL';\n    // A new commit is evidence of an update, never evidence that findings were fixed.\n  } else if (['pull_request_review', 'pull_request_review_comment', 'issue_comment'].includes(type) && item?.user?.login === BOT && item.user.type === 'Bot' && number && ['submitted', 'created', 'edited'].includes(action)) {\n    const reviewed = sha(item.commit_id);\n    const text = String(item.body || '');\n    event.evidence_id = String(item.id || '');\n    if (Number.isSafeInteger(item.id) && item.id > 0) {\n      const anchor = type === 'pull_request_review' ? 'pullrequestreview-' : type === 'issue_comment' ? 'issuecomment-' : 'discussion_r';\n      event.source_url += `#${anchor}${item.id}`;\n    }\n    if (reviewed && current && reviewed !== current) {\n      event.kind = 'STALE_REVIEW'; event.review_status = 'STALE'; event.head_sha = reviewed;\n    } else if (reviewed && current && reviewed === current) {\n      event.head_sha = reviewed;\n      const severity = (text.match(/\\bP[012]\\b/g) || []).sort()[0];\n      if (severity) {\n        event.kind = 'CODEX_FINDING'; event.severity = severity; event.review_status = 'FINDINGS';\n      } else if (type === 'pull_request_review' && action === 'submitted' && ['approved', 'changes_requested', 'commented'].includes(item.state?.toLowerCase())) {\n        event.kind = 'CODEX_REVIEW_COMPLETED'; event.severity = 'NORMAL'; event.review_status = item.state.toUpperCase();\n      }\n    } else {\n      // Issue comments have no authoritative commit_id, including edited comments.\n      event.kind = 'CODEX_COMMENT_UNCORRELATED';\n    }\n    if (!event.kind) event.kind = 'CODEX_STATUS_UNKNOWN';\n  } else if (type === 'check_run' || type === 'check_suite' || type === 'status') {\n    const check = b.check_run || b.check_suite || b;\n    event.head_sha = sha(check.head_sha || b.sha);\n    event.evidence_id = String(check.id || check.context || '');\n    const status = type === 'status' ? b.state : check.status === 'completed' ? check.conclusion : check.status;\n    if (['failure', 'timed_out', 'action_required', 'cancelled', 'startup_failure', 'error'].includes(status)) {\n      event.kind = 'CI_FAILED'; event.severity = 'P1';\n    } else if (status === 'success') event.kind = 'CI_PASSED';\n    const codex = type === 'check_run' && check.app?.slug === 'chatgpt-codex-connector';\n    if (codex) {\n      const correlated = current && current === event.head_sha;\n      event.kind = !correlated ? 'CODEX_STATUS_UNKNOWN' : status === 'in_progress' ? 'CODEX_REVIEW_STARTED' : check.status === 'completed' ? 'CODEX_REVIEW_COMPLETED' : 'CODEX_STATUS_UNKNOWN';\n      event.review_status = !correlated ? 'UNKNOWN' : status === 'in_progress' ? 'STARTED' : check.status === 'completed' ? 'COMPLETED' : 'UNKNOWN';\n      event.severity = 'NORMAL';\n    }\n  }\n  if (!event.kind) return null;\n  if (event.kind !== 'CODEX_COMMENT_UNCORRELATED' && event.kind !== 'CODEX_STATUS_UNKNOWN' && !event.head_sha) return null;\n  event.route = ['P0', 'P1', 'NORMAL'].includes(event.severity) ? 'immediate' : 'digest';\n  event.summary = `${event.kind}${number ? ` PR #${number}` : ''}${event.head_sha ? ` @${event.head_sha.slice(0, 12)}` : ''}${event.review_status !== 'UNKNOWN' ? ` ${event.review_status}` : ''}`;\n  const identity = ['CODEX_FINDING', 'CI_FAILED', 'CI_PASSED', 'CODEX_COMMENT_UNCORRELATED'].includes(event.kind) ? event.evidence_id : '';\n  event.semantic_key = JSON.stringify([REPOSITORY, number, event.head_sha, event.kind, event.review_status, event.severity, identity]);\n  return event;\n}\n\nfunction journal(event) {\n  return { event_id: event.event_id, delivery_id: event.github_delivery_id, semantic_key: event.semantic_key, event_json: JSON.stringify(event), status: 'PENDING', message_id: '', error_code: '' };\n}\n\nfunction plan(rows, now = Date.now()) {\n  // shortcut: Data Table lacks semantic uniqueness; enable only with a verified single sender.\n  const sent = new Set(rows.filter(r => ['SENDING', 'SENT', 'UNKNOWN', 'FAILED'].includes(r.status)).map(r => r.semantic_key));\n  const deliveries = new Set(rows.filter(r => ['SENDING', 'SENT', 'UNKNOWN', 'FAILED'].includes(r.status)).map(r => r.delivery_id));\n  const pending = [];\n  for (const row of [...rows].sort((a, b) => a.id - b.id)) {\n    if (row.status !== 'PENDING' || sent.has(row.semantic_key) || deliveries.has(row.delivery_id)) continue;\n    const e = JSON.parse(row.event_json);\n    if (e.repository !== REPOSITORY || e.semantic_key !== row.semantic_key) throw new Error('JOURNAL_REJECTED');\n    sent.add(row.semantic_key); deliveries.add(row.delivery_id);\n    pending.push({ row, e });\n  }\n  const urgent = pending.find(p => ['P0', 'P1'].includes(p.e.severity));\n  const immediate = urgent || pending.find(p => p.e.route === 'immediate');\n  const selected = immediate ? [immediate] : pending.filter(p => now - Date.parse(p.e.received_at) >= 300000).slice(0, 15);\n  if (!selected.length) return [];\n  const text = selected.map(p => `${p.e.severity} | ${p.e.summary}\\n${p.e.source_url}`).join('\\n\\n');\n  return [{ row_ids: selected.map(p => p.row.id), semantic_keys: selected.map(p => p.row.semantic_key), text: escapeHtml(text), count: selected.length }];\n}\n\nfunction telegramOutcome(response) {\n  const id = response?.result?.message_id ?? response?.message_id;\n  if (Number.isSafeInteger(id) && id > 0 && response?.ok !== false) return { status: 'SENT', message_id: String(id), error_code: '' };\n  const code = response?.error_code;\n  if (code === 429) return { status: 'FAILED', message_id: '', error_code: 'RATE_LIMIT_CONFIRMED_RETRY_AFTER_OWNER_RECONCILIATION' };\n  if ([400, 401, 403].includes(code)) return { status: 'FAILED', message_id: '', error_code: `TELEGRAM_${code}` };\n  return { status: 'UNKNOWN', message_id: '', error_code: 'DELIVERY_UNKNOWN_NO_AUTO_RETRY' };\n}\n\n\nconst outcome = telegramOutcome($input.first().json);\nreturn $('Build Single Notification').first().json.row_ids.map(row_id => ({json: {row_id, ...outcome}}));"
+      },
+      "position": [
+        3000,
+        0
+      ]
+    },
+    {
+      "id": "Persist Delivery Result",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "name": "Persist Delivery Result",
+      "parameters": {
+        "resource": "row",
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "GremoVOD_GitHub_Live_Monitor_Events"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $json.row_id }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "status": "={{ $json.status }}",
+            "message_id": "={{ $json.message_id }}",
+            "error_code": "={{ $json.error_code }}"
+          },
+          "schema": [
+            {
+              "id": "status",
+              "displayName": "status",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "message_id",
+              "displayName": "message_id",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "error_code",
+              "displayName": "error_code",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            }
+          ]
+        }
+      },
+      "position": [
+        3200,
+        0
+      ]
+    },
+    {
+      "id": "Error Handler",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "name": "Error Handler",
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "return [{json: {event_id: 'error:' + $execution.id, delivery_id: '', semantic_key: 'error:' + $execution.id, event_json: '{}', status: 'FAILED', message_id: '', error_code: 'INPUT_REJECTED_SEE_RESTRICTED_EXECUTION'}}];"
+      },
+      "position": [
+        3400,
+        0
+      ]
+    },
+    {
+      "id": "Mock Tests",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "name": "Mock Tests",
+      "parameters": {},
+      "position": [
+        3600,
+        0
+      ]
+    },
+    {
+      "id": "Run Mock Contract Tests",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "name": "Run Mock Contract Tests",
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "'use strict';\n\nconst REPOSITORY = 'gremoled77-droid/gremovod';\nconst BOT = 'chatgpt-codex-connector[bot]';\nconst SHA = /^[a-f0-9]{40}$/;\nconst login = value => typeof value === 'string' && /^[a-zA-Z0-9[\\]_-]{1,100}$/.test(value) ? value : 'UNKNOWN';\nconst sha = value => typeof value === 'string' && SHA.test(value) ? value : null;\nconst escapeHtml = value => String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');\n\nfunction verify(input) {\n  const h = input.headers || {};\n  const body = input.body;\n  if (!body || body.repository?.full_name !== REPOSITORY) throw new Error('REPOSITORY_REJECTED');\n  if (!/^[a-z_]+$/.test(h['x-github-event'] || '')) throw new Error('EVENT_REJECTED');\n  if (!/^[a-zA-Z0-9-]{1,100}$/.test(h['x-github-delivery'] || '')) throw new Error('DELIVERY_REJECTED');\n  const number = body.pull_request?.number || (body.issue?.pull_request && body.issue.number) || body.check_run?.pull_requests?.[0]?.number || body.check_suite?.pull_requests?.[0]?.number;\n  if (number && (!Number.isSafeInteger(number) || number <= 0)) throw new Error('PR_REJECTED');\n  return { ...input, snapshot_url: `https://api.github.com/repos/${REPOSITORY}${number ? `/pulls/${number}` : ''}` };\n}\n\nfunction normalize(input, snapshot, now = new Date().toISOString()) {\n  verify(input);\n  const b = input.body;\n  const type = input.headers['x-github-event'];\n  const action = b.action || '';\n  const pr = b.pull_request || (b.issue?.pull_request ? b.issue : null) || b.check_run?.pull_requests?.[0] || b.check_suite?.pull_requests?.[0] || null;\n  const number = pr?.number || null;\n  const current = snapshot?.number === number && snapshot?.base?.repo?.full_name === REPOSITORY && sha(snapshot?.head?.sha);\n  const head = sha(b.pull_request?.head?.sha) || current;\n  const item = b.review || b.comment;\n  const actor = login(item?.user?.login || b.sender?.login);\n  const event = {\n    event_id: `github:${input.headers['x-github-delivery']}`,\n    received_at: now,\n    github_delivery_id: input.headers['x-github-delivery'],\n    event_type: type,\n    action,\n    repository: REPOSITORY,\n    actor,\n    pr_number: number,\n    task_id: (String(snapshot?.title || pr?.title || '').match(/\\bGA-\\d{2}\\b/) || [null])[0],\n    head_sha: head || null,\n    review_status: 'UNKNOWN',\n    severity: 'INFO',\n    summary: '',\n    source_url: `https://github.com/${REPOSITORY}${number ? `/pull/${number}` : ''}`,\n    kind: '',\n    route: 'digest',\n    evidence_id: '',\n  };\n  if (type === 'push' && !b.deleted && sha(b.after)) {\n    event.kind = 'COMMIT'; event.head_sha = b.after;\n    event.source_url = `https://github.com/${REPOSITORY}/commit/${b.after}`;\n  } else if (type === 'pull_request' && ['opened', 'reopened', 'synchronize', 'ready_for_review', 'closed', 'labeled'].includes(action)) {\n    event.kind = { opened: 'PR_OPENED', reopened: 'PR_REOPENED', synchronize: 'PR_UPDATED', ready_for_review: 'PR_READY', closed: b.pull_request.merged === true ? 'PR_MERGED' : 'PR_CLOSED', labeled: '' }[action];\n    if (event.kind === 'PR_READY' && (b.pull_request.draft || !current || snapshot.draft)) event.kind = '';\n    const block = ['security-blocked', 'financial-blocked', 'dispatcher-stopped'];\n    if (action === 'labeled' && b.sender?.login === 'gremoled77-droid' && block.includes(b.label?.name)) {\n      event.kind = b.label.name.toUpperCase().replace(/-/g, '_'); event.severity = 'P1';\n    }\n    if (event.kind && action !== 'labeled') event.severity = 'NORMAL';\n    // A new commit is evidence of an update, never evidence that findings were fixed.\n  } else if (['pull_request_review', 'pull_request_review_comment', 'issue_comment'].includes(type) && item?.user?.login === BOT && item.user.type === 'Bot' && number && ['submitted', 'created', 'edited'].includes(action)) {\n    const reviewed = sha(item.commit_id);\n    const text = String(item.body || '');\n    event.evidence_id = String(item.id || '');\n    if (Number.isSafeInteger(item.id) && item.id > 0) {\n      const anchor = type === 'pull_request_review' ? 'pullrequestreview-' : type === 'issue_comment' ? 'issuecomment-' : 'discussion_r';\n      event.source_url += `#${anchor}${item.id}`;\n    }\n    if (reviewed && current && reviewed !== current) {\n      event.kind = 'STALE_REVIEW'; event.review_status = 'STALE'; event.head_sha = reviewed;\n    } else if (reviewed && current && reviewed === current) {\n      event.head_sha = reviewed;\n      const severity = (text.match(/\\bP[012]\\b/g) || []).sort()[0];\n      if (severity) {\n        event.kind = 'CODEX_FINDING'; event.severity = severity; event.review_status = 'FINDINGS';\n      } else if (type === 'pull_request_review' && action === 'submitted' && ['approved', 'changes_requested', 'commented'].includes(item.state?.toLowerCase())) {\n        event.kind = 'CODEX_REVIEW_COMPLETED'; event.severity = 'NORMAL'; event.review_status = item.state.toUpperCase();\n      }\n    } else {\n      // Issue comments have no authoritative commit_id, including edited comments.\n      event.kind = 'CODEX_COMMENT_UNCORRELATED';\n    }\n    if (!event.kind) event.kind = 'CODEX_STATUS_UNKNOWN';\n  } else if (type === 'check_run' || type === 'check_suite' || type === 'status') {\n    const check = b.check_run || b.check_suite || b;\n    event.head_sha = sha(check.head_sha || b.sha);\n    event.evidence_id = String(check.id || check.context || '');\n    const status = type === 'status' ? b.state : check.status === 'completed' ? check.conclusion : check.status;\n    if (['failure', 'timed_out', 'action_required', 'cancelled', 'startup_failure', 'error'].includes(status)) {\n      event.kind = 'CI_FAILED'; event.severity = 'P1';\n    } else if (status === 'success') event.kind = 'CI_PASSED';\n    const codex = type === 'check_run' && check.app?.slug === 'chatgpt-codex-connector';\n    if (codex) {\n      const correlated = current && current === event.head_sha;\n      event.kind = !correlated ? 'CODEX_STATUS_UNKNOWN' : status === 'in_progress' ? 'CODEX_REVIEW_STARTED' : check.status === 'completed' ? 'CODEX_REVIEW_COMPLETED' : 'CODEX_STATUS_UNKNOWN';\n      event.review_status = !correlated ? 'UNKNOWN' : status === 'in_progress' ? 'STARTED' : check.status === 'completed' ? 'COMPLETED' : 'UNKNOWN';\n      event.severity = 'NORMAL';\n    }\n  }\n  if (!event.kind) return null;\n  if (event.kind !== 'CODEX_COMMENT_UNCORRELATED' && event.kind !== 'CODEX_STATUS_UNKNOWN' && !event.head_sha) return null;\n  event.route = ['P0', 'P1', 'NORMAL'].includes(event.severity) ? 'immediate' : 'digest';\n  event.summary = `${event.kind}${number ? ` PR #${number}` : ''}${event.head_sha ? ` @${event.head_sha.slice(0, 12)}` : ''}${event.review_status !== 'UNKNOWN' ? ` ${event.review_status}` : ''}`;\n  const identity = ['CODEX_FINDING', 'CI_FAILED', 'CI_PASSED', 'CODEX_COMMENT_UNCORRELATED'].includes(event.kind) ? event.evidence_id : '';\n  event.semantic_key = JSON.stringify([REPOSITORY, number, event.head_sha, event.kind, event.review_status, event.severity, identity]);\n  return event;\n}\n\nfunction journal(event) {\n  return { event_id: event.event_id, delivery_id: event.github_delivery_id, semantic_key: event.semantic_key, event_json: JSON.stringify(event), status: 'PENDING', message_id: '', error_code: '' };\n}\n\nfunction plan(rows, now = Date.now()) {\n  // shortcut: Data Table lacks semantic uniqueness; enable only with a verified single sender.\n  const sent = new Set(rows.filter(r => ['SENDING', 'SENT', 'UNKNOWN', 'FAILED'].includes(r.status)).map(r => r.semantic_key));\n  const deliveries = new Set(rows.filter(r => ['SENDING', 'SENT', 'UNKNOWN', 'FAILED'].includes(r.status)).map(r => r.delivery_id));\n  const pending = [];\n  for (const row of [...rows].sort((a, b) => a.id - b.id)) {\n    if (row.status !== 'PENDING' || sent.has(row.semantic_key) || deliveries.has(row.delivery_id)) continue;\n    const e = JSON.parse(row.event_json);\n    if (e.repository !== REPOSITORY || e.semantic_key !== row.semantic_key) throw new Error('JOURNAL_REJECTED');\n    sent.add(row.semantic_key); deliveries.add(row.delivery_id);\n    pending.push({ row, e });\n  }\n  const urgent = pending.find(p => ['P0', 'P1'].includes(p.e.severity));\n  const immediate = urgent || pending.find(p => p.e.route === 'immediate');\n  const selected = immediate ? [immediate] : pending.filter(p => now - Date.parse(p.e.received_at) >= 300000).slice(0, 15);\n  if (!selected.length) return [];\n  const text = selected.map(p => `${p.e.severity} | ${p.e.summary}\\n${p.e.source_url}`).join('\\n\\n');\n  return [{ row_ids: selected.map(p => p.row.id), semantic_keys: selected.map(p => p.row.semantic_key), text: escapeHtml(text), count: selected.length }];\n}\n\nfunction telegramOutcome(response) {\n  const id = response?.result?.message_id ?? response?.message_id;\n  if (Number.isSafeInteger(id) && id > 0 && response?.ok !== false) return { status: 'SENT', message_id: String(id), error_code: '' };\n  const code = response?.error_code;\n  if (code === 429) return { status: 'FAILED', message_id: '', error_code: 'RATE_LIMIT_CONFIRMED_RETRY_AFTER_OWNER_RECONCILIATION' };\n  if ([400, 401, 403].includes(code)) return { status: 'FAILED', message_id: '', error_code: `TELEGRAM_${code}` };\n  return { status: 'UNKNOWN', message_id: '', error_code: 'DELIVERY_UNKNOWN_NO_AUTO_RETRY' };\n}\n\n\nconst core = {REPOSITORY, BOT, verify, normalize, journal, plan, telegramOutcome, escapeHtml};\nconst f = (() => {'use strict';\nconst repo = { full_name: 'gremoled77-droid/gremovod' };\nconst head = 'a'.repeat(40);\nconst old = 'b'.repeat(40);\nconst pr = { number: 58, title: '[GA-01] settlement', head: { sha: head }, base: { repo }, draft: true, merged: false };\nconst bot = { login: 'chatgpt-codex-connector[bot]', type: 'Bot' };\nfunction fixture(type = 'pull_request', action = 'opened', changes = {}) {\n  return { headers: { 'x-github-event': type, 'x-github-delivery': 'fixture-delivery-1' }, body: { repository: repo, sender: { login: 'gremoled77-droid' }, action, pull_request: pr, ...changes } };\n}\n\nreturn {repo, head, old, pr, bot, fixture};})();\nfunction runTests(core, f) {\n  const results = [];\n  function equal(actual, expected) {\n    if (JSON.stringify(actual) !== JSON.stringify(expected)) throw new Error(`Expected ${JSON.stringify(expected)}; got ${JSON.stringify(actual)}`);\n  }\n  function check(name, fn) {\n    try { fn(); results.push({ name, status: 'PASS' }); }\n    catch (error) { results.push({ name, status: 'FAIL', error: error.message }); }\n  }\n  function rejected(input) {\n    let threw = false;\n    try { core.verify(input); } catch { threw = true; }\n    equal(threw, true);\n  }\n  const now = '2026-10-21T10:00:00.000Z';\n  const ms = Date.parse(now);\n  const normalize = (input, snapshot = f.pr) => core.normalize(input, snapshot, now);\n  const row = (event, id = 1, status = 'PENDING') => ({ ...core.journal(event), id, status });\n  const review = (commit = f.head, body = '') => f.fixture('pull_request_review', 'submitted', { review: { id: 12, user: f.bot, commit_id: commit, body, state: 'commented' } });\n  check('new PR produces one notification plan', () => equal(core.plan([row(normalize(f.fixture()))], ms).length, 1));\n  check('delivery duplicate suppressed within batch', () => equal(core.plan([row(normalize(f.fixture())), row(normalize(f.fixture()), 2)], ms)[0].count, 1));\n  check('semantic duplicate with different delivery suppressed', () => {\n    const event = normalize(f.fixture());\n    const second = { ...event, github_delivery_id: 'fixture-delivery-2' };\n    equal(core.plan([row(event), row(second, 2)], ms)[0].count, 1);\n  });\n  check('sent semantic status suppresses redelivery across executions', () => equal(core.plan([row(normalize(f.fixture()), 1, 'SENT'), row(normalize(f.fixture()), 2)], ms), []));\n  check('new PR commit updates SHA', () => equal(normalize(f.fixture('pull_request', 'synchronize')).head_sha, f.head));\n  check('late PR event retains event SHA', () => equal(normalize(f.fixture('pull_request', 'synchronize', {pull_request: {...f.pr, head: {sha: f.old}}})).head_sha, f.old));\n  check('update does not claim MiniMax fixed findings', () => equal(normalize(f.fixture('pull_request', 'synchronize')).kind, 'PR_UPDATED'));\n  check('old Codex review is stale', () => equal(normalize(review(f.old)).review_status, 'STALE'));\n  check('current completed review has one plan', () => equal(core.plan([row(normalize(review()))], ms)[0].count, 1));\n  check('same SHA review status with new review id deduplicates', () => {\n    const first = normalize(review());\n    const input = review(); input.body.review.id = 100; input.headers['x-github-delivery'] = 'another-review';\n    equal(core.plan([row(first, 1, 'SENT'), row(normalize(input), 2)], ms), []);\n  });\n  check('P1 finding is urgent', () => equal(normalize(review(f.head, '[P1] fix this')).route, 'immediate'));\n  check('P2 finding retained', () => equal(normalize(review(f.head, '[P2] issue')).severity, 'P2'));\n  check('CI failed urgent', () => equal(normalize(f.fixture('check_run', 'completed', { check_run: { id: 99, head_sha: f.head, status: 'completed', conclusion: 'failure' } })).severity, 'P1'));\n  check('CI success recorded', () => equal(normalize(f.fixture('status', '', { sha: f.head, state: 'success', context: 'tests' })).kind, 'CI_PASSED'));\n  check('merged requires merged true', () => equal(normalize(f.fixture('pull_request', 'closed', { pull_request: { ...f.pr, merged: true } })).kind, 'PR_MERGED'));\n  check('closed without merge stays closed', () => equal(normalize(f.fixture('pull_request', 'closed')).kind, 'PR_CLOSED'));\n  check('wrong repository rejected', () => rejected(f.fixture('push', '', { repository: { full_name: 'evil/repo' } })));\n  check('missing delivery rejected', () => rejected({ ...f.fixture(), headers: { 'x-github-event': 'push' } }));\n  check('spoofed bot rejected', () => equal(normalize(f.fixture('pull_request_review', 'submitted', { review: { user: { login: 'attacker', type: 'Bot' }, commit_id: f.head, body: 'P0' } })), null));\n  check('edited Codex comment without commit remains unknown', () => equal(normalize(f.fixture('issue_comment', 'edited', { pull_request: undefined, issue: { number: 58, pull_request: {} }, comment: { id: 1, user: f.bot, body: `Review completed ${f.head}` } })).review_status, 'UNKNOWN'));\n  check('edited inline finding supported', () => equal(normalize(f.fixture('pull_request_review_comment', 'edited', { comment: { id: 5, user: f.bot, commit_id: f.head, body: 'P1' } })).severity, 'P1'));\n  check('GitHub outage cannot mark review complete', () => equal(normalize(review(), { error: 'unavailable' }).review_status, 'UNKNOWN'));\n  check('ready does not mean accepted', () => equal(normalize(f.fixture('pull_request', 'ready_for_review')), null));\n  check('requesting review does not prove started', () => equal(normalize(f.fixture('pull_request', 'review_requested')), null));\n  check('native Codex check start requires current SHA', () => equal(normalize(f.fixture('check_run', 'created', { check_run: { id: 2, head_sha: f.head, status: 'in_progress', app: { slug: 'chatgpt-codex-connector' } } })).review_status, 'STARTED'));\n  check('unrelated check not Codex', () => equal(normalize(f.fixture('check_run', 'created', { check_run: { id: 2, head_sha: f.head, status: 'in_progress', app: { slug: 'github-actions' } } })), null));\n  check('GA transition never inferred from prose', () => equal(normalize(f.fixture('issue_comment', 'created', { comment: { id: 5, user: f.bot, body: 'GREMOVOD_NEXT_TASK GA-02' } })).kind, 'CODEX_COMMENT_UNCORRELATED'));\n  check('body and titles cannot leak to notification', () => {\n    const e = normalize(f.fixture('pull_request', 'opened', { pull_request: { ...f.pr, title: '<b>private password</b>' } }));\n    equal(core.plan([row(e)], ms)[0].text.includes('password'), false);\n  });\n  check('HTML escaping', () => equal(core.escapeHtml('<a>&'), '&lt;a&gt;&amp;'));\n  check('info waits for digest interval', () => equal(core.plan([row(normalize(f.fixture('push', '', { after: f.head })))], ms), []));\n  check('info grouped after five minutes', () => {\n    const e = normalize(f.fixture('push', '', { after: f.head }));\n    const other = { ...e, semantic_key: 'another', github_delivery_id: 'another' };\n    equal(core.plan([row(e), row(other, 2)], ms + 300001)[0].count, 2);\n  });\n  check('urgent precedes pending info', () => {\n    const e = normalize(f.fixture('push', '', { after: f.head }));\n    const urgentInput = review(f.head, 'P0');\n    urgentInput.headers['x-github-delivery'] = 'urgent-delivery';\n    const urgent = normalize(urgentInput);\n    equal(core.plan([row(e), row(urgent, 2)], ms + 300001)[0].row_ids, [2]);\n  });\n  check('timeout outcome blocks auto retry', () => equal(core.telegramOutcome({ error: 'timeout' }).status, 'UNKNOWN'));\n  check('unknown sends never automatically replayed', () => equal(core.plan([row(normalize(f.fixture()), 1, 'UNKNOWN'), row(normalize(f.fixture()), 2)], ms), []));\n  check('sending crash remains blocked', () => equal(core.plan([row(normalize(f.fixture()), 1, 'SENDING'), row(normalize(f.fixture()), 2)], ms), []));\n  check('Telegram confirmed success persists message id', () => equal(core.telegramOutcome({ message_id: 123 }).message_id, '123'));\n  check('Telegram confirmed 429 requires controlled reconciliation', () => equal(core.telegramOutcome({ error_code: 429 }).status, 'FAILED'));\n  check('raw error never enters journal error code', () => equal(core.telegramOutcome({ error: 'token=secret' }).error_code.includes('secret'), false));\n  return results;\n}\n\n\nconst results = runTests(core, f);\nif (results.some(r => r.status === 'FAIL')) throw new Error(JSON.stringify(results.filter(r => r.status === 'FAIL')));\nreturn results.map(json => ({json}));"
+      },
+      "position": [
+        3800,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "GitHub Trigger": {
+      "main": [
+        [
+          {
+            "node": "Verify Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify Event": {
+      "main": [
+        [
+          {
+            "node": "Current GitHub Snapshot",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Error Handler",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Current GitHub Snapshot": {
+      "main": [
+        [
+          {
+            "node": "Normalize Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Event": {
+      "main": [
+        [
+          {
+            "node": "Event Filter",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Error Handler",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Event Filter": {
+      "main": [
+        [
+          {
+            "node": "Prepare Event Journal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Event Journal": {
+      "main": [
+        [
+          {
+            "node": "Event Journal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Event Journal": {
+      "main": [
+        [
+          {
+            "node": "Load Event Journal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Event Journal": {
+      "main": [
+        [
+          {
+            "node": "Deduplicate and Severity Router",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Deduplicate and Severity Router": {
+      "main": [
+        [
+          {
+            "node": "Owner Approval Gate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Owner Approval Gate": {
+      "main": [
+        [
+          {
+            "node": "Expand Delivery Claim",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Expand Delivery Claim": {
+      "main": [
+        [
+          {
+            "node": "Mark SENDING",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark SENDING": {
+      "main": [
+        [
+          {
+            "node": "Build Single Notification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Single Notification": {
+      "main": [
+        [
+          {
+            "node": "Telegram Notification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telegram Notification": {
+      "main": [
+        [
+          {
+            "node": "Record Delivery Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Record Delivery Result": {
+      "main": [
+        [
+          {
+            "node": "Persist Delivery Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Digest Schedule": {
+      "main": [
+        [
+          {
+            "node": "Load Event Journal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mock Tests": {
+      "main": [
+        [
+          {
+            "node": "Run Mock Contract Tests",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Error Handler": {
+      "main": [
+        [
+          {
+            "node": "Event Journal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

@@ -1,0 +1,341 @@
+[
+  {
+    "execution": {
+      "id": "76",
+      "workflowId": "iV4GGl3jWmnjh3Sd",
+      "mode": "manual",
+      "status": "success",
+      "startedAt": "2026-10-21T09:37:31.490Z",
+      "stoppedAt": "2026-10-21T09:37:33.444Z",
+      "retryOf": null,
+      "retrySuccessId": null,
+      "waitTill": null
+    },
+    "nodes": {
+      "Mock Tests": [
+        {
+          "status": "success",
+          "outputs": [
+            1
+          ]
+        }
+      ],
+      "Run Mock Contract Tests": [
+        {
+          "status": "success",
+          "outputs": [
+            38
+          ]
+        }
+      ]
+    },
+    "tests": [
+      {
+        "name": "new PR produces one notification plan",
+        "status": "PASS"
+      },
+      {
+        "name": "delivery duplicate suppressed within batch",
+        "status": "PASS"
+      },
+      {
+        "name": "semantic duplicate with different delivery suppressed",
+        "status": "PASS"
+      },
+      {
+        "name": "sent semantic status suppresses redelivery across executions",
+        "status": "PASS"
+      },
+      {
+        "name": "new PR commit updates SHA",
+        "status": "PASS"
+      },
+      {
+        "name": "late PR event retains event SHA",
+        "status": "PASS"
+      },
+      {
+        "name": "update does not claim MiniMax fixed findings",
+        "status": "PASS"
+      },
+      {
+        "name": "old Codex review is stale",
+        "status": "PASS"
+      },
+      {
+        "name": "current completed review has one plan",
+        "status": "PASS"
+      },
+      {
+        "name": "same SHA review status with new review id deduplicates",
+        "status": "PASS"
+      },
+      {
+        "name": "P1 finding is urgent",
+        "status": "PASS"
+      },
+      {
+        "name": "P2 finding retained",
+        "status": "PASS"
+      },
+      {
+        "name": "CI failed urgent",
+        "status": "PASS"
+      },
+      {
+        "name": "CI success recorded",
+        "status": "PASS"
+      },
+      {
+        "name": "merged requires merged true",
+        "status": "PASS"
+      },
+      {
+        "name": "closed without merge stays closed",
+        "status": "PASS"
+      },
+      {
+        "name": "wrong repository rejected",
+        "status": "PASS"
+      },
+      {
+        "name": "missing delivery rejected",
+        "status": "PASS"
+      },
+      {
+        "name": "spoofed bot rejected",
+        "status": "PASS"
+      },
+      {
+        "name": "edited Codex comment without commit remains unknown",
+        "status": "PASS"
+      },
+      {
+        "name": "edited inline finding supported",
+        "status": "PASS"
+      },
+      {
+        "name": "GitHub outage cannot mark review complete",
+        "status": "PASS"
+      },
+      {
+        "name": "ready does not mean accepted",
+        "status": "PASS"
+      },
+      {
+        "name": "requesting review does not prove started",
+        "status": "PASS"
+      },
+      {
+        "name": "native Codex check start requires current SHA",
+        "status": "PASS"
+      },
+      {
+        "name": "unrelated check not Codex",
+        "status": "PASS"
+      },
+      {
+        "name": "GA transition never inferred from prose",
+        "status": "PASS"
+      },
+      {
+        "name": "body and titles cannot leak to notification",
+        "status": "PASS"
+      },
+      {
+        "name": "HTML escaping",
+        "status": "PASS"
+      },
+      {
+        "name": "info waits for digest interval",
+        "status": "PASS"
+      },
+      {
+        "name": "info grouped after five minutes",
+        "status": "PASS"
+      },
+      {
+        "name": "urgent precedes pending info",
+        "status": "PASS"
+      },
+      {
+        "name": "timeout outcome blocks auto retry",
+        "status": "PASS"
+      },
+      {
+        "name": "unknown sends never automatically replayed",
+        "status": "PASS"
+      },
+      {
+        "name": "sending crash remains blocked",
+        "status": "PASS"
+      },
+      {
+        "name": "Telegram confirmed success persists message id",
+        "status": "PASS"
+      },
+      {
+        "name": "Telegram confirmed 429 requires controlled reconciliation",
+        "status": "PASS"
+      },
+      {
+        "name": "raw error never enters journal error code",
+        "status": "PASS"
+      }
+    ]
+  },
+  {
+    "execution": {
+      "id": "77",
+      "workflowId": "iV4GGl3jWmnjh3Sd",
+      "mode": "manual",
+      "status": "success",
+      "startedAt": "2026-10-21T09:37:34.485Z",
+      "stoppedAt": "2026-10-21T09:37:34.712Z",
+      "retryOf": null,
+      "retrySuccessId": null,
+      "waitTill": null
+    },
+    "nodes": {
+      "GitHub Trigger": [
+        {
+          "status": "success",
+          "outputs": [
+            1
+          ]
+        }
+      ],
+      "Verify Event": [
+        {
+          "status": "success",
+          "outputs": [
+            1,
+            0
+          ]
+        }
+      ],
+      "Current GitHub Snapshot": [
+        {
+          "status": "success",
+          "outputs": [
+            1
+          ]
+        }
+      ],
+      "Normalize Event": [
+        {
+          "status": "success",
+          "outputs": [
+            1,
+            0
+          ]
+        }
+      ],
+      "Event Filter": [
+        {
+          "status": "success",
+          "outputs": [
+            1,
+            0
+          ]
+        }
+      ],
+      "Prepare Event Journal": [
+        {
+          "status": "success",
+          "outputs": [
+            1
+          ]
+        }
+      ],
+      "Event Journal": [
+        {
+          "status": "success",
+          "outputs": [
+            1
+          ]
+        }
+      ],
+      "Load Event Journal": [
+        {
+          "status": "success",
+          "outputs": [
+            4
+          ]
+        }
+      ],
+      "Deduplicate and Severity Router": [
+        {
+          "status": "success",
+          "outputs": [
+            0
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "execution": {
+      "id": "78",
+      "workflowId": "iV4GGl3jWmnjh3Sd",
+      "mode": "manual",
+      "status": "success",
+      "startedAt": "2026-10-21T09:37:35.570Z",
+      "stoppedAt": "2026-10-21T09:37:35.715Z",
+      "retryOf": null,
+      "retrySuccessId": null,
+      "waitTill": null
+    },
+    "nodes": {
+      "GitHub Trigger": [
+        {
+          "status": "success",
+          "outputs": [
+            1
+          ]
+        }
+      ],
+      "Verify Event": [
+        {
+          "status": "success",
+          "outputs": [
+            0,
+            1
+          ]
+        }
+      ],
+      "Error Handler": [
+        {
+          "status": "success",
+          "outputs": [
+            1
+          ]
+        }
+      ],
+      "Event Journal": [
+        {
+          "status": "success",
+          "outputs": [
+            1
+          ]
+        }
+      ],
+      "Load Event Journal": [
+        {
+          "status": "success",
+          "outputs": [
+            5
+          ]
+        }
+      ],
+      "Deduplicate and Severity Router": [
+        {
+          "status": "success",
+          "outputs": [
+            0
+          ]
+        }
+      ]
+    }
+  }
+]

@@ -1,0 +1,96 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "GremoVOD GitHub normalized event",
+  "type": "object",
+  "required": [
+    "event_id",
+    "received_at",
+    "github_delivery_id",
+    "event_type",
+    "action",
+    "repository",
+    "actor",
+    "task_id",
+    "head_sha",
+    "review_status",
+    "severity",
+    "summary",
+    "source_url",
+    "pr_number"
+  ],
+  "properties": {
+    "event_id": {
+      "type": "string"
+    },
+    "received_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "github_delivery_id": {
+      "type": "string"
+    },
+    "event_type": {
+      "type": "string"
+    },
+    "action": {
+      "type": "string"
+    },
+    "repository": {
+      "const": "gremoled77-droid/gremovod"
+    },
+    "actor": {
+      "type": "string"
+    },
+    "task_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "head_sha": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[a-f0-9]{40}$"
+    },
+    "review_status": {
+      "type": "string",
+      "enum": [
+        "UNKNOWN",
+        "STALE",
+        "FINDINGS",
+        "APPROVED",
+        "CHANGES_REQUESTED",
+        "COMMENTED",
+        "STARTED",
+        "COMPLETED"
+      ]
+    },
+    "severity": {
+      "type": "string",
+      "enum": [
+        "INFO",
+        "NORMAL",
+        "P0",
+        "P1",
+        "P2"
+      ]
+    },
+    "summary": {
+      "type": "string"
+    },
+    "source_url": {
+      "type": "string",
+      "pattern": "^https://github\\.com/gremoled77-droid/gremovod(?:/|$)"
+    },
+    "pr_number": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 1
+    }
+  },
+  "additionalProperties": true
+}
