@@ -10,7 +10,11 @@ permissions:
 
 jobs:
   check-agent-scope:
-    if: startsWith(github.head_ref, 'build/claude/') || startsWith(github.head_ref, 'build/argon/') || startsWith(github.head_ref, 'codex/review-') || startsWith(github.head_ref, 'codex/spec-') || startsWith(github.head_ref, 'coordination/')
+    # Legacy agent branches keep their own allowlist. MiniMax/owner task branches
+    # (minimax/**, mavis/**) are scoped through tools/minimax_task_scopes.json;
+    # the tool decides per branch whether a scope is in force, so branches that are
+    # not task branches stay unenforced and historical pull requests keep passing.
+    if: startsWith(github.head_ref, 'build/claude/') || startsWith(github.head_ref, 'build/argon/') || startsWith(github.head_ref, 'codex/review-') || startsWith(github.head_ref, 'codex/spec-') || startsWith(github.head_ref, 'coordination/') || startsWith(github.head_ref, 'minimax/') || startsWith(github.head_ref, 'mavis/')
     runs-on: ubuntu-latest
     timeout-minutes: 4
     steps:

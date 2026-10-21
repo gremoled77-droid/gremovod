@@ -1,0 +1,75 @@
+name: GremoVOD CI contracts
+
+# GA-04: the checks that must always produce a check run.
+#
+# This workflow deliberately has NO path filter. The heavy Studio checks live in
+# studio-offline-ci.yml and are skipped when a pull request changes nothing
+# relevant; the contract checks below always run, so:
+#  * every pull request gets a check, and a required-check rule can never hang on a
+#    pull request whose files match no filter;
+#  * a pull request that changes nothing relevant shows exactly two checks, so it
+#    can never be mistaken for a full Studio acceptance.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  push:
+    branches:
+      - 'mavis/work'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: studio-ci-contract-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci-contract:
+    name: CI contracts and tool tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install the workflow checker dependency
+        run: python -m pip install --quiet "pyyaml==6.0.3"
+      - name: Validate workflow files and repository contracts
+        run: python tools/check_ci_contracts.py
+      - name: Run the offline tool tests
+        run: python -X utf8 -m unittest -v tools.test_ci_contracts tools.test_no_secrets tools.test_agent_scope tools.test_agent_coordination
+      - name: State what this run does not cover
+        if: always()
+        env:
+          STEP_SUMMARY: ${{ github.step_summary }}
+        run: |
+          {
+            echo "### Offline CI scope"
+            echo
+            echo "This run verifies the candidate commit offline only. It is **not** a full"
+            echo "Studio acceptance: no production Studio, no paid provider call, no n8n cloud"
+            echo "execution, no release master QC, no branch-protection decision."
+            echo
+            echo "The heavy Studio checks live in studio-offline-ci.yml and are skipped when a"
+            echo "pull request changes nothing relevant. Skipped means not covered."
+          } >> "$STEP_SUMMARY"
+
+  secret-scan:
+    name: No secrets in this change
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Scan the added lines of this change
+        env:
+          BASE_BRANCH: ${{ github.base_ref || 'mavis/work' }}
+        run: python tools/check_no_secrets.py --base "$BASE_BRANCH"

@@ -1,0 +1,176 @@
+"""Offline regression tests for the CI contract checker."""
+import tempfile
+import unittest
+from pathlib import Path
+
+from tools.check_ci_contracts import (
+    CONTRACT_WORKFLOW,
+    OFFLINE_WORKFLOW,
+    REQUIRED_CONTRACT_JOBS,
+    REQUIRED_OFFLINE_JOBS,
+    REQUIRED_PATH_FILTERS,
+    check_candidate_workflow,
+    check_dependency_lock,
+    check_workflow_file,
+    check_workflows,
+)
+
+GOOD_WORKFLOW = """
+name: Good
+on:
+  pull_request:
+    paths:
+      - 'backend/**'
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - run: echo ok
+"""
+
+
+def write_workflow(directory, name, text):
+    path = Path(directory) / name
+    path.write_text(text, encoding="utf8")
+    return path
+
+
+class WorkflowContractTests(unittest.TestCase):
+    def test_repository_workflows_are_valid(self):
+        self.assertEqual(check_workflows(), [])
+
+    def test_candidate_workflow_keeps_its_contract(self):
+        self.assertEqual(check_candidate_workflow(), [])
+
+    def test_dependency_lock_covers_direct_dependencies(self):
+        self.assertEqual(check_dependency_lock(), [])
+
+    def test_good_workflow_has_no_problems(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            self.assertEqual(check_workflow_file(write_workflow(tmp, "good.yml", GOOD_WORKFLOW)), [])
+
+    def test_yaml_on_key_is_read_as_boolean(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            # PyYAML resolves the bare key "on" to True; the checker must still find it.
+            path = write_workflow(tmp, "bool_on.yml", GOOD_WORKFLOW)
+            self.assertEqual(check_workflow_file(path), [])
+
+    def test_missing_permissions_is_a_problem(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            text = GOOD_WORKFLOW.replace("permissions:\n  contents: read\n", "")
+            problems = check_workflow_file(write_workflow(tmp, "noperm.yml", text))
+            self.assertTrue(any("permissions" in p for p in problems))
+
+    def test_write_all_permissions_is_a_problem(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            text = GOOD_WORKFLOW.replace("permissions:\n  contents: read\n",
+                                         "permissions: write-all\n")
+            problems = check_workflow_file(write_workflow(tmp, "writeall.yml", text))
+            self.assertTrue(any("write-all" in p for p in problems))
+
+    def test_unpinned_action_is_a_problem(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            text = GOOD_WORKFLOW.replace("actions/checkout@v4", "actions/checkout@main")
+            problems = check_workflow_file(write_workflow(tmp, "unpinned.yml", text))
+            self.assertTrue(any("unpinned" in p for p in problems))
+
+    def test_secret_reference_is_a_problem(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            text = GOOD_WORKFLOW.replace("echo ok", "echo ${{ secrets.MY_TOKEN }}")
+            problems = check_workflow_file(write_workflow(tmp, "secret.yml", text))
+            self.assertTrue(any("secret" in p for p in problems))
+
+    def test_pull_request_target_head_checkout_is_a_problem(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            text = GOOD_WORKFLOW.replace(
+                "  pull_request:\n", "  pull_request_target:\n")
+            text = text.replace(
+                "      - uses: actions/checkout@v4\n",
+                "      - uses: actions/checkout@v4\n        with:\n"
+                "          ref: ${{ github.event.pull_request.head.sha }}\n")
+            problems = check_workflow_file(write_workflow(tmp, "prt.yml", text))
+            self.assertTrue(any("pull_request_target" in p for p in problems))
+
+    def test_job_without_timeout_is_a_problem(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            text = GOOD_WORKFLOW.replace("    timeout-minutes: 5\n", "")
+            problems = check_workflow_file(write_workflow(tmp, "notimeout.yml", text))
+            self.assertTrue(any("timeout-minutes" in p for p in problems))
+
+    def test_step_without_uses_or_run_is_a_problem(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            text = GOOD_WORKFLOW.replace("      - run: echo ok\n", "      - name: nothing\n")
+            problems = check_workflow_file(write_workflow(tmp, "empty_step.yml", text))
+            self.assertTrue(any("neither uses nor run" in p for p in problems))
+
+    def test_missing_candidate_workflow_is_reported(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            problems = check_candidate_workflow(Path(tmp))
+            self.assertTrue(any("missing" in p for p in problems))
+
+    def test_candidate_contract_constants_cover_the_ga04_requirements(self):
+        for required in ("backend/main.py", "backend/llm_guard.py",
+                         "backend/character_voice.py", "backend/spend_ledger.py",
+                         "frontend/**"):
+            self.assertIn(required, REQUIRED_PATH_FILTERS)
+        for required in REQUIRED_OFFLINE_JOBS + REQUIRED_CONTRACT_JOBS:
+            self.assertTrue(required)
+
+    def test_job_level_paths_is_rejected(self):
+        """`paths` is not a valid job keyword: Actions refuses the whole file and
+        the run ends with zero jobs."""
+        with tempfile.TemporaryDirectory() as tmp:
+            text = GOOD_WORKFLOW.replace(
+                "    steps:\n",
+                "    paths:\n      - 'backend/**'\n    steps:\n")
+            problems = check_workflow_file(write_workflow(tmp, "jobpaths.yml", text))
+            self.assertTrue(any("unknown keyword 'paths'" in p for p in problems))
+
+    def test_unknown_job_keyword_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            text = GOOD_WORKFLOW.replace("    runs-on: ubuntu-latest\n",
+                                         "    runs-on: ubuntu-latest\n    bogus-key: 1\n")
+            problems = check_workflow_file(write_workflow(tmp, "bogus.yml", text))
+            self.assertTrue(any("unknown keyword 'bogus-key'" in p for p in problems))
+
+    def test_unknown_step_keyword_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            text = GOOD_WORKFLOW.replace("      - run: echo ok\n",
+                                         "      - run: echo ok\n        bogus: 1\n")
+            problems = check_workflow_file(write_workflow(tmp, "bogusstep.yml", text))
+            self.assertTrue(any("unknown keyword 'bogus'" in p for p in problems))
+
+    def test_the_contract_workflow_must_not_carry_a_path_filter(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp) / ".github" / "workflows"
+            directory.mkdir(parents=True)
+            offline = GOOD_WORKFLOW.replace("name: Good", f"name: {OFFLINE_WORKFLOW[:-4]}")
+            (directory / OFFLINE_WORKFLOW).write_text(offline, encoding="utf8")
+            (directory / CONTRACT_WORKFLOW).write_text(
+                GOOD_WORKFLOW.replace("  pull_request:\n",
+                                      "  pull_request:\n    paths:\n      - 'docs/**'\n"),
+                encoding="utf8")
+            problems = check_candidate_workflow(Path(tmp))
+            self.assertTrue(any("must not carry a path filter" in p for p in problems))
+
+    def test_an_offline_job_must_not_be_continue_on_error(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp) / ".github" / "workflows"
+            directory.mkdir(parents=True)
+            offline = GOOD_WORKFLOW.replace("name: Good", f"name: {OFFLINE_WORKFLOW[:-4]}")
+            offline = offline.replace("    timeout-minutes: 5\n",
+                                      "    timeout-minutes: 5\n    continue-on-error: true\n")
+            (directory / OFFLINE_WORKFLOW).write_text(offline, encoding="utf8")
+            (directory / CONTRACT_WORKFLOW).write_text(
+                GOOD_WORKFLOW.replace("name: Good", f"name: {CONTRACT_WORKFLOW[:-4]}"),
+                encoding="utf8")
+            problems = check_candidate_workflow(Path(tmp))
+            self.assertTrue(any("continue-on-error" in p for p in problems))
+
+
+if __name__ == "__main__":
+    unittest.main()
