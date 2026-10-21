@@ -1,6 +1,8 @@
 # Codex ↔ MiniMax: bounded automatic relay
 
 Status: prepared for an explicitly approved smoke; live model execution is not yet proven.
+Current live outcome: [smoke failed and execution stopped](AUTONOMOUS_RESULT_2026-10-21.md).
+Future MiniMax runs require a separately authenticated isolated profile; the shared profile is blocked.
 The existing `scripts/agent-handoff/dispatcher.py` owns the loop. No service, new orchestrator,
 queue database, Python dependency or model SDK is introduced. Changes are stacked on PR #60,
 not integrated into production Studio. The test PR targets this relay branch.
@@ -11,7 +13,7 @@ not integrated into production Studio. The test PR targets this relay branch.
 | --- | --- | --- |
 | PR #56 GitHub handoff | Workflow exports notifications/feedback; it never starts MiniMax. Draft/unmerged workflow is not an installed scheduler. | Keep GitHub as one explicit review source; install the existing dispatcher as a Windows task. |
 | PR #57 Dispatcher v1 | Only the official GitHub bot marker on exact HEAD is an actionable review signal. Finishing an IDE conversation creates no such marker. | Add explicit local publication and signed source-specific receipts. No reading hidden VS Code chat storage. |
-| PR #59 Dispatcher v2 | Local review writes Markdown but `evaluate` still waits for GitHub. A foreground hourly watch ends with its process. | Bounded job mode consumes local JSON independently; Task Scheduler runs a tick every minute. |
+| PR #59 Dispatcher v2 | Local review writes Markdown but `evaluate` still waits for GitHub. A foreground hourly watch ends with its process. | Bounded job mode consumes local JSON independently; Task Scheduler runs a tick every five minutes within a two-hour window. |
 | v2 fixes | Model success/text is not independent test evidence; post-push review worktree is not updated. | Reproduce a frozen regression before the fix; independently test after it; detach reviewer at the new owned SHA. |
 | v2 CLI/lifecycle | `gh pr comment` returns a URL but the helper JSON-decodes every result; detached `symbolic-ref` has exit 1; corrupt state resets counters. GitHub can retain an old PR base SHA after its branch advances. | Review trigger uses JSON REST; strict worktree checks; corrupt state blocks; base SHA is refreshed from the branch ref. |
 | PR #60 monitor | It reads legacy snapshots/reports; no dispatcher phase journal exists. | Emit `events.jsonl`; read it through the existing validated AgentEvent parser and watcher, with STOP warning. |
@@ -55,6 +57,10 @@ Smoke policy is constrained to `tests/agent_handoff_smoke/`; canonical GA branch
 
 The controller must live outside both model worktrees. State, signing key and approval must also live
 outside them. Keep state durable between runs: deleting/recreating it discards local dedupe history.
+MiniMax uses only `<state>/minimax-profile`. It must be authenticated through the normal login flow
+in that isolated profile, without copying existing auth/config files or enabling MCP/plugins/integrations.
+The failed live smoke showed that the shared profile can add tools despite the runtime YAML's tool list.
+The new isolation gate has mock coverage; a fresh live capability check is still required before resuming.
 Restrict the state directory to the owner using Windows directory permissions; HMAC and `smart` do not
 create an OS security boundary against another process running as the same user.
 
@@ -98,7 +104,7 @@ Start-ScheduledTask -TaskName GremoVOD-AgentRelay-Smoke-20261021
 & $manage -Action Status -StateDirectory $state -TaskName GremoVOD-AgentRelay-Smoke-20261021
 ```
 
-The trigger repeats every minute, `MultipleInstances=IgnoreNew`, `RunLevel=Limited`, interactive logon.
+The trigger repeats every five minutes for two hours, `MultipleInstances=IgnoreNew`, `RunLevel=Limited`, interactive logon.
 A cross-process OS lock also protects the shared state. Every approved job has its own policy;
 sharing the same state directory retains global PR/SHA dedupe and STOP. Existing named tasks are never overwritten.
 The task time limit includes both model deadlines, before/after tests and a shutdown margin.

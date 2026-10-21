@@ -1,0 +1,47 @@
+{
+  "kind": "LIVE_SUBSCRIPTION_SMOKE_FAILED_AUTONOMY_NOT_ENABLED",
+  "pr": 70,
+  "initial_and_remote_head": "a2b999df0196539361a22bc93a39ce594389ed45",
+  "terminal_phase": "HALTED",
+  "reason": "MINIMAX_FAILED",
+  "model_process_launches": {
+    "codex": 1,
+    "minimax": 1,
+    "total": 2,
+    "limit_including_smoke": 6
+  },
+  "fix_iterations": 1,
+  "minimax_runtime_status": "aborted",
+  "minimax_observed_assistant_messages": 9,
+  "minimax_observed_tool_names": [
+    "read",
+    "read",
+    "skill",
+    "glob",
+    "read",
+    "edit",
+    "read",
+    "mcp__n8n-mcp__search_workflows",
+    "task_query",
+    "mcp__n8n-mcp__list_credentials",
+    "read",
+    "mcp__n8n-mcp__search_nodes"
+  ],
+  "runtime_config_not_a_complete_capability_firewall": true,
+  "failure_boundary": "MiniMax nonzero exit; no final result file. Raw stderr was not retained in the first run, so exact CLI abort reason is unproven.",
+  "post_stop_local_working_tree_tests": {
+    "passed": 2,
+    "committed": false,
+    "independent_codex_retest": false
+  },
+  "remote_fix_pushed": false,
+  "new_fix_commit": false,
+  "verification_test_sha256": "599b9ac0ee8aaf64cb3005b518b42f0fe68cafdc0a272b573ea2204c095bc9b1",
+  "stop_marker": true,
+  "scheduler_state_observed": "Disabled",
+  "github_owner_report": "https://github.com/gremoled77-droid/gremovod/pull/70#issuecomment-6325326360",
+  "other_active_gremovod_minimax_sessions_observed": 0,
+  "active_background_tasks_observed": 0,
+  "production_task_model_launches": 0,
+  "no_accept": "Initial SHA has changes_requested; no new SHA independently reviewed."
+}

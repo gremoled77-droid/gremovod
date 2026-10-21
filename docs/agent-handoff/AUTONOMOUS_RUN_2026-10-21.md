@@ -1,5 +1,9 @@
 # Temporary autonomous authorization: 2026-10-21
 
+**Outcome: smoke failed; autonomous GA work was not enabled.** See [owner report](AUTONOMOUS_RESULT_2026-10-21.md).
+The intended tool restriction below did not exclude shared-profile MCP/skills in the live run.
+Future MiniMax runs are blocked until an independently authenticated isolated profile is prepared and verified.
+
 Owner authorized the existing dispatcher to run the isolated smoke and continue only if it succeeds.
 This run uses one shared durable state directory, at most six total model launches including smoke,
 one active PR, at most three correcting iterations per PR, and a two-hour schedule window.

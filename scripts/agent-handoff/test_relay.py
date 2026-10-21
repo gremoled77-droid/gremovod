@@ -724,6 +724,9 @@ class RelayTest(unittest.TestCase):
 
     def test_subscription_preflight_rejects_api_and_accepts_account_only(self):
         self.patches[6].stop()
+        account = self.state_dir / "minimax-profile/auth/prod/en/mcode-public/auth.json"
+        account.parent.mkdir(parents=True)
+        account.write_text("{}")
         with (
             mock.patch.object(
                 d,
@@ -753,10 +756,19 @@ class RelayTest(unittest.TestCase):
             )
             with mock.patch.object(d.subprocess, "run", return_value=result):
                 if accepted:
-                    d.subscription_preflight("MiniMax")
+                    d.subscription_preflight("MiniMax", self.state_dir)
                 else:
                     with self.assertRaisesRegex(RuntimeError, "SUBSCRIPTION_REQUIRED"):
-                        d.subscription_preflight("MiniMax")
+                        d.subscription_preflight("MiniMax", self.state_dir)
+
+    def test_shared_profile_and_mcp_are_rejected_without_models(self):
+        with self.assertRaisesRegex(RuntimeError, "ISOLATED_PROFILE_LOGIN_REQUIRED"):
+            d.minimax_profile_environment(self.state_dir)
+        profile = self.state_dir / "minimax-profile"
+        profile.mkdir(parents=True)
+        (profile / "mcp.json").write_text("{}")
+        with self.assertRaisesRegex(RuntimeError, "CAPABILITY_ISOLATION_REQUIRED"):
+            d.minimax_profile_environment(self.state_dir)
 
     def test_stop_before_tick_spends_nothing(self):
         self.arm()

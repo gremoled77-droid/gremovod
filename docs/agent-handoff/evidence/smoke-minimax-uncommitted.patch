@@ -1,0 +1,10 @@
+diff --git a/tests/agent_handoff_smoke/value.py b/tests/agent_handoff_smoke/value.py
+index 59ccc14..24cdd6b 100644
+--- a/tests/agent_handoff_smoke/value.py
++++ b/tests/agent_handoff_smoke/value.py
+@@ -2,4 +2,4 @@
+ 
+ 
+ def nonnegative(value):
+-    return value
++    return value if value > 0 else 0

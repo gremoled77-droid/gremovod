@@ -1168,6 +1168,8 @@ def run_process(argv, cwd, timeout, directory):
             "GIT_CONFIG_VALUE_0": str(cwd),
         }
     )
+    if len(argv) > 2 and Path(str(argv[1])).name == "cli.js" and argv[2] == "exec":
+        env.update(minimax_profile_environment(directory))
     with tempfile.TemporaryFile() as output, tempfile.TemporaryFile() as errors:
         proc = subprocess.Popen(
             [str(x) for x in argv],
@@ -1383,7 +1385,32 @@ def check_session_budget(state):
     return calls
 
 
-def subscription_preflight(agent):
+def minimax_profile_environment(directory):
+    profile = directory / "minimax-profile"
+    if profile.is_symlink():
+        raise RuntimeError("CAPABILITY_ISOLATION_REQUIRED: profile symlink")
+    for name in ("mcp.json", "plugins", "integrations"):
+        item = profile / name
+        if (
+            item.is_file()
+            or item.is_symlink()
+            or (item.is_dir() and any(item.iterdir()))
+        ):
+            raise RuntimeError(
+                "CAPABILITY_ISOLATION_REQUIRED: no MCP/plugins/integrations in relay profile"
+            )
+    accounts = list((profile / "auth").glob("**/auth.json"))
+    if not accounts or any(
+        p.is_symlink() or not p.resolve().is_relative_to(profile.resolve())
+        for p in accounts
+    ):
+        raise RuntimeError(
+            "ISOLATED_PROFILE_LOGIN_REQUIRED: sign in normally; never copy existing credentials"
+        )
+    return {"MINIMAX_DATA_DIR": str(profile), "MAVIS_DATA_DIR": str(profile)}
+
+
+def subscription_preflight(agent, directory=None):
     if agent == "Codex":
         auth = read_json(Path.home() / ".codex" / "auth.json")
         if (
@@ -1393,6 +1420,10 @@ def subscription_preflight(agent):
         ):
             raise RuntimeError("SUBSCRIPTION_REQUIRED: Codex ChatGPT login only")
     else:
+        if directory is None:
+            raise RuntimeError(
+                "CAPABILITY_ISOLATION_REQUIRED: explicit relay state directory"
+            )
         result = subprocess.run(
             [node_executable(), str(mcode_cli_js()), "provider", "list", "--json"],
             capture_output=True,
@@ -1400,6 +1431,7 @@ def subscription_preflight(agent):
             encoding="utf-8",
             timeout=45,
             check=False,
+            env={**os.environ, **minimax_profile_environment(directory)},
         )
         if result.returncode:
             raise RuntimeError(
@@ -1437,7 +1469,7 @@ def obtain_local_review(job, pr, directory, state, record):
     check_head(job, sha, pr["base"]["sha"])
     approval_for(job, directory)
     check_session_budget(state)
-    subscription_preflight("Codex")
+    subscription_preflight("Codex", directory)
     raw = directory / f"PR-{job['pr_number']}-{sha[:12]}-codex-review.json"
     prompt = (
         f"Review only PR #{job['pr_number']} in {REPO}, exact HEAD {sha}, base {pr['base']['sha']}. "
@@ -1465,6 +1497,13 @@ def obtain_local_review(job, pr, directory, state, record):
                 encoding="utf-8",
             )
     if result.returncode:
+        atomic_json(
+            raw.with_suffix(".error.json"),
+            {
+                "returncode": result.returncode,
+                "stderr": redact_json(result.stderr[:2000]),
+            },
+        )
         raise RuntimeError("CODEX_FAILED: no result publication or automatic retry")
     packet = publish_review(job, pr, directory, read_json(raw), "codex-cli")
     return packet
@@ -1499,7 +1538,7 @@ def execute_job_round(job, pr, packet, approval, directory, state, record):
     check_head(job, sha, approval["base_sha"])
     approval_for(job, directory)
     check_session_budget(state)
-    subscription_preflight("MiniMax")
+    subscription_preflight("MiniMax", directory)
     inbox = directory / f"PR-{job['pr_number']}-{sha[:12]}-feedback.json"
     atomic_json(inbox, packet)
     result_path = directory / f"PR-{job['pr_number']}-{sha[:12]}-feedback-result.json"
@@ -1536,6 +1575,13 @@ def execute_job_round(job, pr, packet, approval, directory, state, record):
                 encoding="utf-8",
             )
     if result.returncode:
+        atomic_json(
+            result_path.with_suffix(".error.json"),
+            {
+                "returncode": result.returncode,
+                "stderr": redact_json(result.stderr[:2000]),
+            },
+        )
         raise RuntimeError("MINIMAX_FAILED: no commit/push or automatic retry")
     state["runs"][key]["status"] = "RETURNED"
     transition(job, directory, state, record, "MINIMAX_RETURNED", sha, agent="MiniMax")

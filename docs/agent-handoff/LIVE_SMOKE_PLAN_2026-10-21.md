@@ -1,5 +1,8 @@
 # Prepared smoke: explicit quota approval still required
 
+Historical plan. The owner subsequently authorized one attempt; [its result](AUTONOMOUS_RESULT_2026-10-21.md)
+is HALTED / MINIMAX_FAILED. No automatic retry or autonomous GA execution was enabled.
+
 Implementation: [Draft PR #69](https://github.com/gremoled77-droid/gremovod/pull/69),
 stacked on #60. Test only: [Draft PR #70](https://github.com/gremoled77-droid/gremovod/pull/70),
 base `feature/codex-minimax-relay`, head `minimax/relay-smoke-20261021`.
