@@ -1,5 +1,6 @@
 """Offline regression tests for new-branch ownership guard."""
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -254,9 +255,27 @@ def _control_code_mode(trusted_script):
     return "trusted" if version >= SCOPE_MIN_INTERFACE else "bootstrap"
 
 
-def _run_scope_check(work, script, branch, base):
+def _run_scope_check(work, script, branch, base, event_payload=None):
+    """Run the validator the way the workflow does.
+
+    ``event_payload`` is handed over as GITHUB_EVENT_PATH, the way GitHub hands
+    the event to a workflow run, and the validator cross-checks the branch and the
+    base against it. Without a payload the tool behaves like a local run.
+    """
+    env = dict(os.environ)
+    env.pop("GITHUB_EVENT_PATH", None)
+    if event_payload is not None:
+        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False,
+                                         encoding="utf8") as handle:
+            json.dump(event_payload, handle)
+            env["GITHUB_EVENT_PATH"] = handle.name
     return subprocess.run([sys.executable, str(script), "--branch", branch, "--base", base],
-                          cwd=str(work), capture_output=True, text=True)
+                          cwd=str(work), capture_output=True, text=True, env=env)
+
+
+def _event_payload(base, head):
+    """The part of the GitHub event payload the validator reads."""
+    return {"pull_request": {"base": {"ref": base}, "head": {"ref": head}}}
 
 
 class TrustedControlCodeTests(unittest.TestCase):
@@ -387,6 +406,38 @@ class TrustedControlCodeTests(unittest.TestCase):
                                       "minimax/ga-05-trusted-proxy-throttle", "main")
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
             self.assertIn("CROSS_OWNER_CHANGE: backend/main.py", result.stdout)
+
+    def test_event_payload_that_matches_the_base_is_accepted(self):
+        """GitHub writes the payload, so the branch and base can be verified."""
+        self._pull_request("minimax/ga-05-trusted-proxy-throttle",
+                           {"backend/main.py": "# forbidden\n"})
+        script = _materialize_trusted_code(self.work, "origin/main", self.trusted)
+        result = _run_scope_check(self.work, script, "minimax/ga-05-trusted-proxy-throttle",
+                                  "main", _event_payload("main",
+                                                         "minimax/ga-05-trusted-proxy-throttle"))
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("CROSS_OWNER_CHANGE: backend/main.py", result.stdout)
+
+    def test_event_payload_that_contradicts_the_base_is_rejected(self):
+        """A pull request cannot talk the validator into judging another base."""
+        self._pull_request("minimax/ga-05-trusted-proxy-throttle",
+                           {"backend/main.py": "# forbidden\n"})
+        script = _materialize_trusted_code(self.work, "origin/main", self.trusted)
+        result = _run_scope_check(self.work, script, "minimax/ga-05-trusted-proxy-throttle",
+                                  "main", _event_payload("somewhere-else",
+                                                         "minimax/ga-05-trusted-proxy-throttle"))
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        self.assertIn("SCOPE_ERROR", result.stderr)
+
+    def test_event_payload_that_contradicts_the_branch_is_rejected(self):
+        """A pull request cannot talk the validator into judging another branch."""
+        self._pull_request("minimax/ga-05-trusted-proxy-throttle",
+                           {"backend/main.py": "# forbidden\n"})
+        script = _materialize_trusted_code(self.work, "origin/main", self.trusted)
+        result = _run_scope_check(self.work, script, "minimax/ga-05-trusted-proxy-throttle",
+                                  "main", _event_payload("main", "feature/whatever"))
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        self.assertIn("SCOPE_ERROR", result.stderr)
 
 
 if __name__ == "__main__":
