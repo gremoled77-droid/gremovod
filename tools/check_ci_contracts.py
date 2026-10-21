@@ -39,6 +39,22 @@ OFFLINE_WORKFLOW = "studio-offline-ci.yml"
 # trap.
 CONTRACT_WORKFLOW = "studio-ci-contract.yml"
 
+# The scope guard. Its wiring is a security contract: the code that judges a pull
+# request has to be the copy that lives in the base revision, otherwise a pull
+# request can rewrite the checker that judges it.
+SCOPE_GUARD_WORKFLOW = "agent-scope-guard.yml"
+
+# Markers the scope guard workflow has to contain. They are not a style wish list:
+# each of them is what keeps the verdict out of the pull request's hands.
+REQUIRED_SCOPE_GUARD_MARKERS = (
+    # the base revision of the pull request is where the control code comes from
+    "github.event.pull_request.base.sha",
+    # the control code is materialized outside the working tree of the pull request
+    "runner.temp",
+    # and what runs is the materialized copy, not the one in the pull request
+    "scope-guard/tools/check_agent_scope.py",
+)
+
 # Paths that must trigger the offline workflow: a change to any of them has to run
 # the backend suite or the frontend checks.
 REQUIRED_PATH_FILTERS = (
@@ -287,11 +303,46 @@ def check_dependency_lock(root=ROOT):
     return problems
 
 
+def check_scope_guard_workflow(root=ROOT):
+    """Return problems with the wiring of the scope guard.
+
+    The guard is the only thing that stops a task branch from touching foreign
+    files, so its own wiring is a contract: the validator that judges a pull
+    request has to be the copy from the base revision.
+    """
+    problems = []
+    path = root / ".github" / "workflows" / SCOPE_GUARD_WORKFLOW
+    if not path.is_file():
+        return [f"{SCOPE_GUARD_WORKFLOW}: missing"]
+    text = path.read_text(encoding="utf8")
+    try:
+        workflow = yaml.safe_load(text)
+    except yaml.YAMLError as exc:
+        return [f"{SCOPE_GUARD_WORKFLOW}: not valid YAML ({exc})"]
+    triggers = _triggers(workflow)
+    if not isinstance(triggers, dict) or "pull_request" not in triggers:
+        problems.append(
+            f"{SCOPE_GUARD_WORKFLOW}: must trigger on pull_request; it is the only "
+            f"check that keeps a task branch inside its scope")
+    if "pull_request_target" in triggers:
+        problems.append(
+            f"{SCOPE_GUARD_WORKFLOW}: must not use pull_request_target; that trigger "
+            f"takes the workflow from the default branch, which does not carry the "
+            f"guard, so the check would silently stop running")
+    for marker in REQUIRED_SCOPE_GUARD_MARKERS:
+        if marker not in text:
+            problems.append(
+                f"{SCOPE_GUARD_WORKFLOW}: the trusted control code protocol is missing "
+                f"'{marker}'; the guard has to run the validator of the base revision")
+    return problems
+
+
 def check_all(root=ROOT):
     """Return every contract problem found."""
     problems = []
     problems.extend(check_workflows(root))
     problems.extend(check_candidate_workflow(root))
+    problems.extend(check_scope_guard_workflow(root))
     problems.extend(check_dependency_lock(root))
     return problems
 

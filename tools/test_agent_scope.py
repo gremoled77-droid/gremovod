@@ -1,5 +1,7 @@
 """Offline regression tests for new-branch ownership guard."""
 import json
+import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -15,6 +17,16 @@ from tools.check_agent_scope import (
 )
 
 MANIFEST_FILE = ROOT / "tools" / "minimax_task_scopes.json"
+
+# The real control code and the real manifest are what the CI runs, so the tests
+# below exercise the shipped files instead of a copy that could drift.
+REAL_VALIDATOR = (ROOT / "tools" / "check_agent_scope.py").read_text(encoding="utf8")
+REAL_MANIFEST = MANIFEST_FILE.read_text(encoding="utf8")
+
+# The lowest trusted-interface version this repository knows how to drive. A base
+# revision with an older validator cannot judge a pull request, and the workflow
+# falls back to the bootstrap path instead of running a half-understood tool.
+SCOPE_MIN_INTERFACE = 2
 
 
 def repo_manifest():
@@ -186,6 +198,195 @@ class TaskScopeTests(unittest.TestCase):
             manifest, bootstrapped, in_force = load_manifest("no-such-base-xyz", Path(tmp))
             self.assertFalse(in_force)
             self.assertEqual(manifest_tasks(manifest), {})
+
+
+def _git(repo, *args):
+    return subprocess.run(["git", "-C", str(repo), *args], check=True,
+                          capture_output=True, text=True)
+
+
+def _write(path, text):
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf8")
+
+
+def _make_repository(root, base_files):
+    """Create a bare origin plus a working clone that holds one base revision."""
+    origin = Path(root) / "origin.git"
+    work = Path(root) / "work"
+    subprocess.run(["git", "init", "--quiet", "--bare", "-b", "main", str(origin)], check=True)
+    subprocess.run(["git", "init", "--quiet", "-b", "main", str(work)], check=True)
+    _git(work, "config", "user.email", "ci@example.test")
+    _git(work, "config", "user.name", "CI Probe")
+    _git(work, "remote", "add", "origin", str(origin))
+    for path, text in base_files.items():
+        _write(work / path, text)
+    _git(work, "add", "-A")
+    _git(work, "commit", "-m", "base revision")
+    _git(work, "push", "origin", "main")
+    return work
+
+
+def _materialize_trusted_code(work, base_ref, dest):
+    """Mirror the workflow: the control code comes from the base revision."""
+    dest = Path(dest)
+    (dest / "tools").mkdir(parents=True, exist_ok=True)
+    for name in ("check_agent_scope.py", "minimax_task_scopes.json"):
+        result = subprocess.run(["git", "-C", str(work), "show", f"{base_ref}:tools/{name}"],
+                                capture_output=True)
+        if result.returncode == 0:
+            (dest / "tools" / name).write_bytes(result.stdout)
+    return dest / "tools" / "check_agent_scope.py"
+
+
+def _control_code_mode(trusted_script):
+    """Mirror the workflow: trusted only when the base validator speaks the interface."""
+    script = Path(trusted_script)
+    if not script.is_file():
+        return "bootstrap"
+    result = subprocess.run([sys.executable, str(script), "--interface-version"],
+                            capture_output=True, text=True)
+    try:
+        version = int(result.stdout.strip())
+    except ValueError:
+        return "bootstrap"
+    return "trusted" if version >= SCOPE_MIN_INTERFACE else "bootstrap"
+
+
+def _run_scope_check(work, script, branch, base):
+    return subprocess.run([sys.executable, str(script), "--branch", branch, "--base", base],
+                          cwd=str(work), capture_output=True, text=True)
+
+
+class TrustedControlCodeTests(unittest.TestCase):
+    """The guard must judge a pull request with control code the pull request cannot change.
+
+    Every test builds a real git repository and replays the protocol of
+    ``.github/workflows/agent-scope-guard.yml``: the control code is taken from the
+    base revision and run against the pull request head. Only git is read, nothing
+    from the pull request is executed.
+    """
+
+    BASE_FILES = {
+        "tools/check_agent_scope.py": REAL_VALIDATOR,
+        "tools/minimax_task_scopes.json": REAL_MANIFEST,
+        "backend/main.py": "# base\n",
+        "backend/remote_access.py": "# base\n",
+        ".github/workflows/agent-scope-guard.yml": "# base workflow\n",
+    }
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        self.work = _make_repository(self._tmp.name, self.BASE_FILES)
+        self.trusted = Path(self._tmp.name) / "trusted"
+
+    def _pull_request(self, branch, files):
+        """Create the pull request revision on top of the base revision."""
+        _git(self.work, "checkout", "-B", branch, "main")
+        for path, text in files.items():
+            _write(self.work / path, text)
+        _git(self.work, "add", "-A")
+        _git(self.work, "commit", "-m", "pull request revision")
+
+    def _run_ci_protocol(self, branch, base="main"):
+        """Replay the workflow: trusted control code, or the bootstrap fallback."""
+        script = _materialize_trusted_code(self.work, f"origin/{base}", self.trusted)
+        if _control_code_mode(script) == "trusted":
+            return _run_scope_check(self.work, script, branch, base)
+        return _run_scope_check(self.work, self.work / "tools" / "check_agent_scope.py",
+                                branch, base)
+
+    def test_forbidden_file_is_rejected(self):
+        self._pull_request("minimax/ga-05-trusted-proxy-throttle",
+                           {"backend/main.py": "# forbidden\n"})
+        result = self._run_ci_protocol("minimax/ga-05-trusted-proxy-throttle")
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("CROSS_OWNER_CHANGE: backend/main.py", result.stdout)
+
+    def test_replacing_the_validator_does_not_help(self):
+        """The pull request rewrites the checker and touches a forbidden file."""
+        noop = "import sys\nprint('SCOPE: everything is fine')\nsys.exit(0)\n"
+        self._pull_request("minimax/ga-04-studio-offline-ci",
+                           {"backend/main.py": "# forbidden\n",
+                            "tools/check_agent_scope.py": noop})
+        result = self._run_ci_protocol("minimax/ga-04-studio-offline-ci")
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("CROSS_OWNER_CHANGE: backend/main.py", result.stdout)
+
+    def test_widening_the_allowlist_does_not_help(self):
+        """The pull request adds the forbidden file to its own scope."""
+        manifest = json.loads(REAL_MANIFEST)
+        manifest["tasks"]["ga-05"]["allow"].append("backend/main.py")
+        self._pull_request("minimax/ga-05-trusted-proxy-throttle",
+                           {"backend/main.py": "# forbidden\n",
+                            "tools/minimax_task_scopes.json": json.dumps(manifest, indent=2)})
+        result = self._run_ci_protocol("minimax/ga-05-trusted-proxy-throttle")
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("CROSS_OWNER_CHANGE: backend/main.py", result.stdout)
+
+    def test_changing_the_workflow_is_reported(self):
+        """A pull request that edits the guard itself is named in the check output."""
+        self._pull_request("minimax/ga-04-studio-offline-ci",
+                           {".github/workflows/agent-scope-guard.yml": "# neutered\n"})
+        result = self._run_ci_protocol("minimax/ga-04-studio-offline-ci")
+        self.assertIn("CONTROL_FILE_CHANGE: .github/workflows/agent-scope-guard.yml",
+                      result.stdout)
+
+    def test_allowed_change_passes(self):
+        self._pull_request("minimax/ga-05-trusted-proxy-throttle",
+                           {"backend/remote_access.py": "# allowed\n"})
+        result = self._run_ci_protocol("minimax/ga-05-trusted-proxy-throttle")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_legacy_branches_keep_their_documented_behaviour(self):
+        self._pull_request("build/claude/stage-1-db",
+                           {"canon/characters/graham.json": "# forbidden\n"})
+        result = self._run_ci_protocol("build/claude/stage-1-db")
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("CROSS_OWNER_CHANGE: canon/characters/graham.json", result.stdout)
+        self._pull_request("feature/whatever", {"backend/main.py": "# not enforced\n"})
+        result = self._run_ci_protocol("feature/whatever")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_base_revision_without_a_guard_is_the_bootstrap_case(self):
+        """A base revision that cannot judge the pull request is a separate case."""
+        with tempfile.TemporaryDirectory() as tmp:
+            work = _make_repository(tmp, {"backend/main.py": "# base\n"})
+            script = _materialize_trusted_code(work, "origin/main", Path(tmp) / "trusted")
+            self.assertEqual(_control_code_mode(script), "bootstrap")
+
+    def test_base_revision_with_an_older_validator_is_the_bootstrap_case(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            legacy = Path(tmp) / "legacy"
+            legacy.mkdir()
+            (legacy / "check_agent_scope.py").write_text("print('legacy guard')\n",
+                                                          encoding="utf8")
+            self.assertEqual(_control_code_mode(legacy / "check_agent_scope.py"), "bootstrap")
+
+    def test_trusted_control_code_answers_the_interface_version(self):
+        script = _materialize_trusted_code(self.work, "origin/main", self.trusted)
+        self.assertEqual(_control_code_mode(script), "trusted")
+
+    def test_bootstrap_fallback_judges_the_pull_request_by_its_own_declaration(self):
+        """Without a trusted guard the pull request's own validator runs, loudly."""
+        with tempfile.TemporaryDirectory() as tmp:
+            base = {"backend/main.py": "# base\n",
+                    "tools/minimax_task_scopes.json": REAL_MANIFEST,
+                    "backend/remote_access.py": "# base\n"}
+            work = _make_repository(tmp, base)
+            _git(work, "checkout", "-B", "minimax/ga-05-trusted-proxy-throttle", "main")
+            _write(work / "tools" / "check_agent_scope.py", REAL_VALIDATOR)
+            _write(work / "backend" / "main.py", "# forbidden\n")
+            _git(work, "add", "-A")
+            _git(work, "commit", "-m", "pull request revision")
+            script = _materialize_trusted_code(work, "origin/main", Path(tmp) / "trusted")
+            self.assertEqual(_control_code_mode(script), "bootstrap")
+            result = _run_scope_check(work, work / "tools" / "check_agent_scope.py",
+                                      "minimax/ga-05-trusted-proxy-throttle", "main")
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("CROSS_OWNER_CHANGE: backend/main.py", result.stdout)
 
 
 if __name__ == "__main__":

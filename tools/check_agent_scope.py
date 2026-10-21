@@ -11,13 +11,24 @@ Two independent mechanisms live here:
 * ``task_key_for_branch`` — the newer MiniMax/owner task branches (``minimax/ga-NN-*``,
   ``mavis/ga-NN-*``). Their allowed paths come from ``tools/minimax_task_scopes.json``.
 
-The task manifest is read from the BASE commit, never from the pull request head, so
-a task branch cannot widen its own scope in the same pull request. The very pull
-request that introduces the manifest is the bootstrap case: it declares its scope
-loudly (``SCOPE_BOOTSTRAP``) and is enforced against that declaration.
+Trust model
+-----------
+This file is the control code of the scope guard, so it must not be able to judge
+itself. Two rules follow from that:
+
+* the task manifest is read from the BASE commit, never from the pull request head,
+  so a task branch cannot widen its own scope in the same pull request;
+* the CI workflow runs the copy of this file that lives in the base revision, so a
+  pull request that replaces this validator cannot decide its own verdict.
+
+The very pull request that introduces the scope guard is the bootstrap case: the
+base revision has no trusted control code yet, the pull request's own validator runs
+instead, and the check says so loudly (``SCOPE_BOOTSTRAP``). Such a pull request is
+protected by an owner review, not by CI.
 """
 import argparse
 import json
+import os
 import re
 import subprocess
 import sys
@@ -25,6 +36,22 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 MANIFEST_PATH = "tools/minimax_task_scopes.json"
+
+# Bumped whenever the way this tool is driven changes. The CI workflow asks the
+# base revision for this number before it trusts the copy: a base revision that
+# predates the trusted interface cannot judge a pull request, and the workflow
+# falls back to the bootstrap path instead of running a half-understood tool.
+TRUSTED_INTERFACE_VERSION = 2
+
+# The files that make up the guard itself. A pull request that changes them does
+# not change the verdict of that same pull request (the verdict comes from the
+# base revision), but the change takes effect for every later pull request, so the
+# check reports it by name.
+CONTROL_FILES = (
+    ".github/workflows/agent-scope-guard.yml",
+    "tools/check_agent_scope.py",
+    "tools/minimax_task_scopes.json",
+)
 
 DEFAULT_MANIFEST = {
     "version": 1,
@@ -168,12 +195,47 @@ def forbidden_files(branch, paths, manifest=None):
             if path_denied(p, deny) or not path_allowed(p, allow)]
 
 
-def changed_files(base):
+def changed_files(base, head="HEAD"):
+    """Return the paths the pull request changes, relative to the base branch.
+
+    ``base`` is a branch name on the remote (``origin/<base>``); ``head`` is the
+    commit-ish the pull request head is at. The default keeps the historical
+    behaviour: the working tree is checked out at the pull request head.
+    """
     result = subprocess.run(
-        ["git", "diff", "--name-only", "-z", f"origin/{base}...HEAD"],
+        ["git", "diff", "--name-only", "-z", f"origin/{base}...{head}"],
         check=True, capture_output=True,
     )
     return [p.decode("utf8") for p in result.stdout.split(b"\0") if p]
+
+
+def control_file_changes(paths):
+    """Return the changed paths that belong to the scope guard itself."""
+    return [p for p in paths if p in CONTROL_FILES]
+
+
+def event_refs():
+    """Return the (base, head) branch names of the pull request event.
+
+    The event payload is written by GitHub, so it cannot be forged by the pull
+    request the way a command line argument can. Returns ``(None, None)`` when
+    the tool runs outside GitHub Actions.
+    """
+    path = os.environ.get("GITHUB_EVENT_PATH")
+    if not path or not os.path.isfile(path):
+        return None, None
+    try:
+        payload = json.loads(Path(path).read_text(encoding="utf8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        return None, None
+    pull_request = payload.get("pull_request") if isinstance(payload, dict) else None
+    if not isinstance(pull_request, dict):
+        return None, None
+    base = pull_request.get("base")
+    head = pull_request.get("head")
+    base_ref = base.get("ref") if isinstance(base, dict) else None
+    head_ref = head.get("ref") if isinstance(head, dict) else None
+    return base_ref, head_ref
 
 
 def _git_show_base(base):
@@ -216,10 +278,25 @@ def load_manifest(base, root=ROOT):
 
 
 def main():
+    # The CI workflow asks the base revision for its interface version before it
+    # trusts the copy. This has to work without any other argument, so it is
+    # answered before the parser validates its required arguments.
+    if "--interface-version" in sys.argv:
+        print(TRUSTED_INTERFACE_VERSION)
+        return 0
     parser = argparse.ArgumentParser()
     parser.add_argument("--branch", required=True)
     parser.add_argument("--base", required=True)
     args = parser.parse_args()
+    event_base, event_head = event_refs()
+    if event_base and args.base != event_base:
+        print(f"SCOPE_ERROR: base '{args.base}' does not match the pull request base "
+              f"'{event_base}' from the event payload", file=sys.stderr)
+        return 2
+    if event_head and args.branch != event_head:
+        print(f"SCOPE_ERROR: branch '{args.branch}' does not match the pull request head "
+              f"'{event_head}' from the event payload", file=sys.stderr)
+        return 2
     role = role_for_branch(args.branch)
     key = task_key_for_branch(args.branch)
     if role is None and key is None:
@@ -230,6 +307,12 @@ def main():
     except subprocess.CalledProcessError as exc:
         print(f"SCOPE_ERROR: cannot diff against origin/{args.base}: {exc}", file=sys.stderr)
         return 2
+    for path in control_file_changes(paths):
+        print(f"CONTROL_FILE_CHANGE: {path}")
+    if control_file_changes(paths):
+        print("SCOPE_CONTROL_FILES: this pull request changes the scope guard itself.")
+        print("The verdict below does not depend on that change; it only takes effect for")
+        print("later pull requests and needs an owner review.")
     manifest, bootstrapped, in_force = load_manifest(args.base)
     if not in_force:
         print(f"NO_SCOPE_MANIFEST: {MANIFEST_PATH} отсутствует ни в origin/{args.base}, "

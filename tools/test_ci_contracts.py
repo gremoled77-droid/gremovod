@@ -9,8 +9,11 @@ from tools.check_ci_contracts import (
     REQUIRED_CONTRACT_JOBS,
     REQUIRED_OFFLINE_JOBS,
     REQUIRED_PATH_FILTERS,
+    REQUIRED_SCOPE_GUARD_MARKERS,
+    SCOPE_GUARD_WORKFLOW,
     check_candidate_workflow,
     check_dependency_lock,
+    check_scope_guard_workflow,
     check_workflow_file,
     check_workflows,
 )
@@ -170,6 +173,70 @@ class WorkflowContractTests(unittest.TestCase):
                 encoding="utf8")
             problems = check_candidate_workflow(Path(tmp))
             self.assertTrue(any("continue-on-error" in p for p in problems))
+
+
+class ScopeGuardContractTests(unittest.TestCase):
+    """The scope guard wiring is a security contract, not a style choice."""
+
+    @staticmethod
+    def _guard_text(with_markers=True):
+        """A workflow that carries the trusted control code protocol."""
+        text = GOOD_WORKFLOW
+        if with_markers:
+            steps = "".join(f"      - run: echo {marker}\n"
+                            for marker in REQUIRED_SCOPE_GUARD_MARKERS)
+            text = text.replace("      - run: echo ok\n", steps)
+        return text
+
+    @staticmethod
+    def _write_guard(directory, text):
+        path = Path(directory) / ".github" / "workflows"
+        path.mkdir(parents=True, exist_ok=True)
+        (path / SCOPE_GUARD_WORKFLOW).write_text(text, encoding="utf8")
+
+    def test_repository_scope_guard_keeps_its_contract(self):
+        self.assertEqual(check_scope_guard_workflow(), [])
+
+    def test_missing_scope_guard_workflow_is_reported(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            problems = check_scope_guard_workflow(Path(tmp))
+            self.assertTrue(any("missing" in p for p in problems))
+
+    def test_a_guard_that_runs_the_pull_request_validator_is_reported(self):
+        """The materialization has to happen outside the working tree of the pull
+        request, and what runs has to be the materialized copy."""
+        with tempfile.TemporaryDirectory() as tmp:
+            text = self._guard_text()
+            self._write_guard(tmp, text)
+            self.assertEqual(check_scope_guard_workflow(Path(tmp)), [])
+            # a guard that runs the validator from the working tree of the pull request
+            text = text.replace("scope-guard/tools/check_agent_scope.py",
+                                "tools/check_agent_scope.py")
+            self._write_guard(tmp, text)
+            problems = check_scope_guard_workflow(Path(tmp))
+            self.assertTrue(any("trusted control code protocol" in p for p in problems))
+
+    def test_a_guard_without_the_trusted_base_revision_is_reported(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            text = self._guard_text().replace("github.event.pull_request.base.sha",
+                                              "github.sha")
+            self._write_guard(tmp, text)
+            problems = check_scope_guard_workflow(Path(tmp))
+            self.assertTrue(any("trusted control code protocol" in p for p in problems))
+
+    def test_a_guard_that_does_not_use_the_base_revision_is_reported(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            text = self._guard_text().replace("runner.temp", "workspace")
+            self._write_guard(tmp, text)
+            problems = check_scope_guard_workflow(Path(tmp))
+            self.assertTrue(any("trusted control code protocol" in p for p in problems))
+
+    def test_a_guard_on_pull_request_target_is_reported(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            text = self._guard_text().replace("  pull_request:\n", "  pull_request_target:\n")
+            self._write_guard(tmp, text)
+            problems = check_scope_guard_workflow(Path(tmp))
+            self.assertTrue(any("pull_request_target" in p for p in problems))
 
 
 if __name__ == "__main__":
