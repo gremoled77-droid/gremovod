@@ -191,6 +191,65 @@ test('offline/rate-limit rejection preserves a previously collected durable jour
   await reopened.load();
   assert.equal(reopened.events.length, 1);
 });
+test('one unavailable PR does not discard the PRs that were read', async () => {
+  const f = fixture(),
+    calls = [];
+  const success = mockGitHub(f, calls);
+  const batch = await github([58, 999], async (cmd, args) => {
+    if (args.at(-1).endsWith('/pulls/999')) throw Error('404 Not Found');
+    return success(cmd, args);
+  });
+  assert.equal(batch.pulls.length, 1, 'the readable PR must survive');
+  assert.equal(batch.pulls[0].number, 58);
+  assert.ok(batch.events.some(e => e.agent === 'Codex GitHub'));
+  assert.ok(batch.events.some(e => e.event_type === 'finding'));
+  assert.ok(batch.warnings.some(w => w.includes('#999')), 'the unavailable PR is reported');
+});
+test('unavailable optional Actions does not discard PR, review or findings', async () => {
+  const f = fixture(),
+    calls = [];
+  const success = mockGitHub(f, calls);
+  const batch = await github([58], async (cmd, args) => {
+    if (args.at(-1).includes('/actions/runs?')) throw Error('403 Actions scope unavailable');
+    return success(cmd, args);
+  });
+  assert.equal(batch.pulls.length, 1);
+  assert.equal(batch.pulls[0].review.p1, 1);
+  assert.ok(batch.events.some(e => e.event_type === 'finding'));
+  assert.ok(!batch.events.some(e => e.event_type === 'github_actions'));
+  assert.ok(batch.warnings.some(w => w.includes('Actions')), 'the missing optional source is reported');
+});
+test('a PR that cannot be read at all still rejects the batch', async () => {
+  await assert.rejects(
+    github([58], async () => {
+      throw Error('network offline');
+    })
+  );
+});
+test('two writers of one journal never append the same upstream event twice', async t => {
+  const root = await temp(t),
+    file = path.join(root, 'events.jsonl');
+  const a = new Journal(file),
+    b = new Journal(file);
+  await Promise.all([a.load(), b.load()]);
+  await Promise.all([a.add([make()]), b.add([make()])]);
+  const rows = (await fs.readFile(file, 'utf8')).split('\n').filter(Boolean);
+  assert.equal(rows.length, 1, 'the shared event must be written once');
+  assert.equal(new Set(rows.map(r => JSON.parse(r).event_id)).size, 1);
+  const reopened = new Journal(file);
+  await reopened.load();
+  assert.equal(reopened.events.length, 1);
+});
+test('the first append creates the journal directory', async t => {
+  const root = await temp(t),
+    file = path.join(root, 'nested', 'deeper', 'events.jsonl');
+  const j = new Journal(file);
+  await j.load();
+  await j.add([make()]);
+  const reopened = new Journal(file);
+  await reopened.load();
+  assert.equal(reopened.events.length, 1);
+});
 test('next task requires observed merge and real Codex marker, no owner permission fabricated', async () => {
   const f = fixture();
   f.comments.push({

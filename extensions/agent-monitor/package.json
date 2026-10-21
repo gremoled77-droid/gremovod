@@ -68,7 +68,7 @@
   "scripts": {
     "build": "tsc -p .",
     "vscode:prepublish": "npm run build",
-    "test": "npm run build && node --test test/core.test.cjs",
+    "test": "npm run build && node --test test/core.test.cjs test/resilience.test.cjs",
     "test:host": "npm run build && node test/run-host.cjs",
     "package": "vsce package --no-dependencies --allow-missing-repository --out gremovod-agent-monitor-0.1.0.vsix"
   },

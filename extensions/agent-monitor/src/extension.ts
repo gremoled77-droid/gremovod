@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import {createHash, randomBytes} from 'node:crypto';
 import {join} from 'node:path';
 import {homedir, tmpdir} from 'node:os';
-import {AgentEvent, Detail, Filter, Journal, filterEvents, redact, safeUrl} from './events';
+import {Detail, Filter, Journal, filterEvents, redact, safeUrl} from './events';
 import {PullState, allowedReport, cliPresence, gitSource, github, localSources} from './sources';
 
 export function html(webview: vscode.Webview, uri: vscode.Uri) {
@@ -25,20 +25,27 @@ export function html(webview: vscode.Webview, uri: vscode.Uri) {
 
 export function activate(context: vscode.ExtensionContext) {
   let panel: vscode.WebviewPanel | undefined;
+  let opening: Promise<vscode.WebviewPanel> | undefined;
   let latest: any;
   let details: Record<string, Detail> = {};
   let disposed = false;
   let journal: Journal;
-  const disposables: vscode.Disposable[] = [];
-  let busy = false,
-    pending = false,
-    nextGitHub = 0,
+  let localBusy = false,
+    localPending = false,
+    remoteBusy = false,
+    remotePending = false;
+  let nextGitHub = 0,
     failures = 0;
   let generation = 0,
     lastAttempt = 0;
   let pulls: PullState[] = [];
   let githubStatus = 'Not connected';
   let lastGitHub: string | null = null;
+  let localWarnings: string[] = [];
+  let remoteWarnings: string[] = [];
+  let localView = {rounds: {} as Record<string, number>, lastRun: 'Unknown', connected: false};
+  let gitView = {branch: 'Unknown', changed: [] as string[]};
+  let cliCache: Record<string, string> = {};
   let filter: Filter = {};
   let visible = 200;
   const send = () => {
@@ -63,52 +70,46 @@ export function activate(context: vscode.ExtensionContext) {
   };
   let root = '',
     dispatcher = '';
-  async function refresh() {
-    if (disposed) return;
-    if (busy) {
-      pending = true;
+  /** Build the snapshot from the state collected so far and hand it to the panel. */
+  const publish = () => {
+    if (!panel || !journal) return;
+    const ids = new Set(journal.events.map(e => e.event_id));
+    for (const id of Object.keys(details)) if (!ids.has(id)) delete details[id];
+    latest = {
+      updated: new Date().toISOString(),
+      githubStatus,
+      lastGitHub,
+      nextGitHub: new Date(nextGitHub).toISOString(),
+      pulls,
+      warnings: [...localWarnings, ...remoteWarnings],
+      local: localView,
+      git: {branch: redact(gitView.branch), worktree: root, changed: gitView.changed},
+      cli: cliCache,
+      journal: journal.path,
+      lastEvent: journal.events.at(-1)?.timestamp ?? null,
+    };
+    send();
+  };
+  /**
+   * Local sources only: the dispatcher state, the worktree and the journal. This path never waits
+   * for GitHub, so a local change is published even while the network poll is still running.
+   */
+  async function refreshLocal(): Promise<void> {
+    if (disposed || !journal) return;
+    if (localBusy) {
+      localPending = true;
       return;
     }
-    busy = true;
+    localBusy = true;
     const activeGeneration = generation;
     try {
       const local = await localSources(dispatcher);
       const git = await gitSource(root);
-      let remoteEvents: AgentEvent[] = [];
-      const warnings = [...local.warnings, ...git.warnings, ...journal.warnings];
-      const cfg = vscode.workspace.getConfiguration('gremovodAgentMonitor', vscode.Uri.file(root));
-      if (Date.now() >= nextGitHub) {
-        lastAttempt = Date.now();
-        const seconds = Math.max(60, Math.min(3600, Number(cfg.get('pollSeconds', 120)) || 120));
-        try {
-          const numbers = cfg.get<number[]>('pullRequests', [58, 59]);
-          if (!Array.isArray(numbers) || numbers.length > 10) throw Error('Invalid PR configuration');
-          const remote = await github(numbers);
-          if (disposed || generation !== activeGeneration) return;
-          pulls = remote.pulls;
-          remoteEvents = remote.events;
-          details = {...details, ...remote.details};
-          warnings.push(...remote.warnings);
-          failures = 0;
-          lastGitHub = new Date().toISOString();
-          githubStatus = 'Connected';
-          try {
-            await context.workspaceState.update('agentMonitor.lastPulls', {pulls, at: lastGitHub});
-          } catch {
-            warnings.push('VS Code snapshot cache could not be saved; event journal remains independent.');
-          }
-        } catch (error: any) {
-          failures++;
-          githubStatus = 'Not connected / cached observations';
-          const detail = redact(error?.stderr || error?.message || 'Unknown error').slice(0, 300);
-          warnings.push(
-            `GitHub refresh failed: ${detail}. Check gh authentication/network/rate limits. Cached events remain visible.`
-          );
-        }
-        nextGitHub = Date.now() + Math.min(3600000, seconds * 1000 * 2 ** Math.min(failures, 5));
-      }
       if (disposed || generation !== activeGeneration) return;
+      localView = {rounds: local.rounds, lastRun: local.lastRun, connected: local.connected};
+      gitView = {branch: git.branch, changed: git.changed};
       details = {...details, ...local.details};
+      localWarnings = [...local.warnings, ...git.warnings, ...journal.warnings];
       const localEvents = local.events.map(e => {
         const task = e.task_id ?? pulls.find(p => p.number === e.pr_number)?.task;
         return task
@@ -119,24 +120,11 @@ export function activate(context: vscode.ExtensionContext) {
             }
           : e;
       });
-      await journal.add([...localEvents, ...git.events, ...remoteEvents]);
+      await journal.add([...localEvents, ...git.events]);
       if (disposed || generation !== activeGeneration) return;
-      const ids = new Set(journal.events.map(e => e.event_id));
-      for (const id of Object.keys(details)) if (!ids.has(id)) delete details[id];
-      latest = {
-        updated: new Date().toISOString(),
-        githubStatus,
-        lastGitHub,
-        nextGitHub: new Date(nextGitHub).toISOString(),
-        pulls,
-        warnings,
-        local: {rounds: local.rounds, lastRun: local.lastRun, connected: local.connected},
-        git: {branch: redact(git.branch), worktree: root, changed: git.changed},
-        cli: await cliPresence(),
-        journal: journal.path,
-        lastEvent: journal.events.at(-1)?.timestamp ?? null,
-      };
-      send();
+      cliCache = await cliPresence();
+      if (disposed || generation !== activeGeneration) return;
+      publish();
     } catch {
       panel?.webview.postMessage({
         type: 'error',
@@ -144,27 +132,77 @@ export function activate(context: vscode.ExtensionContext) {
           'Не удалось обновить монитор. Проверьте доступ к локальному журналу; исходники и state.json не изменялись.',
       });
     } finally {
-      busy = false;
-      if (pending && !disposed) {
-        pending = false;
-        void refresh();
+      localBusy = false;
+      if (localPending && !disposed) {
+        localPending = false;
+        void refreshLocal();
       }
     }
   }
-  const command = vscode.commands.registerCommand('gremovodAgentMonitor.open', async () => {
-    if (!vscode.workspace.isTrusted) {
-      vscode.window.showWarningMessage('Agent Monitor requires a trusted workspace.');
+  /** GitHub poll. It is the only path that waits for the network and it holds its own lock. */
+  async function refreshRemote(): Promise<void> {
+    if (disposed || !journal) return;
+    if (remoteBusy) {
+      remotePending = true;
       return;
     }
-    if (panel) {
-      panel.reveal();
-      return;
+    if (Date.now() < nextGitHub) return;
+    remoteBusy = true;
+    const activeGeneration = generation;
+    try {
+      const cfg = vscode.workspace.getConfiguration('gremovodAgentMonitor', vscode.Uri.file(root));
+      const seconds = Math.max(60, Math.min(3600, Number(cfg.get('pollSeconds', 120)) || 120));
+      lastAttempt = Date.now();
+      try {
+        const numbers = cfg.get<number[]>('pullRequests', [58, 59]);
+        if (!Array.isArray(numbers) || numbers.length > 10) throw Error('Invalid PR configuration');
+        const remote = await github(numbers);
+        if (disposed || generation !== activeGeneration) return;
+        pulls = remote.pulls;
+        details = {...details, ...remote.details};
+        remoteWarnings = remote.warnings;
+        failures = 0;
+        lastGitHub = new Date().toISOString();
+        githubStatus = 'Connected';
+        try {
+          await context.workspaceState.update('agentMonitor.lastPulls', {pulls, at: lastGitHub});
+        } catch {
+          remoteWarnings = [
+            ...remoteWarnings,
+            'VS Code snapshot cache could not be saved; event journal remains independent.',
+          ];
+        }
+        await journal.add(remote.events);
+        if (disposed || generation !== activeGeneration) return;
+      } catch (error: any) {
+        failures++;
+        githubStatus = 'Not connected / cached observations';
+        const detail = redact(error?.stderr || error?.message || 'Unknown error').slice(0, 300);
+        remoteWarnings = [
+          `GitHub refresh failed: ${detail}. Check gh authentication/network/rate limits. Cached events remain visible.`,
+        ];
+      }
+      nextGitHub = Date.now() + Math.min(3600000, seconds * 1000 * 2 ** Math.min(failures, 5));
+      if (disposed || generation !== activeGeneration) return;
+      publish();
+    } finally {
+      remoteBusy = false;
+      if (remotePending && !disposed) {
+        remotePending = false;
+        void refreshRemote();
+      }
     }
+  }
+  async function refresh(): Promise<void> {
+    await refreshLocal();
+    await refreshRemote();
+  }
+  const openPanel = async (): Promise<vscode.WebviewPanel> => {
     generation++;
     root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? '';
     if (!root) {
       vscode.window.showInformationMessage('Откройте локальную папку проекта для Agent Monitor.');
-      return;
+      throw Error('No workspace folder');
     }
     disposed = false;
     filter = {};
@@ -172,6 +210,10 @@ export function activate(context: vscode.ExtensionContext) {
     nextGitHub = 0;
     failures = 0;
     details = {};
+    localWarnings = [];
+    remoteWarnings = [];
+    localView = {rounds: {}, lastRun: 'Unknown', connected: false};
+    gitView = {branch: 'Unknown', changed: []};
     const saved = context.workspaceState.get<{pulls: PullState[]; at: string}>('agentMonitor.lastPulls');
     pulls = saved?.pulls ?? [];
     lastGitHub = saved?.at ?? null;
@@ -187,7 +229,9 @@ export function activate(context: vscode.ExtensionContext) {
     const key = createHash('sha256').update(root).digest('hex').slice(0, 16);
     journal = new Journal(join(context.globalStorageUri.fsPath, key, 'events.jsonl'));
     await journal.load();
-    panel = vscode.window.createWebviewPanel(
+    // Resources of this panel only: closing it must not touch the resources of another one.
+    const own: vscode.Disposable[] = [];
+    const created = vscode.window.createWebviewPanel(
       'gremovodAgentMonitor',
       'GremoVOD Agent Monitor',
       vscode.ViewColumn.One,
@@ -198,8 +242,9 @@ export function activate(context: vscode.ExtensionContext) {
         enableCommandUris: false,
       }
     );
-    panel.webview.html = html(panel.webview, context.extensionUri);
-    panel.webview.onDidReceiveMessage(
+    panel = created;
+    created.webview.html = html(created.webview, context.extensionUri);
+    created.webview.onDidReceiveMessage(
       async (m: any) => {
         if (!m || typeof m !== 'object' || typeof m.type !== 'string') return;
         if (m.type === 'ready') {
@@ -230,7 +275,7 @@ export function activate(context: vscode.ExtensionContext) {
         if (!e) return;
         const d = details[e.event_id];
         if (m.type === 'detail')
-          panel?.webview.postMessage({
+          created.webview.postMessage({
             type: 'detail',
             id: e.event_id,
             text: d?.text ?? `${e.summary}\n\nПолный текст недоступен в этом снимке. Откройте источник.`,
@@ -249,7 +294,7 @@ export function activate(context: vscode.ExtensionContext) {
         }
       },
       undefined,
-      disposables
+      own
     );
     const watcher = vscode.workspace.createFileSystemWatcher(
       new vscode.RelativePattern(vscode.Uri.file(dispatcher), '{state.json,PR-*.md,PR-*.json}')
@@ -263,24 +308,41 @@ export function activate(context: vscode.ExtensionContext) {
     watcher.onDidCreate(changed);
     watcher.onDidDelete(changed);
     const timer = setInterval(() => void refresh(), 30000);
-    disposables.push(watcher, {
+    own.push(watcher, {
       dispose: () => {
         clearInterval(timer);
         clearTimeout(debounce);
       },
     });
-    panel.onDidDispose(() => {
-      disposed = true;
-      panel = undefined;
-      for (const d of disposables.splice(0)) d.dispose();
+    created.onDidDispose(() => {
+      // Only the owner of the panel clears the shared state.
+      if (panel === created) {
+        panel = undefined;
+        disposed = true;
+      }
+      for (const d of own.splice(0)) d.dispose();
     });
     await refresh();
+    return created;
+  };
+  const command = vscode.commands.registerCommand('gremovodAgentMonitor.open', async () => {
+    if (!vscode.workspace.isTrusted) {
+      vscode.window.showWarningMessage('Agent Monitor requires a trusted workspace.');
+      return;
+    }
+    if (panel) {
+      panel.reveal();
+      return;
+    }
+    // A second open while the first one is still starting must join it, not start a rival panel.
+    if (!opening) opening = openPanel().finally(() => (opening = undefined));
+    const created = await opening.catch(() => undefined);
+    created?.reveal();
   });
   context.subscriptions.push(command, {
     dispose: () => {
       disposed = true;
       panel?.dispose();
-      for (const d of disposables.splice(0)) d.dispose();
     },
   });
   return {getSnapshot: () => latest, getEvents: () => journal?.events ?? [], close: () => panel?.dispose()};

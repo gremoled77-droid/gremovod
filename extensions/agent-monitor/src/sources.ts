@@ -114,16 +114,36 @@ export async function github(numbers: number[], command: Run = run): Promise<Bat
       throw Error('Unexpected paginated GitHub response');
     return value.flat();
   };
-  for (const number of [...new Set(numbers)]) {
-    if (!Number.isSafeInteger(number) || number < 1) throw Error('Invalid PR number');
+  /**
+   * Read one optional source of a PR. A failure is reported as a warning and never turns the
+   * already collected data of that PR into missing data.
+   */
+  const optional = async <T>(
+    number: number,
+    label: string,
+    read: () => Promise<T>,
+    fallback: T
+  ): Promise<T> => {
+    try {
+      return await read();
+    } catch (error: any) {
+      result.warnings.push(
+        `PR #${number}: ${label} unavailable (${redact(error?.message ?? 'Unknown error').slice(0, 200)}).`
+      );
+      return fallback;
+    }
+  };
+  /** Collect one PR. Events of a PR that fails stay out of the batch: only the warning remains. */
+  const collect = async (number: number): Promise<Batch & {pulls: PullState[]}> => {
+    const local = {...blank(), pulls: [] as PullState[]};
     const base = `repos/${REPO}`;
     const pr = await api(`${base}/pulls/${number}`);
     if (!/^[a-f0-9]{40}$/i.test(pr.head?.sha ?? '')) throw Error('Invalid GitHub head SHA');
-    const comments = await pages(`${base}/issues/${number}/comments`);
-    const reviews = await pages(`${base}/pulls/${number}/reviews`);
-    const inline = await pages(`${base}/pulls/${number}/comments`);
-    const commits = await pages(`${base}/pulls/${number}/commits`);
-    const files = await pages(`${base}/pulls/${number}/files`);
+    const comments = await optional(number, 'comments', () => pages(`${base}/issues/${number}/comments`), [] as any[]);
+    const reviews = await optional(number, 'reviews', () => pages(`${base}/pulls/${number}/reviews`), [] as any[]);
+    const inline = await optional(number, 'inline comments', () => pages(`${base}/pulls/${number}/comments`), [] as any[]);
+    const commits = await optional(number, 'commits', () => pages(`${base}/pulls/${number}/commits`), [] as any[]);
+    const files = await optional(number, 'files', () => pages(`${base}/pulls/${number}/files`), [] as any[]);
     if ((pr.changed_files ?? 0) > files.length)
       result.warnings.push(
         `PR #${number}: GitHub files response is incomplete (${files.length}/${pr.changed_files}).`
@@ -145,7 +165,7 @@ export async function github(numbers: number[], command: Run = run): Promise<Bat
     );
     if (pr.merged && marker)
       pull.next = `${next}: GitHub merge + Codex marker observed; dispatcher acceptance Unknown`;
-    result.pulls.push(pull);
+    local.pulls.push(pull);
     const add = (
       type: string,
       id: string,
@@ -173,8 +193,8 @@ export async function github(numbers: number[], command: Run = run): Promise<Bat
         },
         id
       );
-      result.events.push(e);
-      result.details[e.event_id] = {text: redact(text).slice(0, 64000), url: safeUrl(url)};
+      local.events.push(e);
+      local.details[e.event_id] = {text: redact(text).slice(0, 64000), url: safeUrl(url)};
     };
     add(
       'pr_created',
@@ -236,7 +256,12 @@ export async function github(numbers: number[], command: Run = run): Promise<Bat
         );
       }
     }
-    const actions = await api(`${base}/actions/runs?head_sha=${pr.head.sha}&per_page=100`);
+    const actions = await optional(
+      number,
+      'GitHub Actions',
+      () => api(`${base}/actions/runs?head_sha=${pr.head.sha}&per_page=100`),
+      {total_count: 0, workflow_runs: []} as any
+    );
     if ((actions.total_count ?? 0) > 100)
       result.warnings.push(`PR #${number}: Actions view limited to 100 runs at current SHA.`);
     for (const a of actions.workflow_runs ?? [])
@@ -251,12 +276,32 @@ export async function github(numbers: number[], command: Run = run): Promise<Bat
         a.head_sha
       );
     // A moving head invalidates the collected view; retry on the next poll rather than declaring a stale review clear.
-    const latest = await api(`${base}/pulls/${number}`);
-    if (latest.head.sha !== pull.sha) {
+    const latest = await optional(number, 'head re-check', () => api(`${base}/pulls/${number}`), undefined as any);
+    if (latest && latest.head?.sha !== pull.sha) {
       pull.review.status = 'Stale SHA';
       result.warnings.push(`PR #${number}: head changed during refresh; next poll required.`);
     }
+    return local;
+  };
+  const unique = [...new Set(numbers)];
+  let failed = 0;
+  for (const number of unique) {
+    if (!Number.isSafeInteger(number) || number < 1) throw Error('Invalid PR number');
+    try {
+      const local = await collect(number);
+      result.events.push(...local.events);
+      Object.assign(result.details, local.details);
+      result.pulls.push(...local.pulls);
+    } catch (error: any) {
+      // One unavailable PR must not discard the data of the PRs that were read successfully.
+      failed++;
+      result.warnings.push(
+        `PR #${number}: unavailable (${redact(error?.message ?? 'Unknown error').slice(0, 200)}).`
+      );
+    }
   }
+  if (unique.length && failed === unique.length)
+    throw Error('GitHub refresh failed: no configured PR could be read.');
   return result;
 }
 
