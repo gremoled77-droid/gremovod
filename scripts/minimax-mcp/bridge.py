@@ -20,6 +20,11 @@ from pathlib import Path, PurePosixPath
 HERE = Path(__file__).resolve().parent
 OUTPUT_LIMIT = 16_384
 ACTIVE = {"RESERVED", "RUNNING"}
+# The CLI stores the credential in auth.json and the credential state (region,
+# build env, status) in auth-state.json. Everything else it writes into its
+# data dir is bootstrap it owns: config.yaml, .builtin-skills, agents, bin,
+# cache, integrations, plugins, run, v2, and the *.lock files.
+AUTH_FILES = ("auth.json", "auth-state.json")
 SECRET = re.compile(
     r"(?i)(bearer\s+\S+|(?:sk-|ghp_|github_pat_)[A-Za-z0-9_-]{8,}|(?:api[_-]?key|access[_-]?token|refresh[_-]?token|password|secret)[\"']?\s*[:=]\s*[\"']?[^\s\"',}]{4,})"
 )
@@ -62,6 +67,53 @@ def safe_name(name):
     ):
         raise ValueError("FILE_NOT_ALLOWED")
     return name
+
+
+def seed_profile(source: Path, target: Path):
+    """Seed a fresh CLI data dir with only the owner's auth subtree.
+
+    The CLI writes its own bootstrap trees into whatever data dir it is given,
+    and it keeps MCP servers, integrations, plugins, skills and API-key
+    providers in that same dir. Copying only auth/ into a directory the bridge
+    creates therefore keeps foreign capability and credential state out by
+    construction instead of by inspection: nothing else is ever copied.
+
+    auth-state.json is copied with auth.json because the CLI reads it to
+    resolve the credential region and build environment. *.lock files are
+    skipped: the CLI recreates them.
+    """
+    auth = checked_path(source / "auth")
+    if not auth.is_dir():
+        raise ValueError("ISOLATED_AUTH_MISSING")
+    entries = [item for item in auth.rglob("*") if item.is_file()]
+    if not any(item.name == "auth.json" for item in entries):
+        raise ValueError("ISOLATED_AUTH_MISSING")
+    target.mkdir(parents=True, exist_ok=False)
+    states = []
+    for item in entries:
+        checked = checked_path(item)
+        if checked.name.endswith(".lock"):
+            continue
+        if checked.name not in AUTH_FILES:
+            raise ValueError("PROFILE_NOT_LOGIN_ONLY")
+        destination = target / "auth" / checked.relative_to(auth)
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(checked, destination)
+        if checked.name == "auth-state.json":
+            states.append(destination)
+    # The CLI reports the same provider list for an empty profile and for a
+    # signed-in one, so `provider list` cannot prove a subscription credential.
+    # The credential state file is the only local evidence: without it, or with
+    # a status other than "authenticated", there is no usable login.
+    if not states:
+        raise ValueError("SUBSCRIPTION_AUTH_UNVERIFIED")
+    try:
+        state = json.loads(states[0].read_text(encoding="utf-8"))
+    except ValueError:
+        raise ValueError("SUBSCRIPTION_AUTH_UNVERIFIED") from None
+    if state.get("status") != "authenticated":
+        raise ValueError("SUBSCRIPTION_AUTH_UNVERIFIED")
+    return target
 
 
 def isolated_environment(root: Path, profile: Path):
@@ -422,7 +474,8 @@ class Bridge:
             "1",
         ]
 
-    def live_preflight(self, request_digest, head_sha):
+    def live_grant(self, request_digest, head_sha):
+        """Validate the out-of-band owner grant for this exact request."""
         approval = checked_path(
             Path(
                 self.config.get("approval_file", self.directory / "owner-approval.json")
@@ -441,6 +494,15 @@ class Bridge:
             or datetime.fromisoformat(grant["expires_at"]) <= datetime.now(UTC)
         ):
             raise ValueError("OWNER_APPROVAL_INVALID")
+        return grant
+
+    def live_preflight(self, request_id, request_digest, head_sha):
+        """Owner grant, CLI identity and the isolated runtime profile.
+
+        The runtime profile is created here, before any launch, so the CLI
+        bootstrap trees it writes later cannot reach the owner profile.
+        """
+        self.live_grant(request_digest, head_sha)
         argv = self.command()
         if not all(Path(p).is_file() for p in argv[:2]):
             raise ValueError("CLI_MISSING")
@@ -452,14 +514,16 @@ class Bridge:
             or package.get("version") != "0.6.12"
         ):
             raise ValueError("CLI_VERSION_UNVERIFIED")
-        profile = checked_path(self.directory / "minimax-profile")
-        if not profile.is_dir() or not list((profile / "auth").glob("**/auth.json")):
-            raise ValueError("ISOLATED_AUTH_MISSING")
-        # Strict login-only input profile; new/unknown capability/config trees fail closed.
+        owner = checked_path(self.directory / "minimax-profile")
+        profile = seed_profile(
+            owner, checked_path(self.directory / f"runtime-{request_id}")
+        )
+        # Strict login-only runtime profile; new/unknown capability/config trees
+        # fail closed. The owner profile itself is never handed to the CLI.
         for item in profile.rglob("*"):
             checked_path(item)
             if item.relative_to(profile).parts[0] != "auth" or (
-                item.is_file() and item.name != "auth.json"
+                item.is_file() and item.name not in AUTH_FILES
             ):
                 raise ValueError("PROFILE_NOT_LOGIN_ONLY")
         return argv, profile
@@ -497,7 +561,9 @@ class Bridge:
             try:
                 contents = self.inputs(head_sha, files)
                 if self.mode == "live":
-                    argv, profile = self.live_preflight(request_digest, head_sha)
+                    argv, profile = self.live_preflight(
+                        request_id, request_digest, head_sha
+                    )
                     # An owner grant is single-use, even if a launch subsequently fails.
                     if self.state["calls"]:
                         raise ValueError("OWNER_GRANT_SPENT")
@@ -653,7 +719,9 @@ class Bridge:
                     for p in status.get("providers", [])
                 ):
                     raise ValueError(probe_error or "SUBSCRIPTION_AUTH_UNVERIFIED")
-                self.live_preflight(record["request_digest"], record["head_sha"])
+                # The grant is re-checked after the probe; the runtime profile is
+                # bridge-created and may already hold the CLI bootstrap trees.
+                self.live_grant(record["request_digest"], record["head_sha"])
             if self.cancelled.is_set() or time.monotonic() - started >= self.timeout:
                 raise ValueError("CANCELLED" if self.cancelled.is_set() else "TIMEOUT")
             with self.mutex:
@@ -684,12 +752,17 @@ class Bridge:
                     result = json.loads(record["stdout"])
                 except ValueError:
                     raise ValueError("INVALID_OUTPUT") from None
-                if (
-                    not isinstance(result, dict)
-                    or not result
-                    or result.get("error")
-                    or result.get("status") in {"failed", "aborted", "cancelled"}
-                ):
+                if not isinstance(result, dict) or not result:
+                    raise ValueError("INVALID_OUTPUT")
+                status = result.get("status")
+                # The CLI ExecResult reports succeeded, failed, timeout,
+                # cancelled or limit_exceeded. Only "succeeded" may be recorded
+                # as a result; every other status fails closed.
+                if self.mode == "live":
+                    valid = status == "succeeded"
+                else:
+                    valid = status is None or status == "succeeded"
+                if result.get("error") or not valid:
                     raise ValueError("INVALID_OUTPUT")
                 if self.inputs(record["head_sha"], list(contents)) != contents:
                     raise ValueError("INPUT_CHANGED")

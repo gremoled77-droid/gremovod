@@ -432,8 +432,25 @@ class BridgeTests(Fixture):
         profile = service.directory / "minimax-profile"
         (profile / "auth" / "global").mkdir(parents=True)
         (profile / "auth" / "global" / "auth.json").write_text("{}")
+        (profile / "auth" / "global" / "auth-state.json").write_text(
+            json.dumps({"status": "authenticated", "region": "en", "buildEnv": "prod"})
+        )
         (profile / "v2" / "plugin-cache").mkdir(parents=True)
-        self.assertEqual(self.execute(service)["error"], "PROFILE_NOT_LOGIN_ONLY")
+        # Foreign capability state in the owner profile is never handed to the
+        # CLI: the runtime profile holds the auth subtree and nothing else.
+        record = self.execute(service)
+        self.assertNotIn("error", record)
+        self.wait(service)
+        runtime = service.directory / "runtime-one"
+        self.assertEqual(
+            sorted(item.relative_to(runtime).as_posix() for item in runtime.rglob("*")),
+            [
+                "auth",
+                "auth/global",
+                "auth/global/auth-state.json",
+                "auth/global/auth.json",
+            ],
+        )
 
     def prepared_live(self):
         service, grant = self.live_request()
@@ -448,6 +465,9 @@ class BridgeTests(Fixture):
         auth = service.directory / "minimax-profile/auth/global/auth.json"
         auth.parent.mkdir(parents=True)
         auth.write_text("{}")
+        (auth.parent / "auth-state.json").write_text(
+            json.dumps({"status": "authenticated", "region": "en", "buildEnv": "prod"})
+        )
         return service
 
     def test_live_command_contract_with_mocked_transport(self):
@@ -458,7 +478,15 @@ class BridgeTests(Fixture):
         }
         replies = [
             (None, 0, {"stdout": json.dumps(provider), "stderr": ""}),
-            (None, 0, {"stdout": '{"synthetic": true}', "stderr": ""}),
+            # The real ExecResult carries a status; only "succeeded" is accepted.
+            (
+                None,
+                0,
+                {
+                    "stdout": json.dumps({"status": "succeeded", "synthetic": True}),
+                    "stderr": "",
+                },
+            ),
         ]
         with patch.object(service, "capture", side_effect=replies) as transport:
             self.execute(service)
