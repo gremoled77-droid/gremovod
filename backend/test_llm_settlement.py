@@ -13,8 +13,11 @@
 """
 import asyncio
 import json
+import sqlite3
+import tempfile
 import time
 import unittest
+from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
 from backend import llm_guard, main, test_smoke
@@ -157,6 +160,42 @@ class LlmSettlementTests(unittest.TestCase):
         row = self.call_row('ga01-unparseable-1')
         self.assertEqual(row['status'], 'submission_unknown')
         self.assertEqual(row['usd'], quote['estimated_usd'])
+
+    def test_zero_total_tokens_does_not_release_the_reserve(self):
+        """total_tokens=0 при непустых prompt/completion — не доказательство «не списал».
+
+        Ответ без разбираемого текста: единственное доказательство отсутствия оплаты —
+        полный и непротиворечивый набор счётчиков с нулями. Одно поле total_tokens=0
+        резерв обнулять не может.
+        """
+        self.prepare()
+        quote = self.quote()
+        body = {'provider': 'piapi', 'project_id': self.pid, 'model': 'gpt-5.6-luna', 'messages': self.messages,
+                'max_tokens': 500, 'approved': True, 'quote_token': quote['quote_token'],
+                'max_cost_usd': quote['estimated_usd'], 'request_id': 'ga01-zero-total-1'}
+        usage = {'total_tokens': 0, 'prompt_tokens': 500, 'completion_tokens': 100}
+        with patch.object(main, 'request_piapi', AsyncMock(return_value={'usage': usage})):
+            r = self.client.post('/api/llm/chat', json=body)
+        self.assertEqual(r.status_code, 502, r.text)
+        row = self.call_row('ga01-zero-total-1')
+        self.assertEqual(row['status'], 'submission_unknown')
+        self.assertEqual(row['usd'], quote['estimated_usd'])
+        self.assertTrue(row['note'])
+
+    def test_timeout_after_send_keeps_the_reserve(self):
+        """Таймаут после отправки не доказывает, что деньги не списаны: резерв держится."""
+        self.prepare()
+        quote = self.quote()
+        body = {'provider': 'piapi', 'project_id': self.pid, 'model': 'gpt-5.6-luna', 'messages': self.messages,
+                'max_tokens': 500, 'approved': True, 'quote_token': quote['quote_token'],
+                'max_cost_usd': quote['estimated_usd'], 'request_id': 'ga01-timeout-1'}
+        with patch.object(main, 'request_piapi', AsyncMock(side_effect=TimeoutError('read timeout'))):
+            with self.assertRaises(Exception):
+                self.client.post('/api/llm/chat', json=body)
+        row = self.call_row('ga01-timeout-1')
+        self.assertEqual(row['status'], 'submission_unknown')
+        self.assertEqual(row['usd'], quote['estimated_usd'])
+        self.assertTrue(row['note'])
 
     def test_duplicate_request_id_does_not_resubmit(self):
         """Повтор того же request_id не отправляет запрос провайдеру снова."""
@@ -395,6 +434,27 @@ class AgentsReconcileTests(unittest.TestCase):
         self.assertEqual(again.status_code, 409, again.text)
         self.assertEqual(self.spend_row()['usd'], amount, 'повторная сверка не должна менять сумму')
 
+    def test_repeat_reconcile_never_lowers_the_confirmed_fact(self):
+        """Повторная сверка не уменьшает уже подтверждённый факт и не меняет сумму.
+
+        Подтверждённая часть — доказанный факт: её нельзя списать ни нулевой, ни
+        повторной сверкой. Повторная сверка отклоняется, сумма остаётся прежней.
+        """
+        self.prepare()
+        good = {'prompt_tokens': 120, 'completion_tokens': 40}
+        r, _ = self.run_agents('ga01-recon-4', [('Сцена.', good), ('Континуитет.', {}), ('Промпты.', good)])
+        self.assertEqual(r.status_code, 200, r.text)
+        confirmed = self.confirmed_for(240, 80)
+        row = self.spend_row()
+        first = self.reconcile(row['id'], {'outcome': 'failed', 'note': 'списания по второй роли нет'})
+        self.assertEqual(first.status_code, 200, first.text)
+        self.assertAlmostEqual(self.split_row()['confirmed_usd'], confirmed, places=6)
+        amount = self.spend_row()['usd']
+        again = self.reconcile(row['id'], {'outcome': 'done', 'usd': 0.0, 'note': 'повторная сверка'})
+        self.assertEqual(again.status_code, 409, again.text)
+        self.assertAlmostEqual(self.split_row()['confirmed_usd'], confirmed, places=6)
+        self.assertAlmostEqual(self.spend_row()['usd'], amount, places=6)
+
     def test_reconcile_zero_never_zeroes_confirmed_part(self):
         """Ноль в сверке не обнуляет подтверждённое и не даёт отрицательной суммы."""
         self.prepare()
@@ -603,6 +663,175 @@ class UsageValidatorTests(unittest.TestCase):
         self.assertIsNone(tokens_out)
         usd, _, _ = llm_guard.actual_cost(price_in, price_out, {'prompt_tokens': 120, 'completion_tokens': 40})
         self.assertGreater(usd, 0)
+
+
+class ZeroUsageTrustTests(unittest.TestCase):
+    """Доказательство «провайдер ничего не списал» — полный и непротиворечивый набор.
+
+    Одно поле total_tokens=0 доказательством не является: остальные счётчики могут
+    ему противоречить или отсутствовать. Нулевое потребление доказывается только тем,
+    что оба обязательных счётчика равны нулю и сумма сходится.
+    """
+
+    def test_total_tokens_zero_does_not_hide_prompt_tokens(self):
+        usage = {'total_tokens': 0, 'prompt_tokens': 500, 'completion_tokens': 100}
+        self.assertIsNotNone(llm_guard.usage_problem(usage))
+        self.assertFalse(llm_guard._not_charged({'usage': usage}))
+
+    def test_total_tokens_zero_does_not_hide_completion_tokens(self):
+        usage = {'total_tokens': 0, 'prompt_tokens': 0, 'completion_tokens': 200}
+        self.assertIsNotNone(llm_guard.usage_problem(usage))
+        self.assertFalse(llm_guard._not_charged({'usage': usage}))
+
+    def test_total_tokens_zero_without_mandatory_counters_is_not_a_proof(self):
+        usage = {'total_tokens': 0}
+        problem = llm_guard.usage_problem(usage)
+        self.assertIsNotNone(problem)
+        self.assertIn('prompt_tokens', problem)
+        self.assertFalse(llm_guard._not_charged({'usage': usage}))
+
+    def test_inconsistent_token_sum_is_not_a_fact(self):
+        """Сумма токенов не сходится — достоверного usage нет, резерв удерживается."""
+        usage = {'total_tokens': 100, 'prompt_tokens': 60, 'completion_tokens': 30}
+        self.assertIsNotNone(llm_guard.usage_problem(usage))
+        status, usd, tokens_in, tokens_out, reason = llm_guard.settle_from_usage(0.1, 0.2, usage, 1.0)
+        self.assertEqual(status, 'submission_unknown')
+        self.assertEqual(usd, 1.0)
+        self.assertIsNone(tokens_in)
+        self.assertIsNone(tokens_out)
+        self.assertTrue(reason)
+
+    def test_correct_zero_usage_is_still_a_proof_of_no_charge(self):
+        """Корректный нулевой usage по контракту провайдера — доказательство «не списал»."""
+        self.assertTrue(llm_guard._not_charged({'usage': {'prompt_tokens': 0, 'completion_tokens': 0}}))
+        self.assertTrue(llm_guard._not_charged({'usage': {'total_tokens': 0, 'prompt_tokens': 0,
+                                                           'completion_tokens': 0}}))
+        self.assertIsNone(llm_guard.usage_problem({'prompt_tokens': 0, 'completion_tokens': 0}))
+
+    def test_absent_total_tokens_is_not_a_problem(self):
+        self.assertIsNone(llm_guard.usage_problem({'prompt_tokens': 120, 'completion_tokens': 40}))
+        self.assertEqual(llm_guard.valid_tokens({'prompt_tokens': 120, 'completion_tokens': 40}), (120, 40))
+
+    def test_broken_total_tokens_is_not_trusted(self):
+        for total in (True, False, 1.5, '10', -1, 10 ** 12):
+            usage = {'total_tokens': total, 'prompt_tokens': 1, 'completion_tokens': 1}
+            self.assertIsNotNone(llm_guard.usage_problem(usage), repr(total))
+            self.assertFalse(llm_guard._not_charged({'usage': usage}), repr(total))
+
+    def test_empty_usage_is_not_a_proof(self):
+        self.assertFalse(llm_guard._not_charged({}))
+        self.assertFalse(llm_guard._not_charged({'usage': {}}))
+        self.assertFalse(llm_guard._not_charged({'usage': 'nonsense'}))
+
+
+OLD_LLM_CALLS_SCHEMA = (
+    'CREATE TABLE llm_calls(id TEXT PRIMARY KEY,request_id TEXT UNIQUE,project_id TEXT NOT NULL,model TEXT NOT NULL,'
+    'status TEXT NOT NULL,usd REAL NOT NULL,estimated_usd REAL NOT NULL,input_tokens INTEGER,output_tokens INTEGER,'
+    'created_at TEXT NOT NULL)')
+
+
+class SettlementMigrationTests(unittest.TestCase):
+    """Разделение подтверждённого и неопределённого: миграция атомарна и возобновляема.
+
+    Наличие колонки confirmed_usd не считается признаком завершения миграции: после
+    аварии колонка могла остаться, а часть старых записей — нет.
+    """
+
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.path = Path(self.temp.name) / 'studio.sqlite3'
+
+    def old_database(self, rows=(), with_column=False):
+        db = sqlite3.connect(self.path)
+        try:
+            db.execute(OLD_LLM_CALLS_SCHEMA)
+            if with_column:
+                db.execute('ALTER TABLE llm_calls ADD COLUMN confirmed_usd REAL')
+            db.executemany(
+                'INSERT INTO llm_calls(id,request_id,project_id,model,status,usd,estimated_usd,'
+                'input_tokens,output_tokens,created_at) VALUES(?,?,?,?,?,?,?,?,?,?)', rows)
+            db.commit()
+        finally:
+            db.close()
+
+    def connect(self):
+        db = sqlite3.connect(self.path)
+        db.row_factory = sqlite3.Row
+        return db
+
+    def rows(self, db):
+        return {row['id']: dict(row) for row in db.execute('SELECT * FROM llm_calls')}
+
+    def sample_rows(self):
+        return [
+            ('c-done', 'r1', 'p1', 'gpt-5.6-luna', 'done', 0.5, 0.5, 100, 20, 'now'),
+            ('c-unknown', 'r2', 'p1', 'gpt-5.6-luna', 'submission_unknown', 0.7, 0.7, 200, 40, 'now'),
+            ('c-reserved', 'r3', 'p1', 'gpt-5.6-luna', 'reserved', 0.3, 0.3, None, None, 'now'),
+        ]
+
+    def test_old_database_without_the_column_is_migrated(self):
+        """Старая база без колонки: и колонка появляется, и backfill завершается."""
+        self.old_database(self.sample_rows())
+        db = self.connect()
+        self.addCleanup(db.close)
+        llm_guard.ensure_confirmed_usd(db)
+        rows = self.rows(db)
+        self.assertAlmostEqual(rows['c-done']['confirmed_usd'], 0.5, places=6)
+        self.assertAlmostEqual(rows['c-unknown']['confirmed_usd'],
+                               llm_guard.confirmed_from_tokens('gpt-5.6-luna', 200, 40), places=6)
+        self.assertAlmostEqual(rows['c-reserved']['confirmed_usd'], 0.0, places=6)
+        self.assertEqual(llm_guard.pending_confirmed_usd(db), 0)
+
+    def test_half_migrated_database_is_completed_on_the_next_start(self):
+        """Колонка осталась от аварии, backfill не прошёл: следующий старт его доводит."""
+        self.old_database(self.sample_rows(), with_column=True)
+        db = self.connect()
+        self.addCleanup(db.close)
+        self.assertEqual(llm_guard.pending_confirmed_usd(db), 3)
+        llm_guard.ensure_confirmed_usd(db)
+        rows = self.rows(db)
+        self.assertAlmostEqual(rows['c-done']['confirmed_usd'], 0.5, places=6)
+        self.assertAlmostEqual(rows['c-unknown']['confirmed_usd'],
+                               llm_guard.confirmed_from_tokens('gpt-5.6-luna', 200, 40), places=6)
+        self.assertAlmostEqual(rows['c-reserved']['confirmed_usd'], 0.0, places=6)
+        self.assertEqual(llm_guard.pending_confirmed_usd(db), 0)
+
+    def test_interrupted_migration_leaves_no_half_migrated_schema(self):
+        """Авария внутри миграции откатывается целиком: колонки не остаётся."""
+        self.old_database(self.sample_rows())
+        db = self.connect()
+        self.addCleanup(db.close)
+        with patch.object(llm_guard, 'confirmed_from_tokens', side_effect=RuntimeError('авария')):
+            with self.assertRaises(RuntimeError):
+                llm_guard.ensure_confirmed_usd(db)
+        columns = {row['name'] for row in db.execute('PRAGMA table_info(llm_calls)')}
+        self.assertNotIn('confirmed_usd', columns)
+        llm_guard.ensure_confirmed_usd(db)
+        columns = {row['name'] for row in db.execute('PRAGMA table_info(llm_calls)')}
+        self.assertIn('confirmed_usd', columns)
+        self.assertEqual(llm_guard.pending_confirmed_usd(db), 0)
+
+    def test_repeated_migration_keeps_existing_values(self):
+        """Повторный запуск не пересчитывает и не портит уже подтверждённые суммы."""
+        self.old_database(self.sample_rows())
+        db = self.connect()
+        self.addCleanup(db.close)
+        llm_guard.ensure_confirmed_usd(db)
+        first = self.rows(db)
+        llm_guard.ensure_confirmed_usd(db)
+        second = self.rows(db)
+        for key in ('c-done', 'c-unknown', 'c-reserved'):
+            self.assertAlmostEqual(first[key]['confirmed_usd'], second[key]['confirmed_usd'], places=6)
+
+    def test_free_done_row_is_not_repriced(self):
+        """Бесплатный подтверждённый вызов (usd=0) остаётся нулём и не пересчитывается."""
+        self.old_database([('c-free', 'r9', 'p1', 'gpt-5.6-luna', 'done', 0.0, 0.0, 10, 0, 'now')])
+        db = self.connect()
+        self.addCleanup(db.close)
+        llm_guard.ensure_confirmed_usd(db)
+        llm_guard.ensure_confirmed_usd(db)
+        self.assertAlmostEqual(self.rows(db)['c-free']['confirmed_usd'], 0.0, places=6)
 
 
 if __name__ == '__main__':

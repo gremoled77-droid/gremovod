@@ -363,7 +363,12 @@ MAX_USAGE_TOKENS = 10_000_000
 
 
 def usage_problem(usage):
-    """Почему usage нельзя считать подтверждённым фактом. None — счётчики достоверны."""
+    """Почему usage нельзя считать подтверждённым фактом. None — счётчики достоверны.
+
+    total_tokens проверяется наравне с остальными: он обязан сходиться с суммой
+    prompt_tokens+completion_tokens. Расхождение означает, что провайдер прислал
+    противоречивые счётчики, и доверять им нельзя — резерв удерживается до сверки.
+    """
     if not isinstance(usage, dict):
         return 'usage отсутствует или это не объект'
     for name in ('prompt_tokens', 'completion_tokens'):
@@ -376,6 +381,16 @@ def usage_problem(usage):
             return f'{name} отрицательный'
         if value > MAX_USAGE_TOKENS:
             return f'{name} за пределом {MAX_USAGE_TOKENS}'
+    total = usage.get('total_tokens')
+    if total is not None:
+        if isinstance(total, bool) or not isinstance(total, int):
+            return 'total_tokens не целое число'
+        if total < 0:
+            return 'total_tokens отрицательный'
+        if total > MAX_USAGE_TOKENS:
+            return f'total_tokens за пределом {MAX_USAGE_TOKENS}'
+        if total != usage['prompt_tokens'] + usage['completion_tokens']:
+            return 'total_tokens не сходится с prompt_tokens+completion_tokens'
     return None
 
 
@@ -540,6 +555,59 @@ async def execute_minimax_task(studio, task_id, body, key):
     return result
 
 
+def pending_confirmed_usd(db):
+    """Сколько строк журнала осталось без подтверждённой части.
+
+    NULL означает «строка от старой базы, до которой миграция не дошла»: оба пути
+    вставки пишут подтверждённую часть явно, поэтому NULL — это всегда незавершённый
+    backfill, а не «ноль по соглашению».
+    """
+    return db.execute('SELECT COUNT(*) FROM llm_calls WHERE confirmed_usd IS NULL').fetchone()[0]
+
+
+def backfill_confirmed_usd(db):
+    """Восстановить подтверждённую часть по старым строкам. Идемпотентно.
+
+    Заполняются только строки, у которых подтверждённой части нет (NULL): именно они
+    остались от прерванной миграции. Уже заполненные строки не трогаются, поэтому
+    повторный запуск ничего не пересчитывает и ничего не портит.
+    """
+    db.execute("UPDATE llm_calls SET confirmed_usd=usd WHERE status='done' AND confirmed_usd IS NULL")
+    db.execute("UPDATE llm_calls SET confirmed_usd=0 WHERE status IN ('reserved','failed') AND confirmed_usd IS NULL")
+    for old in db.execute("SELECT id,model,input_tokens,output_tokens FROM llm_calls "
+                          "WHERE status='submission_unknown' AND confirmed_usd IS NULL").fetchall():
+        db.execute('UPDATE llm_calls SET confirmed_usd=? WHERE id=?',
+                   (confirmed_from_tokens(old['model'], old['input_tokens'], old['output_tokens']), old['id']))
+    return pending_confirmed_usd(db)
+
+
+def ensure_confirmed_usd(db):
+    """Разделение подтверждённого и неопределённого — атомарно и возобновляемо.
+
+    Наличие колонки не считается признаком завершения миграции: после аварии между
+    ALTER TABLE и backfill колонка оставалась, а часть старых записей — нет. Поэтому
+    ALTER и backfill идут одной транзакцией (DDL в SQLite транзакционный), а строки,
+    оставшиеся без подтверждённой части, добиваются при каждом старте.
+
+    Возвращает число незавершённых строк после прохода.
+    """
+    columns = {row['name'] for row in db.execute('PRAGMA table_info(llm_calls)')}
+    own_transaction = not db.in_transaction
+    if own_transaction:
+        db.execute('BEGIN IMMEDIATE')
+    try:
+        if 'confirmed_usd' not in columns:
+            db.execute('ALTER TABLE llm_calls ADD COLUMN confirmed_usd REAL')
+        pending = backfill_confirmed_usd(db)
+        if own_transaction:
+            db.execute('COMMIT')
+    except BaseException:
+        if own_transaction:
+            db.execute('ROLLBACK')
+        raise
+    return pending
+
+
 def register(app, studio):
     @app.on_event('startup')
     def setup():
@@ -553,15 +621,11 @@ def register(app, studio):
                 revision TEXT NOT NULL,created_at TEXT NOT NULL,FOREIGN KEY(task_id) REFERENCES llm_tasks(id) ON DELETE CASCADE)''')
             if 'note' not in {r['name'] for r in db.execute('PRAGMA table_info(llm_calls)')}:
                 db.execute('ALTER TABLE llm_calls ADD COLUMN note TEXT')
-            if 'confirmed_usd' not in {r['name'] for r in db.execute('PRAGMA table_info(llm_calls)')}:
-                # Разделение подтверждённого и неопределённого. Старая база хранила только
-                # сумму: подтверждённую часть восстанавливаем по записанным токенам.
-                db.execute('ALTER TABLE llm_calls ADD COLUMN confirmed_usd REAL')
-                db.execute("UPDATE llm_calls SET confirmed_usd=usd WHERE status='done'")
-                db.execute("UPDATE llm_calls SET confirmed_usd=0 WHERE status IN ('reserved','failed')")
-                for old in db.execute("SELECT id,model,input_tokens,output_tokens FROM llm_calls WHERE status='submission_unknown'").fetchall():
-                    db.execute('UPDATE llm_calls SET confirmed_usd=? WHERE id=?',
-                               (confirmed_from_tokens(old['model'], old['input_tokens'], old['output_tokens']), old['id']))
+            # Разделение подтверждённого и неопределённого. Старая база хранила только
+            # сумму: подтверждённую часть восстанавливаем по записанным токенам.
+            # Миграция атомарна и возобновляема: незавершённые строки добиваются
+            # при каждом старте, а не только в момент появления колонки.
+            ensure_confirmed_usd(db)
 
     @app.post('/api/llm/estimate')
     def estimate(body: Estimate):
@@ -731,13 +795,18 @@ def register(app, studio):
 
 
 def _not_charged(value):
-    """Провайдер явно сообщил, что ничего не списал: нулевое потребление токенов."""
+    """Провайдер явно сообщил, что ничего не списал: нулевое потребление токенов.
+
+    Доказательство — полный и непротиворечивый набор счётчиков, где оба
+    обязательных счётчика равны нулю. Одно поле total_tokens=0 доказательством не
+    является: остальные счётчики могут ему противоречить или отсутствовать, а
+    такой usage не бывает достоверным.
+    """
     usage = value.get('usage') if isinstance(value, dict) and isinstance(value.get('usage'), dict) else {}
     if not usage:
         return False
-    total = usage.get('total_tokens')
-    if isinstance(total, int) and not isinstance(total, bool) and total == 0:
-        return True
+    if usage_problem(usage) is not None:
+        return False
     tokens = valid_tokens(usage)
     return tokens is not None and tokens == (0, 0)
 
