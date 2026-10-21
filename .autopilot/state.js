@@ -13,7 +13,7 @@ window.STATE =
   "skillDir": "C:/Users/BLOWKA/.minimax/skills/autopilot",
   "baseCommit": "df1e1a3",
   "startedAt": "2026-10-20T13:38:10+03:00",
-  "updatedAt": "2026-10-21T06:46:25+03:00",
+  "updatedAt": "2026-10-21T06:46:46+03:00",
   "finishedAt": "2026-10-21T05:18:53+03:00",
   "stages": [
     {
@@ -447,20 +447,58 @@ window.STATE =
       "review": "да — ремонт ветки",
       "model": "сильная",
       "status": "done",
-      "retries": 0,
-      "repairs": 0,
       "startedAt": "2026-10-21T03:41:12+03:00",
       "finishedAt": "2026-10-21T05:17:57+03:00",
+      "retries": 0,
+      "repairs": 0,
       "tests": {
         "passed": 371,
         "failed": 0
       },
       "commit": "0512213"
+    },
+    {
+      "id": "F4",
+      "title": "Последние правки: числа в документах и достижимость маршрутов из интерфейса",
+      "requirements": [
+        "R20",
+        "R21",
+        "R24",
+        "R25",
+        "R30",
+        "R33",
+        "R34"
+      ],
+      "blockedBy": [],
+      "wave": 9,
+      "zone": [
+        "frontend/src/llmAsk.ts",
+        "frontend/src/IdeaBrief.tsx",
+        "frontend/src/WorldFromBrief.tsx",
+        "frontend/src/WorkflowPanel.tsx",
+        "frontend/src/OutlineDialog.tsx",
+        "backend/llm_guard.py",
+        "docs/HANDOFF_MINIMAX_LLM_GATEWAY.md",
+        "docs/LLM_GATEWAY_TEST_REPORT.md",
+        "docs/LLM_GATEWAY_ARCHITECTURE.md"
+      ],
+      "review": "да — ремонт ветки",
+      "model": "сильная",
+      "status": "done",
+      "startedAt": "2026-10-21T06:46:45+03:00",
+      "finishedAt": "2026-10-21T06:46:45+03:00",
+      "retries": 0,
+      "repairs": 0,
+      "tests": {
+        "passed": 377,
+        "failed": 0
+      },
+      "commit": "aef3ac7"
     }
   ],
   "tests": {
-    "passed": 371,
-    "failed": 371
+    "passed": 377,
+    "failed": 0
   },
   "debt": {
     "placeholders": [
@@ -563,9 +601,12 @@ window.STATE =
     "2026-10-21T05:17:58+03:00",
     "2026-10-21T05:18:53+03:00",
     "2026-10-21T05:43:31+03:00",
-    "2026-10-21T06:46:25+03:00"
+    "2026-10-21T06:46:25+03:00",
+    "2026-10-21T06:46:44+03:00",
+    "2026-10-21T06:46:45+03:00",
+    "2026-10-21T06:46:46+03:00"
   ],
-  "rev": 67,
+  "rev": 70,
   "waiting": null,
   "waits": [
     {
@@ -1070,6 +1111,30 @@ window.STATE =
       "k": "add",
       "key": "report",
       "n": 6
+    },
+    {
+      "t": "2026-10-21T06:46:44+03:00",
+      "k": "tickets",
+      "n": 10
+    },
+    {
+      "t": "2026-10-21T06:46:45+03:00",
+      "k": "ticket",
+      "ids": [
+        "F4"
+      ],
+      "act": "done",
+      "tests": {
+        "passed": 377,
+        "failed": 0
+      }
+    },
+    {
+      "t": "2026-10-21T06:46:46+03:00",
+      "k": "gate",
+      "g": "G3",
+      "ok": true,
+      "problems": 0
     }
   ],
   "reqList": [
@@ -1390,7 +1455,7 @@ window.STATE =
     },
     "G3": {
       "ok": true,
-      "at": "2026-10-21T00:39:24+03:00",
+      "at": "2026-10-21T06:46:46+03:00",
       "problems": 0
     },
     "G4": {
