@@ -1,5 +1,11 @@
 {
-  "generated_at_utc": "2026-10-21T13:42:28.092096+00:00",
+  "generated_at_utc": "2026-10-21T13:45:39.275100+00:00",
+  "publication_observation": {
+    "timestamp_moscow": "2026-10-21 16:44:38",
+    "ga01_current_head": "c634c0c915a1afbf3d75df5bc897f75ef5b723ea",
+    "ga01_current_head_review": "NOT_REVIEWED",
+    "note": "GA-01 advanced during publication. Verdicts and runner defaults below still refer to the reviewed 5c47ace head. No MiniMax branch was updated by publication. Other reviewed heads, main and mavis/work were unchanged at observation."
+  },
   "original_results": {
     "ga01_profile_pass": 82,
     "ga01_new_file_included_tests": 30,

@@ -4,6 +4,12 @@
   "repository": "gremoled77-droid/gremovod",
   "base_branch": "mavis/work",
   "base_sha": "57cac59ca790d380d8e68f2f6db82674ca142e92",
+  "publication_observation": {
+    "timestamp_moscow": "2026-10-21 16:44:38",
+    "ga01_current_head": "c634c0c915a1afbf3d75df5bc897f75ef5b723ea",
+    "ga01_current_head_review": "NOT_REVIEWED",
+    "note": "GA-01 advanced during publication. Verdicts and runner defaults below still refer to the reviewed 5c47ace head. No MiniMax branch was updated by publication. Other reviewed heads, main and mavis/work were unchanged at observation."
+  },
   "prs": {
     "ga01": {"number": 58, "head_sha": "5c47ace69477d2793deba1155b1d5df91a55e46d", "verdict": "CHANGES_REQUESTED"},
     "ga04": {"number": 62, "head_sha": "08213fdc271dcef7f203e7cedb866b2588e55257", "verdict": "CHANGES_REQUESTED"},

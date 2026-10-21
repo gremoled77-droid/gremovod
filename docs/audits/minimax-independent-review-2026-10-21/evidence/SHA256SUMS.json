@@ -1,12 +1,12 @@
 {
   "algorithm": "sha256",
   "package_files": {
-    "evidence/offline_results.json": "583a8324c3ba5e462bf036101a72fcdfa74a6fba4c2276449c2983576c1e9cc5",
-    "evidence/reviewed_refs.json": "2162f9591d5f7da78538717996687c7a62c142df37daefbf6633a0a65f8509d1",
-    "MINIMAX_HANDOFF.md": "aabd57b46ac235ca2e7dfa02fa396840da7680a607bb259188d16952612c6bcb",
-    "README.md": "736982a20639db4e77294622f55c00e349421a81288d9bbeb095b51704084b79",
-    "REVIEW.md": "1c8e6080a6b4f74f46f005bb95602e5284a55290c487ade85b54d970763ba521",
-    "TEST_RESULTS.md": "8cb548a37f3e4abe485a96e04e60ba890e74980bd4f304d668b34a236e8dc1e5",
+    "evidence/offline_results.json": "39ad08b7b5025e41d3dcbff0ca4f5fe76d4fdb957eab349a7a06ffb1aa57a5de",
+    "evidence/reviewed_refs.json": "fcfcc074004fd8a4180a4ce317757cba5443e5b684e32e054cccd460cfddd88b",
+    "MINIMAX_HANDOFF.md": "c7792f2036e42e6f961d23efd7a1acb9b90aac516ea817db13e0714fab42325c",
+    "README.md": "0596016ca9a1b64121e97fa5072fb3eaa48d810145ffb4e0b5f212e1866ebee0",
+    "REVIEW.md": "768548197a950e8ac252c34f3e295a558fcde60e9d26eefac851331b3868291b",
+    "TEST_RESULTS.md": "21a99e88f163d551ea2e97cda0d732f6be7556d8ee7d2f76d7312b9352d6b42c",
     "tests/regression_contracts.py": "4e96a665bd70298777223f34742dfe02292e6c9f871762b0d223dbeae103d732",
     "tests/reproduce_ga01.py": "097b89027d89d1ed91cbe6dd10701d36664318b651bffc1e280f60400ef4b867",
     "tests/reproduce_ga04.py": "da5fe06cb2c1eef54e8612d207c1f59d678540f47962c0dca8f07e40ebea57ec",
