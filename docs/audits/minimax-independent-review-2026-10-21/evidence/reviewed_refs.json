@@ -1,0 +1,28 @@
+{
+  "review_date": "2026-10-21",
+  "review_head_check_moscow": "2026-10-21 16:15:03",
+  "repository": "gremoled77-droid/gremovod",
+  "base_branch": "mavis/work",
+  "base_sha": "57cac59ca790d380d8e68f2f6db82674ca142e92",
+  "prs": {
+    "ga01": {"number": 58, "head_sha": "5c47ace69477d2793deba1155b1d5df91a55e46d", "verdict": "CHANGES_REQUESTED"},
+    "ga04": {"number": 62, "head_sha": "08213fdc271dcef7f203e7cedb866b2588e55257", "verdict": "CHANGES_REQUESTED"},
+    "ga05": {"number": 63, "head_sha": "7524c677551c7ba3f34b8ce40a1a655895a88ff5", "verdict": "CHANGES_REQUESTED"},
+    "ga03": {"number": 64, "head_sha": "0dd0c22d6d87e9ebcc00af550a48b1d605c98bdd", "verdict": "CHANGES_REQUESTED", "runtime": "BLOCKED_NOT_IMPLEMENTED"}
+  },
+  "protected_refs_before_publication": {
+    "main": "4b1c1b297c0dd1966e3376ece213722210fdee29",
+    "mavis/work": "57cac59ca790d380d8e68f2f6db82674ca142e92",
+    "minimax/ga-01-llm-settlement": "5c47ace69477d2793deba1155b1d5df91a55e46d",
+    "minimax/ga-04-studio-offline-ci": "08213fdc271dcef7f203e7cedb866b2588e55257",
+    "minimax/ga-05-trusted-proxy-throttle": "7524c677551c7ba3f34b8ce40a1a655895a88ff5",
+    "minimax/ga-03-release-acceptance": "0dd0c22d6d87e9ebcc00af550a48b1d605c98bdd"
+  },
+  "github_ci_ga04": {
+    "offline_run": 39600260621,
+    "contracts_run": 39600260691,
+    "scope_run": 39600260706,
+    "coordination_run": 39600260836,
+    "jobs": [119222660585,119222660987,119222661186,119222661213,119222661463,119222661670,119222661259,119222660810]
+  }
+}
