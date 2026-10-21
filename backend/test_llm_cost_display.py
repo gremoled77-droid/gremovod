@@ -31,6 +31,8 @@ UNKNOWN = ProviderResult(ok=False, text='', usage=Usage(None, None, estimated=Tr
                          charged_possible=True, provider_request_id=None)
 REFUSED = ProviderResult(ok=False, text='', usage=Usage(None, None, estimated=True), error_kind='http_401',
                          charged_possible=False, provider_request_id=None)
+RATE_LIMITED = ProviderResult(ok=False, text='', usage=Usage(None, None, estimated=True), error_kind='http_429',
+                              charged_possible=True, provider_request_id=None)
 
 
 class GatewayCase(unittest.TestCase):
@@ -216,6 +218,58 @@ class FourAmountsTests(GatewayCase):
         llm = self.llm_block(pid)
         self.assertGreater(llm['unknown_cost_usd'], 0)
         self.assertEqual(llm['actual_cost_usd'], 0)
+
+    def test_free_route_charge_possible_falls_back_to_paid_provider(self):
+        """Маршрут с нулевым тарифом без квотного ограничения: списать нечего, цепочка идёт на платный маршрут."""
+        pid = self.project()
+        registry = self.registry(rate(**MINIMAX), rate(**KIE),
+                                 rate('openrouter', 'minimax/minimax-m3.1-flash:free', role='coding',
+                                      input=0, output=0, free=True, opt_in=True, quota_limited=False))
+        body = {'project_id': pid, 'model': 'minimax/minimax-m3.1-flash:free',
+                'messages': [{'role': 'user', 'content': 'Грэм подмигивает'}], 'max_tokens': 500,
+                'route_mode': 'auto', 'task': 'coding', 'allow_free': True}
+        with patch.object(llm_guard, 'current_registry', return_value=registry):
+            quote = self.client.post('/api/llm/estimate', json=body).json()
+            payload = {'provider': 'openrouter', 'project_id': pid, 'model': body['model'],
+                       'messages': body['messages'], 'max_tokens': 500, 'approved': True,
+                       'quote_token': quote['quote_token'], 'max_cost_usd': quote['estimated_usd'],
+                       'request_id': 'budget-free-429-1', 'route_mode': 'auto', 'task': 'coding',
+                       'allow_free': True}
+            with patch.object(llm_adapters, 'complete', AsyncMock(side_effect=[RATE_LIMITED, PAID])):
+                ok = self.client.post('/api/llm/chat', json=payload)
+        self.assertEqual(ok.status_code, 200, ok.text)
+        llm = self.llm_block(pid)
+        # подтверждённый факт только у платного провайдера: удвоения нет
+        self.assertEqual(llm['actual_cost_usd'], 0.00027)
+        self.assertEqual(llm['unknown_cost_usd'], 0)
+        self.assertEqual(llm['reserved_usd'], 0)
+        self.assertEqual(llm['calls'], 2)
+
+    def test_free_route_with_quota_limit_shows_unknown_charge_with_reserve(self):
+        """Бесплатная квота может перейти в платное: списание неизвестно, резерв ненулевой."""
+        pid = self.project()
+        registry = self.registry(rate(**MINIMAX), rate(**KIE),
+                                 rate('openrouter', 'minimax/minimax-m3.1-flash:free', role='coding',
+                                      input=0, output=0, free=True, opt_in=True, quota_limited=True))
+        body = {'project_id': pid, 'model': 'minimax/minimax-m3.1-flash:free',
+                'messages': [{'role': 'user', 'content': 'Грэм подмигивает'}], 'max_tokens': 500,
+                'route_mode': 'auto', 'task': 'coding', 'allow_free': True}
+        with patch.object(llm_guard, 'current_registry', return_value=registry):
+            quote = self.client.post('/api/llm/estimate', json=body).json()
+            payload = {'provider': 'openrouter', 'project_id': pid, 'model': body['model'],
+                       'messages': body['messages'], 'max_tokens': 500, 'approved': True,
+                       'quote_token': quote['quote_token'], 'max_cost_usd': quote['estimated_usd'],
+                       'request_id': 'budget-free-quota-1', 'route_mode': 'auto', 'task': 'coding',
+                       'allow_free': True}
+            with patch.object(llm_adapters, 'complete', AsyncMock(return_value=RATE_LIMITED)):
+                failed = self.client.post('/api/llm/chat', json=payload)
+        self.assertEqual(failed.status_code, 502)
+        llm = self.llm_block(pid)
+        # подтверждённого списания нет; возможное списание видно отдельным итогом с ненулевым резервом
+        self.assertEqual(llm['actual_cost_usd'], 0)
+        self.assertGreater(llm['unknown_cost_usd'], 0)
+        self.assertEqual(llm['reserved_usd'], 0)
+        self.assertEqual(llm['calls'], 1)
 
 
 class SeriesBudgetTests(GatewayCase):

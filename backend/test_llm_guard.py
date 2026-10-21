@@ -1,5 +1,6 @@
 import json
 import shutil
+import socket
 import sqlite3
 import tempfile
 import unittest
@@ -549,10 +550,11 @@ class LlmJournalTests(unittest.TestCase):
                     'usage': {'prompt_tokens': 1000, 'completion_tokens': 200}}
         real_complete = llm_adapters.complete
 
-        async def fake_complete(route, messages, max_tokens, **kwargs):
+        async def fake_complete(route, messages, max_tokens, client=None, **kwargs):
+            # свой транспорт теста: подменённый клиент шлюза (в тестах сеть закрыта) не мешает проверке
             transport = httpx.MockTransport(lambda request: httpx.Response(200, json=answered))
-            async with httpx.AsyncClient(transport=transport) as client:
-                return await real_complete(route, messages, max_tokens, client=client, **kwargs)
+            async with httpx.AsyncClient(transport=transport) as own:
+                return await real_complete(route, messages, max_tokens, client=own, **kwargs)
 
         with patch.object(llm_guard, 'current_registry', return_value=registry), \
                 patch.object(llm_adapters.connections, 'provider_key', return_value='test-key'), \
@@ -628,6 +630,195 @@ class LlmJournalTests(unittest.TestCase):
         self.assertEqual(answer['actual'], {'cost_usd': 0.00027, 'status': 'confirmed', 'max_cost_usd': 0.000309})
         self.assertEqual(answer['reference']['cost_usd'], 0.00006)
         self.assertEqual(answer['execution'], {'provider': 'minimax', 'model': 'MiniMax-M3.1-Flash', 'status': 'paid'})
+
+    def test_free_route_without_quota_limit_does_not_stop_the_chain(self):
+        """Маршрут с нулевым тарифом без квотного ограничения: списать нечего, цепочка идёт на платный маршрут."""
+        self.prepare()
+        registry = self.registry(rate(**KIE), rate(**MINIMAX), rate(**OPENROUTER))
+        free_result = ProviderResult(ok=False, text='', usage=Usage(None, None, estimated=True), error_kind='http_429',
+                                     charged_possible=True, provider_request_id=None)
+        paid_result = ProviderResult(ok=True, text='Платный ответ', usage=Usage(1000, 200), error_kind=None,
+                                     charged_possible=False, provider_request_id='req-paid')
+        with patch.object(llm_guard, 'current_registry', return_value=registry), \
+                patch.object(llm_adapters, 'complete', AsyncMock(side_effect=[free_result, paid_result])) as call:
+            body, quote = self.estimate('minimax/minimax-m3.1-flash:free', route_mode='auto', task='coding', allow_free=True)
+            r = self.client.post('/api/llm/chat', json=self.chat_body(body, quote, 'journal-free-429',
+                                                                      route_mode='auto', task='coding', allow_free=True))
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertEqual(call.await_count, 2)
+        rows = self.rows()
+        self.assertEqual(len(rows), 2)
+        free_row, paid_row = rows
+        # на маршруте с нулевым тарифом списать нечего: исход «возможно списано» невозможен
+        self.assertEqual((free_row['execution_provider'], free_row['actual_status']), ('openrouter', 'not_charged'))
+        self.assertEqual(free_row['actual_cost_usd'], 0.0)
+        # факт только у платного провайдера: удвоения нет
+        self.assertEqual((paid_row['execution_provider'], paid_row['actual_status']), ('minimax', 'confirmed'))
+        self.assertEqual(paid_row['actual_cost_usd'], 0.00027)
+        self.assertEqual(self.spent(), (0.00027, 0.00027))
+
+    def test_free_route_with_quota_limit_holds_paid_reserve_on_unknown_charge(self):
+        """Бесплатная квота может перейти в платное: цепочка останавливается, резерв ненулевой."""
+        self.prepare()
+        registry = self.registry(rate(**KIE), rate(**MINIMAX), rate(**OPENROUTER, quota_limited=True))
+        free_result = ProviderResult(ok=False, text='', usage=Usage(None, None, estimated=True), error_kind='http_429',
+                                     charged_possible=True, provider_request_id=None)
+        with patch.object(llm_guard, 'current_registry', return_value=registry), \
+                patch.object(llm_adapters, 'complete', AsyncMock(return_value=free_result)) as call:
+            body, quote = self.estimate('minimax/minimax-m3.1-flash:free', route_mode='auto', task='coding', allow_free=True)
+            r = self.client.post('/api/llm/chat', json=self.chat_body(body, quote, 'journal-free-quota',
+                                                                      route_mode='auto', task='coding', allow_free=True))
+        self.assertEqual(r.status_code, 502)
+        self.assertEqual(call.await_count, 1)  # цепочка остановлена: второй платной попытки нет
+        row = self.rows()[0]
+        self.assertEqual(row['actual_status'], 'unknown')
+        # неизвестное списание держит ненулевой резерв — с платного маршрута цепочки
+        self.assertGreater(row['reserved_usd'], 0)
+        self.assertEqual(row['reserved_usd'], 0.000309)
+        self.assertEqual(self.spent(), (0.000309, 0.000309))
+
+    def test_free_route_with_quota_limit_without_paid_route_is_refused(self):
+        """Платного маршрута нет: резерв под возможное списание взять негде — работа не принимается."""
+        self.prepare()
+        registry = self.registry(rate('openrouter', 'minimax/minimax-m3.1-flash:free', role='coding',
+                                      input=0, output=0, free=True, opt_in=True, quota_limited=True))
+        with patch.object(llm_guard, 'current_registry', return_value=registry), \
+                patch.object(llm_adapters, 'complete', AsyncMock(return_value=ProviderResult(
+                    ok=False, text='', usage=Usage(None, None, estimated=True), error_kind='http_429',
+                    charged_possible=True, provider_request_id=None))) as call:
+            body, quote = self.estimate('minimax/minimax-m3.1-flash:free', route_mode='auto', task='coding', allow_free=True)
+            r = self.client.post('/api/llm/chat', json=self.chat_body(body, quote, 'journal-free-quota-alone',
+                                                                      route_mode='auto', task='coding', allow_free=True))
+        self.assertEqual(r.status_code, 400)
+        self.assertIn('резерв', r.text.lower())
+        call.assert_not_called()
+        self.assertEqual(self.rows(), [])
+
+    def test_free_route_with_quota_limit_answered_with_usage_holds_paid_reserve(self):
+        """Провайдер ответил с usage, но списание возможно: факт неизвестен, резерв — с платного маршрута."""
+        self.prepare()
+        registry = self.registry(rate(**KIE), rate(**MINIMAX), rate(**OPENROUTER, quota_limited=True))
+        # 200 без пригодного текста, usage разобран: списание возможно, сумма неизвестна
+        result = ProviderResult(ok=False, text='', usage=Usage(1000, 200), error_kind='bad_body',
+                                charged_possible=True, provider_request_id='req-free')
+        with patch.object(llm_guard, 'current_registry', return_value=registry), \
+                patch.object(llm_adapters, 'complete', AsyncMock(return_value=result)) as call:
+            body, quote = self.estimate('minimax/minimax-m3.1-flash:free', route_mode='auto', task='coding', allow_free=True)
+            r = self.client.post('/api/llm/chat', json=self.chat_body(body, quote, 'journal-free-answered',
+                                                                      route_mode='auto', task='coding', allow_free=True))
+        self.assertEqual(r.status_code, 502)
+        self.assertEqual(call.await_count, 1)
+        row = self.rows()[0]
+        # списание возможно, но не подтверждено: факта нет, резерв ненулевой — в сверку
+        self.assertEqual(row['actual_status'], 'unknown')
+        self.assertIsNone(row['actual_cost_usd'])
+        self.assertGreater(row['reserved_usd'], 0)
+        self.assertEqual(row['reserved_usd'], 0.000309)
+        self.assertEqual(self.spent(), (0.000309, 0.000309))
+
+    def test_free_route_answered_with_usage_without_charge_is_free(self):
+        """Тот же маршрут без квоты: списать нечего — подтверждённый ноль, а не неизвестное списание."""
+        self.prepare()
+        registry = self.registry(rate(**KIE), rate(**MINIMAX), rate(**OPENROUTER))
+        result = ProviderResult(ok=False, text='', usage=Usage(1000, 200), error_kind='bad_body',
+                                charged_possible=False, provider_request_id='req-free')
+        with patch.object(llm_guard, 'current_registry', return_value=registry), \
+                patch.object(llm_adapters, 'complete', AsyncMock(return_value=result)):
+            body, quote = self.estimate('minimax/minimax-m3.1-flash:free', route_mode='auto', task='coding', allow_free=True)
+            r = self.client.post('/api/llm/chat', json=self.chat_body(body, quote, 'journal-free-answered-ok',
+                                                                      route_mode='auto', task='coding', allow_free=True))
+        self.assertEqual(r.status_code, 502)
+        row = self.rows()[0]
+        self.assertEqual(row['actual_status'], 'free')
+        self.assertEqual(row['actual_cost_usd'], 0.0)
+        self.assertEqual(self.spent(), (0.0, 0.0))
+
+
+class OwnerRegistryIsolationTests(unittest.TestCase):
+    """Тесты не зависят от рабочего реестра владельца: его маршрут не уводит вызов в HTTP-адаптер."""
+
+    setUp = test_smoke.StudioSmokeTests.setUp
+    tearDown = test_smoke.StudioSmokeTests.tearDown
+
+    def prepare(self):
+        main.PIAPI_KEY_FILE.write_text('test-key', encoding='utf-8')
+        self.pid = self.client.post('/api/projects', json={'title': 'LLM', 'state': {}}).json()['id']
+        self.messages = [{'role': 'system', 'content': 'Перепиши в промпт'}, {'role': 'user', 'content': 'Грэм подмигивает'}]
+
+    def owner_registry(self):
+        """Рабочий файл реестра владельца: включённый маршрут piapi на модель legacy-клиентов."""
+        tmp = tempfile.mkdtemp(prefix='llm-owner-registry-')
+        self.addCleanup(shutil.rmtree, tmp, ignore_errors=True)
+        path = Path(tmp) / 'llm_gateway.prices.json'
+        payload = registry_config(rate('piapi', 'gpt-5.6-luna', role='extra', input=0.02, output=0.12,
+                                       enabled=True, verified_at='2026-10-21'))
+        path.write_text(json.dumps(payload), encoding='utf-8')
+        return path
+
+    def test_owner_registry_file_is_not_read_by_tests(self):
+        path = self.owner_registry()
+        self.assertTrue(llm_gateway.test_mode())  # процесс тестов: режим тестов включён
+        with patch.object(llm_gateway, 'REAL_CONFIG_PATH', path):
+            registry = llm_gateway.load_registry()
+        # реестр тестов задан явно: маршруты рабочего файла владельца в него не попадают
+        self.assertEqual(registry.source_path, str(llm_gateway.EXAMPLE_CONFIG_PATH))
+        self.assertEqual([entry.enabled for entry in registry.entries], [False] * len(registry.entries))
+
+    def test_enabled_owner_route_does_not_hijack_mocked_legacy_transport(self):
+        """Включённый маршрут владельца не перехватывает вызов: тест мокает legacy-транспорт, а не адаптер."""
+        self.prepare()
+        path = self.owner_registry()
+        body = {'project_id': self.pid, 'model': 'gpt-5.6-luna', 'messages': self.messages, 'max_tokens': 500}
+        with patch.object(llm_gateway, 'REAL_CONFIG_PATH', path):
+            quote = self.client.post('/api/llm/estimate', json=body).json()
+            self.assertIn('quote_token', quote)
+            payload = {'provider': 'piapi', 'project_id': self.pid, 'model': body['model'], 'messages': body['messages'],
+                       'max_tokens': body['max_tokens'], 'approved': True, 'quote_token': quote['quote_token'],
+                       'max_cost_usd': quote['estimated_usd'], 'request_id': 'owner-registry-1'}
+            with patch.object(main, 'request_piapi', AsyncMock(return_value=REPLY)) as legacy, \
+                    patch.object(llm_adapters, 'complete',
+                                 AsyncMock(side_effect=AssertionError('вызов ушёл в HTTP-адаптер'))) as adapter:
+                r = self.client.post('/api/llm/chat', json=payload)
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertEqual(legacy.await_count, 1)  # мокнутый legacy-транспорт сработал
+        adapter.assert_not_called()  # в адаптер (и в сеть) вызов не ушёл
+
+
+class ProviderTransportTests(unittest.IsolatedAsyncioTestCase):
+    """В тестах транспорт адаптера подменён: живой вызов — явная ошибка, а не запрос наружу."""
+
+    async def test_live_provider_call_is_blocked_in_tests(self):
+        client = llm_guard.provider_client()
+        self.assertIsNotNone(client)
+        with self.assertRaises(AssertionError) as ctx:
+            await client.get('https://api.piapi.ai/v1/models')
+        self.assertIn('сеть', str(ctx.exception))
+
+
+class NetworkGuardTests(unittest.TestCase):
+    """Из тестов наружу не ходим: внешний адрес — явная ошибка, локальный сервер — можно.
+
+    Механизм общий для обеих брифовых команд: и pytest, и unittest discover.
+    """
+
+    def test_external_address_is_refused_before_the_request(self):
+        # адрес из документации RFC 5737: ни одного запроса наружу не уходит
+        with self.assertRaises(AssertionError) as ctx:
+            socket.create_connection(('198.51.100.7', 80), timeout=1)
+        self.assertIn('сеть', str(ctx.exception))
+
+    def test_local_loopback_server_stays_reachable(self):
+        server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        server.bind(('127.0.0.1', 0))
+        server.listen(1)
+        try:
+            port = server.getsockname()[1]
+            with socket.create_connection(('127.0.0.1', port), timeout=2) as client:
+                client.sendall(b'ping')
+                accepted, _ = server.accept()
+                self.assertEqual(accepted.recv(4), b'ping')
+        finally:
+            server.close()
 
 
 if __name__ == '__main__':

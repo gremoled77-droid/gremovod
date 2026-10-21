@@ -17,6 +17,7 @@ import uuid
 from dataclasses import replace
 from datetime import datetime, timezone
 
+import httpx
 from fastapi import HTTPException
 from pydantic import BaseModel, Field
 
@@ -299,6 +300,45 @@ def _route_is_free(registry, route):
     return llm_gateway.is_free_entry(registry.entry(route.provider, route.model))
 
 
+def quota_limited(registry, route):
+    """Маршрут под квотным ограничением: бесплатная квота может перейти в платную."""
+    entry = registry.entry(route.provider, route.model)
+    return bool(entry is not None and entry.quota_limited)
+
+
+def charge_possible(registry, route, reported):
+    """Может ли маршрут списать деньги по исходу вызова.
+
+    У маршрута с нулевым тарифом без квотного ограничения списать нечего: там не за что платить,
+    поэтому исход «возможно списано» невозможен и цепочка продолжается на платный маршрут.
+    У маршрута с нулевым тарифом под квотным ограничением бесплатная квота может перейти в платное:
+    списание возможно, цепочка останавливается. У платного маршрута исход провайдера решает.
+    """
+    if not reported:
+        return False
+    if not _route_is_free(registry, route):
+        return True
+    return quota_limited(registry, route)
+
+
+def paid_reserve(registry, chain, estimates, index, messages, max_tokens):
+    """Резерв под возможное списание на маршруте с нулевым тарифом: с платного маршрута.
+
+    Сначала платный маршрут цепочки — тот, что был бы следующим, — затем любой платный маршрут
+    реестра (как в агентском пути). Платного маршрута нет: резерв взять негде.
+    """
+    for position in range(index + 1, len(chain)):
+        amount = float(estimates[position].cost_usd or 0.0)
+        if amount > 0:
+            return amount
+    entry = llm_gateway.paid_reserve_entry(registry)
+    if entry is None:
+        return None
+    quote = route_estimate(registry, entry.route(), messages, max_tokens)
+    amount = float(quote.cost_usd or 0.0)
+    return amount if amount > 0 else None
+
+
 def plan_chain(registry, task, allow_free=False):
     """Цепочка маршрутов задачи: сначала бесплатные, затем не больше одного платного.
 
@@ -398,6 +438,21 @@ def provider_key_for(route, key):
     return None
 
 
+def _network_forbidden(request):
+    """Обработчик транспорта в тестах: наружу не идём — явная ошибка вместо сетевого вызова."""
+    raise AssertionError('Тест попытался выйти в сеть к провайдеру: ' + str(request.url))
+
+
+def provider_client():
+    """Клиент транспорта адаптера. В процессе тестов сеть закрыта: попытка живого вызова — явная ошибка.
+
+    Вне тестов клиент не подменяется: адаптер создаёт свой (backend/llm_adapters.py).
+    """
+    if not llm_gateway.test_mode():
+        return None
+    return httpx.AsyncClient(transport=httpx.MockTransport(_network_forbidden))
+
+
 async def call_provider(studio, route, messages, max_tokens, key, registry, allow_free):
     """Вызов провайдера по маршруту. Возвращает общую форму: текст, расход токенов, вид сбоя, могло ли списаться."""
     if is_legacy_route(route):
@@ -426,17 +481,23 @@ async def call_provider(studio, route, messages, max_tokens, key, registry, allo
                 'provider_request_id': (value.get('id') if isinstance(value, dict) else None),
                 'status_code': 200, 'detail': None, 'answered': True}
     from backend import llm_adapters
+    client = provider_client()
+    # подменённый транспорт передаётся адаптеру; вне тестов адаптер создаёт клиент сам
+    transport = {'client': client} if client is not None else {}
     try:
         result = await llm_adapters.complete(route, messages, max_tokens,
                                              api_key=provider_key_for(route, key),
                                              registry=registry_with_route(registry, route),
-                                             allow_free=allow_free)
+                                             allow_free=allow_free, **transport)
     except HTTPException as exc:
         # отказ до сети: маршрут не включён или тариф не подтверждён — списания не было
         return {'ok': False, 'text': '', 'usage': Usage(None, None, estimated=True), 'usage_raw': {},
                 'error_kind': 'route_rejected', 'charged_possible': False, 'provider_request_id': None,
                 'status_code': int(getattr(exc, 'status_code', 400) or 400), 'detail': exc.detail,
                 'answered': False}
+    finally:
+        if client is not None:
+            await client.aclose()
     if not result.ok:
         # провайдер ответил и его usage разобран — ответ считается полученным:
         # по usage известен факт списания, даже если пригодного текста нет
@@ -473,7 +534,8 @@ def _finish_call(db, row_id, values):
     db.execute('UPDATE llm_calls SET status=?,usd=?,actual_cost_usd=?,actual_status=?,billing_source=?,'
                'input_tokens=?,output_tokens=?,cached_input_tokens=?,reasoning_tokens=?,'
                'reference_provider=?,reference_model=?,reference_kind=?,reference_rate_snapshot_id=?,'
-               'reference_cost_usd=?,reference_cost_status=?,error_kind=?,provider_request_id=? WHERE id=?', values)
+               'reference_cost_usd=?,reference_cost_status=?,error_kind=?,provider_request_id=?,'
+               'reserved_usd=? WHERE id=?', values)
 
 
 def register(app, studio):
@@ -548,6 +610,16 @@ async def guarded_chat(studio, body, key=None):
     stop_error = None
     for index, (route, estimate) in enumerate(zip(chain, estimates)):
         reserve = float(estimate.cost_usd or 0.0)
+        unknown_reserve = None
+        if _route_is_free(registry, route) and quota_limited(registry, route):
+            # бесплатная квота может перейти в платное: резерв под такое списание держит платный
+            # маршрут. Платного маршрута нет — работа не принимается, иначе списание ушло бы мимо лимитов
+            unknown_reserve = paid_reserve(registry, chain, estimates, index, messages, body.max_tokens)
+            if unknown_reserve is None:
+                raise HTTPException(400, 'Нет платного маршрута: резерв под возможное списание взять негде')
+        # резерв под неподтверждённое списание: у платного маршрута — его собственный тариф,
+        # у маршрута с нулевым тарифом под квотным ограничением — тариф платного маршрута
+        held = unknown_reserve if unknown_reserve is not None else reserve
         row_id = uuid.uuid4().hex
         row_request_id = request_id if index == 0 else request_id + '-fallback' + str(index)
         reference = reference_of(registry, route, estimated_usage(messages, body.max_tokens))
@@ -583,7 +655,8 @@ async def guarded_chat(studio, body, key=None):
                                               usage.input_tokens, usage.output_tokens, usage.cached_input_tokens,
                                               usage.reasoning_tokens, confirmed['provider'], confirmed['model'],
                                               confirmed['kind'], confirmed['rate_snapshot_id'], confirmed['cost_usd'],
-                                              confirmed['status'], None, result['provider_request_id'], row_id))
+                                              confirmed['status'], None, result['provider_request_id'],
+                                              reserve, row_id))
                 return {'choices': [{'message': {'role': 'assistant', 'content': result['text']}}],
                         'usage': result['usage_raw'], 'provider': route.provider, 'model': body.model,
                         'cost_usd': None, 'estimated_usd': cost,
@@ -595,7 +668,8 @@ async def guarded_chat(studio, body, key=None):
                                           usage.input_tokens, usage.output_tokens, usage.cached_input_tokens,
                                           usage.reasoning_tokens, confirmed['provider'], confirmed['model'],
                                           confirmed['kind'], confirmed['rate_snapshot_id'], confirmed['cost_usd'],
-                                          confirmed['status'], None, result['provider_request_id'], row_id))
+                                          confirmed['status'], None, result['provider_request_id'],
+                                          reserve, row_id))
             return {'choices': [{'message': {'role': 'assistant', 'content': result['text']}}],
                     'usage': result['usage_raw'], 'provider': route.provider, 'model': body.model,
                     'cost_usd': actual.cost_usd, 'estimated_usd': cost,
@@ -609,25 +683,48 @@ async def guarded_chat(studio, body, key=None):
         if result.get('answered') and actual is not None and actual.cost_usd is not None:
             # провайдер ответил и тарифицировал: факт известен по usage, резерв освобождается
             confirmed = reference_of(registry, route, usage)
-            with studio.connect() as db:
-                _finish_call(db, row_id, ('done', actual.cost_usd, actual.cost_usd, actual.status, actual.billing_source,
-                                          usage.input_tokens, usage.output_tokens, usage.cached_input_tokens,
-                                          usage.reasoning_tokens, confirmed['provider'], confirmed['model'],
-                                          confirmed['kind'], confirmed['rate_snapshot_id'], confirmed['cost_usd'],
-                                          confirmed['status'], result['error_kind'], result['provider_request_id'], row_id))
+            if _route_is_free(registry, route) and charge_possible(registry, route, bool(result['charged_possible'])):
+                # маршрут с нулевым тарифом, но списание возможно: бесплатная квота могла перейти
+                # в платное — факта нет, сумму неизвестного сведения держит платный маршрут
+                with studio.connect() as db:
+                    _finish_call(db, row_id, ('done', held, None, 'unknown', 'route_tariff',
+                                              usage.input_tokens, usage.output_tokens, usage.cached_input_tokens,
+                                              usage.reasoning_tokens, confirmed['provider'], confirmed['model'],
+                                              confirmed['kind'], confirmed['rate_snapshot_id'], confirmed['cost_usd'],
+                                              confirmed['status'], result['error_kind'], result['provider_request_id'],
+                                              held, row_id))
+            else:
+                with studio.connect() as db:
+                    _finish_call(db, row_id, ('done', actual.cost_usd, actual.cost_usd, actual.status, actual.billing_source,
+                                              usage.input_tokens, usage.output_tokens, usage.cached_input_tokens,
+                                              usage.reasoning_tokens, confirmed['provider'], confirmed['model'],
+                                              confirmed['kind'], confirmed['rate_snapshot_id'], confirmed['cost_usd'],
+                                              confirmed['status'], result['error_kind'], result['provider_request_id'],
+                                              reserve, row_id))
             raise HTTPException(result['status_code'] or 502,
                                 _detail_text(result['detail'], 'Провайдер не вернул пригодный ответ'))
         if result.get('answered'):
             # провайдер ответил, но расход получить нельзя: вызов закрыт, в usd — оценка, резерв удерживается
-            with studio.connect() as db:
-                _finish_call(db, row_id, ('done', reserve, None, 'unknown', 'route_tariff',
-                                          None, None, None, None,
-                                          reference['provider'], reference['model'], reference['kind'],
-                                          reference['rate_snapshot_id'], reference['cost_usd'],
-                                          reference['status'], result['error_kind'], result['provider_request_id'], row_id))
+            if _route_is_free(registry, route) and not charge_possible(registry, route, bool(result['charged_possible'])):
+                # маршрут с нулевым тарифом и списать негде: подтверждённый ноль, а не неизвестное списание
+                with studio.connect() as db:
+                    _finish_call(db, row_id, ('done', 0.0, 0.0, 'free', 'free_quota',
+                                              None, None, None, None,
+                                              reference['provider'], reference['model'], reference['kind'],
+                                              reference['rate_snapshot_id'], reference['cost_usd'],
+                                              reference['status'], result['error_kind'], result['provider_request_id'],
+                                              reserve, row_id))
+            else:
+                with studio.connect() as db:
+                    _finish_call(db, row_id, ('done', held, None, 'unknown', 'route_tariff',
+                                              None, None, None, None,
+                                              reference['provider'], reference['model'], reference['kind'],
+                                              reference['rate_snapshot_id'], reference['cost_usd'],
+                                              reference['status'], result['error_kind'], result['provider_request_id'],
+                                              held, row_id))
             raise HTTPException(result['status_code'] or 502,
                                 _detail_text(result['detail'], 'Провайдер не вернул пригодный ответ'))
-        charged = bool(result['charged_possible'])
+        charged = charge_possible(registry, route, bool(result['charged_possible']))
         actual_status = 'unknown' if charged else 'not_charged'
         with studio.connect() as db:
             _finish_call(db, row_id, ('failed', 0.0, None if charged else 0.0, actual_status,
@@ -635,7 +732,7 @@ async def guarded_chat(studio, body, key=None):
                                       None, None, None, None,
                                       reference['provider'], reference['model'], reference['kind'],
                                       reference['rate_snapshot_id'], reference['cost_usd'], reference['status'],
-                                      result['error_kind'], result['provider_request_id'], row_id))
+                                      result['error_kind'], result['provider_request_id'], held, row_id))
         if charged:
             # исход неопределён: платная попытка не повторяется, резерв удерживается до сверки
             raise HTTPException(result['status_code'] or 502,

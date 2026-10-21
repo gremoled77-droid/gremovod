@@ -14,10 +14,13 @@ import json
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from backend import network_guard
+
 ROOT = Path(__file__).resolve().parents[1]
 CONFIG_DIR = ROOT / 'config'
 REAL_CONFIG_PATH = CONFIG_DIR / 'llm_gateway.prices.json'
 EXAMPLE_CONFIG_PATH = CONFIG_DIR / 'llm_gateway.prices.example.json'
+TEST_MODE_ENV = network_guard.TEST_MODE_ENV
 
 PROVIDER_TITLES = {'kie': 'Kie.ai', 'piapi': 'PiAPI', 'minimax': 'MiniMax', 'deepseek': 'DeepSeek',
                    'openrouter': 'OpenRouter'}
@@ -298,9 +301,31 @@ def _registry_from(data: dict, source: str) -> Registry:
                     source_path=source)
 
 
+def test_mode() -> bool:
+    """Процесс тестов: рабочий реестр владельца не подхватывается, внешняя сеть закрыта.
+
+    В студии режим тестов не включается: её реестр — рабочий файл владельца, маршруты в нём
+    включает сам владелец, а сеть шлюзу нужна.
+    """
+    return network_guard.test_mode()
+
+
+# Защита сети ставится один раз в процессе тестов — и под pytest, и под unittest discover.
+network_guard.install_if_test_mode()
+
+
 def load_registry(path: str | None = None) -> Registry:
-    """Читает реестр из файла конфигурации. Файла нет — берётся приложенный пример (все маршруты выключены)."""
-    candidate = Path(path) if path else REAL_CONFIG_PATH
+    """Читает реестр из файла конфигурации. Файла нет — берётся приложенный пример (все маршруты выключены).
+
+    В процессе тестов рабочий файл владельца не подхватывается: реестр тестов задаётся явно —
+    приложенным примером (все маршруты выключены) или файлом, который задаёт сам тест.
+    """
+    if path:
+        candidate = Path(path)
+    elif test_mode():
+        candidate = EXAMPLE_CONFIG_PATH
+    else:
+        candidate = REAL_CONFIG_PATH
     source = candidate if candidate.exists() else EXAMPLE_CONFIG_PATH
     data = json.loads(source.read_text(encoding='utf-8'))
     return _registry_from(data, str(source))
@@ -468,6 +493,26 @@ def _agent_reserve_entry(registry: Registry, provider: str | None, model: str | 
     """
     entry = registry.entry(provider, model)
     if _has_tariff(entry):
+        return entry
+    baseline = registry.baseline('default_baseline')
+    if _has_paid_tariff(baseline):
+        return baseline
+    for item in registry.entries:
+        if _has_paid_tariff(item):
+            return item
+    return None
+
+
+def paid_reserve_entry(registry: Registry, provider: str | None = None, model: str | None = None) -> ModelEntry | None:
+    """Запись платного маршрута, по тарифу которой держится резерв под неподтверждённое списание.
+
+    Только платный тариф: нулевой тариф (0/0) деньгами резерв не прикрывает — подтверждённо
+    бесплатный маршрут не может держать деньги под возможное списание. Порядок тот же, что в
+    агентском пути: названная модель → базовая линия владельца → любой платный маршрут с тарифом.
+    Платного маршрута нет — резерв взять негде, работа не принимается.
+    """
+    entry = registry.entry(provider, model)
+    if _has_paid_tariff(entry):
         return entry
     baseline = registry.baseline('default_baseline')
     if _has_paid_tariff(baseline):
