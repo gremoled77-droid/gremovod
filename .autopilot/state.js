@@ -2,7 +2,7 @@ window.STATE =
 {
   "version": 2,
   "slug": "llm-gateway",
-  "dir": "2026-10-20-llm-gateway--wip",
+  "dir": "2026-10-20-llm-gateway",
   "title": "LLM Gateway: тарифный ориентир Kie/PiAPI в карточке, факт в бюджете",
   "mode": "semi",
   "depth": "normal",
@@ -13,8 +13,8 @@ window.STATE =
   "skillDir": "C:/Users/BLOWKA/.minimax/skills/autopilot",
   "baseCommit": "df1e1a3",
   "startedAt": "2026-10-20T13:38:10+03:00",
-  "updatedAt": "2026-10-21T05:17:56+03:00",
-  "finishedAt": null,
+  "updatedAt": "2026-10-21T05:18:53+03:00",
+  "finishedAt": "2026-10-21T05:18:53+03:00",
   "stages": [
     {
       "id": "preflight",
@@ -60,8 +60,9 @@ window.STATE =
     },
     {
       "id": "final",
-      "status": "active",
-      "startedAt": "2026-10-21T03:04:19+03:00"
+      "status": "done",
+      "startedAt": "2026-10-21T03:04:19+03:00",
+      "finishedAt": "2026-10-21T05:18:53+03:00"
     }
   ],
   "requirements": {
@@ -445,15 +446,21 @@ window.STATE =
       ],
       "review": "да — ремонт ветки",
       "model": "сильная",
-      "status": "in-progress",
+      "status": "done",
       "retries": 0,
       "repairs": 0,
-      "startedAt": "2026-10-21T03:41:12+03:00"
+      "startedAt": "2026-10-21T03:41:12+03:00",
+      "finishedAt": "2026-10-21T05:17:57+03:00",
+      "tests": {
+        "passed": 371,
+        "failed": 0
+      },
+      "commit": "0512213"
     }
   ],
   "tests": {
-    "passed": 359,
-    "failed": 0
+    "passed": 371,
+    "failed": 371
   },
   "debt": {
     "placeholders": [
@@ -549,9 +556,12 @@ window.STATE =
     "2026-10-21T03:40:01+03:00",
     "2026-10-21T03:41:11+03:00",
     "2026-10-21T03:41:12+03:00",
-    "2026-10-21T05:17:56+03:00"
+    "2026-10-21T05:17:56+03:00",
+    "2026-10-21T05:17:57+03:00",
+    "2026-10-21T05:17:58+03:00",
+    "2026-10-21T05:18:53+03:00"
   ],
-  "rev": 62,
+  "rev": 65,
   "waiting": null,
   "waits": [
     {
@@ -1019,6 +1029,29 @@ window.STATE =
       "k": "add",
       "key": "report",
       "n": 3
+    },
+    {
+      "t": "2026-10-21T05:17:57+03:00",
+      "k": "ticket",
+      "ids": [
+        "F3"
+      ],
+      "act": "done",
+      "tests": {
+        "passed": 371,
+        "failed": 0
+      }
+    },
+    {
+      "t": "2026-10-21T05:17:58+03:00",
+      "k": "tests",
+      "passed": 371,
+      "failed": 371
+    },
+    {
+      "t": "2026-10-21T05:18:53+03:00",
+      "k": "finish",
+      "result": "LLM Gateway собран: карточка показывает тарифный ориентир Kie/PiAPI первым, «Бюджет» суммирует только фактическое списание; 371 backend + 119 frontend тестов зелёные, слепая приёмка PASS"
     }
   ],
   "reqList": [
@@ -1349,7 +1382,7 @@ window.STATE =
       "matched": 23
     }
   },
-  "result": null,
+  "result": "LLM Gateway собран: карточка показывает тарифный ориентир Kie/PiAPI первым, «Бюджет» суммирует только фактическое списание; 371 backend + 119 frontend тестов зелёные, слепая приёмка PASS",
   "report": [
     "403 без маркеров Cloudflare классифицируется по-разному в двух путях: legacy отпускает резерв, адаптер удерживает его навсегда — деньги не теряются, но бюджет владельца блокируется отказом, который ничего не стоил",
     "Не-HTTPException из транспорта (внутренняя ошибка) оставляет строку в status=reserved/actual_status=estimated навсегда и блокирует повтор с тем же request_id (409). Резерв учтён в лимите, но виден в «зарезервировано», а не в корзине «неизвестные списания», которую владелец сверяет",
