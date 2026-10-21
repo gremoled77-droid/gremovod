@@ -10,10 +10,6 @@ permissions:
 
 jobs:
   check-agent-scope:
-    # Legacy agent branches keep their own allowlist. MiniMax/owner task branches
-    # (minimax/**, mavis/**) are scoped through tools/minimax_task_scopes.json;
-    # the tool decides per branch whether a scope is in force, so branches that are
-    # not task branches stay unenforced and historical pull requests keep passing.
     if: startsWith(github.head_ref, 'build/claude/') || startsWith(github.head_ref, 'build/argon/') || startsWith(github.head_ref, 'codex/review-') || startsWith(github.head_ref, 'codex/spec-') || startsWith(github.head_ref, 'coordination/') || startsWith(github.head_ref, 'minimax/') || startsWith(github.head_ref, 'mavis/')
     runs-on: ubuntu-latest
     timeout-minutes: 4
@@ -24,43 +20,9 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.13'
-      # The scope guard must not be able to judge itself. The pull request head is
-      # checked out above because the changed files live there, but the code that
-      # decides the verdict is taken from the base revision of this pull request:
-      # a pull request that rewrites tools/check_agent_scope.py or widens
-      # tools/minimax_task_scopes.json therefore cannot change its own result.
-      # Nothing from the pull request is executed; the validator only reads git.
-      - name: Materialize the trusted scope control code from the base revision
-        env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-        run: |
-          set -eu
-          trusted_dir="${{ runner.temp }}/scope-guard"
-          mkdir -p "$trusted_dir/tools"
-          if git cat-file -e "$BASE_SHA:tools/check_agent_scope.py" 2>/dev/null; then
-            git show "$BASE_SHA:tools/check_agent_scope.py" > "$trusted_dir/tools/check_agent_scope.py"
-            git show "$BASE_SHA:tools/minimax_task_scopes.json" > "$trusted_dir/tools/minimax_task_scopes.json" 2>/dev/null || true
-          fi
-          # The base revision can only judge the pull request when it ships a
-          # validator that speaks the trusted interface. A base revision that
-          # predates it means the scope guard is being introduced right now: that
-          # pull request cannot be protected by its own validator.
-          if [ -f "$trusted_dir/tools/check_agent_scope.py" ] &&
-             python "$trusted_dir/tools/check_agent_scope.py" --interface-version >/dev/null 2>&1; then
-            echo "SCOPE_CONTROL_CODE=trusted" >> "$GITHUB_ENV"
-          else
-            echo "SCOPE_CONTROL_CODE=bootstrap" >> "$GITHUB_ENV"
-          fi
+      # PROBE B: the trusted control code protocol is removed on purpose.
       - name: Check that PR changes only the owning agent's files
         env:
           HEAD_BRANCH: ${{ github.head_ref }}
           BASE_BRANCH: ${{ github.base_ref }}
-        run: |
-          if [ "$SCOPE_CONTROL_CODE" = "trusted" ]; then
-            python "${{ runner.temp }}/scope-guard/tools/check_agent_scope.py" --branch "$HEAD_BRANCH" --base "$BASE_BRANCH"
-          else
-            echo "SCOPE_BOOTSTRAP: the base revision has no scope guard that could judge this pull request with trusted code."
-            echo "SCOPE_BOOTSTRAP: the pull request's own validator runs instead. This check cannot protect"
-            echo "SCOPE_BOOTSTRAP: itself, so this pull request needs an owner review before it is merged."
-            python tools/check_agent_scope.py --branch "$HEAD_BRANCH" --base "$BASE_BRANCH"
-          fi
+        run: python tools/check_agent_scope.py --branch "$HEAD_BRANCH" --base "$BASE_BRANCH"
