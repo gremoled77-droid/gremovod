@@ -59,8 +59,8 @@ if ($PSCmdlet.ShouldProcess($TaskName, 'Register bounded dispatcher schedule (di
     $trigger = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(1) -RepetitionInterval (New-TimeSpan -Minutes 1)
     $principal = New-ScheduledTaskPrincipal -UserId ([Security.Principal.WindowsIdentity]::GetCurrent().Name) -LogonType Interactive -RunLevel Limited
     $settings = New-ScheduledTaskSettingsSet -MultipleInstances IgnoreNew -ExecutionTimeLimit $timeLimit -StartWhenAvailable
-    $task = New-ScheduledTask -Action $scheduledAction -Trigger $trigger -Principal $principal -Settings $settings
+    $task = New-ScheduledTask -Action $scheduledAction -Trigger $trigger -Principal $principal -Settings $settings -Description 'GremoVOD bounded existing dispatcher; no merge, no production, explicit quota approval.'
     $task.Settings.Enabled = [bool]$Enable
-    Register-ScheduledTask -TaskName $TaskName -InputObject $task -Description 'GremoVOD bounded existing dispatcher; no merge, no production, explicit quota approval.' | Out-Null
+    Register-ScheduledTask -TaskName $TaskName -InputObject $task | Out-Null
     Write-Output 'Task registered. Owner approval remains independent from Scheduler enablement.'
 }

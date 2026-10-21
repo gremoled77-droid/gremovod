@@ -1,0 +1,16 @@
+﻿{
+    "captured_at":  "2026-10-21T18:54:14.7211111Z",
+    "task_name":  "GremoVOD-AgentRelay-Smoke-20261021",
+    "state":  "Disabled",
+    "enabled":  false,
+    "multiple_instances":  "IgnoreNew",
+    "execution_time_limit":  "PT8M",
+    "logon_type":  "Interactive",
+    "run_level":  "Limited",
+    "interval":  "PT1M",
+    "action":  "C:\\AI_Workflow_Studio\\.venv\\Scripts\\python.exe",
+    "arguments":  "\"C:\\Users\\BLOWKA\\aider-test\\gremovod-agent-relay\\scripts\\agent-handoff\\dispatcher.py\" --job \"C:\\Users\\BLOWKA\\aider-test\\outputs\\relay-smoke-job.json\" --run --state-dir \"C:\\Users\\BLOWKA\\aider-test\\outputs\\relay-smoke-state\"",
+    "stop_marker":  true,
+    "approvals_present":  false,
+    "live_models_started_by_this_task":  false
+}
