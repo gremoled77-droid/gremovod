@@ -17,6 +17,7 @@ import sqlite3
 import tempfile
 import time
 import unittest
+from contextlib import contextmanager
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
@@ -492,7 +493,51 @@ class AgentsReconcileTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200, response.text)
         after = self.spend_row()
         self.assertEqual(after['usd'], round(confirmed + 0.001, 6))
-        self.assertEqual(self.split_row()['confirmed_usd'], confirmed)
+        # Явная сверка называет факт, поэтому подтверждённая часть покрывает всю сумму.
+        # Иначе в сводке остаётся расход, который не объяснён ни подтверждённой частью,
+        # ни неопределённым остатком.
+        self.assertEqual(self.split_row()['confirmed_usd'], round(confirmed + 0.001, 6))
+
+    def test_reconcile_done_without_amount_is_rejected(self):
+        """Без названной суммы сверка 'done' ничего не решает: оценка — не доказанный факт."""
+        self.prepare()
+        good = {'prompt_tokens': 120, 'completion_tokens': 40}
+        r, _ = self.run_agents('ga01-recon-nosum', [('Сцена.', good), ('Континуитет.', {}), ('Промпты.', good)])
+        self.assertEqual(r.status_code, 200, r.text)
+        row = self.spend_row()
+        before = (row['usd'], self.split_row()['confirmed_usd'])
+        response = self.reconcile(row['id'], {'outcome': 'done', 'note': 'без названной суммы'})
+        self.assertEqual(response.status_code, 422, response.text)
+        after = self.spend_row()
+        self.assertEqual((after['usd'], self.split_row()['confirmed_usd']), before,
+                         'строка без названной суммы не меняется')
+
+    def test_reconcile_of_a_broken_row_is_refused(self):
+        """Запись с нечитаемой суммой не сверяется: сначала нужно решение владельца."""
+        self.prepare()
+        good = {'prompt_tokens': 120, 'completion_tokens': 40}
+        r, _ = self.run_agents('ga01-recon-broken', [('Сцена.', good), ('Континуитет.', {}), ('Промпты.', good)])
+        self.assertEqual(r.status_code, 200, r.text)
+        row = self.spend_row()
+        with main.connect() as db:
+            db.execute("UPDATE llm_calls SET usd='unreadable' WHERE id=?", (row['id'],))
+        response = self.reconcile(row['id'], {'outcome': 'failed', 'note': 'списания нет'})
+        self.assertEqual(response.status_code, 409, response.text)
+
+    def test_reconcile_confirms_the_named_amount_and_leaves_no_unknown(self):
+        """После явной сверки неизвестного остатка не остаётся: сумма подтверждена."""
+        self.prepare()
+        good = {'prompt_tokens': 120, 'completion_tokens': 40}
+        r, _ = self.run_agents('ga01-recon-named', [('Сцена.', good), ('Континуитет.', {}), ('Промпты.', good)])
+        self.assertEqual(r.status_code, 200, r.text)
+        response = self.reconcile(self.spend_row()['id'], {'outcome': 'done', 'unconfirmed_usd': 0.001,
+                                                           'note': 'у провайдера по второй роли 0.001'})
+        self.assertEqual(response.status_code, 200, response.text)
+        payload = response.json()
+        self.assertEqual(payload['confirmed_usd'], payload['usd'])
+        self.assertEqual(payload['unknown_usd'], 0)
+        after = self.split_row()
+        self.assertAlmostEqual(after['confirmed_usd'], after['usd'], places=6)
 
     def test_usd_and_unconfirmed_usd_together_are_rejected(self):
         """Две суммы сразу — неоднозначно: такой запрос не принимается."""
@@ -832,6 +877,224 @@ class SettlementMigrationTests(unittest.TestCase):
         llm_guard.ensure_confirmed_usd(db)
         llm_guard.ensure_confirmed_usd(db)
         self.assertAlmostEqual(self.rows(db)['c-free']['confirmed_usd'], 0.0, places=6)
+
+
+class NonfinitePriceTests(unittest.TestCase):
+    """Нечисловая цена провайдера: резерв удерживается, расчёт не падает."""
+
+    def test_nonfinite_price_holds_the_reserve_with_a_reason(self):
+        status, held, tokens_in, tokens_out, reason = llm_guard.settle_from_usage(
+            float('nan'), 1, {'prompt_tokens': 1, 'completion_tokens': 1}, 0.25)
+        self.assertEqual(status, 'submission_unknown')
+        self.assertEqual(held, 0.25)
+        self.assertIsNone(tokens_in)
+        self.assertIsNone(tokens_out)
+        self.assertIn('цена', reason)
+
+    def test_infinite_price_keeps_the_reserve_instead_of_releasing_it(self):
+        status, held, *_ = llm_guard.settle_from_usage(
+            float('inf'), 1, {'prompt_tokens': 1, 'completion_tokens': 1}, 0.25)
+        self.assertEqual((status, held), ('submission_unknown', 0.25))
+
+
+class LegacyMoneyRepairTests(unittest.TestCase):
+    """Старая база: испорченные счётчики и отрицательные суммы не мешают старту и не уменьшают бюджет."""
+
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.root = Path(self.temp.name)
+        self.path = self.root / 'legacy.sqlite3'
+        self.counter = 0
+
+    def connect(self, path=None):
+        db = sqlite3.connect(path or self.path)
+        db.row_factory = sqlite3.Row
+        return db
+
+    @contextmanager
+    def database(self, path=None):
+        db = self.connect(path)
+        try:
+            with db:
+                yield db
+        finally:
+            db.close()
+
+    def rows(self, db):
+        return {row['id']: dict(row) for row in db.execute('SELECT * FROM llm_calls')}
+
+    def legacy_database(self, rows=None, path=None):
+        """Старая схема (без confirmed_usd и note) с заданными строками.
+
+        Оценка здесь не обязана быть числом: именно такие значения и должен пережить
+        старт Studio.
+        """
+        if rows is None:
+            rows = [('c-broken', 'submission_unknown', 0.4, 0.4, 'bad', 40),
+                    ('c-negative', 'done', -0.14, 0.1, None, None)]
+        with self.database(path) as db:
+            db.execute('CREATE TABLE llm_calls(id TEXT PRIMARY KEY,request_id TEXT UNIQUE,project_id TEXT NOT NULL,'
+                       'model TEXT NOT NULL,status TEXT NOT NULL,usd REAL NOT NULL,estimated_usd,input_tokens,'
+                       'output_tokens,created_at TEXT NOT NULL)')
+            for row in rows:
+                db.execute('INSERT INTO llm_calls VALUES(?,?,?,?,?,?,?,?,?,?)',
+                           (row[0], row[0], 'p1', 'gpt-5.6-luna', row[1], row[2], row[3], row[4], row[5], main.now()))
+        return path or self.path
+
+    def fresh_database(self, rows):
+        """Чистая старая база под конкретный набор строк: свой файл на набор."""
+        self.counter += 1
+        path = self.root / f'legacy-{self.counter}.sqlite3'
+        return self.legacy_database(rows, path)
+
+    def start_app(self, path):
+        """Настоящий старт Studio на старой базе: схема, миграция, ремонт."""
+        from contextlib import contextmanager
+        from types import SimpleNamespace
+
+        from fastapi import FastAPI
+        from fastapi.testclient import TestClient
+
+        @contextmanager
+        def connect():
+            with self.database(path) as db:
+                yield db
+
+        app = FastAPI()
+        llm_guard.register(app, SimpleNamespace(connect=connect))
+        with TestClient(app):
+            pass
+
+    def test_malformed_legacy_tokens_do_not_break_the_backfill(self):
+        """Испорченный счётчик не роняет расчёт: подтверждённой части просто нет."""
+        path = self.legacy_database()
+        with self.database(path) as db:
+            llm_guard.ensure_confirmed_usd(db)
+            row = self.rows(db)['c-broken']
+            self.assertAlmostEqual(row['confirmed_usd'], 0.0, places=6)
+            self.assertAlmostEqual(row['usd'], 0.4, places=6)
+
+    def test_legacy_negative_spend_is_repaired_and_keeps_the_budget(self):
+        """Отрицательная старая сумма не уменьшает бюджет: резерв восстанавливается по оценке."""
+        path = self.legacy_database()
+        with self.database(path) as db:
+            llm_guard.ensure_confirmed_usd(db)
+            llm_guard.repair_legacy_money(db)
+            row = self.rows(db)['c-negative']
+            self.assertEqual(row['status'], 'submission_unknown')
+            self.assertAlmostEqual(row['usd'], 0.1, places=6)
+            self.assertAlmostEqual(row['confirmed_usd'], 0.0, places=6)
+            self.assertAlmostEqual(llm_guard.spent(db, 'p1')[0], 0.5, places=6)
+            # Повторный проход ничего не меняет.
+            llm_guard.repair_legacy_money(db)
+            self.assertAlmostEqual(self.rows(db)['c-negative']['usd'], 0.1, places=6)
+
+    def test_startup_repairs_legacy_money_and_the_app_still_starts(self):
+        """Старт на старой базе: испорченные суммы чинятся, приложение поднимается."""
+        path = self.legacy_database()
+        self.start_app(path)
+        with self.database(path) as db:
+            rows = self.rows(db)
+        self.assertAlmostEqual(rows['c-broken']['confirmed_usd'], 0.0, places=6)
+        self.assertAlmostEqual(rows['c-broken']['usd'], 0.4, places=6)
+        self.assertEqual(rows['c-negative']['status'], 'submission_unknown')
+        self.assertAlmostEqual(rows['c-negative']['usd'], 0.1, places=6)
+
+    def test_startup_survives_unreadable_amounts(self):
+        """Оценка 'bad', NULL, -5, бесконечность: старт не падает, сумма не выдумывается."""
+        for bad in ('bad', None, -5, float('inf'), float('nan')):
+            with self.subTest(estimate=repr(bad)):
+                path = self.fresh_database([('c-bad', 'reserved', -0.1, bad, None, None)])
+                self.start_app(path)
+                with self.database(path) as db:
+                    row = self.rows(db)['c-bad']
+                self.assertEqual(row['status'], 'submission_unknown')
+                self.assertNotEqual(row['usd'], 0.0, 'неизвестное списание не превращается в ноль')
+                self.assertAlmostEqual(row['confirmed_usd'], 0.0, places=6)
+
+    def test_unreadable_amount_blocks_spending_until_the_owner_decides(self):
+        """Нечитаемая сумма не даёт потратить сверх лимита: траты остановлены."""
+        path = self.fresh_database([('c-bad', 'reserved', -0.1, 'bad', None, None)])
+        self.start_app(path)
+        with self.database(path) as db:
+            row = self.rows(db)['c-bad']
+            self.assertEqual(row['usd'], llm_guard.UNREADABLE_AMOUNT)
+            self.assertIn('OWNER_DECISION_REQUIRED', row['note'] or '')
+            # Бюджет по такой строке не считается, и траты не проходят.
+            with self.assertRaises(ValueError):
+                llm_guard.spent(db, 'p1')
+            with self.assertRaises(llm_guard.HTTPException) as caught:
+                llm_guard.check_budget(db, 'p1', 0.01)
+            self.assertEqual(caught.exception.status_code, 409)
+
+    def test_reserve_is_restored_from_the_estimate_when_the_sum_is_broken(self):
+        """Резерв восстанавливается по оценке, а не обнуляется."""
+        path = self.fresh_database([('c-neg', 'reserved', -0.1, 0.25, None, None)])
+        with self.database(path) as db:
+            llm_guard.ensure_confirmed_usd(db)
+            llm_guard.repair_legacy_money(db)
+            row = self.rows(db)['c-neg']
+            self.assertEqual(row['status'], 'submission_unknown')
+            self.assertAlmostEqual(row['usd'], 0.25, places=6)
+            self.assertAlmostEqual(row['confirmed_usd'], 0.0, places=6)
+            self.assertAlmostEqual(llm_guard.spent(db, 'p1')[0], 0.25, places=6)
+            # Повторный проход ничего не меняет.
+            llm_guard.repair_legacy_money(db)
+            self.assertAlmostEqual(self.rows(db)['c-neg']['usd'], 0.25, places=6)
+
+    def test_reserve_is_restored_from_the_recorded_tokens_when_the_estimate_is_broken(self):
+        """Токены дают цену: резерв восстанавливается, подтверждённое не больше удержанного."""
+        path = self.fresh_database([('c-tok', 'submission_unknown', -0.1, 'bad', 1000, 100)])
+        with self.database(path) as db:
+            llm_guard.ensure_confirmed_usd(db)
+            llm_guard.repair_legacy_money(db)
+            row = self.rows(db)['c-tok']
+            proven = llm_guard.confirmed_from_tokens('gpt-5.6-luna', 1000, 100)
+            self.assertGreater(proven, 0)
+            self.assertAlmostEqual(row['usd'], proven, places=6)
+            self.assertAlmostEqual(row['confirmed_usd'], proven, places=6)
+            self.assertLessEqual(row['confirmed_usd'], row['usd'])
+
+    def test_legacy_done_with_unconfirmed_part_becomes_unknown(self):
+        """done с неподтверждённой частью больше не выглядит корректной: разница ждёт сверки."""
+        path = self.fresh_database([('c-done', 'done', 0.5, 0.5, None, None)])
+        with self.database(path) as db:
+            llm_guard.ensure_confirmed_usd(db)
+            # Подтверждённая часть меньше удержанной: так остаются записи после старой сверки.
+            db.execute('UPDATE llm_calls SET confirmed_usd=0.1 WHERE id=?', ('c-done',))
+            llm_guard.repair_legacy_money(db)
+            row = self.rows(db)['c-done']
+            self.assertEqual(row['status'], 'submission_unknown')
+            self.assertAlmostEqual(row['confirmed_usd'], 0.1, places=6)
+            self.assertAlmostEqual(row['usd'], 0.5, places=6)
+            summary = llm_guard.summary(db, {'p1'})
+            self.assertAlmostEqual(summary['usd'], summary['confirmed_usd'] + summary['unknown_usd'], places=6)
+            self.assertEqual(summary['unknown_calls'], 1)
+            # Повторный проход ничего не меняет.
+            llm_guard.repair_legacy_money(db)
+            again = self.rows(db)['c-done']
+            self.assertEqual(again['status'], 'submission_unknown')
+            self.assertAlmostEqual(again['usd'], 0.5, places=6)
+
+    def test_absurd_legacy_tokens_do_not_inflate_the_confirmed_part(self):
+        """Из 1.5 и 1e30 токенов не рождается подтверждённая сумма больше удержанной."""
+        path = self.fresh_database([('c-f', 'submission_unknown', 0.5, 0.5, 1.5, 1e30)])
+        with self.database(path) as db:
+            llm_guard.ensure_confirmed_usd(db)
+            llm_guard.repair_legacy_money(db)
+            row = self.rows(db)['c-f']
+            self.assertAlmostEqual(row['confirmed_usd'], 0.0, places=6)
+            self.assertLessEqual(row['confirmed_usd'], row['usd'])
+
+    def test_only_bounded_integers_are_token_counts(self):
+        """Счётчик провайдера: только целые неотрицательные в пределах доверия."""
+        for value in (1.5, 1e30, float('inf'), float('nan'), -1, True, '12', 120.0):
+            with self.subTest(value=repr(value)):
+                self.assertIsNone(llm_guard.token_count(value))
+        self.assertEqual(llm_guard.token_count(120), 120)
+        self.assertEqual(llm_guard.token_count(0), 0)
+        self.assertIsNone(llm_guard.token_count(llm_guard.MAX_USAGE_TOKENS + 1))
 
 
 if __name__ == '__main__':

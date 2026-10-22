@@ -179,9 +179,34 @@ def payload_of(model, messages, max_tokens):
     return {'kind': 'llm', 'model': model, 'max_tokens': max_tokens, 'messages': digest}
 
 
+def unreadable_holdings(db, project_id=None):
+    """Удерживающие записи, сумму которых нельзя честно посчитать.
+
+    Сумма такой записи либо нечисловая, либо отрицательная. Пока она есть, бюджет не
+    считается: сумма не известна, а подставлять ноль — значит тихо освободить деньги.
+    Такие строки видны владельцу, а траты по ним останавливаются.
+    """
+    try:
+        rows = db.execute(f"SELECT id,project_id,usd FROM llm_calls WHERE {HOLDING_SQL}",
+                          HOLDING_STATUSES).fetchall()
+    except sqlite3.Error:
+        return []
+    broken = []
+    for r in rows:
+        if project_id is not None and r['project_id'] != project_id:
+            continue
+        if amount_or_none(r['usd']) is None:
+            broken.append(dict(r))
+    return broken
+
+
 def spent(db, project_id):
     """(проект, сегодня по Москве) уже занято на LLM: резерв, подтверждённый факт и неопределённые вызовы."""
     from backend.security import MOSCOW
+    broken = unreadable_holdings(db, project_id)
+    if broken:
+        raise ValueError('учёт расходов повреждён: ' + str(len(broken)) +
+                         ' записей с нечитаемой суммой — бюджет не считается')
     today = datetime.now(MOSCOW).date().isoformat()
     total = daily = 0.0
     for r in db.execute(f"SELECT project_id,usd,created_at FROM llm_calls WHERE {HOLDING_SQL}", HOLDING_STATUSES):
@@ -200,7 +225,8 @@ def summary(db, projects=None):
     from backend.security import MOSCOW
     today = datetime.now(MOSCOW).date().isoformat()
     out = {'calls': 0, 'usd': 0.0, 'estimated_usd': 0.0, 'today_usd': 0.0, 'by_model': {},
-           'unknown_calls': 0, 'unknown_usd': 0.0, 'confirmed_usd': 0.0, 'over_estimate_calls': 0, 'over_estimate_usd': 0.0}
+           'unknown_calls': 0, 'unknown_usd': 0.0, 'confirmed_usd': 0.0, 'over_estimate_calls': 0,
+           'over_estimate_usd': 0.0, 'unreadable_calls': 0}
     try:
         rows = db.execute(f"SELECT id,project_id,model,status,usd,estimated_usd,created_at FROM llm_calls WHERE {HOLDING_SQL}", HOLDING_STATUSES).fetchall()
     except Exception:  # таблица появляется при запуске сервера
@@ -209,22 +235,33 @@ def summary(db, projects=None):
     for r in rows:
         if projects is not None and r['project_id'] not in projects:
             continue
+        amount = amount_or_none(r['usd'])
+        if amount is None:
+            # Сумма нечитаема: посчитать её как ноль нельзя, но и не блокировать отчёт
+            # нельзя — владелец должен увидеть проблему и решить, сколько в строке.
+            out['calls'] += 1
+            out['unreadable_calls'] += 1
+            item = out['by_model'].setdefault(r['model'], {'calls': 0, 'usd': 0.0})
+            item['calls'] += 1
+            continue
         out['calls'] += 1
-        out['usd'] += r['usd']
-        out['estimated_usd'] += r['estimated_usd']
+        out['usd'] += amount
+        estimate = amount_or_none(r['estimated_usd'])
+        if estimate is not None:
+            out['estimated_usd'] += estimate
         if datetime.fromisoformat(r['created_at']).astimezone(MOSCOW).date().isoformat() == today:
-            out['today_usd'] += r['usd']
+            out['today_usd'] += amount
         confirmed = confirmed_map.get(r['id'], 0.0)
         out['confirmed_usd'] += confirmed
         if r['status'] == 'submission_unknown':
             out['unknown_calls'] += 1
-            out['unknown_usd'] += max(0.0, round(r['usd'] - confirmed, 6))
-        if r['usd'] > r['estimated_usd']:
+            out['unknown_usd'] += max(0.0, round(amount - confirmed, 6))
+        if estimate is not None and amount > estimate:
             out['over_estimate_calls'] += 1
-            out['over_estimate_usd'] += r['usd'] - r['estimated_usd']
+            out['over_estimate_usd'] += amount - estimate
         item = out['by_model'].setdefault(r['model'], {'calls': 0, 'usd': 0.0})
         item['calls'] += 1
-        item['usd'] += r['usd']
+        item['usd'] += amount
     for key in ('usd', 'estimated_usd', 'today_usd', 'unknown_usd', 'confirmed_usd', 'over_estimate_usd'):
         out[key] = round(out[key], 6)
     for item in out['by_model'].values():
@@ -233,8 +270,17 @@ def summary(db, projects=None):
 
 
 def check_budget(db, project_id, cost):
-    """Единый барьер денег: LLM и генерации проходят по одному лимиту проекта и дня."""
+    """Единый барьер денег: LLM и генерации проходят по одному лимиту проекта и дня.
+
+    Нечитаемая сумма в удерживающей записи — это не ноль и не «потрачено ноль»: бюджет
+    по такой строке посчитать нельзя, поэтому платный вызов не проходит. Fail-closed:
+    лучше остановить траты, чем тихо освободить лимит на неизвестную сумму.
+    """
     from backend import security
+    broken = unreadable_holdings(db, project_id)
+    if broken:
+        raise HTTPException(409, 'Учёт расходов повреждён: ' + str(len(broken)) +
+                            ' записей с нечитаемой суммой. Траты остановлены до решения владельца.')
     security.check_budget(db, project_id, cost)
 
 
@@ -249,18 +295,39 @@ def split_held(held_usd, confirmed_usd):
     return confirmed, unknown
 
 
+def token_count(value):
+    """Достоверное число токенов из старой базы. None — счётчику верить нельзя.
+
+    Только целые неотрицательные значения в пределах доверия к счётчикам: дробное
+    число, bool, строка и заведомо огромное значение количеством токенов не являются.
+    Раньше такое значение роняло расчёт с TypeError, а расчёт идёт на старте Studio:
+    одна испорченная строка в журнале не должна мешать приложению подняться. Дробное
+    или огромное значение опаснее падения: из него получалась подтверждённая сумма,
+    больше удержанной.
+    """
+    if isinstance(value, bool) or not isinstance(value, int):
+        return None
+    if value < 0 or value > MAX_USAGE_TOKENS:
+        return None
+    return value
+
+
 def confirmed_from_tokens(model, tokens_in, tokens_out):
     """Подтверждённая часть по записанным токенам: 0, если модель или токены неизвестны.
 
     Нужен для старой базы: там подтверждённая часть не хранилась отдельной колонкой.
+    Испорченные счётчики не ломают расчёт: подтверждённой части просто нет, а резерв
+    остаётся удержанным до ручной сверки.
     """
-    if tokens_in is None or tokens_out is None:
+    counted_in = token_count(tokens_in)
+    counted_out = token_count(tokens_out)
+    if counted_in is None or counted_out is None:
         return 0.0
     prices = PRICES.get(model)
     if prices is None:
         return 0.0
     price_in, price_out = prices
-    usd = (tokens_in * price_in + tokens_out * price_out) / 1_000_000
+    usd = (counted_in * price_in + counted_out * price_out) / 1_000_000
     if not math.isfinite(usd) or usd < 0:
         return 0.0
     return round(usd, 6)
@@ -417,18 +484,52 @@ def actual_cost(price_in, price_out, usage):
     return round(usd, 6), tokens_in, tokens_out
 
 
+def money(value):
+    """Сумма в долларах: конечное неотрицательное число. Всё остальное — ноль."""
+    try:
+        amount = float(value)
+    except (TypeError, ValueError):
+        return 0.0
+    if not math.isfinite(amount) or amount < 0:
+        return 0.0
+    return round(amount, 6)
+
+
+def amount_or_none(value):
+    """Достоверная сумма из журнала: конечное неотрицательное число. None — нечитаемо.
+
+    Различать «ноль» и «нечитаемо» обязательно: неизвестное списание, превращённое в
+    ноль, тихо освобождает бюджет, а повреждённая запись не должна ни ронять расчёт,
+    ни проходить под видом «не потрачено».
+    """
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    amount = float(value)
+    if not math.isfinite(amount) or amount < 0:
+        return None
+    return round(amount, 6)
+
+
 def settle_from_usage(price_in, price_out, usage, estimate):
     """Единое решение по деньгам: (status, usd, tokens_in, tokens_out, reason).
 
     Достоверный usage — подтверждённый факт, сумма полная. Отсутствующий или
     повреждённый usage не доказывает $0: резерв остаётся в руках под статусом
     'submission_unknown' с причиной, а сумма не может быть отрицательной.
+
+    Причина называет, что именно не сработало: счётчики провайдера или цену. Раньше
+    нечисловая цена приходила в ту же ветку, что и отсутствующий usage, а причина
+    склеивалась с None: вызов падал вместо того, чтобы удержать резерв до сверки.
     """
     usd, tokens_in, tokens_out = actual_cost(price_in, price_out, usage)
     if usd is not None:
         return 'done', usd, tokens_in, tokens_out, ''
-    return ('submission_unknown', round(estimate, 6), None, None,
-            'провайдер не отдал достоверный usage: ' + usage_problem(usage))
+    problem = usage_problem(usage)
+    if problem is not None:
+        reason = 'провайдер не отдал достоверный usage: ' + problem
+    else:
+        reason = 'цена провайдера нечисловая или неконечная: стоимость факта не вычислима'
+    return 'submission_unknown', money(estimate), None, None, reason
 
 
 def provider_key(authorization, direct):
@@ -608,6 +709,101 @@ def ensure_confirmed_usd(db):
     return pending
 
 
+# Метка нечитаемой суммы в журнале расходов. Значение намеренно не число: любой расчёт
+# бюджета по такой строке падает, и деньги не тратятся, пока владелец не решит, сколько
+# в ней на самом деле. Подставлять ноль означало бы «не потрачено», а это не факт.
+UNREADABLE_AMOUNT = 'unreadable'
+
+
+def append_note(old, reason):
+    """Причина добавляется к существующей заметке, а не заменяет её. Идемпотентно."""
+    text = (old or '').strip()
+    if not text:
+        return reason
+    if not reason or reason in text:
+        return text
+    return f'{text} | {reason}'
+
+
+def repair_legacy_money(db):
+    """Старые записи с невозможной суммой: денежного факта из них нет.
+
+    Ноль, «нечитаемо» и «доказанный факт» — три разные вещи:
+
+    - удерживающая строка без читаемой суммы получает резерв заново из того, чему в
+      строке можно верить: оценки вызова и цены по записанным токенам. Резерв не меньше
+      подтверждённой части, иначе подтверждённое окажется больше удержанного;
+    - если верить нечем (оценка нечитаема, токенов нет), сумма остаётся нечисловой, а
+      строка ждёт решения владельца: расчёт бюджета по ней падает, деньги не тратятся.
+      Потолок резерва здесь — политика, и без утверждения владельца его величина не
+      выдумывается;
+    - удерживающая строка, у которой подтверждённая часть меньше удержанной, больше не
+      выглядит корректной: разница становится неопределённым остатком, а статус —
+      'submission_unknown'. Подтверждённая часть без доказанного факта не растёт.
+
+    Идемпотентно: повторный запуск ничего не меняет. Вызывается на старте, когда
+    колонки confirmed_usd и note уже гарантированно есть.
+    """
+    columns = {row['name'] for row in db.execute('PRAGMA table_info(llm_calls)')}
+    if 'confirmed_usd' not in columns:
+        return 0
+    has_note = 'note' in columns
+    select = ('SELECT id,status,model,usd,estimated_usd,confirmed_usd,input_tokens,output_tokens' +
+              (',note' if has_note else '') + ' FROM llm_calls')
+    repaired = 0
+    for old in db.execute(select).fetchall():
+        if old['usd'] == UNREADABLE_AMOUNT:
+            continue  # уже помечена: решение владельца ещё не принято
+        held = amount_or_none(old['usd'])
+        estimate = amount_or_none(old['estimated_usd'])
+        confirmed = amount_or_none(old['confirmed_usd'])
+        proven = confirmed_from_tokens(old['model'], old['input_tokens'], old['output_tokens'])
+        status = old['status']
+        holding = status in HOLDING_STATUSES
+        values = {}
+        reason = ''
+        if held is None:
+            # Читаемой суммы у строки нет: она нечитаема или отрицательна.
+            if holding:
+                candidates = [value for value in (estimate, proven) if value is not None and value > 0]
+                if candidates:
+                    restored = max(candidates)
+                    source = 'оценке и токенам' if estimate and proven else ('оценке' if estimate else 'токенам')
+                    values = {'status': 'submission_unknown', 'usd': restored,
+                              'confirmed_usd': min(proven, restored) if proven > 0 else 0.0}
+                    reason = ('старая запись с нечитаемой суммой: резерв восстановлен по ' + source +
+                              ', исход не подтверждён')
+                else:
+                    values = {'status': 'submission_unknown', 'usd': UNREADABLE_AMOUNT, 'confirmed_usd': 0.0}
+                    reason = ('старая запись с нечитаемой суммой: восстановить не из чего, '
+                              'нужно решение владельца (OWNER_DECISION_REQUIRED)')
+            else:
+                # Не удерживающая строка денег не держит: значение суммы не имеет.
+                values = {'usd': 0.0, 'confirmed_usd': 0.0}
+                reason = 'старая запись с нечитаемой суммой: запись денег не держит, сумма приведена к нулю'
+        else:
+            # Сумма читаема: подтверждённое не может превышать удержанное.
+            new_confirmed = min(confirmed if confirmed is not None else 0.0, held)
+            if confirmed is None or confirmed < 0 or new_confirmed != confirmed:
+                values['confirmed_usd'] = new_confirmed
+                reason = ('старая запись с нечитаемой или избыточной подтверждённой частью: '
+                          'часть приведена к удержанной')
+            if status == 'done' and held > new_confirmed:
+                # Вызов помечен как завершённый, но подтверждена не вся сумма: разница
+                # ждёт сверки, а не прячется в подтверждённой части.
+                values['status'] = 'submission_unknown'
+                reason = ('старая запись done с неподтверждённой частью: разница переведена '
+                          'в неопределённый остаток')
+        if not values:
+            continue
+        if has_note and reason:
+            values['note'] = append_note(old['note'] if 'note' in old.keys() else None, reason)
+        assignments = ','.join(f'{name}=?' for name in values)
+        db.execute(f'UPDATE llm_calls SET {assignments} WHERE id=?', (*values.values(), old['id']))
+        repaired += 1
+    return repaired
+
+
 def register(app, studio):
     @app.on_event('startup')
     def setup():
@@ -626,6 +822,8 @@ def register(app, studio):
             # Миграция атомарна и возобновляема: незавершённые строки добиваются
             # при каждом старте, а не только в момент появления колонки.
             ensure_confirmed_usd(db)
+            # Старые записи с невозможной суммой не уменьшают бюджет и ждут сверки.
+            repair_legacy_money(db)
 
     @app.post('/api/llm/estimate')
     def estimate(body: Estimate):
@@ -756,6 +954,9 @@ def register(app, studio):
         части её не обнуляет. Освобождается только неопределённый остаток, подтверждённое
         остаётся в счёте. Повторная сверка отклоняется: исход уже решён и сумма не может
         списаться второй раз.
+
+        Исход 'done' требует названной суммы: без неё предварительная оценка провайдера
+        была бы выдана за доказанный расход.
         """
         if not body.approved:
             raise HTTPException(400, 'Нужно подтверждение сверки: она меняет учёт расхода')
@@ -766,7 +967,12 @@ def register(app, studio):
                 raise HTTPException(404, 'Вызов не найден')
             if row['status'] != 'submission_unknown':
                 raise HTTPException(409, 'Сверка доступна только для вызова с неопределённым исходом')
-            confirmed, unknown = split_held(row['usd'], row['confirmed_usd'] if confirmed_column(db) else 0)
+            if amount_or_none(row['usd']) is None:
+                raise HTTPException(409, 'Запись расхода повреждена: сумма нечитаема, нужна ручная правка владельцем')
+            if body.outcome == 'done' and body.usd is None and body.unconfirmed_usd is None:
+                # Без названной суммы сверка ничего не решает: оценка — не факт.
+                raise HTTPException(422, 'Для исхода done нужна названная сумма: usd или unconfirmed_usd')
+            confirmed, _unknown = split_held(row['usd'], row['confirmed_usd'] if confirmed_column(db) else 0)
             if body.outcome == 'failed':
                 # Провайдер ничего не списал по неопределённой части: резерв снимается,
                 # подтверждённые списания остаются в счёте.
@@ -775,14 +981,18 @@ def register(app, studio):
             elif body.unconfirmed_usd is not None:
                 held = round(confirmed + body.unconfirmed_usd, 6)
                 status = 'done'
-            elif body.usd is not None:
+            else:
                 # Оператор назвал стоимость вызова целиком: ниже подтверждённого не опускаемся.
                 held = max(confirmed, round(body.usd, 6))
                 status = 'done'
-            else:
-                held = round(confirmed + unknown, 6)
-                status = 'done'
             held = max(0.0, round(held, 6))
+            # Явная сверка с владельцем называет факт: после исхода 'done' вся удержанная
+            # сумма подтверждена, неопределённого остатка не остаётся. Подтверждённая
+            # часть при этом не уменьшается — она растёт до названной суммы, поэтому
+            # сводка не показывает расход, который не объяснён ни подтверждённым, ни
+            # неопределённым остатком.
+            if status == 'done':
+                confirmed = held
             note = body.note
             if body.outcome == 'failed' and confirmed > 0:
                 note = f'{body.note} (неопределённый резерв снят, подтверждённая часть {confirmed} сохранена)'
