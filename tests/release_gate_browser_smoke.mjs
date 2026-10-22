@@ -211,6 +211,12 @@ page.on('request', request => {
   if (url.includes('/decision') || url.includes('/qc/'))
     requests.push(request.method() + ' ' + url.split('release-artifacts')[1]);
 });
+const uploads = [];
+page.on('request', request => {
+  const pathname = new URL(request.url()).pathname;
+  if (request.method() === 'POST' && /\/api\/projects\/[^/]+\/release-artifacts$/.test(pathname))
+    uploads.push(pathname);
+});
 
 try {
   backend = startBackend(dataDir);
@@ -231,10 +237,41 @@ try {
 
   // проект создаётся заранее на временном сервере: экран выпуска работает с сохранённым проектом
   const token = (await (await fetch(`http://127.0.0.1:${API_PORT}/api/session`)).json()).token;
-  await fetch(`http://127.0.0.1:${API_PORT}/api/projects`, {
-    method: 'POST',
-    headers: {'content-type': 'application/json', 'x-studio-session': token},
-    body: JSON.stringify({title: 'E2E выпуск', state: {}}),
+  const created = await (
+    await fetch(`http://127.0.0.1:${API_PORT}/api/projects`, {
+      method: 'POST',
+      headers: {'content-type': 'application/json', 'x-studio-session': token},
+      body: JSON.stringify({title: 'E2E выпуск', state: {}}),
+    })
+  ).json();
+  const projectId = created.id;
+
+  /** Смена состояния проекта двигает ревизию — так получаем честный конфликт импорта. */
+  async function bumpRevision() {
+    const current = await (
+      await fetch(`http://127.0.0.1:${API_PORT}/api/projects/${projectId}`, {headers: {'x-studio-session': token}})
+    ).json();
+    await fetch(`http://127.0.0.1:${API_PORT}/api/projects`, {
+      method: 'POST',
+      headers: {'content-type': 'application/json', 'x-studio-session': token},
+      body: JSON.stringify({
+        id: projectId,
+        title: current.title,
+        state: {...(current.state || {}), smoke: Date.now()},
+        base_revision: current.revision,
+      }),
+    });
+  }
+
+  // задержка загрузки: пока запрос импорта висит, ревизия проекта меняется — получаем 409
+  let delayUpload = false;
+  await page.route(url => /\/api\/projects\/[^/]+\/release-artifacts$/.test(url.pathname), async route => {
+    if (route.request().method() === 'POST' && delayUpload) {
+      delayUpload = false;
+      await sleep(900);
+      await bumpRevision();
+    }
+    await route.continue();
   });
 
   async function openRelease() {
@@ -265,11 +302,21 @@ try {
   const errorText = await panel.locator('.rg-error').first().innerText().catch(() => '');
   check('повреждённый файл: русская ошибка, артефакта нет', /MP4|прочитать|видео/i.test(errorText), errorText);
 
-  // 2. нормальный файл: импорт — ещё не финальный
+  // 2. конфликт ревизии: 409 по-русски и без автоматического повтора
+  delayUpload = true;
+  const uploadsBefore = uploads.length;
+  await upload(path.join(fxDir, 'ok.mp4'), 'conflict');
+  const conflictText = await panel.locator('.rg-error').first().innerText().catch(() => '');
+  check('конфликт ревизии: русская ошибка 409', /изменил|ревизи/i.test(conflictText), conflictText);
+  check('409 не повторяется автоматически: один POST', uploads.length - uploadsBefore === 1, `${uploads.length - uploadsBefore}`);
+  check('после 409 артефакт не создан', (await page.getByTestId('final-count').innerText()) === '0');
+  check('после 409 ожидают приёмки 0', (await page.getByTestId('pending-count').innerText()) === '0');
+
+  // 3. нормальный файл: импорт — ещё не финальный
   await upload(path.join(fxDir, 'ok.mp4'), 'e2e-master');
   await page.waitForTimeout(1500);
   const afterImport = await panel.innerText();
-  check('после загрузки: состояние «не пройдена»', /Загружен, проверка не пройдена/.test(afterImport));
+  check('после повторной загрузки: состояние «не пройдена»', /Загружен, проверка не пройдена/.test(afterImport));
   check('импорт не назван финальным', (await page.getByTestId('final-count').innerText()) === '0');
   check('импорт ждёт приёмки', (await page.getByTestId('pending-count').innerText()) === '1');
   const approve = panel.getByTestId('approve');
@@ -279,14 +326,14 @@ try {
   check('видна ревизия проекта', /Ревизия проекта/.test(afterImport));
   await page.screenshot({path: path.join(tmp, 'shot1_imported.png'), fullPage: true});
 
-  // 3. N34: вердикт сервера
+  // 4. N34: вердикт сервера
   await panel.getByRole('button', {name: 'Проверить N34'}).click();
   await page.waitForTimeout(2500);
   const afterQc = await panel.innerText();
   check('N34 пройдена, состояние TECHNICAL_PASS', /Пройдена/.test(afterQc) && /PASS_TECHNICAL/.test(afterQc));
   check('ждёт решения владельца', /ждёт решения владельца/.test(afterQc));
 
-  // 4. неверный owner_id: ошибка сервера, решение не принято
+  // 5. неверный owner_id: ошибка сервера, решение не принято
   await panel.getByLabel('Идентификатор владельца').fill('wrong');
   await panel.getByLabel(/подтверждаю право/).check();
   await approve.click();
@@ -294,7 +341,7 @@ try {
   check('неверный owner_id: ошибка сервера показана', /не совпадает/.test(await panel.innerText()));
   check('финальных всё ещё 0', (await page.getByTestId('final-count').innerText()) === '0');
 
-  // 5. утверждение + двойной клик
+  // 6. утверждение + двойной клик
   await panel.getByLabel('Идентификатор владельца').fill(OWNER);
   const before = requests.filter(r => r.startsWith('POST') && r.includes('/decision')).length;
   await approve.dblclick();
@@ -305,7 +352,7 @@ try {
   check('финальных 1', (await page.getByTestId('final-count').innerText()) === '1');
   await page.screenshot({path: path.join(tmp, 'shot2_approved.png'), fullPage: true});
 
-  // 6. рестарт backend: решение сохранилось
+  // 7. рестарт backend: решение сохранилось
   await stopBackend();
   backend = startBackend(dataDir);
   check('backend перезапущен', await waitFor(`http://127.0.0.1:${API_PORT}/api/health`, 90000));
@@ -318,7 +365,7 @@ try {
     afterRestart.slice(0, 80).replace(/\n/g, ' | ')
   );
 
-  // 7. байты изменены на диске: утверждение снимается
+  // 8. байты изменены на диске: утверждение снимается
   const library = path.join(dataDir, 'library');
   const master = fs.readdirSync(library).find(name => name.endsWith('.mp4'));
   fs.appendFileSync(path.join(library, master), Buffer.from('tail-bytes'));
@@ -331,7 +378,7 @@ try {
   check('показано, что нужна новая проверка N34', /изменён после проверки/.test(afterChange));
   await page.screenshot({path: path.join(tmp, 'shot3_changed.png'), fullPage: true});
 
-  // 8. отклонение: причина обязательна
+  // 9. отклонение: причина обязательна
   const reject = panel.getByTestId('reject');
   check('отклонить недоступно без причины', await reject.isDisabled());
   await panel.getByLabel('Причина отклонения').fill('плохой звук');
@@ -343,7 +390,7 @@ try {
   check('история решений видна', /История решений/.test(afterReject));
   await page.screenshot({path: path.join(tmp, 'shot4_rejected.png'), fullPage: true});
 
-  // 9. второй MP4 без звука: N34 с требованием аудио — BLOCKED, утверждать нельзя
+  // 10. второй MP4 без звука: N34 с требованием аудио — BLOCKED, утверждать нельзя
   await upload(path.join(fxDir, 'silent.mp4'), 'silent-master');
   await page.waitForTimeout(2000);
   check(
