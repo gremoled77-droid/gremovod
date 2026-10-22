@@ -48,7 +48,6 @@ docs/*.jpg
 # Local worktrees and production data stay on this computer.
 /.worktrees/
 /projects/
-/.claude/
 /Claude outputs/
 /guitar-workshop/
 /index.html
@@ -73,3 +72,11 @@ Screenshots/
 *.log
 # NOTE: .aiderignore and .aider.model.settings.yml are tracked on purpose.
 # Ignore Aider's local caches precisely instead of the broad ".aider*" glob.
+
+# Claude Code project configuration is tracked on purpose: the rules, the skills and
+# the hooks are part of the repository contract and have to be reviewable. Only the
+# machine specific parts of .claude/ stay local.
+/.claude/settings.local.json
+/.claude/*.local.json
+/.claude/worktrees/
+/.claude/projects/
