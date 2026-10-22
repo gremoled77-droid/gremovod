@@ -12,6 +12,7 @@ import shutil
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from tools import capcut_handoff
 from tools import mock_media_pilot
@@ -595,6 +596,279 @@ class CapCutHandoffTests(unittest.TestCase):
         readme = (self.output / "README_RU.md").read_text(encoding="utf-8")
         self.assertIn("12 с", readme)
         self.assertIn("монтажный ритм", readme)
+
+    # ---------- 17. an incomplete pack keeps its integrity, but is not ready ----------
+
+    def test_incomplete_package_keeps_integrity_but_is_not_ready(self):
+        self.make_clip("clips/shot01.mp4")
+        self.write_edit_list([make_row(1, "clips/shot01.mp4"),
+                              make_row(2, "clips/absent.mp4")])
+
+        manifest = self.export()
+
+        self.assertEqual(manifest["status"], "INCOMPLETE")
+        report = capcut_handoff.verify_package(self.output)
+        self.assertTrue(report["ok"], report)
+        self.assertFalse(report["ready_for_montage"])
+
+
+class ManifestVerificationTests(unittest.TestCase):
+    """Verification of a finished pack: structure, boundaries and readiness.
+
+    Only synthetic packages in a temporary folder — no ffmpeg, no network, no
+    owner media. The checks here answer one question: may a person trust the
+    result of ``verify_package()`` and start importing the pack by hand?
+    """
+
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.root = Path(self.temp.name)
+        self.pack = self.root / "pack"
+        self.pack.mkdir()
+
+    # ---------- helpers ----------
+
+    def write_file(self, relative, content=b"data"):
+        path = self.pack / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(content)
+        return path
+
+    def write_manifest(self, manifest):
+        (self.pack / "manifest.json").write_text(
+            json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    def read_manifest(self):
+        return json.loads((self.pack / "manifest.json").read_text(encoding="utf-8"))
+
+    def entry_for(self, relative):
+        """A manifest entry that describes the file as it is right now."""
+        target = self.pack / relative
+        return {"path": relative, "sha256": capcut_handoff.sha256_file(target),
+                "bytes": target.stat().st_size}
+
+    def build_pack(self, *, status="READY_FOR_MONTAGE", ready=True, documents=True,
+                   clip="01_Clips/001_scene01_shot01.mp4"):
+        """A minimal but correct handoff v1 package."""
+        self.write_file(clip, b"clip-bytes")
+        files = [self.entry_for(clip)]
+        listed_documents = []
+        if documents:
+            for name, content in ((capcut_handoff.EDIT_LIST_CSV, "a;b\n"),
+                                  (capcut_handoff.EDIT_LIST_JSON, "{}\n"),
+                                  (capcut_handoff.README_NAME, "# Пакет\n")):
+                self.write_file(name, content.encode("utf-8"))
+                listed_documents.append(self.entry_for(name))
+        self.write_manifest({"schema": capcut_handoff.SCHEMA, "status": status,
+                             "ready_for_montage": ready, "files": files,
+                             "documents": listed_documents})
+        return self.pack
+
+    def report(self, pack=None):
+        """The verification result; a refusal is reported as ok=False."""
+        try:
+            return capcut_handoff.verify_package(pack or self.pack)
+        except capcut_handoff.HandoffError as exc:
+            return {"ok": False, "checked": 0, "mismatches": [str(exc)],
+                    "status": None, "ready_for_montage": None}
+
+    def rejected(self, pack=None):
+        """True when the pack is refused — by an error or by ok=False."""
+        return self.report(pack)["ok"] is False
+
+    def hash_spy(self):
+        """Record every hashed path and fail loudly on a file outside the pack."""
+        calls = []
+        original = capcut_handoff.sha256_file
+        root = self.pack.resolve()
+
+        def spy(path):
+            resolved = Path(path).resolve()
+            calls.append(resolved)
+            if not resolved.is_relative_to(root):
+                raise AssertionError(f"файл вне пакета был прочитан: {resolved}")
+            return original(path)
+
+        return calls, spy
+
+    # ---------- a correct pack ----------
+
+    def test_correct_package_passes(self):
+        self.build_pack()
+
+        report = capcut_handoff.verify_package(self.pack)
+
+        self.assertTrue(report["ok"], report)
+        self.assertEqual(report["mismatches"], [])
+        self.assertEqual(report["checked"], 4)
+        self.assertTrue(report["ready_for_montage"])
+
+    def test_changed_file_is_reported(self):
+        self.build_pack()
+        (self.pack / "01_Clips/001_scene01_shot01.mp4").write_bytes(b"changed")
+
+        report = capcut_handoff.verify_package(self.pack)
+
+        self.assertFalse(report["ok"], report)
+        self.assertTrue(any("SHA-256" in m for m in report["mismatches"]), report)
+
+    def test_extra_file_in_the_package_is_reported(self):
+        self.build_pack()
+        self.write_file("01_Clips/stray.mp4", b"stray")
+
+        report = capcut_handoff.verify_package(self.pack)
+
+        self.assertFalse(report["ok"], report)
+        self.assertTrue(any("stray.mp4" in m for m in report["mismatches"]), report)
+
+    def test_correct_incomplete_package_keeps_integrity_but_is_not_ready(self):
+        self.build_pack(status="INCOMPLETE", ready=False)
+
+        report = capcut_handoff.verify_package(self.pack)
+
+        self.assertTrue(report["ok"], report)
+        self.assertEqual(report["mismatches"], [])
+        self.assertFalse(report["ready_for_montage"])
+        self.assertEqual(report["status"], "INCOMPLETE")
+
+    # ---------- a manifest that is not a handoff v1 ----------
+
+    def test_empty_ready_manifest_is_rejected(self):
+        self.write_manifest({"schema": capcut_handoff.SCHEMA, "status": "READY_FOR_MONTAGE",
+                             "ready_for_montage": True, "files": [], "documents": []})
+
+        report = self.report()
+
+        self.assertFalse(report["ok"], report)
+        self.assertTrue(any("edit-list.csv" in m for m in report["mismatches"]), report)
+
+    def test_non_object_manifest_is_a_controlled_rejection(self):
+        (self.pack / "manifest.json").write_text("[]", encoding="utf-8")
+
+        try:
+            report = capcut_handoff.verify_package(self.pack)
+        except capcut_handoff.HandoffError as exc:
+            self.assertIn("неверную структуру", str(exc))
+            return
+        except (AttributeError, TypeError) as exc:
+            self.fail(f"повреждённый манифест дал {type(exc).__name__}: {exc}")
+        self.assertFalse(report["ok"], report)
+
+    def test_manifest_of_another_schema_is_rejected(self):
+        self.build_pack()
+        manifest = self.read_manifest()
+        manifest["schema"] = "gremovod.capcut-handoff/99"
+        self.write_manifest(manifest)
+
+        self.assertTrue(self.rejected())
+
+    def test_manifest_without_file_lists_is_rejected(self):
+        self.write_manifest({"schema": capcut_handoff.SCHEMA, "status": "READY_FOR_MONTAGE",
+                             "ready_for_montage": True, "files": {}, "documents": []})
+
+        self.assertTrue(self.rejected())
+
+    def test_malformed_entry_is_reported_without_a_crash(self):
+        self.build_pack()
+        manifest = self.read_manifest()
+        manifest["files"].append("не объект")
+        manifest["files"].append({"sha256": "0" * 64})
+        manifest["files"].append({"path": 42})
+        self.write_manifest(manifest)
+
+        report = self.report()
+
+        self.assertFalse(report["ok"], report)
+        self.assertTrue(any("не является объектом" in m for m in report["mismatches"]), report)
+        self.assertTrue(any("без пути" in m for m in report["mismatches"]), report)
+
+    def test_duplicate_path_in_the_manifest_is_reported(self):
+        self.build_pack()
+        manifest = self.read_manifest()
+        manifest["files"].append(dict(manifest["files"][0]))
+        self.write_manifest(manifest)
+
+        report = self.report()
+
+        self.assertFalse(report["ok"], report)
+        self.assertTrue(any("дважды" in m for m in report["mismatches"]), report)
+
+    def test_missing_required_document_is_reported(self):
+        self.build_pack()
+        (self.pack / capcut_handoff.EDIT_LIST_CSV).unlink()
+
+        report = self.report()
+
+        self.assertFalse(report["ok"], report)
+        self.assertTrue(any("обязательный документ" in m for m in report["mismatches"]), report)
+
+    def test_inconsistent_readiness_is_reported(self):
+        self.build_pack(status="INCOMPLETE", ready=True)
+
+        report = self.report()
+
+        self.assertFalse(report["ok"], report)
+        self.assertTrue(any("ready_for_montage=true" in m for m in report["mismatches"]), report)
+
+    # ---------- the package boundary ----------
+
+    def test_manifest_path_outside_the_package_is_rejected_and_not_read(self):
+        outside = self.root / "outside.txt"
+        outside.write_text("SYNTHETIC-OUTSIDE-MARKER", encoding="utf-8")
+        self.build_pack()
+        manifest = self.read_manifest()
+        manifest["files"].append({"path": "../outside.txt",
+                                  "sha256": capcut_handoff.sha256_file(outside),
+                                  "bytes": outside.stat().st_size})
+        self.write_manifest(manifest)
+
+        calls, spy = self.hash_spy()
+        with mock.patch.object(capcut_handoff, "sha256_file", spy):
+            report = self.report()
+
+        self.assertFalse(report["ok"], report)
+        self.assertTrue(any("outside.txt" in m for m in report["mismatches"]), report)
+        self.assertNotIn(outside.resolve(), calls)
+
+    def test_absolute_path_in_the_manifest_is_rejected_and_not_read(self):
+        outside = self.root / "outside.txt"
+        outside.write_text("SYNTHETIC-OUTSIDE-MARKER", encoding="utf-8")
+        self.build_pack()
+        manifest = self.read_manifest()
+        manifest["files"].append({"path": str(outside),
+                                  "sha256": capcut_handoff.sha256_file(outside),
+                                  "bytes": outside.stat().st_size})
+        self.write_manifest(manifest)
+
+        calls, spy = self.hash_spy()
+        with mock.patch.object(capcut_handoff, "sha256_file", spy):
+            report = self.report()
+
+        self.assertFalse(report["ok"], report)
+        self.assertNotIn(outside.resolve(), calls)
+
+    def test_symlink_out_of_the_package_is_rejected_and_not_read(self):
+        outside = self.root / "outside.txt"
+        outside.write_text("SYNTHETIC-OUTSIDE-MARKER", encoding="utf-8")
+        self.build_pack()
+        link = self.pack / "01_Clips" / "link.mp4"
+        try:
+            os.symlink(outside, link)
+        except (OSError, NotImplementedError) as exc:
+            self.skipTest(f"symlinks are not available here: {exc}")
+        manifest = self.read_manifest()
+        manifest["files"].append({"path": "01_Clips/link.mp4",
+                                  "sha256": capcut_handoff.sha256_file(outside),
+                                  "bytes": outside.stat().st_size})
+        self.write_manifest(manifest)
+
+        calls, spy = self.hash_spy()
+        with mock.patch.object(capcut_handoff, "sha256_file", spy):
+            report = self.report()
+
+        self.assertFalse(report["ok"], report)
+        self.assertNotIn(outside.resolve(), calls)
 
 
 if __name__ == "__main__":

@@ -39,6 +39,7 @@ EDIT_LIST_CSV = "edit-list.csv"
 EDIT_LIST_JSON = "edit-list.json"
 MANIFEST_NAME = "manifest.json"
 README_NAME = "README_RU.md"
+REQUIRED_DOCUMENTS = (EDIT_LIST_CSV, EDIT_LIST_JSON, README_NAME)
 AUDIO_TRACKS = ("voice", "music", "sfx")
 VERTICAL_SUFFIX = "_9x16"
 VIDEO_SUFFIXES = {".mp4", ".mov", ".m4v", ".webm", ".mkv", ".avi"}
@@ -143,22 +144,46 @@ def probe_media(path):
 
 # ---------- input validation ----------
 
+def _resolve_relative_inside(root, relative, *, empty_message, escape_subject):
+    """Shared rules for one relative path that must stay inside ``root``.
+
+    Absolute paths, ``..`` escapes and symlinks that leave the root are refused
+    instead of being silently clipped. The caller names the root in the error.
+    """
+    root = Path(root).resolve()
+    if not isinstance(relative, str) or not relative.strip():
+        raise HandoffError(empty_message)
+    candidate = Path(relative)
+    if candidate.is_absolute() or candidate.drive or candidate.root:
+        raise HandoffError(f"Абсолютный путь запрещён: {relative}")
+    resolved = (root / candidate).resolve()
+    if resolved == root or not resolved.is_relative_to(root):
+        raise HandoffError(f"Путь выходит за {escape_subject}: {relative}")
+    return resolved
+
+
 def resolve_media_path(media_root, relative):
     """Resolve one relative media path inside the allowed root.
 
     Absolute paths, ``..`` escapes and symlinks that leave the root are refused
     with ``HandoffError`` instead of being silently clipped.
     """
-    root = Path(media_root).resolve()
-    if not isinstance(relative, str) or not relative.strip():
-        raise HandoffError("Путь к файлу в монтажном листе пуст")
-    candidate = Path(relative)
-    if candidate.is_absolute() or candidate.drive or candidate.root:
-        raise HandoffError(f"Абсолютный путь запрещён: {relative}")
-    resolved = (root / candidate).resolve()
-    if resolved == root or not resolved.is_relative_to(root):
-        raise HandoffError(f"Путь выходит за разрешённый корень медиа: {relative}")
-    return resolved
+    return _resolve_relative_inside(
+        media_root, relative,
+        empty_message="Путь к файлу в монтажном листе пуст",
+        escape_subject="разрешённый корень медиа")
+
+
+def resolve_pack_path(pack_root, relative):
+    """Resolve one path of a finished pack inside that pack.
+
+    The media-root rules apply unchanged: a manifest must not point outside the
+    package, and the file is not read before the path is resolved.
+    """
+    return _resolve_relative_inside(
+        pack_root, relative,
+        empty_message="Путь в манифесте пакета пуст",
+        escape_subject="корень пакета")
 
 
 def read_edit_list(edit_list_path):
@@ -630,8 +655,51 @@ def _readme(manifest, rows):
 
 # ---------- verification ----------
 
+def _manifest_structure_problem(manifest):
+    """Why the manifest is not a usable handoff v1 — or ``None`` when it is."""
+    if not isinstance(manifest, dict):
+        return "ожидается объект JSON"
+    schema = manifest.get("schema")
+    if schema != SCHEMA:
+        return f"ожидается схема {SCHEMA}, получено {schema!r}"
+    for key in ("files", "documents"):
+        if not isinstance(manifest.get(key), list):
+            return f"поле {key} должно быть списком"
+    return None
+
+
+def _readiness_problems(manifest, target, listed):
+    """Problems that make the manifest's own readiness claim inconsistent."""
+    problems = []
+    status = manifest.get("status")
+    ready = manifest.get("ready_for_montage")
+    if not isinstance(status, str) or not status.strip():
+        problems.append("поле status должно быть непустой строкой")
+    if not isinstance(ready, bool):
+        problems.append("поле ready_for_montage должно быть true или false")
+    elif ready and status != "READY_FOR_MONTAGE":
+        problems.append(f"ready_for_montage=true, но status={status}")
+    elif not ready and status == "READY_FOR_MONTAGE":
+        problems.append("status=READY_FOR_MONTAGE, но ready_for_montage=false")
+    for name in REQUIRED_DOCUMENTS:
+        if not (target / name).is_file():
+            problems.append(f"{name}: обязательный документ пакета отсутствует")
+        elif name not in listed:
+            problems.append(f"{name}: обязательный документ не указан в манифесте")
+    if ready is True and not manifest["files"]:
+        problems.append("готовый пакет не содержит ни одного файла")
+    return problems
+
+
 def verify_package(output_dir):
-    """Re-read a finished pack and check it against its own manifest."""
+    """Re-read a finished pack and check it against its own manifest.
+
+    The manifest is validated before any file is read: it must be a handoff v1
+    object, it must list the documents of the exporter, and every path is
+    resolved inside the package before its hash is taken. Integrity and
+    readiness stay apart — a correctly built INCOMPLETE pack keeps ``ok=True``
+    and is still not ready for montage.
+    """
     target = Path(output_dir)
     manifest_path = target / MANIFEST_NAME
     if not manifest_path.is_file():
@@ -640,17 +708,33 @@ def verify_package(output_dir):
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
         raise HandoffError(f"Манифест пакета не читается: {exc}") from exc
+    problem = _manifest_structure_problem(manifest)
+    if problem:
+        raise HandoffError(f"Манифест пакета имеет неверную структуру: {problem}")
     mismatches = []
     checked = 0
     listed = set()
-    for entry in list(manifest.get("files") or []) + list(manifest.get("documents") or []):
+    seen = set()
+    for entry in manifest["files"] + manifest["documents"]:
+        if not isinstance(entry, dict):
+            mismatches.append("запись манифеста не является объектом")
+            continue
         relative = entry.get("path")
-        if not relative:
+        if not isinstance(relative, str) or not relative.strip():
             mismatches.append("запись манифеста без пути")
             continue
+        key = Path(relative).as_posix()
+        if key in seen:
+            mismatches.append(f"{relative}: путь указан в манифесте дважды")
+            continue
+        seen.add(key)
+        try:
+            path = resolve_pack_path(target, relative)
+        except HandoffError as exc:
+            mismatches.append(f"{relative}: {exc}")
+            continue
         checked += 1
-        listed.add(relative)
-        path = target / relative
+        listed.add(key)
         if not path.is_file():
             mismatches.append(f"{relative}: файл отсутствует")
             continue
@@ -659,6 +743,7 @@ def verify_package(output_dir):
         size = entry.get("bytes")
         if size is not None and path.stat().st_size != size:
             mismatches.append(f"{relative}: размер не совпадает с манифестом")
+    mismatches.extend(_readiness_problems(manifest, target, listed))
     # A file that is in the pack but not in the manifest is not part of the pack:
     # a stray copy must not be imported by mistake.
     for path in sorted(target.rglob("*")):
