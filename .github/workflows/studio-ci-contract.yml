@@ -73,3 +73,36 @@ jobs:
         env:
           BASE_BRANCH: ${{ github.base_ref || 'mavis/work' }}
         run: python tools/check_no_secrets.py --base "$BASE_BRANCH"
+
+  claude-hooks:
+    name: Claude hooks guard tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      # The PreToolUse guards of Claude Code are a security control, so their tests
+      # run in a check of their own. This workflow carries no path filter, so the
+      # check exists on every pull request: a required check that is skipped when
+      # no path matches is a false green, not a protection.
+      - name: Run the Claude Code guard hook tests
+        run: python -X utf8 -m unittest -v tests.test_claude_hooks
+      - name: State what this run does not cover
+        if: always()
+        env:
+          STEP_SUMMARY: ${{ github.step_summary }}
+        run: |
+          {
+            echo "### Claude hooks guard tests"
+            echo
+            echo "This run exercises the PreToolUse guards of Claude Code (Git, file paths"
+            echo "and paid calls) against throwaway repositories in temporary directories."
+            echo
+            echo "It proves that the guards refuse the operations they must refuse. It does"
+            echo "not prove that a live Claude Code session really runs the guards, and it"
+            echo "makes no paid provider call."
+          } >> "$STEP_SUMMARY"

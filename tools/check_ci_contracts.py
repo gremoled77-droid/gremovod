@@ -76,6 +76,14 @@ REQUIRED_CONTRACT_JOBS = (
     "secret-scan",
 )
 
+# The Claude Code PreToolUse guards are a security control, so their regression tests
+# need a check that exists on every pull request. A check behind a path filter stays
+# "skipped" when the pull request changes nothing relevant, and a skipped required
+# check is a false green. The job therefore has to exist in the contract workflow and
+# has to actually run the hooks tests.
+CLAUDE_HOOKS_JOB = "claude-hooks"
+CLAUDE_HOOKS_TESTS = "tests.test_claude_hooks"
+
 # Keywords the Actions schema accepts. A key outside these sets makes the whole
 # workflow file invalid, and GitHub reports it as a run with zero jobs.
 ALLOWED_WORKFLOW_KEYS = {
@@ -278,6 +286,35 @@ def check_candidate_workflow(root=ROOT):
     return problems
 
 
+def check_claude_hooks_job(root=ROOT):
+    """Return problems with the Claude hooks test job of the contract workflow.
+
+    The job has to live in the workflow without a path filter, so it produces a check
+    on every pull request, and it has to run the hooks tests: a job that exists but
+    runs nothing is a check that can never turn red.
+    """
+    problems = []
+    workflow, issues = _read_workflow(root, CONTRACT_WORKFLOW)
+    problems.extend(issues)
+    if workflow is None:
+        return problems
+    jobs = workflow.get("jobs") or {}
+    job = jobs.get(CLAUDE_HOOKS_JOB)
+    if not isinstance(job, dict):
+        problems.append(
+            f"{CONTRACT_WORKFLOW}: missing job '{CLAUDE_HOOKS_JOB}'; the Claude Code "
+            f"guard tests need a check of their own to stay mandatory")
+        return problems
+    steps = job.get("steps") or []
+    commands = "\n".join(
+        str(step.get("run") or "") for step in steps if isinstance(step, dict))
+    if CLAUDE_HOOKS_TESTS not in commands:
+        problems.append(
+            f"{CONTRACT_WORKFLOW}: job '{CLAUDE_HOOKS_JOB}' does not run "
+            f"'{CLAUDE_HOOKS_TESTS}'")
+    return problems
+
+
 def _requirement_names(text):
     names = []
     for raw in text.splitlines():
@@ -343,6 +380,7 @@ def check_all(root=ROOT):
     problems.extend(check_workflows(root))
     problems.extend(check_candidate_workflow(root))
     problems.extend(check_scope_guard_workflow(root))
+    problems.extend(check_claude_hooks_job(root))
     problems.extend(check_dependency_lock(root))
     return problems
 

@@ -12,6 +12,7 @@ from tools.check_ci_contracts import (
     REQUIRED_SCOPE_GUARD_MARKERS,
     SCOPE_GUARD_WORKFLOW,
     check_candidate_workflow,
+    check_claude_hooks_job,
     check_dependency_lock,
     check_scope_guard_workflow,
     check_workflow_file,
@@ -51,6 +52,31 @@ class WorkflowContractTests(unittest.TestCase):
 
     def test_dependency_lock_covers_direct_dependencies(self):
         self.assertEqual(check_dependency_lock(), [])
+
+    def test_the_claude_hooks_tests_have_a_mandatory_check_of_their_own(self):
+        """The guards of Claude Code are a security control, so their regression tests
+        need a check that exists on every pull request. A check behind a path filter
+        stays "skipped" when the pull request changes nothing relevant, and a skipped
+        required check is a false green."""
+        self.assertEqual(check_claude_hooks_job(), [])
+
+    def test_a_contract_workflow_without_the_hooks_job_is_reported(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp) / ".github" / "workflows"
+            directory.mkdir(parents=True)
+            (directory / CONTRACT_WORKFLOW).write_text(GOOD_WORKFLOW, encoding="utf8")
+            problems = check_claude_hooks_job(Path(tmp))
+            self.assertTrue(any("claude-hooks" in p for p in problems))
+
+    def test_a_hooks_job_that_does_not_run_the_tests_is_reported(self):
+        """A job that exists but runs nothing is a check that can never turn red."""
+        text = GOOD_WORKFLOW.replace("  build:\n", "  claude-hooks:\n")
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp) / ".github" / "workflows"
+            directory.mkdir(parents=True)
+            (directory / CONTRACT_WORKFLOW).write_text(text, encoding="utf8")
+            problems = check_claude_hooks_job(Path(tmp))
+            self.assertTrue(any("tests.test_claude_hooks" in p for p in problems))
 
     def test_good_workflow_has_no_problems(self):
         with tempfile.TemporaryDirectory() as tmp:
