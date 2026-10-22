@@ -67,9 +67,11 @@ NOT_RUN_CHECKS = [
 ENV_ALLOW = ('PATH', 'PATHEXT', 'SYSTEMROOT', 'SYSTEMDRIVE', 'WINDIR', 'COMSPEC', 'PROCESSOR_ARCHITECTURE',
              'NUMBER_OF_PROCESSORS', 'OS', 'LANG', 'LANGUAGE', 'LC_ALL', 'LC_CTYPE', 'LC_MESSAGES', 'TZ',
              'PYTHONIOENCODING', 'PYTHONUTF8', 'SSL_CERT_FILE')
-SENSITIVE = re.compile(r'KEY|TOKEN|SECRET|PASS|PWD|CREDENTIAL|AUTH|COOKIE|SESSION|PRIVATE|DPAPI|BEARER', re.I)
+SENSITIVE = re.compile(r'^(?!(OLD)?PWD$).*(KEY|TOKEN|SECRET|PASS|PWD|CREDENTIAL|AUTH|COOKIE|SESSION|PRIVATE|DPAPI|BEARER)', re.I)
 SECRET_PATTERNS = [re.compile(r'sk-[A-Za-z0-9_-]{8,}'), re.compile(r'(?i)bearer\s+[^\s\'"]+'),
                    re.compile(r'(?i)\b(api[_-]?key|token|secret|password|passwd)\b(\s*[=:]\s*)[^\s\'",]+')]
+# Шаблоны без значений (`.env.example`) — не ключи.
+TEMPLATE_SUFFIXES = ('.example', '.sample', '.template', '.dist')
 KEY_FILE_GLOBS = ('*_API_KEY.txt', '.env', '.env.*', 'backend/*_API_KEY.txt', 'backend/.env', 'backend/.env.*',
                   'kie-access/api-key.dpapi')
 STANDING_NO_GO = [
@@ -146,7 +148,8 @@ def key_files(root=ROOT):
     """Файлы ключей в дереве (пути относительно корня). Содержимое не читается."""
     found = set()
     for pattern in KEY_FILE_GLOBS:
-        found.update(str(path.relative_to(root)).replace(os.sep, '/') for path in root.glob(pattern) if path.is_file())
+        found.update(str(path.relative_to(root)).replace(os.sep, '/') for path in root.glob(pattern)
+                     if path.is_file() and not path.name.endswith(TEMPLATE_SUFFIXES))
     return sorted(found)
 
 

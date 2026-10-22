@@ -180,6 +180,7 @@ class SecretScrubTests(unittest.TestCase):
         self.assertNotIn('owner', env['HOME'] + env['USERPROFILE'])  # песочница, не настоящий профиль
         self.assertNotIn('owner', env['ELEVENLABS_KEY_FILE'])
         self.assertIn('PIAPI_API_KEY', removed)
+        self.assertEqual(gate.scrub({'PWD': '/x', 'OLDPWD': '/y', 'DB_PWD': 'secret-pwd'})[1], ['DB_PWD'])  # PWD — папка
         self.assertIn(CANARY, values)
         self.assertNotIn(CANARY, json.dumps(env))
 
@@ -210,6 +211,8 @@ class SecretScrubTests(unittest.TestCase):
             (root / 'kie-access').mkdir()
             (root / 'kie-access' / 'api-key.dpapi').write_text('x', encoding='utf-8')
             (root / '.env.local').write_text('x', encoding='utf-8')
+            (root / '.env.example').write_text('PIAPI_API_KEY=', encoding='utf-8')  # шаблон без значений — не ключ
+            (root / '.env.cloud.example').write_text('x', encoding='utf-8')
             self.assertEqual(gate.key_files(root), ['.env.local', 'PIAPI_API_KEY.txt', 'kie-access/api-key.dpapi'])
 
 
