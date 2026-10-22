@@ -10,6 +10,8 @@
 собственным файлом и сама выводит вердикт из измерений. Готовый вердикт из
 отчёта не принимается: считает его студия.
 """
+import contextlib
+import contextvars
 import hashlib
 import json
 import re
@@ -28,8 +30,12 @@ PASS_TECHNICAL = 'PASS_TECHNICAL'
 CHUNK = 1024 * 1024
 
 
-def sha256_file(path: Path) -> str:
-    """Хеш файла мастера: отчёт принимается только для того же байт-в-байт файла."""
+_HASH_CACHE = {}
+_HASH_CACHE_MAX = 64
+_CACHE_ALLOWED = contextvars.ContextVar('media_qc_hash_cache', default=False)
+
+
+def _digest(path: Path) -> str:
     digest = hashlib.sha256()
     with Path(path).open('rb') as source:
         while True:
@@ -38,6 +44,40 @@ def sha256_file(path: Path) -> str:
                 break
             digest.update(chunk)
     return digest.hexdigest()
+
+
+@contextlib.contextmanager
+def cached_hashes():
+    """Только для чтения состояния (экран, GET): повторный хеш неизменённого файла берётся из кэша.
+
+    Решения, QC и заморозка N35 этот режим не включают и всегда читают файл заново.
+    """
+    token = _CACHE_ALLOWED.set(True)
+    try:
+        yield
+    finally:
+        _CACHE_ALLOWED.reset(token)
+
+
+def sha256_file(path: Path) -> str:
+    """Хеш файла мастера: отчёт принимается только для того же байт-в-байт файла.
+
+    В режиме `cached_hashes()` хеш переиспользуется, пока не изменились inode, размер, mtime и ctime:
+    ctime нельзя вернуть назад через utime, поэтому правка на месте с восстановленным mtime кэш не обманет.
+    """
+    if not _CACHE_ALLOWED.get():
+        return _digest(path)
+    stat = Path(path).stat()
+    key = str(Path(path).resolve())
+    stamp = (stat.st_ino, stat.st_size, stat.st_mtime_ns, stat.st_ctime_ns)
+    hit = _HASH_CACHE.get(key)
+    if hit and hit[0] == stamp:
+        return hit[1]
+    value = _digest(path)
+    if len(_HASH_CACHE) >= _HASH_CACHE_MAX:
+        _HASH_CACHE.pop(next(iter(_HASH_CACHE)))
+    _HASH_CACHE[key] = (stamp, value)
+    return value
 
 
 def _optional(runner, args):

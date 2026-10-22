@@ -139,6 +139,24 @@ class GateTests(unittest.TestCase):
                                         files={'file': ('bad.mp4', source, 'video/mp4')})
         self.assertIn(response.status_code, (415, 422), response.text)
 
+    def test_import_with_stale_project_revision_is_a_conflict(self):
+        stale = self.revision()
+        self.save_state({'a': 9})  # revision вырос
+        with self.video.open('rb') as source:
+            response = self.client.post(f'/api/projects/{self.pid}/release-artifacts',
+                                        data={'project_revision': str(stale), 'title': 'Старый'},
+                                        files={'file': ('master.mp4', source, 'video/mp4')})
+        self.assertEqual(response.status_code, 409, response.text)
+        self.assertEqual(response.json()['detail']['code'], 'PROJECT_REVISION_CONFLICT')
+        self.assertEqual(len(self.client.get(f'/api/projects/{self.pid}/release-artifacts').json()), 1)
+
+    def test_revision_growth_alone_keeps_approval(self):
+        self.approved()
+        before = self.revision()
+        self.save_state({'a': 1, 'b': 2})  # то же содержимое: revision растёт, якорь содержимого — нет
+        self.assertGreater(self.revision(), before)
+        self.assertEqual(self.gate()['state'], 'OWNER_APPROVED')
+
     # --- B1: байты изменены после QC ----------------------------------------------------
     def test_bytes_changed_after_qc_is_not_technical_pass(self):
         self.qc()
@@ -285,6 +303,100 @@ class GateTests(unittest.TestCase):
         self.assertEqual(gate['decision_stale_code'], 'CONTENT_CHANGED')
         # переутверждение одним действием
         self.assertEqual(self.decide().json()['gate']['state'], 'OWNER_APPROVED')
+
+    # --- гонки и крайние случаи ---------------------------------------------------------
+    def test_concurrent_identical_approvals_write_one_decision(self):
+        import threading
+        self.qc()
+        body = {'decision': 'APPROVED', 'owner_id': OWNER, 'processing_rights_confirmed': True,
+                'expected_master_sha256': self.gate()['master_sha256']}
+        barrier = threading.Barrier(4)
+        codes = []
+
+        def go():
+            barrier.wait()
+            codes.append(self.client.post(self.base + '/decision', json=body).status_code)
+
+        threads = [threading.Thread(target=go) for _ in range(4)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+        self.assertEqual(codes, [200] * 4, codes)
+        self.assertEqual(len(self.gate()['history']), 1)
+
+    def test_file_swapped_between_hash_and_record_is_not_approved(self):
+        from backend import release_gate
+        self.qc()
+        original = release_gate._record
+
+        def swap_then_record(*args, **kwargs):
+            with self.stored().open('ab') as handle:  # файл меняется после хеширования, до записи
+                handle.write(b'\0swap')
+            return original(*args, **kwargs)
+
+        with patch.object(release_gate, '_record', swap_then_record):
+            self.decide()
+        gate = self.gate()
+        self.assertNotEqual(gate['state'], 'OWNER_APPROVED')
+
+    def test_invalid_decision_and_oversized_note_are_validation_errors(self):
+        self.qc()
+        self.assertEqual(self.decide('MAYBE').status_code, 422)
+        self.assertEqual(self.decide('REJECTED', note='я' * 2001).status_code, 422)
+        self.assertEqual(self.gate()['history'], [])
+
+    def test_reject_note_is_stored_verbatim_unicode(self):
+        note = 'Грэм <b>не</b> тот "кадр" — звук 🔊'
+        self.assertEqual(self.decide('REJECTED', note=note).status_code, 200)
+        self.assertEqual(self.gate()['history'][0]['note'], note)
+
+    # --- кэш хеша только для чтения ----------------------------------------------------
+    def digests(self):
+        from backend import media_qc
+        calls = []
+        original = media_qc._digest
+
+        def counting(path):
+            calls.append(str(path))
+            return original(path)
+
+        return calls, patch.object(media_qc, '_digest', counting)
+
+    def test_gate_reads_reuse_the_hash_of_an_unchanged_file(self):
+        from backend import media_qc
+        media_qc._HASH_CACHE.clear()
+        self.qc()
+        calls, counting = self.digests()
+        with counting:
+            first = self.gate()
+            after_first = len(calls)
+            second = self.gate()
+        self.assertEqual(after_first, 1, calls)  # и master_facts, и N35 в одном чтении делят один хеш
+        self.assertEqual(len(calls), after_first, 'второе чтение не должно хешировать файл')
+        self.assertEqual(first['master_sha256'], second['master_sha256'])
+
+    def test_cache_sees_appended_bytes_and_in_place_edits_with_restored_mtime(self):
+        import os
+        self.qc()
+        before = self.gate()['master_sha256']
+        path = self.stored()
+        stat = path.stat()
+        data = bytearray(path.read_bytes())
+        data[len(data) // 2] ^= 0xFF  # тот же размер
+        path.write_bytes(bytes(data))
+        os.utime(path, ns=(stat.st_atime_ns, stat.st_mtime_ns))  # mtime возвращён назад
+        after = self.gate()
+        self.assertNotEqual(after['master_sha256'], before)
+        self.assertTrue(after['qc_stale'])
+
+    def test_decisions_always_rehash_even_when_the_cache_is_warm(self):
+        self.qc()
+        self.gate()  # кэш прогрет
+        calls, counting = self.digests()
+        with counting:
+            self.assertEqual(self.decide().status_code, 200)
+        self.assertGreaterEqual(len(calls), 1)
 
     # --- перезапуск --------------------------------------------------------------------
     def test_state_survives_restart(self):

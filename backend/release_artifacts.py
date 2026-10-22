@@ -8,6 +8,8 @@ from fastapi import File, Form, HTTPException, UploadFile
 from fastapi import Request
 from pydantic import BaseModel, Field
 
+from backend import media_qc
+
 MAX_RELEASE_BYTES = 1024 * 1024 * 1024
 
 
@@ -220,7 +222,8 @@ def register(app, studio):
         """Состояние выпуска, вычисленное сервером (хеш файла считается заново при каждом чтении)."""
         from backend import release_gate
         studio.project(project_id)
-        return release_gate.release_gate(studio, project_id, artifact_id)
+        with media_qc.cached_hashes():  # чтение: хеш неизменённого файла не пересчитывается; решения кэш не используют
+            return release_gate.release_gate(studio, project_id, artifact_id)
 
     @app.post('/api/projects/{project_id}/release-artifacts/{artifact_id}/decision')
     def release_decision(project_id: str, artifact_id: str, body: DecisionRequest, request: Request):
