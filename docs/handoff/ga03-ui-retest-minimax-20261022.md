@@ -17,8 +17,15 @@
 | Тесты бэкенда | `python -m pytest backend` | 513 passed, 26 subtests (бэкенд не менялся) |
 | Браузерный smoke | `node tests/release_gate_browser_smoke.mjs` | 44 PASS, 0 FAIL (было 38) |
 
-GitHub Actions на этой ветке ещё не запускался (ветка не была запушена на момент прогона) — статус CI
-нужно посмотреть после пуша.
+GitHub Actions: на этой ветке отработал один прогон — «Agent ownership boundaries (new task
+branches)» (run `39840921940`), и он **пропущен** (skipped), а не пройден: guard в этой цепочке
+веток не знает префиксы `minimax/*` и печатает `LEGACY_BRANCH_NOT_ENFORCED`. Никакой воркфлоу,
+который гоняет `pytest`/`npm test`, в этой ветке нет: на `origin/main` воркфлоу отсутствуют
+вовсе, а полноценный offline-CI (`studio-offline-ci.yml`, `studio-ci-contract.yml` — тесты
+бэкенда, media/QC и фронта) живёт только в цепочке PR #87 (через PR #62). Поэтому фактический
+прогон всех тестов на этой ветке — локальный, описанный выше.
+
+Draft PR: #90, база — `minimax/ga-03-release-ui` (head PR #86), стек на PR #86.
 
 ## Найденные дефекты и что исправлено
 
@@ -115,7 +122,8 @@ PR #87 (`build/claude/ga-03-scope-ext`, коммит `c40f8bd`) расширяе
 
 Порядок для владельца: **PR #87 должен встать в базу до PR #86** (или до моего PR), иначе
 scope-проверка моей ветки останется в режиме `NO_SCOPE_MANIFEST` / `LEGACY_BRANCH_NOT_ENFORCED`
-и фактически ничего не проверяет.
+и фактически ничего не проверяет — а вместе с PR #87 приезжает и offline-CI, который гоняет
+`pytest` и `npm test`.
 
 ## Как запустить стенд и рабочую копию
 
