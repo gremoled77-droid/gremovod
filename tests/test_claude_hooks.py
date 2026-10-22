@@ -6,10 +6,11 @@ script as a subprocess with a real Claude Code hook payload on stdin, so the
 JSON contract is covered as well as the decision logic.
 
 Nothing here touches the network, a provider or the real studio database. The
-Git cases run against a throwaway repository in a temporary directory.
+Git cases run against throwaway repositories in temporary directories.
 """
 import importlib.util
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -51,13 +52,21 @@ def git(repo, *args):
 class TempRepo:
     """A throwaway repository with one commit and a selectable branch."""
 
-    def __init__(self, branch):
+    def __init__(self, branch="feature/work", branches=(), remote=None, keep_main=True):
         self._tmp = tempfile.TemporaryDirectory()
         self.path = Path(self._tmp.name)
         git(self.path, "init", "-q", "-b", "main")
         git(self.path, "-c", "user.email=t@example.invalid", "-c", "user.name=t",
             "commit", "-q", "--allow-empty", "-m", "init")
+        if branch != "main":
+            git(self.path, "branch", branch)
+        for name in branches:
+            git(self.path, "branch", name)
+        if remote:
+            git(self.path, "remote", "add", "origin", remote)
         git(self.path, "symbolic-ref", "HEAD", f"refs/heads/{branch}")
+        if not keep_main:
+            git(self.path, "branch", "-D", "main")
 
     @property
     def cwd(self):
@@ -72,18 +81,60 @@ class GitGuardTests(unittest.TestCase):
         self.repo = TempRepo("feature/work")
         self.addCleanup(self.repo.close)
 
-    def assertDenied(self, command, needle=None):
-        allowed, reason = guard_git.check(command, self.repo.cwd)
+    def assertDenied(self, command, needle=None, cwd=None):
+        allowed, reason = guard_git.check(command, cwd or self.repo.cwd)
         self.assertFalse(allowed, f"expected denial for: {command}")
         if needle:
             self.assertIn(needle, reason.lower())
 
-    def assertAllowed(self, command):
-        allowed, reason = guard_git.check(command, self.repo.cwd)
+    def assertAllowed(self, command, cwd=None):
+        allowed, reason = guard_git.check(command, cwd or self.repo.cwd)
         self.assertTrue(allowed, f"expected allowance for: {command} ({reason})")
+
+    # -- source versus target -------------------------------------------------
+
+    def test_sync_merge_from_protected_source_is_allowed(self):
+        # The task branch pulls the integration branch. The source is protected,
+        # the branch being written is not.
+        self.assertAllowed("git merge origin/mavis/work")
+
+    def test_sync_merge_from_main_is_allowed(self):
+        self.assertAllowed("git merge origin/main")
+
+    def test_sync_rebase_onto_protected_source_is_allowed(self):
+        self.assertAllowed("git rebase origin/mavis/work")
+
+    def test_cherry_pick_from_protected_source_is_allowed(self):
+        self.assertAllowed("git cherry-pick origin/mavis/work")
+
+    def test_merge_into_protected_current_branch_is_denied(self):
+        repo = TempRepo("mavis/work")
+        self.addCleanup(repo.close)
+        allowed, _ = guard_git.check("git merge feature/x", repo.cwd)
+        self.assertFalse(allowed, "merging INTO a protected branch must be denied")
+
+    def test_rebase_on_protected_current_branch_is_denied(self):
+        repo = TempRepo("main")
+        self.addCleanup(repo.close)
+        allowed, _ = guard_git.check("git rebase origin/mavis/work", repo.cwd)
+        self.assertFalse(allowed, "rebasing a protected branch must be denied")
+
+    def test_reset_hard_on_protected_current_branch_is_denied(self):
+        repo = TempRepo("main")
+        self.addCleanup(repo.close)
+        allowed, _ = guard_git.check("git reset --hard origin/mavis/work", repo.cwd)
+        self.assertFalse(allowed, "resetting a protected branch must be denied")
+
+    # -- push -----------------------------------------------------------------
 
     def test_push_to_main_is_denied(self):
         self.assertDenied("git push origin main", "protected")
+
+    def test_push_refspec_into_main_is_denied(self):
+        self.assertDenied("git push origin HEAD:main", "protected")
+
+    def test_push_delete_of_main_is_denied(self):
+        self.assertDenied("git push origin --delete main", "protected")
 
     def test_push_to_current_protected_branch_is_denied(self):
         repo = TempRepo("main")
@@ -91,14 +142,94 @@ class GitGuardTests(unittest.TestCase):
         allowed, _ = guard_git.check("git push", repo.cwd)
         self.assertFalse(allowed, "a bare push from a protected branch must be denied")
 
-    def test_merge_of_main_is_denied(self):
-        self.assertDenied("git merge origin/main", "protected")
-
-    def test_merge_while_on_protected_branch_is_denied(self):
-        repo = TempRepo("mavis/work")
+    def test_push_to_protected_upstream_is_denied(self):
+        repo = TempRepo("feature/work")
         self.addCleanup(repo.close)
-        allowed, _ = guard_git.check("git merge feature/x", repo.cwd)
-        self.assertFalse(allowed, "merging while on a protected branch must be denied")
+        git(repo.path, "branch", "--set-upstream-to=main", "feature/work")
+        allowed, _ = guard_git.check("git push", repo.cwd)
+        self.assertFalse(allowed, "pushing to a protected upstream must be denied")
+
+    def test_mass_push_with_one_protected_ref_is_denied(self):
+        self.assertDenied("git push origin feature/work main", "protected")
+
+    def test_mass_push_to_task_branches_is_allowed(self):
+        self.assertAllowed("git push origin feature/work feature/other")
+
+    def test_push_all_is_denied_when_a_protected_branch_exists(self):
+        repo = TempRepo("feature/work")
+        self.addCleanup(repo.close)
+        allowed, _ = guard_git.check("git push --all origin", repo.cwd)
+        self.assertFalse(allowed, "push --all must not carry a protected branch")
+
+    def test_push_all_without_protected_branch_is_allowed(self):
+        repo = TempRepo("feature/work", keep_main=False)
+        self.addCleanup(repo.close)
+        allowed, _ = guard_git.check("git push --all origin", repo.cwd)
+        self.assertTrue(allowed, "push --all without a protected branch is allowed")
+
+    def test_push_mirror_is_denied(self):
+        self.assertDenied("git push --mirror origin", "mirror")
+
+    def test_push_tags_is_allowed(self):
+        self.assertAllowed("git push origin --tags")
+
+    def test_force_push_is_denied(self):
+        self.assertDenied("git push --force origin feature/work", "force")
+
+    def test_force_push_short_flag_is_denied(self):
+        self.assertDenied("git push -f origin feature/work", "force")
+
+    def test_force_push_clustered_flags_is_denied(self):
+        self.assertDenied("git push -fu origin feature/work", "force")
+
+    def test_force_with_lease_is_denied(self):
+        self.assertDenied("git push --force-with-lease origin feature/work", "force")
+
+    def test_push_task_branch_is_allowed(self):
+        self.assertAllowed("git push -u origin feature/work")
+
+    def test_push_feature_slash_main_is_allowed(self):
+        self.assertAllowed("git push origin feature/main")
+
+    # -- alternative working directory ---------------------------------------
+
+    def test_git_with_alternative_directory_is_checked(self):
+        other = TempRepo("main")
+        self.addCleanup(other.close)
+        allowed, _ = guard_git.check(f"git -C {other.cwd} push origin main", self.repo.cwd)
+        self.assertFalse(allowed, "-C must switch the repository the guard inspects")
+
+    def test_git_with_alternative_directory_on_task_branch_is_allowed(self):
+        other = TempRepo("feature/other")
+        self.addCleanup(other.close)
+        allowed, _ = guard_git.check(f"git -C {other.cwd} push origin feature/other", self.repo.cwd)
+        self.assertTrue(allowed, "a task branch in another directory is allowed")
+
+    # -- branch and worktree deletion ----------------------------------------
+
+    def test_delete_protected_branch_is_denied(self):
+        self.assertDenied("git branch -D main", "protected")
+
+    def test_delete_current_branch_is_denied(self):
+        self.assertDenied("git branch -D feature/work", "branch")
+
+    def test_delete_branch_used_by_another_worktree_is_denied(self):
+        git(self.repo.path, "branch", "feature/shared")
+        with tempfile.TemporaryDirectory() as holder:
+            worktree_path = Path(holder) / "wt"
+            git(self.repo.path, "worktree", "add", "-q", str(worktree_path), "feature/shared")
+            self.assertDenied("git branch -D feature/shared", "worktree")
+
+    def test_remove_other_worktree_is_denied(self):
+        self.assertDenied("git worktree remove ../somebody-else", "worktree")
+
+    def test_remove_current_worktree_is_denied(self):
+        self.assertDenied(f"git worktree remove {self.repo.cwd}", "worktree")
+
+    # -- destructive local operations -----------------------------------------
+
+    def test_clean_force_is_denied(self):
+        self.assertDenied("git clean -fdx", "clean")
 
     def test_checkout_main_is_denied(self):
         self.assertDenied("git checkout main", "protected")
@@ -106,23 +237,24 @@ class GitGuardTests(unittest.TestCase):
     def test_switch_to_main_is_denied(self):
         self.assertDenied("git switch main", "protected")
 
-    def test_force_push_is_denied(self):
-        self.assertDenied("git push --force origin feature/work", "force")
+    def test_checkout_new_branch_is_allowed(self):
+        self.assertAllowed("git checkout -b feature/new")
 
-    def test_clean_force_is_denied(self):
-        self.assertDenied("git clean -fdx", "clean")
+    def test_bulk_discard_of_changes_is_denied(self):
+        self.assertDenied("git checkout -- .", "discard")
+        self.assertDenied("git restore .", "discard")
 
-    def test_delete_protected_branch_is_denied(self):
-        self.assertDenied("git branch -D main", "protected")
+    def test_reset_hard_with_uncommitted_changes_is_denied(self):
+        repo = TempRepo("feature/work")
+        self.addCleanup(repo.close)
+        (repo.path / "scratch.txt").write_text("wip", encoding="utf-8")
+        allowed, _ = guard_git.check("git reset --hard HEAD~1", repo.cwd)
+        self.assertFalse(allowed, "reset --hard must not discard uncommitted work")
 
-    def test_remove_other_worktree_is_denied(self):
-        self.assertDenied("git worktree remove ../somebody-else", "worktree")
+    def test_reset_hard_on_clean_tree_is_allowed(self):
+        self.assertAllowed("git reset --hard HEAD")
 
-    def test_push_task_branch_is_allowed(self):
-        self.assertAllowed("git push -u origin feature/work")
-
-    def test_push_feature_slash_main_is_allowed(self):
-        self.assertAllowed("git push origin feature/main")
+    # -- harmless operations --------------------------------------------------
 
     def test_read_only_git_commands_are_allowed(self):
         self.assertAllowed("git status --short")
@@ -134,6 +266,9 @@ class GitGuardTests(unittest.TestCase):
 
     def test_chained_command_containing_push_is_caught(self):
         self.assertDenied("git status && git push origin main", "protected")
+
+    def test_chained_sync_merge_is_allowed(self):
+        self.assertAllowed("git fetch origin && git merge origin/mavis/work")
 
     def test_outside_a_repository_a_plain_command_is_allowed(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -196,6 +331,62 @@ class FileGuardTests(unittest.TestCase):
     def test_pem_key_is_denied(self):
         self.assertDenied(str(ROOT / "certs" / "server.pem"))
 
+    # -- canonicalisation -----------------------------------------------------
+
+    def test_path_with_parent_segments_is_canonicalised(self):
+        self.assertDenied(str(ROOT / "backend" / ".." / "backend" / "studio.sqlite3"))
+
+    def test_relative_path_is_resolved_against_the_project(self):
+        self.assertDenied("backend/studio.sqlite3")
+        self.assertDenied("runtime/worker-token.txt")
+
+    def test_write_outside_the_worktree_is_denied(self):
+        # Outside the worktree and outside every designated temporary root.
+        outside = Path(tempfile.gettempdir()).parent / "gremovod_outside_probe" / "notes.txt"
+        self.assertDenied(str(outside), "outside")
+
+    def test_symlink_escaping_the_worktree_is_denied(self):
+        outside = Path(tempfile.gettempdir()).parent / "gremovod_symlink_target.txt"
+        link = ROOT / "_tmp_link_probe.txt"
+        try:
+            os.symlink(outside, link)
+        except (OSError, NotImplementedError):
+            self.skipTest("symlinks are not available in this environment")
+        try:
+            self.assertDenied(str(link), "outside")
+        finally:
+            link.unlink()
+
+    def test_symlink_into_a_temporary_root_is_allowed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "target.sqlite3"
+            link = ROOT / "_tmp_link_probe.sqlite3"
+            try:
+                os.symlink(target, link)
+            except (OSError, NotImplementedError):
+                self.skipTest("symlinks are not available in this environment")
+            try:
+                self.assertAllowed(str(link))
+            finally:
+                link.unlink()
+
+    # -- temporary test data --------------------------------------------------
+
+    def test_temporary_database_in_the_os_temp_dir_is_allowed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            self.assertAllowed(str(Path(tmp) / "test.sqlite3"))
+            self.assertAllowed(str(Path(tmp) / "frame.png"))
+
+    def test_temporary_data_in_the_repo_tmp_folder_is_allowed(self):
+        self.assertAllowed(str(ROOT / "tmp" / "test.sqlite3"))
+
+    def test_secret_shaped_file_in_a_temporary_folder_is_still_denied(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            self.assertDenied(str(Path(tmp) / "PIAPI_API_KEY.txt"))
+
+    def test_real_database_at_the_repository_root_is_denied(self):
+        self.assertDenied(str(ROOT / "studio.sqlite3"))
+
 
 class PaidGuardTests(unittest.TestCase):
     def assertDenied(self, command, needle=None):
@@ -214,7 +405,10 @@ class PaidGuardTests(unittest.TestCase):
     def test_live_piapi_dry_run_is_allowed(self):
         self.assertAllowed("python scripts/live_piapi_test.py --dry-run")
 
-    def test_hunyuan_watch_is_denied(self):
+    def test_live_piapi_confirmed_run_is_denied(self):
+        self.assertDenied("python scripts/live_piapi_test.py --yes", "money")
+
+    def test_hunyuan_watch_is_denied_by_default(self):
         self.assertDenied("python scripts/watch_hunyuan_test.py")
 
     def test_paid_host_call_is_denied(self):
@@ -232,18 +426,63 @@ class PaidGuardTests(unittest.TestCase):
     def test_ordinary_command_is_allowed(self):
         self.assertAllowed("python -m unittest tests.test_claude_hooks -v")
 
-    def test_opt_in_environment_variable_allows(self):
-        import os
+    # -- the opt-in is not an authorisation -----------------------------------
+
+    def test_opt_in_does_not_open_direct_provider_calls(self):
+        previous = os.environ.get("GREMOVOD_ALLOW_GATED_PAID")
+        os.environ["GREMOVOD_ALLOW_GATED_PAID"] = "1"
+        try:
+            allowed, _ = guard_paid.check("curl https://api.piapi.ai/v1/task")
+            self.assertFalse(allowed, "a direct provider call must stay denied")
+            allowed, _ = guard_paid.check("python scripts/live_piapi_test.py")
+            self.assertFalse(allowed, "a direct provider call must stay denied")
+        finally:
+            if previous is None:
+                os.environ.pop("GREMOVOD_ALLOW_GATED_PAID", None)
+            else:
+                os.environ["GREMOVOD_ALLOW_GATED_PAID"] = previous
+
+    def test_opt_in_allows_the_gated_studio_path(self):
+        previous = os.environ.get("GREMOVOD_ALLOW_GATED_PAID")
+        os.environ["GREMOVOD_ALLOW_GATED_PAID"] = "1"
+        try:
+            allowed, reason = guard_paid.check("python scripts/watch_hunyuan_test.py")
+            self.assertTrue(allowed, f"the gated studio path must be allowed: {reason}")
+            self.assertIn("studio", reason.lower())
+        finally:
+            if previous is None:
+                os.environ.pop("GREMOVOD_ALLOW_GATED_PAID", None)
+            else:
+                os.environ["GREMOVOD_ALLOW_GATED_PAID"] = previous
+
+    def test_old_opt_in_name_is_not_honoured(self):
         previous = os.environ.get("GREMOVOD_ALLOW_PAID")
         os.environ["GREMOVOD_ALLOW_PAID"] = "1"
         try:
-            allowed, _ = guard_paid.check("python scripts/live_piapi_test.py")
-            self.assertTrue(allowed, "the explicit opt-in must open the guard")
+            allowed, _ = guard_paid.check("curl https://api.piapi.ai/v1/task")
+            self.assertFalse(allowed, "the old variable must not authorise anything")
         finally:
             if previous is None:
                 os.environ.pop("GREMOVOD_ALLOW_PAID", None)
             else:
                 os.environ["GREMOVOD_ALLOW_PAID"] = previous
+
+    # -- compound and indirect calls ------------------------------------------
+
+    def test_paid_host_inside_a_nested_shell_is_denied(self):
+        self.assertDenied('bash -c "curl https://api.piapi.ai/v1/task"')
+
+    def test_paid_host_inside_cmd_is_denied(self):
+        self.assertDenied('cmd /c "curl https://api.piapi.ai/v1/task"')
+
+    def test_paid_host_after_a_chained_command_is_denied(self):
+        self.assertDenied("git status && curl https://api.openai.com/v1/images")
+
+    def test_paid_host_in_a_piped_segment_is_denied(self):
+        self.assertDenied("echo x | curl https://api.minimax.io/v1/chat")
+
+    def test_paid_host_in_an_environment_assignment_is_denied(self):
+        self.assertDenied("set PIAPI_API_KEY=abc && curl https://api.kie.ai/v1/task")
 
 
 class HookContractTests(unittest.TestCase):
@@ -277,6 +516,16 @@ class HookContractTests(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertEqual(json.loads(out), {"continue": True})
 
+    def test_sync_merge_answers_with_continue(self):
+        code, out = run_hook("guard_git.py", {
+            "hook_event_name": "PreToolUse",
+            "tool_name": "Bash",
+            "cwd": self.repo.cwd,
+            "tool_input": {"command": "git merge origin/mavis/work"},
+        })
+        self.assertEqual(code, 0)
+        self.assertEqual(json.loads(out), {"continue": True})
+
     def test_denied_write_answers_with_deny_decision(self):
         code, out = run_hook("guard_files.py", {
             "hook_event_name": "PreToolUse",
@@ -299,14 +548,16 @@ class HookContractTests(unittest.TestCase):
         answer = json.loads(out)
         self.assertEqual(answer["hookSpecificOutput"]["permissionDecision"], "deny")
 
-    def test_malformed_payload_does_not_crash(self):
+    def test_malformed_git_payload_fails_closed(self):
+        """A payload that cannot be read cannot be verified, so it is refused."""
         result = subprocess.run(
             [sys.executable, str(HOOKS / "guard_git.py")],
             input=b"not json at all",
             capture_output=True, timeout=60, check=False,
         )
         self.assertEqual(result.returncode, 0)
-        self.assertEqual(json.loads(result.stdout.decode("utf-8")), {"continue": True})
+        answer = json.loads(result.stdout.decode("utf-8"))
+        self.assertEqual(answer["hookSpecificOutput"]["permissionDecision"], "deny")
 
     def test_empty_payload_does_not_crash(self):
         result = subprocess.run(
@@ -316,6 +567,28 @@ class HookContractTests(unittest.TestCase):
         )
         self.assertEqual(result.returncode, 0)
         self.assertEqual(json.loads(result.stdout.decode("utf-8")), {"continue": True})
+
+    def test_malformed_file_payload_is_denied(self):
+        """A write whose payload cannot be parsed must fail closed."""
+        result = subprocess.run(
+            [sys.executable, str(HOOKS / "guard_files.py")],
+            input=b"not json at all",
+            capture_output=True, timeout=60, check=False,
+        )
+        self.assertEqual(result.returncode, 0)
+        answer = json.loads(result.stdout.decode("utf-8"))
+        self.assertEqual(answer["hookSpecificOutput"]["permissionDecision"], "deny")
+
+    def test_write_without_a_path_is_denied(self):
+        code, out = run_hook("guard_files.py", {
+            "hook_event_name": "PreToolUse",
+            "tool_name": "Write",
+            "cwd": str(ROOT),
+            "tool_input": {},
+        })
+        self.assertEqual(code, 0)
+        answer = json.loads(out)
+        self.assertEqual(answer["hookSpecificOutput"]["permissionDecision"], "deny")
 
 
 if __name__ == "__main__":

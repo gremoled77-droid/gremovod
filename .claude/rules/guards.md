@@ -5,19 +5,47 @@
 
 | Хук | Что отклоняет |
 |---|---|
-| `.claude/hooks/guard_git.py` | `push`/`merge`/`rebase`/`reset`/`checkout` в защищённую ветку (`main`, `master`, `mavis/work`), `push --force`, `git clean -f`, удаление чужой ветки или worktree |
-| `.claude/hooks/guard_paid.py` | `scripts/live_piapi_test.py` без `--dry-run`, `scripts/watch_hunyuan_test.py`, прямые обращения к платным хостам (`api.piapi.ai`, `api.openai.com`, …) |
-| `.claude/hooks/guard_files.py` | запись в ключи (`*_API_KEY.txt`, `.env`), SQLite, `backend/media/`, `backend/library/`, `backend/character_library/`, `runtime/`, `projects/`, `.claude/settings.local.json` |
+| `.claude/hooks/guard_git.py` | запись в защищённую ветку (`main`, `master`, `mavis/work`); `push --force`; `push --mirror`; `push --all` с защищённой веткой в наборе; удаление чужой ветки или worktree; `git clean -f`; массовая отмена изменений; `reset --hard` при незакоммиченных правках |
+| `.claude/hooks/guard_paid.py` | прямые обращения к платным хостам (`api.piapi.ai`, `api.openai.com`, …), `scripts/live_piapi_test.py` без `--dry-run`, флаги `--paid`/`--spend` |
+| `.claude/hooks/guard_files.py` | запись в ключи (`*_API_KEY.txt`, `.env`), приватные ключи, реальные данные (`backend/media/`, `backend/library/`, `backend/character_library/`, `runtime/`, `projects/`), SQLite рабочей студии, `.claude/settings.local.json` |
 
-Правила:
+## Источник и цель — разные вещи
+
+Хук Git различает ветку, которую команда **читает**, и ветку, которую она **пишет**:
+
+- `git merge origin/mavis/work` на task-ветке — обычная синхронизация, разрешена;
+- `git merge` на самой `mavis/work` — запись в защищённую ветку, запрещена;
+- `git push origin main` — запись в удалённую защищённую ветку, запрещена;
+- `git push origin HEAD:main` — то же, что и предыдущее: смотрится **правая** часть
+  refspec;
+- `git push origin feature/main` — обычная ветка, разрешена.
+
+## Границы покрытия хуков
+
+- Хук Git видит только командную строку. Что скрипт делает внутри, не видно;
+  известные опасные скрипты перечислены явно.
+- Хук файлов проверяет один вызов инструмента за раз. Он не читает содержимое файлов
+  и не видит, что запишет скрипт позже.
+- Хук платного **не является авторизацией оплаты**. Прямой вызов провайдера обходит
+  бюджет, разрешение владельца и idempotency защищённого Studio — поэтому он
+  запрещён всегда, без исключения.
+- `scripts/live_piapi_test.py --dry-run` разрешён: скрипт возвращается до сетевого
+  запроса и печатает только оценку цены. Любой другой вызов скрипта запрещён.
+- `GREMOVOD_ALLOW_GATED_PAID=1` открывает только путь через локальную Studio
+  (`scripts/watch_hunyuan_test.py`). Решение о покупке всё равно принимает Studio:
+  бюджет, разрешение владельца и idempotency. Переменная не даёт права тратить.
+- Если payload не читается, хук отказывает: непроверенное действие не выполняется.
+
+## Правила
 
 - Отклонённая хуком команда — это сигнал, а не сбой. Не искать обход: перечитать
   причину, исправить задачу или выполнить вручную с разрешения владельца.
-- Платный запуск не выполняется в сессии вообще. Разрешение владельца на конкретный
-  запрос оформляется через `GREMOVOD_ALLOW_PAID=1` в окружении сессии и через
-  бюджетный пакет студии — не через эту переменную.
-- Хуки **не заменяют** `scripts/check_git_files.py` (pre-commit) и CI-сканер секретов:
-  pre-commit ловит путь в staged-изменениях, CI — в diff, хуки — в момент действия.
+- Временные тестовые данные разрешены только в `tempfile.gettempdir()` и в папке
+  `tmp/` репозитория (расширяется через `GREMOVOD_TEMP_ROOTS`). Ключи и приватные
+  ключи запрещены везде, включая временные папки.
+- Хуки **не заменяют** `scripts/check_git_files.py` (pre-commit) и CI-сканер
+  секретов: pre-commit ловит путь в staged-изменениях, CI — в diff, хуки — в момент
+  действия.
 
 Проверить хуки без запуска студии:
 

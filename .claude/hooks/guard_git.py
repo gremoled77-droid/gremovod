@@ -1,21 +1,14 @@
 """PreToolUse guard: dangerous Git operations in the GremoVOD repository.
 
-Reads the Claude Code hook payload on stdin, decides whether the requested shell
-command may run, and answers with a permission decision on stdout.
+The guard separates the branch a command READS from the branch it WRITES:
 
-Rules enforced:
+* a task branch pulling the integration branch - ``git merge origin/mavis/work`` -
+  is a normal synchronisation and stays allowed;
+* anything that writes a protected branch (``main``, ``master``, ``mavis/work``)
+  is refused.
 
-* push / merge / rebase / checkout may not target or run on a protected
-  branch (``main``, ``master``, ``mavis/work``);
-* ``git push --force`` is refused: the repository contract requires an explicit
-  owner permission for a force push;
-* ``git clean`` with a force flag is refused: it destroys untracked local media,
-  keys and databases that live only on this machine;
-* deleting a branch or a worktree that is not the current one is refused, so a
-  session cannot destroy another agent's work.
-
-The guard never runs Git commands with side effects. It only reads the current
-branch and the working tree state.
+Coverage limits are listed at the end of this file and in
+``.claude/rules/guards.md``.
 """
 from __future__ import annotations
 
@@ -35,25 +28,32 @@ GIT_TOKEN = re.compile(r"(?<![\w./-])git(?=\s|$)")
 SPLIT = re.compile(r"(?:&&|\|\||;|\||\n)")
 WORD = re.compile(r"""["']?([^\s"';&|]+)["']?""")
 
-FORCE_FLAGS = {"-f", "--force", "--force-with-lease"}
-# A force flag inside a Git option cluster: -f, -fd, -fdx, --force.
+# A force flag inside a Git option cluster: -f, -fu, --force, --force-with-lease.
+FORCE_FLAG = re.compile(r"^(--force[a-z-]*|-[a-zA-Z]*f[a-zA-Z]*)$")
+# A force flag inside a Git option cluster for "git clean": -f, -fd, -fdx, --force.
 CLEAN_FORCE = re.compile(r"\bclean\b[^|;&]*(-[a-zA-Z]*f[a-zA-Z]*|--force)\b")
 
 
 def read_payload():
-    """Read the hook payload from stdin. Returns an empty dict on any problem."""
+    """Read the hook payload from stdin.
+
+    Returns ``(payload, state)`` where state is ``"empty"`` (nothing was sent),
+    ``"invalid"`` (something arrived but is not a JSON object) or ``"ok"``.
+    """
     try:
         raw = sys.stdin.buffer.read().decode("utf-8", "replace")
     except (OSError, ValueError):
-        return {}
+        return {}, "invalid"
     raw = raw.strip()
     if not raw:
-        return {}
+        return {}, "empty"
     try:
         payload = json.loads(raw)
     except json.JSONDecodeError:
-        return {}
-    return payload if isinstance(payload, dict) else {}
+        return {}, "invalid"
+    if not isinstance(payload, dict):
+        return {}, "invalid"
+    return payload, "ok"
 
 
 def tool_command(payload):
@@ -87,10 +87,10 @@ def project_dir(payload):
     return os.getcwd()
 
 
-def _git(cwd, *args):
+def _git(repo, *args):
     try:
         result = subprocess.run(
-            ["git", "-C", cwd, *args],
+            ["git", "-C", str(repo), *args],
             capture_output=True, timeout=10, check=False,
         )
     except (OSError, subprocess.SubprocessError):
@@ -100,19 +100,53 @@ def _git(cwd, *args):
     return result.stdout.decode("utf-8", "replace").strip()
 
 
-def current_branch(cwd):
+def current_branch(repo):
     """Name of the checked out branch, or None when it cannot be determined.
 
     ``git branch --show-current`` is used on purpose: ``rev-parse --abbrev-ref
     HEAD`` answers "HEAD" for a branch that has no commit yet, which would hide
     the protected branch name exactly when a fresh worktree is checked out.
     """
-    if _git(cwd, "rev-parse", "--is-inside-work-tree") != "true":
+    if _git(repo, "rev-parse", "--is-inside-work-tree") != "true":
         return None
-    name = _git(cwd, "branch", "--show-current")
+    name = _git(repo, "branch", "--show-current")
     if not name or name == "HEAD":
         return None
     return name
+
+
+def upstream_branch(repo):
+    """Upstream of the checked out branch, or None."""
+    name = _git(repo, "rev-parse", "--abbrev-ref", "@{upstream}")
+    if not name or name == "HEAD":
+        return None
+    return name
+
+
+def local_branches(repo):
+    """Names of the local branches of the repository."""
+    out = _git(repo, "branch", "--format=%(refname:short)")
+    if not out:
+        return set()
+    return {line.strip() for line in out.splitlines() if line.strip()}
+
+
+def worktree_branches(repo):
+    """Branches that are checked out in some worktree of the repository."""
+    out = _git(repo, "worktree", "list", "--porcelain")
+    if not out:
+        return set()
+    names = set()
+    for line in out.splitlines():
+        if line.startswith("branch "):
+            names.add(line[len("branch "):].strip().replace("refs/heads/", "", 1))
+    return names
+
+
+def has_changes(repo):
+    """True when the working tree or the index carries uncommitted changes."""
+    out = _git(repo, "status", "--porcelain")
+    return bool(out)
 
 
 def git_commands(command):
@@ -151,17 +185,15 @@ def _subcommand(words):
     return ""
 
 
-def _refspec_targets(words):
-    """Branch names that appear as an argument of an invocation."""
-    targets = []
-    for word in words[1:]:
-        if word.startswith("-"):
-            continue
-        name = word.split(":", 1)[-1] if ":" in word else word
-        name = name.split("^")[0]
-        if name:
-            targets.append(name.lower())
-    return targets
+def _repo_dir(words, cwd):
+    """The repository a command acts on. ``git -C <path>`` switches it."""
+    for index, word in enumerate(words):
+        if word == "-C" and index + 1 < len(words):
+            candidate = Path(words[index + 1])
+            if not candidate.is_absolute():
+                candidate = Path(cwd) / candidate
+            return str(candidate)
+    return cwd
 
 
 def _is_protected(name, protected):
@@ -181,20 +213,27 @@ def _is_protected(name, protected):
     return False
 
 
-def _push_target(words, cwd):
-    """Resolve what a push would update.
+def _positional(words):
+    """Arguments of an invocation that are not options."""
+    return [word for word in words[1:] if not word.startswith("-")]
 
-    Returns ``("explicit", name)`` when the command names a protected branch and
-    ``("current", name)`` when the push follows the checked out branch.
+
+def _push_destinations(words):
+    """Remote side branches a push would write.
+
+    ``git push origin main`` writes ``main`` on the remote. ``git push origin
+    HEAD:main`` writes ``main`` and reads ``HEAD``. Only the written side
+    matters, so the destination after the colon is what is checked.
     """
-    protected = protected_branches()
-    for name in _refspec_targets(words):
-        if _is_protected(name, protected):
-            return "explicit", name
-    branch = current_branch(cwd)
-    if branch and _is_protected(branch, protected):
-        return "current", branch
-    return None, None
+    args = _positional(words)
+    refs = args[1:] if len(args) >= 2 else []
+    destinations = []
+    for ref in refs:
+        if ":" in ref:
+            destinations.append(ref.split(":", 1)[1])
+        else:
+            destinations.append(ref)
+    return destinations
 
 
 def check(command, cwd):
@@ -202,44 +241,83 @@ def check(command, cwd):
     if not command or not command.strip():
         return True, ""
     protected = protected_branches()
-    branch = current_branch(cwd)
     for words in git_commands(command):
         sub = _subcommand(words)
         if not sub:
             continue
+        repo = _repo_dir(words, cwd)
+        branch = current_branch(repo)
         if sub == "push":
-            if any(word.lower() in FORCE_FLAGS for word in words):
+            if any(FORCE_FLAG.match(word.lower()) for word in words):
                 return False, (
                     "Force push is blocked for this repository. The owner contract "
                     "requires a separate explicit permission for force-push; use a "
                     "normal push to a task branch instead."
                 )
-            kind, name = _push_target(words, cwd)
-            if kind:
+            if "--mirror" in words:
                 return False, (
-                    f"Push to the protected branch '{name}' is blocked. Push only your "
-                    "own task branch and open a draft pull request for review."
+                    "'git push --mirror' is blocked: it copies every ref of the "
+                    "repository, including the protected branches."
                 )
-        elif sub in ("merge", "rebase", "cherry-pick"):
-            if branch and _is_protected(branch, protected):
-                return False, (
-                    f"'{sub}' is blocked while the checked out branch is the protected "
-                    f"branch '{branch}'. Work on a task branch instead."
-                )
-            for name in _refspec_targets(words):
+            destinations = _push_destinations(words)
+            if "--all" in words:
+                protected_local = sorted(
+                    name for name in local_branches(repo) if _is_protected(name, protected))
+                if protected_local:
+                    return False, (
+                        f"'git push --all' would publish the protected branch "
+                        f"'{protected_local[0]}'. Push the task branch explicitly."
+                    )
+            elif not destinations:
+                upstream = upstream_branch(repo)
+                if upstream:
+                    destinations = [upstream]
+                elif branch:
+                    destinations = [branch]
+            for name in destinations:
                 if _is_protected(name, protected):
                     return False, (
-                        f"'{sub}' into the protected branch '{name}' is blocked. "
-                        "Protected branches change only through a reviewed pull request."
+                        f"Push to the protected branch '{name}' is blocked. Push only "
+                        "your own task branch and open a draft pull request for review."
                     )
-        elif sub in ("reset", "restore", "revert"):
             if branch and _is_protected(branch, protected):
                 return False, (
-                    f"'{sub}' is blocked while the checked out branch is the protected "
-                    f"branch '{branch}'. Work on a task branch instead."
+                    f"Push from the protected branch '{branch}' is blocked. Switch to "
+                    "a task branch first."
                 )
-        elif sub in ("checkout", "switch"):
-            for name in _refspec_targets(words):
+        elif sub in ("merge", "rebase", "cherry-pick", "reset", "restore", "revert"):
+            # The written branch is the current one. The argument is only the
+            # source, so a protected source is a normal synchronisation.
+            if branch and _is_protected(branch, protected):
+                return False, (
+                    f"'{sub}' writes the protected branch '{branch}' and is blocked. "
+                    "Work on a task branch instead."
+                )
+            if sub == "reset" and any(word.lower() in ("--hard", "--merge") for word in words):
+                if has_changes(repo):
+                    return False, (
+                        "'git reset --hard' would discard uncommitted work in the "
+                        "working tree. Commit or stash the changes first."
+                    )
+            if sub == "restore" and "." in _positional(words):
+                return False, (
+                    "'git restore .' would discard every uncommitted change in the "
+                    "working tree. Restore the files one by one instead."
+                )
+        elif sub == "checkout":
+            if "--" in words:
+                return False, (
+                    "'git checkout -- .' would discard every uncommitted change in "
+                    "the working tree. Discard the files one by one instead."
+                )
+            for name in _positional(words):
+                if _is_protected(name, protected):
+                    return False, (
+                        f"Switching to the protected branch '{name}' is blocked in an "
+                        "agent worktree. The protected branch belongs to the owner."
+                    )
+        elif sub == "switch":
+            for name in _positional(words):
                 if _is_protected(name, protected):
                     return False, (
                         f"Switching to the protected branch '{name}' is blocked in an "
@@ -253,15 +331,21 @@ def check(command, cwd):
                 )
         elif sub == "branch":
             if "-D" in words or "--delete" in words:
-                for name in _refspec_targets(words):
+                busy = worktree_branches(repo)
+                for name in _positional(words):
                     if _is_protected(name, protected):
                         return False, f"Deleting the protected branch '{name}' is blocked."
                     if branch and name == branch.lower():
                         return False, "Deleting the checked out branch is blocked."
+                    if name in busy:
+                        return False, (
+                            f"Branch '{name}' is checked out in another worktree. "
+                            "Deleting it would break another session."
+                        )
         elif sub == "worktree":
             if "remove" in [word.lower() for word in words]:
-                for name in _refspec_targets(words):
-                    if name == "remove":
+                for name in _positional(words):
+                    if name.lower() == "remove":
                         continue
                     if Path(name).resolve() == Path(cwd).resolve():
                         return False, "Removing the current worktree is blocked."
@@ -273,7 +357,21 @@ def check(command, cwd):
 
 
 def main():
-    payload = read_payload()
+    payload, state = read_payload()
+    if state == "invalid":
+        # A payload that cannot be read cannot be checked, and the guard exists
+        # to stop a wrong action, not to excuse one.
+        print(json.dumps({
+            "hookSpecificOutput": {
+                "hookEventName": "PreToolUse",
+                "permissionDecision": "deny",
+                "permissionDecisionReason": (
+                    "The hook payload could not be read, so the command was not "
+                    "verified. Retry the command; if it still fails, report it."
+                ),
+            }
+        }))
+        return 0
     command = tool_command(payload)
     cwd = project_dir(payload)
     allowed, reason = check(command, cwd)

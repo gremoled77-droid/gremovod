@@ -9,6 +9,9 @@
 | Вопрос | Файл |
 |---|---|
 | Общий контракт всех агентов | `AGENTS.md` |
+| Критерии качества разработки | `AGENTS.md`, раздел «Критерии качества разработки» |
+| Цель текущей беты и решения D1–D4 | `AGENTS.md`, раздел «Цель текущей беты» |
+| Глобальная приёмка #54 | [PR #54](https://github.com/gremoled77-droid/gremovod/pull/54) — [реестр решений](https://github.com/gremoled77-droid/gremovod/blob/audit/global-acceptance-20261021/docs/audits/global-acceptance-2026-10-21/07_DECISION_REGISTER.md), [пробелы беты](https://github.com/gremoled77-droid/gremovod/blob/audit/global-acceptance-20261021/docs/audits/global-acceptance-2026-10-21/05_BETA_GAP_ANALYSIS.md), [агенты и знания](https://github.com/gremoled77-droid/gremovod/blob/audit/global-acceptance-20261021/docs/audits/global-acceptance-2026-10-21/04_AGENTS_AND_SKILLS.md) |
 | Роли агентов, границы зон, shared-пути | `docs/AGENT_ROLE_MATRIX.md` |
 | Трёхагентная сборка и эстафета | `AGENT_BUILD_MANUAL.md` |
 | Текущий статус и приёмка задач | `STATUS.md` |
