@@ -127,13 +127,21 @@ scope-проверка моей ветки останется в режиме `N
 
 ## Как запустить стенд и рабочую копию
 
-Запуск студии из новой папки (свои порты, свой каталог данных):
+Запуск студии из новой папки (свои порты, свой каталог данных — рабочую SQLite студии не трогаем):
 
 ```
 cd C:\AI_Workflow_Studio\.worktrees\minimax-ga03
-$env:STUDIO_DATA_DIR = "C:\AI_Workflow_Studio\.worktrees\minimax-ga03\.stand-data"
+$env:STUDIO_DATA_DIR = "$env:TEMP\gremovod-stand-ga03"
 C:\AI_Workflow_Studio\.venv\Scripts\python.exe -m uvicorn backend.main:app --host 127.0.0.1 --port 8001
 ```
+
+Проверено: `/api/health` отвечает `{"ok":true,"version":"0.3.0","mode":"local"}`, база стенда создаётся
+в своём каталоге, `C:\AI_Workflow_Studio\backend\studio.sqlite3` не тронута.
+
+Примечание: в рабочей копии остался неотслеживаемый каталог `.stand-data/` — это данные пробного
+запуска (собственная `studio.sqlite3` и пустые `media`/`character_library`). Он не попадает в
+коммиты и его можно удалить обычным `Remove-Item`; в команде выше каталог данных вынесен за
+пределы репозитория, чтобы такое больше не повторялось.
 
 Проверка браузерного smoke (нужны ffmpeg и playwright с chromium):
 
