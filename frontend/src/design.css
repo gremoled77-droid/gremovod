@@ -812,3 +812,70 @@ section.panel {
 .topbar-status.offline {
   color: var(--bad);
 }
+
+/* Экран «Выпуск» (GA-03): приёмка итогового MP4 */
+.rg {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 12px;
+}
+.rg-upload,
+.rg-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.rg-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: var(--surface-2);
+}
+.rg-sha code {
+  word-break: break-all;
+}
+.rg-error {
+  color: var(--bad);
+  font-size: 13px;
+}
+.rg-state {
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  background: var(--surface);
+}
+.rg-OWNER_APPROVED {
+  color: var(--ok);
+}
+.rg-REJECTED {
+  color: var(--bad);
+}
+.rg-TECHNICAL_PASS {
+  color: var(--accent);
+}
+.rg-IMPORTED {
+  color: var(--muted);
+}
+.rg-select {
+  max-width: 100%;
+}
+.rg-upload input[type='text'],
+.rg-row input[type='text'] {
+  max-width: 360px;
+}
+.rg-blockers {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.rg-honest {
+  max-width: 720px;
+}
+.rg-history {
+  font-size: 13px;
+}
