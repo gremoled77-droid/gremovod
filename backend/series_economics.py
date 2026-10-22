@@ -18,7 +18,9 @@ def check_budget(db,project_id,cost):
     owned=projects(db,parent['parent_id'])
     from backend import security;reserved=sum(r['estimated_usd'] for r in security.reservations(db) if r['project_id'] in owned)
     from backend import llm_guard
-    reserved+=llm_guard.summary(db,owned)['usd']
+    llm=llm_guard.summary(db,owned)
+    if llm['unreadable_calls']:raise HTTPException(409,'Учёт расходов серии повреждён: запись LLM с нечитаемой суммой. Траты остановлены до решения владельца.')
+    reserved+=llm['usd']
     if reserved+cost>limit['limit_usd']+1e-9:raise HTTPException(400,'Превышен общий бюджет серии. Измени лимит на доске раскадровки.')
 
 

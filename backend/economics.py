@@ -86,7 +86,7 @@ def register(app,studio):
         chat_images=[x for x in attempts if x['api_equivalent']]
         from backend import llm_guard
         with studio.connect() as db:llm=llm_guard.summary(db,{project_id})
-        return {'llm':llm,'project_id':project_id,'actual_usd_known':round(actual,6),'costs_complete':unknown==0,
+        return {'llm':llm,'project_id':project_id,'actual_usd_known':round(actual,6),'costs_complete':unknown==0 and llm['unreadable_calls']==0,'llm_unreadable_calls':llm['unreadable_calls'],
                 'chat_image_count':len(chat_images),'chat_api_equivalent_usd':round(sum(x['api_equivalent']['usd'] for x in chat_images),6),
                 'unknown_cost_count':unknown,'llm_calls_unpriced':llm_unpriced,'media_costs_complete':media_unknown==0,'unknown_generation_cost_count':media_unknown,'estimated_usd':round(sum(x['estimated_usd'] or 0 for x in attempts),6),
                 'attempts':len(media),'used_generations':used,'success_percent':round(100*used/len(media),1) if media else None,
