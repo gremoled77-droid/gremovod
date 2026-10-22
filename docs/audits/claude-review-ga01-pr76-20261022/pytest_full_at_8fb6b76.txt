@@ -1,0 +1,237 @@
+.............................................................. [ 11%]
+........................................................................ [ 24%]
+........................................................... [ 35%]
+........................................................................ [ 48%]
+.............................................................. [ 59%]
+...................................................................... [ 72%]
+........................................................................ [ 85%]
+.................................................................... [ 97%]
+...........                                                              [100%]
+============================== warnings summary ===============================
+backend\main.py:48
+  C:\Users\BLOWKA\review-ga01-76b\backend\main.py:48: DeprecationWarning: 
+          on_event is deprecated, use lifespan event handlers instead.
+  
+          Read more about it in the
+          [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+          
+    @app.on_event('startup')
+
+..\..\..\AI_Workflow_Studio\.venv\Lib\site-packages\fastapi\applications.py:4745: 23 warnings
+backend/test_llm_settlement.py: 7 warnings
+  C:\AI_Workflow_Studio\.venv\Lib\site-packages\fastapi\applications.py:4745: DeprecationWarning: 
+          on_event is deprecated, use lifespan event handlers instead.
+  
+          Read more about it in the
+          [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+          
+    return self.router.on_event(event_type)  # ty: ignore[deprecated]
+
+backend\native_chat.py:73
+  C:\Users\BLOWKA\review-ga01-76b\backend\native_chat.py:73: DeprecationWarning: 
+          on_event is deprecated, use lifespan event handlers instead.
+  
+          Read more about it in the
+          [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+          
+    @app.on_event('startup')
+
+backend\economics.py:19
+  C:\Users\BLOWKA\review-ga01-76b\backend\economics.py:19: DeprecationWarning: 
+          on_event is deprecated, use lifespan event handlers instead.
+  
+          Read more about it in the
+          [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+          
+    @app.on_event('startup')
+
+backend\external_generation.py:48
+  C:\Users\BLOWKA\review-ga01-76b\backend\external_generation.py:48: DeprecationWarning: 
+          on_event is deprecated, use lifespan event handlers instead.
+  
+          Read more about it in the
+          [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+          
+    @app.on_event('startup')
+
+backend\security.py:198
+  C:\Users\BLOWKA\review-ga01-76b\backend\security.py:198: DeprecationWarning: 
+          on_event is deprecated, use lifespan event handlers instead.
+  
+          Read more about it in the
+          [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+          
+    @app.on_event('startup')
+
+backend\job_recovery.py:14
+  C:\Users\BLOWKA\review-ga01-76b\backend\job_recovery.py:14: DeprecationWarning: 
+          on_event is deprecated, use lifespan event handlers instead.
+  
+          Read more about it in the
+          [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+          
+    @app.on_event('startup')
+
+backend\job_delivery.py:45
+  C:\Users\BLOWKA\review-ga01-76b\backend\job_delivery.py:45: DeprecationWarning: 
+          on_event is deprecated, use lifespan event handlers instead.
+  
+          Read more about it in the
+          [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+          
+    @app.on_event('startup')
+
+backend\job_delivery.py:58
+  C:\Users\BLOWKA\review-ga01-76b\backend\job_delivery.py:58: DeprecationWarning: 
+          on_event is deprecated, use lifespan event handlers instead.
+  
+          Read more about it in the
+          [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+          
+    @app.on_event('shutdown')
+
+backend\reference_upload.py:71
+  C:\Users\BLOWKA\review-ga01-76b\backend\reference_upload.py:71: DeprecationWarning: 
+          on_event is deprecated, use lifespan event handlers instead.
+  
+          Read more about it in the
+          [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+          
+    @app.on_event('startup')
+
+backend\production_folders.py:258
+  C:\Users\BLOWKA\review-ga01-76b\backend\production_folders.py:258: DeprecationWarning: 
+          on_event is deprecated, use lifespan event handlers instead.
+  
+          Read more about it in the
+          [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+          
+    @app.on_event('startup')
+
+backend\release_artifacts.py:151
+  C:\Users\BLOWKA\review-ga01-76b\backend\release_artifacts.py:151: DeprecationWarning: 
+          on_event is deprecated, use lifespan event handlers instead.
+  
+          Read more about it in the
+          [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+          
+    @app.on_event('startup')
+
+backend\media_qc.py:414
+  C:\Users\BLOWKA\review-ga01-76b\backend\media_qc.py:414: DeprecationWarning: 
+          on_event is deprecated, use lifespan event handlers instead.
+  
+          Read more about it in the
+          [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+          
+    @app.on_event('startup')
+
+backend\storyboard.py:162
+  C:\Users\BLOWKA\review-ga01-76b\backend\storyboard.py:162: DeprecationWarning: 
+          on_event is deprecated, use lifespan event handlers instead.
+  
+          Read more about it in the
+          [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+          
+    @app.on_event('startup')
+
+backend\production_entities.py:124
+  C:\Users\BLOWKA\review-ga01-76b\backend\production_entities.py:124: DeprecationWarning: 
+          on_event is deprecated, use lifespan event handlers instead.
+  
+          Read more about it in the
+          [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+          
+    @app.on_event('startup')
+
+backend\visual_plan.py:226
+  C:\Users\BLOWKA\review-ga01-76b\backend\visual_plan.py:226: DeprecationWarning: 
+          on_event is deprecated, use lifespan event handlers instead.
+  
+          Read more about it in the
+          [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+          
+    @app.on_event('startup')
+
+backend\llm_guard.py:808
+backend/test_llm_settlement.py::LegacyMoneyRepairTests::test_startup_repairs_legacy_money_and_the_app_still_starts
+backend/test_llm_settlement.py::LegacyMoneyRepairTests::test_startup_survives_unreadable_amounts
+backend/test_llm_settlement.py::LegacyMoneyRepairTests::test_startup_survives_unreadable_amounts
+backend/test_llm_settlement.py::LegacyMoneyRepairTests::test_startup_survives_unreadable_amounts
+backend/test_llm_settlement.py::LegacyMoneyRepairTests::test_startup_survives_unreadable_amounts
+backend/test_llm_settlement.py::LegacyMoneyRepairTests::test_startup_survives_unreadable_amounts
+backend/test_llm_settlement.py::LegacyMoneyRepairTests::test_unreadable_amount_blocks_spending_until_the_owner_decides
+  C:\Users\BLOWKA\review-ga01-76b\backend\llm_guard.py:808: DeprecationWarning: 
+          on_event is deprecated, use lifespan event handlers instead.
+  
+          Read more about it in the
+          [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+          
+    @app.on_event('startup')
+
+backend\qa_reviews.py:277
+  C:\Users\BLOWKA\review-ga01-76b\backend\qa_reviews.py:277: DeprecationWarning: 
+          on_event is deprecated, use lifespan event handlers instead.
+  
+          Read more about it in the
+          [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+          
+    @app.on_event('startup')
+
+backend\series_economics.py:30
+  C:\Users\BLOWKA\review-ga01-76b\backend\series_economics.py:30: DeprecationWarning: 
+          on_event is deprecated, use lifespan event handlers instead.
+  
+          Read more about it in the
+          [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+          
+    @app.on_event('startup')
+
+backend\character_voice.py:91
+  C:\Users\BLOWKA\review-ga01-76b\backend\character_voice.py:91: DeprecationWarning: 
+          on_event is deprecated, use lifespan event handlers instead.
+  
+          Read more about it in the
+          [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+          
+    @app.on_event('startup')
+
+backend\sound.py:134
+  C:\Users\BLOWKA\review-ga01-76b\backend\sound.py:134: DeprecationWarning: 
+          on_event is deprecated, use lifespan event handlers instead.
+  
+          Read more about it in the
+          [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+          
+    @app.on_event('startup')
+
+backend\temp_cleanup.py:231
+  C:\Users\BLOWKA\review-ga01-76b\backend\temp_cleanup.py:231: DeprecationWarning: 
+          on_event is deprecated, use lifespan event handlers instead.
+  
+          Read more about it in the
+          [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+          
+    @app.on_event('startup')
+
+backend\story_plan.py:134
+  C:\Users\BLOWKA\review-ga01-76b\backend\story_plan.py:134: DeprecationWarning: 
+          on_event is deprecated, use lifespan event handlers instead.
+  
+          Read more about it in the
+          [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+          
+    @app.on_event('startup')
+
+backend\n8n_spend.py:190
+  C:\Users\BLOWKA\review-ga01-76b\backend\n8n_spend.py:190: DeprecationWarning: 
+          on_event is deprecated, use lifespan event handlers instead.
+  
+          Read more about it in the
+          [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+          
+    @app.on_event('startup')
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+548 passed, 60 warnings, 39 subtests passed in 215.57s (0:03:35)
+rc=0
