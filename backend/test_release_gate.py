@@ -304,6 +304,53 @@ class GateTests(unittest.TestCase):
         # переутверждение одним действием
         self.assertEqual(self.decide().json()['gate']['state'], 'OWNER_APPROVED')
 
+    # --- гонки и крайние случаи ---------------------------------------------------------
+    def test_concurrent_identical_approvals_write_one_decision(self):
+        import threading
+        self.qc()
+        body = {'decision': 'APPROVED', 'owner_id': OWNER, 'processing_rights_confirmed': True,
+                'expected_master_sha256': self.gate()['master_sha256']}
+        barrier = threading.Barrier(4)
+        codes = []
+
+        def go():
+            barrier.wait()
+            codes.append(self.client.post(self.base + '/decision', json=body).status_code)
+
+        threads = [threading.Thread(target=go) for _ in range(4)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+        self.assertEqual(codes, [200] * 4, codes)
+        self.assertEqual(len(self.gate()['history']), 1)
+
+    def test_file_swapped_between_hash_and_record_is_not_approved(self):
+        from backend import release_gate
+        self.qc()
+        original = release_gate._record
+
+        def swap_then_record(*args, **kwargs):
+            with self.stored().open('ab') as handle:  # файл меняется после хеширования, до записи
+                handle.write(b'\0swap')
+            return original(*args, **kwargs)
+
+        with patch.object(release_gate, '_record', swap_then_record):
+            self.decide()
+        gate = self.gate()
+        self.assertNotEqual(gate['state'], 'OWNER_APPROVED')
+
+    def test_invalid_decision_and_oversized_note_are_validation_errors(self):
+        self.qc()
+        self.assertEqual(self.decide('MAYBE').status_code, 422)
+        self.assertEqual(self.decide('REJECTED', note='я' * 2001).status_code, 422)
+        self.assertEqual(self.gate()['history'], [])
+
+    def test_reject_note_is_stored_verbatim_unicode(self):
+        note = 'Грэм <b>не</b> тот "кадр" — звук 🔊'
+        self.assertEqual(self.decide('REJECTED', note=note).status_code, 200)
+        self.assertEqual(self.gate()['history'][0]['note'], note)
+
     # --- перезапуск --------------------------------------------------------------------
     def test_state_survives_restart(self):
         self.approved()

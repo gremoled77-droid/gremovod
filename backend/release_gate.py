@@ -187,15 +187,20 @@ def release_gate(studio, project_id, artifact_id):
 
 
 def _record(studio, project_id, artifact, decision, owner, live, content, rights, verdict, note):
+    """Запись решения. Повтор того же решения по тем же байтам читается под тем же замком записи, а не до него."""
     row_id = uuid.uuid4().hex
     with studio.connect() as db:
         db.execute('BEGIN IMMEDIATE')
+        latest = _latest_decision(db, artifact['id'])
+        if (latest is not None and latest['decision'] == decision and latest['master_sha256'] == live
+                and (decision == REJECTED_DECISION or latest['content_sha256'] == content)):
+            return latest['decision_id'], False
         db.execute('INSERT INTO release_decisions(decision_id,artifact_id,project_id,version_id,master_sha256,content_sha256,'
                    'project_revision,decision,owner_id,processing_rights_confirmed,qc_verdict,note,created_at) '
                    'VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)',
                    (row_id, artifact['id'], project_id, artifact['version_id'], live, content, artifact['project_revision'],
                     decision, owner, 1 if rights else 0, verdict, note, studio.now()))
-    return row_id
+    return row_id, True
 
 
 def decide(studio, project_id, artifact_id, request, body):
@@ -214,8 +219,8 @@ def decide(studio, project_id, artifact_id, request, body):
             return {'duplicate': True, 'gate': current}
         if body.expected_master_sha256 and live and body.expected_master_sha256 != live:
             note = f'[MASTER_CHANGED] {note}'
-        _record(studio, project_id, artifact, REJECTED_DECISION, owner, live, content, False, facts['qc_verdict'], note)
-        return {'duplicate': False, 'gate': release_gate(studio, project_id, artifact_id)}
+        _, created = _record(studio, project_id, artifact, REJECTED_DECISION, owner, live, content, False, facts['qc_verdict'], note)
+        return {'duplicate': not created, 'gate': release_gate(studio, project_id, artifact_id)}
     # APPROVED: порядок проверок фиксирован, каждый отказ — собственный код.
     if not body.processing_rights_confirmed:
         raise fail('PROCESSING_RIGHTS_NOT_CONFIRMED')
@@ -234,5 +239,5 @@ def decide(studio, project_id, artifact_id, request, body):
         raise fail('MEDIA_NOT_CONFIRMED', detail=manifest.get('reason') or '')
     if current['state'] == OWNER_APPROVED:  # повтор: тот же файл и то же содержимое уже утверждены
         return {'duplicate': True, 'gate': current}
-    _record(studio, project_id, artifact, APPROVED_DECISION, owner, live, content, True, facts['qc_verdict'], note)
-    return {'duplicate': False, 'gate': release_gate(studio, project_id, artifact_id)}
+    _, created = _record(studio, project_id, artifact, APPROVED_DECISION, owner, live, content, True, facts['qc_verdict'], note)
+    return {'duplicate': not created, 'gate': release_gate(studio, project_id, artifact_id)}
