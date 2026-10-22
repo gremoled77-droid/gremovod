@@ -45,7 +45,10 @@
         "backend/test_media_qc.py",
         "backend/test_qa_reviews.py",
         "frontend/src/StageSummary.tsx",
-        "frontend/src/releaseGate.test.mjs"
+        "frontend/src/releaseGate.ts",
+        "frontend/src/releaseGate.test.mjs",
+        "frontend/src/design.css",
+        "tests/release_gate_browser_smoke.mjs"
       ]
     },
     "ga-04": {
