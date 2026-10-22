@@ -92,6 +92,13 @@ Issue #96 (MM-CAPCUT-03-R2), P2, назначено владельцем 23.10.2
 (`os.name == "nt"`), на других ОС эти два теста дают явный SKIP, а не PASS. Полная регрессия
 проекта не повторялась — по заданию.
 
+GitHub Actions на финальном HEAD ветки:
+
+| Прогон | Статус |
+|---|---|
+| `validate-agent-handoff` — run `39857287707` | **success** (шаг «Validate handoff files, role boundaries and seven safe MOCK n8n JSON files») |
+| `check-agent-scope` — run `39857287516` | **skipped** — `LEGACY_BRANCH_NOT_ENFORCED`, см. раздел «Scope». Skipped — это не PASS |
+
 Все данные — временные синтетические файлы в `TemporaryDirectory`; сети, production, SQLite,
 реальных медиа и платных вызовов не было.
 
