@@ -5,9 +5,20 @@ import uuid
 from pathlib import Path
 
 from fastapi import File, Form, HTTPException, UploadFile
-from pydantic import BaseModel
+from fastapi import Request
+from pydantic import BaseModel, Field
 
 MAX_RELEASE_BYTES = 1024 * 1024 * 1024
+
+
+class DecisionRequest(BaseModel):
+    """Решение владельца. Состояния, QC и права здесь не передаются: сервер выводит их сам."""
+    decision: str = Field(..., pattern='^(APPROVED|REJECTED)$')
+    owner_id: str = Field('', max_length=200)
+    expected_master_sha256: str = Field('', max_length=64)
+    processing_rights_confirmed: bool = False
+    required_modalities: list[str] = Field(default_factory=lambda: ['VIDEO'], max_length=4)
+    note: str = Field('', max_length=2000)
 
 
 class ReleaseArtifact(BaseModel):
@@ -138,7 +149,7 @@ def persist_release_artifact(studio, project_id, project_revision, version_id, t
             db.execute(
                 'INSERT INTO release_artifacts VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)',
                 (artifact_id, project_id, project_revision, version_id, asset_id, title, filename,
-                 'video/mp4', width, height, duration, 'ready', created_at),
+                 'video/mp4', width, height, duration, 'imported', created_at),
             )
             row = db.execute('SELECT * FROM release_artifacts WHERE id=?', (artifact_id,)).fetchone()
     except BaseException:
@@ -167,6 +178,9 @@ def register(app, studio):
                 created_at TEXT NOT NULL
             )''')
             db.execute('CREATE INDEX IF NOT EXISTS release_artifacts_project_created ON release_artifacts(project_id,created_at DESC)')
+            from backend import release_gate
+            db.execute(release_gate.SCHEMA)
+            db.execute(release_gate.INDEX)
 
     @app.get('/api/projects/{project_id}/release-artifacts', response_model=list[ReleaseArtifact])
     def listing(project_id: str):
@@ -199,3 +213,18 @@ def register(app, studio):
             temporary, width, height, duration,
         )
         return artifact_record(row)
+
+
+    @app.get('/api/projects/{project_id}/release-artifacts/{artifact_id}/gate')
+    def read_gate(project_id: str, artifact_id: str):
+        """Состояние выпуска, вычисленное сервером (хеш файла считается заново при каждом чтении)."""
+        from backend import release_gate
+        studio.project(project_id)
+        return release_gate.release_gate(studio, project_id, artifact_id)
+
+    @app.post('/api/projects/{project_id}/release-artifacts/{artifact_id}/decision')
+    def release_decision(project_id: str, artifact_id: str, body: DecisionRequest, request: Request):
+        """Решение владельца: APPROVED строго по инвариантам, REJECTED всегда записывается."""
+        from backend import release_gate
+        studio.project(project_id)
+        return release_gate.decide(studio, project_id, artifact_id, request, body)
