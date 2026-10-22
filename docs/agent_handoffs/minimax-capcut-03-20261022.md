@@ -6,6 +6,7 @@
 (ожидаемый SHA сверен и совпал).
 **Draft PR:** #95 (база `minimax/capcut-02-retest`, стек на #93).
 **HEAD кода:** `14f141a` — `fix(capcut): проверка пакета не доверяет манифесту наружу (R1/R3)`.
+**HEAD ветки:** `d5a739e` — `docs(capcut): handoff MM-CAPCUT-03 — R1/R3, red/green, CI, ограничения`.
 Ветка содержит два коммита поверх базы: код+README, затем этот отчёт.
 
 **Что делалось:** разбор и точечное исправление проверки целостности офлайн-пакета CapCut по
@@ -103,8 +104,8 @@ Studio на 8000/5173 не запускалась.
 
 | Прогон | Статус |
 |---|---|
-| `validate-agent-handoff` | уточняется в разделе ниже |
-| `check-agent-scope` | **skipped** — `LEGACY_BRANCH_NOT_ENFORCED`: guard в этой цепочке не знает префиксы `minimax/*` |
+| `validate-agent-handoff` — run `39852783529`, HEAD `d5a739e` | **success** (8 с): «Validate handoff files, role boundaries and seven safe MOCK n8n JSON files» |
+| `check-agent-scope` — run `39852783555`, HEAD `d5a739e` | **skipped**, шаги job не выполнялись: guard в этой цепочке не знает префиксы `minimax/*` (`LEGACY_BRANCH_NOT_ENFORCED`) |
 
 CI на этой ветке ограничен: в цепочке PR #93 нет воркфлоу, который гоняет `pytest` и тесты
 экспорта (offline-CI приезжает вместе с PR #87 / PR #62). Поэтому все прогоны тестов выше —
