@@ -21,7 +21,9 @@
   tools.test_agent_coordination tests.test_claude_hooks`) 191 OK; `tools/check_ci_contracts.py`
   → `CI_CONTRACT: OK`; scope guard → `LEGACY_BRANCH_NOT_ENFORCED`, exit 0; pre-commit →
   `Git file check: OK`. В GitHub Actions — 4 workflow, 9 job, все `success`
-  (прогоны 39772893687, 39772893690, 39772893738, 39772893626). Платные API не вызывались.
+  (прогоны 39773268986, 39773269019, 39773269127, 39773269015 на финальном HEAD
+  `1082015`; те же прогоны на предыдущем коммите `04b7bbf` — 39772893687, 39772893690,
+  39772893738, 39772893626 — тоже зелёные). Платные API не вызывались.
 - **Блокировки для Codex:** нет.
 
 ## Что и как слито
@@ -69,10 +71,10 @@ workflow оставлена как есть. `agent-coordination.yml` и так 
 
 | Workflow | Job'ы | Итог |
 |---|---|---|
-| GremoVOD CI contracts (39772893738) | CI contracts and tool tests; **Claude hooks guard tests**; No secrets in this change | success |
-| GremoVOD Studio offline CI (39772893687) | Backend unit tests; Backend media and QC tests; Frontend unit tests; Frontend TypeScript and production build | success |
-| Agent ownership boundaries (39772893690) | check-agent-scope | success (`SCOPE_BOOTSTRAP` → `LEGACY_BRANCH_NOT_ENFORCED`) |
-| Agent handoff and workflow export checks (39772893626) | validate-agent-handoff | success |
+| GremoVOD CI contracts (39773269127) | CI contracts and tool tests; **Claude hooks guard tests**; No secrets in this change | success |
+| GremoVOD Studio offline CI (39773268986) | Backend unit tests; Backend media and QC tests; Frontend unit tests; Frontend TypeScript and production build | success |
+| Agent ownership boundaries (39773269019) | check-agent-scope | success (`SCOPE_BOOTSTRAP` → `LEGACY_BRANCH_NOT_ENFORCED`) |
+| Agent handoff and workflow export checks (39773269015) | validate-agent-handoff | success |
 
 Scope guard отработал в bootstrap-режиме: в `origin/mavis/work` ещё нет
 `tools/check_agent_scope.py`, поэтому валидатор взял из pull request, а решение остаётся
