@@ -157,6 +157,56 @@ class TaskScopeTests(unittest.TestCase):
                ".env.cloud.example", "docs/CLOUD_DEPLOY.md"]
         self.assertEqual(forbidden_files("minimax/ga-05-trusted-proxy-throttle", own, manifest), [])
 
+    def test_claude_may_edit_exactly_the_offline_ci_workflow(self):
+        offline = ".github/workflows/studio-offline-ci.yml"
+        self.assertEqual(forbidden_files("build/claude/ci-media-verify-20261022", [offline]), [])
+        closed = [".github/workflows/agent-scope-guard.yml",
+                  ".github/workflows/studio-ci-contract.yml",
+                  ".github/workflows/other.yml",
+                  ".github/workflows/studio-offline-ci.yml.bak",
+                  ".github/CODEOWNERS", "AGENTS.md", "canon/x.json",
+                  "frontend/src/App.tsx"]
+        self.assertEqual(forbidden_files("build/claude/ci-media-verify-20261022", closed), closed)
+
+    def test_capcut_scopes_allow_only_their_declared_files(self):
+        manifest = repo_manifest()
+        shared = ["tools/capcut_handoff.py", "tools/test_capcut_handoff.py",
+                  "docs/capcut-handoff/README.md"]
+        cases = {
+            "minimax/capcut-02-retest": shared + [
+                "docs/capcut-handoff/SCOPE-REQUEST.md",
+                "docs/agent_handoffs/minimax-capcut-02-20261022.md"],
+            "minimax/capcut-03-manifest-verify": shared + [
+                "docs/agent_handoffs/minimax-capcut-03-20261022.md",
+                "docs/agent_handoffs/minimax-capcut-03-r2-20261023.md"],
+            "minimax/capcut-04-edit-list": [
+                "tests/test_capcut_edit_list_integration.py",
+                "docs/capcut-handoff/README.md",
+                "docs/agent_handoffs/minimax-capcut-04-20261023.md"],
+        }
+        for branch, own in cases.items():
+            self.assertEqual(forbidden_files(branch, own, manifest), [], branch)
+
+    def test_capcut_scopes_stay_closed_to_everything_else(self):
+        manifest = repo_manifest()
+        foreign = ["backend/main.py", "backend/capcut_export.py", "frontend/src/App.tsx",
+                   ".github/workflows/studio-offline-ci.yml", "tools/check_agent_scope.py",
+                   "tools/minimax_task_scopes.json", "AGENTS.md", "canon/x.json",
+                   "skills/x/SKILL.md"]
+        for branch in ("minimax/capcut-02-retest", "minimax/capcut-03-manifest-verify",
+                       "minimax/capcut-04-edit-list"):
+            self.assertEqual(forbidden_files(branch, foreign, manifest), foreign, branch)
+        # capcut-04 must not edit the tool or its tests: they are read-only for it
+        self.assertEqual(
+            forbidden_files("minimax/capcut-04-edit-list",
+                            ["tools/capcut_handoff.py", "tools/test_capcut_handoff.py"],
+                            manifest),
+            ["tools/capcut_handoff.py", "tools/test_capcut_handoff.py"])
+        # a task key nobody declared still fails closed
+        self.assertEqual(
+            forbidden_files("minimax/capcut-05-x", ["tools/capcut_handoff.py"], manifest),
+            ["tools/capcut_handoff.py"])
+
     def test_missing_manifest_fails_closed(self):
         paths = ["backend/main.py"]
         self.assertEqual(forbidden_files("minimax/ga-04-studio-offline-ci", paths, None), paths)
@@ -176,7 +226,10 @@ class TaskScopeTests(unittest.TestCase):
         for key, entry in repo_manifest()["tasks"].items():
             for path in entry["allow"]:
                 target = ROOT / path
-                self.assertTrue(target.exists() or target.parent.is_dir(),
+                # A task may create a new subdirectory (docs/capcut-handoff/), but
+                # its top-level directory must exist.
+                top = ROOT / path.split("/")[0]
+                self.assertTrue(target.exists() or target.parent.is_dir() or top.is_dir(),
                                 f"{key}: {path}")
 
     def test_invalid_manifest_is_reported(self):

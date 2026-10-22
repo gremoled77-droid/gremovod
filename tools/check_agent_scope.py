@@ -77,6 +77,9 @@ OWNED = {
     "claude": (
         "backend/", "db/", "scripts/", "tools/", "prompts/", "tests/",
         "docs/agent_handoffs/claude-",
+        # One exact workflow, never .github/ or .github/workflows/: the scope guard
+        # workflow and every other workflow stay closed to this role.
+        ".github/workflows/studio-offline-ci.yml",
     ),
     "argon": (
         "workflows/", "integrations/n8n/",

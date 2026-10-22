@@ -77,6 +77,33 @@
         ".env.cloud.example",
         "docs/CLOUD_DEPLOY.md"
       ]
+    },
+    "capcut-02": {
+      "summary": "Приёмка офлайн-экспорта в CapCut: tools/capcut_handoff.py и его тесты.",
+      "allow": [
+        "tools/capcut_handoff.py",
+        "tools/test_capcut_handoff.py",
+        "docs/capcut-handoff/README.md",
+        "docs/capcut-handoff/SCOPE-REQUEST.md",
+        "docs/agent_handoffs/minimax-capcut-02-"
+      ]
+    },
+    "capcut-03": {
+      "summary": "Проверка пакета CapCut не доверяет манифесту (R1/R3/R2): тот же инструмент, отдельный handoff.",
+      "allow": [
+        "tools/capcut_handoff.py",
+        "tools/test_capcut_handoff.py",
+        "docs/capcut-handoff/README.md",
+        "docs/agent_handoffs/minimax-capcut-03-"
+      ]
+    },
+    "capcut-04": {
+      "summary": "Интеграционный тест edit_list -> пакет CapCut; backend и exporter только на чтение.",
+      "allow": [
+        "tests/test_capcut_edit_list_integration.py",
+        "docs/capcut-handoff/README.md",
+        "docs/agent_handoffs/minimax-capcut-04-"
+      ]
     }
   }
 }
