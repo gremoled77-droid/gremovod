@@ -265,6 +265,15 @@ def check_candidate_workflow(root=ROOT):
                 problems.append(
                     f"{OFFLINE_WORKFLOW}: job '{job_name}' is continue-on-error; "
                     f"a broken test would not turn the check red")
+        # A pull request that only edits this workflow must still run it, otherwise a
+        # change to the CI itself is merged without one real run of the changed jobs.
+        own_path = f".github/workflows/{OFFLINE_WORKFLOW}"
+        pull_request = (_triggers(offline) or {}).get("pull_request")
+        pr_paths = pull_request.get("paths") if isinstance(pull_request, dict) else None
+        if isinstance(pr_paths, list) and not any(_covers(str(f), own_path) for f in pr_paths):
+            problems.append(
+                f"{OFFLINE_WORKFLOW}: the pull_request path filter does not cover "
+                f"'{own_path}'; a change to the workflow would run none of its jobs")
         filters = _event_path_filters(offline)
         for required in REQUIRED_PATH_FILTERS:
             covering = sorted(f for f in filters if _covers(f, required))
