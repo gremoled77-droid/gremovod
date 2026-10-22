@@ -35,6 +35,27 @@ def digest(value):
     ).hexdigest()
 
 
+def source_head():
+    root = HERE.parents[1]
+    return (
+        subprocess.check_output(
+            [
+                "git",
+                "-c",
+                f"safe.directory={root.as_posix()}",
+                "-C",
+                str(root),
+                "rev-parse",
+                "HEAD",
+            ],
+            timeout=10,
+            stderr=subprocess.DEVNULL,
+        )
+        .decode("utf-8")
+        .strip()
+    )
+
+
 def checked_path(path: Path):
     """Reject aliases before resolving, including Windows junctions and ancestors."""
     path = path.absolute()
@@ -237,6 +258,18 @@ class Bridge:
         self.worker = None
         self.cancelled = threading.Event()
         self.closed = False
+        self.live_lock = None
+        self.claim = None
+        self.deadline = None
+        self.active_id = None
+        self.authority = checked_path(
+            Path(
+                config.get("authority_dir", HERE.parents[1] / ".minimax-mcp/authority")
+            )
+        )
+        self.approval_path = checked_path(
+            Path(config.get("approval_file", self.authority / "owner-approval.json"))
+        )
         self.calls_limit = config.get("max_calls", 1)
         self.timeout = config.get("timeout_seconds", 120)
         if (
@@ -263,6 +296,10 @@ class Bridge:
                 "approval_file",
             )
         }
+        if self.mode == "live":
+            identity["authority_dir"] = str(self.authority)
+            identity["git"] = config.get("git")
+        self.policy_digest = digest(identity | {"state_dir": str(self.directory)})
         state_path = checked_path(self.directory / "state.json")
         try:
             self.state = (
@@ -294,7 +331,10 @@ class Bridge:
     def save(self):
         try:
             temp = checked_path(self.directory / "state.tmp")
-            temp.write_text(json.dumps(self.state, indent=2), encoding="utf-8")
+            with temp.open("w", encoding="utf-8") as handle:
+                json.dump(self.state, handle, indent=2)
+                handle.flush()
+                os.fsync(handle.fileno())
             os.replace(temp, checked_path(self.directory / "state.json"))
         except OSError:
             self.state["halted"] = True
@@ -317,6 +357,7 @@ class Bridge:
                                 "status",
                                 "error",
                                 "exit_code",
+                                "stage",
                             )
                         }
                         | {"at": now()}
@@ -422,36 +463,85 @@ class Bridge:
             "1",
         ]
 
-    def live_preflight(self, request_digest, head_sha):
-        approval = checked_path(
-            Path(
-                self.config.get("approval_file", self.directory / "owner-approval.json")
-            )
-        )
-        if not approval.is_file():
-            raise ValueError("OWNER_APPROVAL_REQUIRED")
-        grant = json.loads(approval.read_text(encoding="utf-8"))
-        if (
-            grant.get("request_digest") != request_digest
-            or grant.get("head_sha") != head_sha
-            or grant.get("pr_number") != self.config["pr_number"]
-            or grant.get("capability") != "lightweight-no-tools"
-            or grant.get("max_calls") != 1
-            or grant.get("subscription_only") is not True
-            or datetime.fromisoformat(grant["expires_at"]) <= datetime.now(UTC)
-        ):
-            raise ValueError("OWNER_APPROVAL_INVALID")
+    def approval_scope(self, request_id, request_digest, head_sha):
+        """Offline owner-side scope preview; never invokes either model CLI."""
         argv = self.command()
         if not all(Path(p).is_file() for p in argv[:2]):
             raise ValueError("CLI_MISSING")
-        package = json.loads(
-            Path(argv[1]).with_name("package.json").read_text(encoding="utf-8")
-        )
+        cli = Path(argv[1])
+        package = json.loads(cli.with_name("package.json").read_text(encoding="utf-8"))
         if (
             package.get("name") != "@minimax-ai/code"
             or package.get("version") != "0.6.12"
         ):
             raise ValueError("CLI_VERSION_UNVERIFIED")
+        cli_files = [
+            cli,
+            cli.with_name("package.json"),
+            *sorted(cli.with_name("chunks").glob("*.js")),
+        ]
+        return {
+            "version": 2,
+            "authority_dir": str(self.authority),
+            "policy_digest": self.policy_digest,
+            "request_id": request_id,
+            "request_digest": request_digest,
+            "head_sha": head_sha,
+            "pr_number": self.config["pr_number"],
+            "capability": "lightweight-no-tools",
+            "max_calls": 1,
+            "subscription_only": True,
+            "timeout_seconds": self.timeout,
+            "bridge_fingerprint": digest(
+                {
+                    p.name: hashlib.sha256(checked_path(p).read_bytes()).hexdigest()
+                    for p in [
+                        HERE / "bridge.py",
+                        HERE / "server.py",
+                        HERE / "requirements.txt",
+                    ]
+                }
+            ),
+            "bridge_head_sha": source_head(),
+            "cli_fingerprint": digest(
+                {
+                    str(p): hashlib.sha256(checked_path(p).read_bytes()).hexdigest()
+                    for p in [Path(argv[0]), *cli_files]
+                }
+            ),
+        }
+
+    def guard(self):
+        if self.cancelled.is_set() or (self.directory / "STOP").exists():
+            raise ValueError("CANCELLED")
+        if self.claim and datetime.fromisoformat(
+            self.claim["expires_at"]
+        ) <= datetime.now(UTC):
+            raise ValueError("OWNER_APPROVAL_EXPIRED")
+        if self.deadline is not None and time.monotonic() >= self.deadline:
+            raise ValueError("TIMEOUT")
+
+    def release_live_lock(self):
+        if self.live_lock:
+            self.live_lock.close()
+            self.live_lock = None
+
+    def live_preflight(self, request_digest, head_sha, request_id):
+        approval = checked_path(self.approval_path)
+        if approval.parent != self.authority:
+            raise ValueError("OWNER_AUTHORITY_MISMATCH")
+        if not approval.is_file():
+            raise ValueError("OWNER_APPROVAL_REQUIRED")
+        grant = json.loads(approval.read_text(encoding="utf-8"))
+        if not re.fullmatch(
+            r"[a-f0-9]{32}", grant.get("grant_id", "")
+        ) or datetime.fromisoformat(grant["expires_at"]) <= datetime.now(UTC):
+            raise ValueError("OWNER_APPROVAL_INVALID")
+        scope = self.approval_scope(request_id, request_digest, head_sha)
+        if any(grant.get(k) != value for k, value in scope.items()):
+            raise ValueError("OWNER_APPROVAL_INVALID")
+        if self.claim and self.claim["approval_digest"] != digest(grant):
+            raise ValueError("OWNER_APPROVAL_CHANGED")
         profile = checked_path(self.directory / "minimax-profile")
         if not profile.is_dir() or not list((profile / "auth").glob("**/auth.json")):
             raise ValueError("ISOLATED_AUTH_MISSING")
@@ -462,7 +552,32 @@ class Bridge:
                 item.is_file() and item.name != "auth.json"
             ):
                 raise ValueError("PROFILE_NOT_LOGIN_ONLY")
-        return argv, profile
+        return self.command(), profile, grant
+
+    def claim_grant(self, grant):
+        self.authority.mkdir(parents=True, exist_ok=True)
+        try:
+            self.live_lock = StateLock(checked_path(self.authority / "execution.lock"))
+        except ValueError:
+            raise ValueError("LIVE_BUSY") from None
+        claims = checked_path(self.authority / "claims")
+        claims.mkdir(exist_ok=True)
+        claim = {
+            "grant_id": grant["grant_id"],
+            "approval_digest": digest(grant),
+            "claimed_at": now(),
+            "expires_at": grant["expires_at"],
+        }
+        try:
+            with checked_path(claims / (grant["grant_id"] + ".json")).open(
+                "x", encoding="utf-8"
+            ) as handle:
+                json.dump(claim, handle)
+                handle.flush()
+                os.fsync(handle.fileno())
+        except FileExistsError:
+            raise ValueError("OWNER_GRANT_SPENT") from None
+        self.claim = claim
 
     def execute(self, request_id, task, head_sha, files):
         with self.mutex:
@@ -497,16 +612,21 @@ class Bridge:
             try:
                 contents = self.inputs(head_sha, files)
                 if self.mode == "live":
-                    argv, profile = self.live_preflight(request_digest, head_sha)
+                    argv, profile, grant = self.live_preflight(
+                        request_digest, head_sha, request_id
+                    )
                     # An owner grant is single-use, even if a launch subsequently fails.
                     if self.state["calls"]:
                         raise ValueError("OWNER_GRANT_SPENT")
+                    self.guard()
+                    self.claim_grant(grant)
                 else:
                     argv, profile = (
                         [sys.executable, "-I", str(HERE / "mock_worker.py")],
                         self.directory / "mock-profile",
                     )
             except (ValueError, OSError, KeyError, TypeError):
+                self.release_live_lock()
                 exc = sys.exception()
                 return {
                     "error": str(exc)
@@ -525,12 +645,20 @@ class Bridge:
                 "stdout": "",
                 "stderr": "",
                 "mock": self.mode == "mock",
+                "stages": [],
             }
             self.state["jobs"][request_id] = record
             self.state["calls"] += 1
-            self.save()
-            self.event(record)
             self.cancelled.clear()
+            self.deadline = time.monotonic() + self.timeout
+            self.active_id = request_id
+            try:
+                self.save()
+                self.event(record)
+            except BaseException:
+                self.active_id = None
+                self.release_live_lock()
+                raise
             self.worker = threading.Thread(
                 target=self.run,
                 args=(record, argv, profile, task, contents),
@@ -543,15 +671,32 @@ class Bridge:
         buffers = {"stdout": bytearray(), "stderr": bytearray()}
         overflow = threading.Event()
         readers = []
+        watcher = None
+        watch_done = threading.Event()
+        watch_error = []
         child = None
         error = None
         exit_code = None
         try:
-            if self.cancelled.is_set():
-                raise ValueError("CANCELLED")
+            self.guard()
             child = Child(argv, workspace, env)
             with self.mutex:
                 self.child = child
+            deadline = min(self.deadline or float("inf"), time.monotonic() + timeout)
+
+            def watch():
+                while not watch_done.wait(0.02) and child.process.poll() is None:
+                    try:
+                        self.guard()
+                        if time.monotonic() >= deadline:
+                            raise ValueError("TIMEOUT")
+                    except ValueError as exc:
+                        watch_error.append(str(exc))
+                        child.kill()
+                        return
+
+            watcher = threading.Thread(target=watch, daemon=True)
+            watcher.start()
 
             def read_pipe(name):
                 pipe = getattr(child.process, name)
@@ -569,19 +714,27 @@ class Bridge:
                 reader.start()
                 readers.append(reader)
 
+            writer_error = []
+
             def write_input():
                 try:
+                    self.guard()
                     child.process.stdin.write(payload)
                     child.process.stdin.close()
-                except OSError:
-                    pass  # A failed/cancelled child may close input before reading it.
+                except (ValueError, OSError) as exc:
+                    writer_error.append(
+                        str(exc) if isinstance(exc, ValueError) else "STDIN_FAILED"
+                    )
+                finally:
+                    child.process.stdin.close()
 
             writer = threading.Thread(target=write_input, daemon=True)
             writer.start()
-            deadline = time.monotonic() + timeout
             next_head_check = time.monotonic() + 0.5
             while child.process.poll() is None:
-                if self.cancelled.is_set() or (self.directory / "STOP").exists():
+                if writer_error:
+                    error = writer_error[0]
+                elif self.cancelled.is_set() or (self.directory / "STOP").exists():
                     error = "CANCELLED"
                 elif overflow.is_set():
                     error = "OUTPUT_LIMIT"
@@ -606,6 +759,9 @@ class Bridge:
             if any(r.is_alive() for r in readers):
                 raise ValueError("OUTPUT_DRAIN_FAILED")
             error = error or ("OUTPUT_LIMIT" if overflow.is_set() else None)
+            error = error or (writer_error[0] if writer_error else None)
+            error = error or (watch_error[0] if watch_error else None)
+            self.guard()
         except Exception:  # noqa: BLE001 - process boundary must fail closed on native errors.
             exc = sys.exception()
             error = (
@@ -614,10 +770,13 @@ class Bridge:
                 else "PROCESS_ERROR"
             )
         finally:
+            watch_done.set()
+            if watcher:
+                watcher.join(timeout=2)
             if child:
                 child.kill() if child.process.poll() is None else None
                 child.close()
-                child.process.wait(timeout=5)
+                exit_code = child.process.wait(timeout=5)
             with self.mutex:
                 self.child = None
         return (
@@ -628,6 +787,29 @@ class Bridge:
 
     def run(self, record, argv, profile, task, contents):
         error = None
+
+        def stage(name, command, payload, timeout, head_sha=None):
+            self.guard()
+            record["stage"] = name
+            self.save()
+            self.event(record)
+            started = now()
+            outcome, code, output = self.capture(
+                command, workspace, env, payload, timeout, head_sha
+            )
+            diagnostic = {
+                "stage": name,
+                "started_at": started,
+                "finished_at": now(),
+                "exit_code": code,
+                "stderr": SECRET.sub("[REDACTED]", output["stderr"]),
+                "error": outcome,
+            }
+            record["stages"].append(diagnostic)
+            record.update(exit_code=code, stderr=diagnostic["stderr"])
+            self.save()
+            return outcome, code, output
+
         try:
             root = checked_path(self.directory / record["request_id"])
             workspace = root / "workspace"
@@ -636,26 +818,34 @@ class Bridge:
             started = time.monotonic()
             if self.mode == "live":
                 # Bounded metadata query, not inference. Never persist provider output.
-                probe_error, code, output = self.capture(
+                probe_error, code, output = stage(
+                    "provider_probe",
                     argv[:2] + ["provider", "list", "--json"],
-                    workspace,
-                    env,
                     b"",
                     min(15, self.timeout),
                 )
-                status = (
-                    json.loads(output["stdout"])
-                    if not probe_error and code == 0
-                    else {}
-                )
+                if probe_error or code != 0:
+                    raise ValueError(probe_error or "CLI_FAILED")
+                try:
+                    status = json.loads(output["stdout"])
+                except ValueError:
+                    raise ValueError("PROVIDER_OUTPUT_INVALID") from None
+                if not isinstance(status, dict) or not isinstance(
+                    status.get("providers"), list
+                ):
+                    raise ValueError("PROVIDER_OUTPUT_INVALID")
                 if status.get("minimaxModelSource") != "token_plan" or not any(
-                    p.get("providerId") == "minimax_oauth" and p.get("active")
+                    isinstance(p, dict)
+                    and p.get("providerId") == "minimax_oauth"
+                    and p.get("active")
                     for p in status.get("providers", [])
                 ):
                     raise ValueError(probe_error or "SUBSCRIPTION_AUTH_UNVERIFIED")
-                self.live_preflight(record["request_digest"], record["head_sha"])
-            if self.cancelled.is_set() or time.monotonic() - started >= self.timeout:
-                raise ValueError("CANCELLED" if self.cancelled.is_set() else "TIMEOUT")
+                self.guard()
+                self.live_preflight(
+                    record["request_digest"], record["head_sha"], record["request_id"]
+                )
+            self.guard()
             with self.mutex:
                 record["status"] = "RUNNING"
                 self.save()
@@ -668,10 +858,9 @@ class Bridge:
             }
             if self.inputs(record["head_sha"], list(contents)) != contents:
                 raise ValueError("INPUT_CHANGED")
-            error, record["exit_code"], output = self.capture(
+            error, record["exit_code"], output = stage(
+                "model_exec",
                 argv,
-                workspace,
-                env,
                 json.dumps(payload).encode("utf-8"),
                 self.timeout - (time.monotonic() - started),
                 record["head_sha"],
@@ -680,6 +869,7 @@ class Bridge:
             if not error and record["exit_code"] != 0:
                 error = "CLI_FAILED"
             if not error:
+                self.guard()
                 try:
                     result = json.loads(record["stdout"])
                 except ValueError:
@@ -702,22 +892,28 @@ class Bridge:
                 else "PROCESS_ERROR"
             )
         finally:
-            with self.mutex:
-                record.update(
-                    status="FAILED" if error else "SUCCEEDED",
-                    finished_at=now(),
-                    error=error,
-                )
-                if error:
-                    self.state["halted"] = True
-                self.save()
-                self.event(record)
+            try:
+                with self.mutex:
+                    record.update(
+                        status="FAILED" if error else "SUCCEEDED",
+                        finished_at=now(),
+                        error=error,
+                    )
+                    if error:
+                        self.state["halted"] = True
+                    self.save()
+                    self.event(record)
+            finally:
+                self.active_id = None
+                self.release_live_lock()
 
     def result(self, request_id):
         with self.mutex:
             return dict(self.state["jobs"].get(request_id, {"error": "NOT_FOUND"}))
 
     def cancel(self, request_id):
+        if request_id == self.active_id:
+            self.cancelled.set()  # Do not wait for a metadata/Git check to release the state mutex.
         with self.mutex:
             record = self.state["jobs"].get(request_id)
             if not record:

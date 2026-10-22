@@ -4,6 +4,7 @@ import os
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import unittest
 from contextlib import asynccontextmanager
@@ -46,7 +47,8 @@ class Fixture(unittest.TestCase):
             "allowed_files": ["value.py"],
             "state_dir": str(self.root / "state"),
             "max_calls": 3,
-            "timeout_seconds": 2,
+            "timeout_seconds": 10,
+            "authority_dir": str(self.root / "authority"),
         }
         self.bridges = []
 
@@ -183,7 +185,8 @@ class BridgeTests(Fixture):
     def test_deduplication_and_conflicting_id(self):
         service = self.make()
         self.execute(service)
-        self.wait(service)
+        result = self.wait(service)
+        self.assertEqual(result["status"], "SUCCEEDED", result)
         self.assertEqual(self.execute(service)["status"], "SUCCEEDED")
         self.assertEqual(
             self.execute(service, task="different")["error"], "REQUEST_ID_CONFLICT"
@@ -380,20 +383,24 @@ class BridgeTests(Fixture):
             checked_path(link)
 
     def live_request(self):
+        node, cli = self.root / "node.exe", self.root / "cli.js"
+        node.touch(exist_ok=True)
+        cli.touch(exist_ok=True)
+        cli.with_name("package.json").write_text(
+            json.dumps({"name": "@minimax-ai/code", "version": "0.6.12"})
+        )
         service = self.make(
             mode="live",
-            node=str(self.root / "missing-node"),
-            cli_js=str(self.root / "missing-cli.js"),
+            node=str(node),
+            cli_js=str(cli),
         )
-        grant = {
-            "request_digest": digest(
-                {"task": "mock:ok", "head_sha": self.sha, "files": ["value.py"]}
-            ),
-            "head_sha": self.sha,
-            "pr_number": 70,
-            "capability": "lightweight-no-tools",
-            "max_calls": 1,
-            "subscription_only": True,
+        service.authority.mkdir(exist_ok=True)
+        grant = service.approval_scope(
+            "one",
+            digest({"task": "mock:ok", "head_sha": self.sha, "files": ["value.py"]}),
+            self.sha,
+        ) | {
+            "grant_id": "1" * 32,
             "expires_at": (datetime.now(UTC) + timedelta(minutes=5)).isoformat(),
         }
         return service, grant
@@ -410,12 +417,13 @@ class BridgeTests(Fixture):
     def test_expired_owner_approval(self):
         service, grant = self.live_request()
         grant["expires_at"] = (datetime.now(UTC) - timedelta(seconds=1)).isoformat()
-        (service.directory / "owner-approval.json").write_text(json.dumps(grant))
+        service.approval_path.write_text(json.dumps(grant))
         self.assertEqual(self.execute(service)["error"], "OWNER_APPROVAL_INVALID")
 
     def test_missing_cli(self):
         service, grant = self.live_request()
-        (service.directory / "owner-approval.json").write_text(json.dumps(grant))
+        service.approval_path.write_text(json.dumps(grant))
+        Path(service.config["cli_js"]).unlink()
         self.assertEqual(self.execute(service)["error"], "CLI_MISSING")
 
     def test_missing_auth_and_foreign_profile(self):
@@ -427,7 +435,7 @@ class BridgeTests(Fixture):
             json.dumps({"name": "@minimax-ai/code", "version": "0.6.12"})
         )
         service.config.update(node=str(node), cli_js=str(cli))
-        (service.directory / "owner-approval.json").write_text(json.dumps(grant))
+        service.approval_path.write_text(json.dumps(grant))
         self.assertEqual(self.execute(service)["error"], "ISOLATED_AUTH_MISSING")
         profile = service.directory / "minimax-profile"
         (profile / "auth" / "global").mkdir(parents=True)
@@ -444,7 +452,7 @@ class BridgeTests(Fixture):
             json.dumps({"name": "@minimax-ai/code", "version": "0.6.12"})
         )
         service.config.update(node=str(node), cli_js=str(cli))
-        (service.directory / "owner-approval.json").write_text(json.dumps(grant))
+        service.approval_path.write_text(json.dumps(grant))
         auth = service.directory / "minimax-profile/auth/global/auth.json"
         auth.parent.mkdir(parents=True)
         auth.write_text("{}")
@@ -487,6 +495,318 @@ class BridgeTests(Fixture):
             result = self.wait(service)
         self.assertEqual(result["error"], "SUBSCRIPTION_AUTH_UNVERIFIED")
         self.assertEqual(transport.call_count, 1)
+
+    def grant_for(self, service, grant_id="2" * 32):
+        return service.approval_scope(
+            "one",
+            digest({"task": "mock:ok", "head_sha": self.sha, "files": ["value.py"]}),
+            self.sha,
+        ) | {
+            "grant_id": grant_id,
+            "expires_at": (datetime.now(UTC) + timedelta(minutes=5)).isoformat(),
+        }
+
+    def provider_reply(self):
+        return (
+            None,
+            0,
+            {
+                "stdout": json.dumps(
+                    {
+                        "minimaxModelSource": "token_plan",
+                        "providers": [{"providerId": "minimax_oauth", "active": True}],
+                    }
+                ),
+                "stderr": "",
+            },
+        )
+
+    def test_same_grant_cannot_move_to_another_state(self):
+        first = self.prepared_live()
+        second = self.make(
+            **(
+                first.config
+                | {
+                    "state_dir": str(self.root / "second"),
+                    "approval_file": str(first.approval_path),
+                }
+            )
+        )
+        self.assertEqual(self.execute(second)["error"], "OWNER_APPROVAL_INVALID")
+
+    def test_claim_survives_lost_job_state(self):
+        service = self.prepared_live()
+        with patch.object(
+            service,
+            "capture",
+            side_effect=[
+                self.provider_reply(),
+                (None, 0, {"stdout": '{"ok":true}', "stderr": ""}),
+            ],
+        ):
+            self.execute(service)
+            self.assertEqual(self.wait(service)["status"], "SUCCEEDED")
+        service.close()
+        state = json.loads((service.directory / "state.json").read_text())
+        state.update(
+            calls=0, jobs={}
+        )  # Synthetic loss/reset of only this disposable test state.
+        (service.directory / "state.json").write_text(json.dumps(state))
+        restarted = self.make(**service.config)
+        self.assertEqual(self.execute(restarted)["error"], "OWNER_GRANT_SPENT")
+
+    def test_authority_lock_blocks_other_state_with_different_grant(self):
+        first = self.prepared_live()
+        second = self.make(
+            **(
+                first.config
+                | {
+                    "state_dir": str(self.root / "second"),
+                    "approval_file": str(first.authority / "second.json"),
+                }
+            )
+        )
+        auth = second.directory / "minimax-profile/auth/global/auth.json"
+        auth.parent.mkdir(parents=True)
+        auth.write_text("{}")
+        second.approval_path.write_text(json.dumps(self.grant_for(second)))
+        entered, release = threading.Event(), threading.Event()
+
+        def blocked(*args):
+            entered.set()
+            release.wait(3)
+            return self.provider_reply()
+
+        with patch.object(first, "capture", side_effect=blocked):
+            self.execute(first)
+            self.assertTrue(entered.wait(2))
+            try:
+                self.assertEqual(self.execute(second)["error"], "LIVE_BUSY")
+                self.assertEqual(second.status()["calls_reserved"], 0)
+            finally:
+                first.cancel("one")
+                release.set()
+                self.wait(first)
+
+    def test_cli_bytes_changed_after_grant(self):
+        service = self.prepared_live()
+        Path(service.config["cli_js"]).write_text("changed")
+        self.assertEqual(self.execute(service)["error"], "OWNER_APPROVAL_INVALID")
+
+    def test_request_id_is_bound_to_grant(self):
+        service = self.prepared_live()
+        self.assertEqual(
+            self.execute(service, request_id="different")["error"],
+            "OWNER_APPROVAL_INVALID",
+        )
+
+    def test_auth_probe_exit_and_stderr_retained(self):
+        service = self.prepared_live()
+        with patch.object(
+            service,
+            "capture",
+            return_value=(
+                None,
+                23,
+                {
+                    "stdout": "private-provider-data",
+                    "stderr": "auth refused access_token=synthetic-private",
+                },
+            ),
+        ) as capture:
+            self.execute(service)
+            result = self.wait(service)
+        self.assertEqual(capture.call_count, 1)
+        self.assertEqual(result["error"], "CLI_FAILED")
+        self.assertEqual(result["exit_code"], 23)
+        self.assertEqual(result["stages"][0]["stage"], "provider_probe")
+        self.assertIn("[REDACTED]", result["stderr"])
+        self.assertNotIn(
+            "private-provider-data", (service.directory / "state.json").read_text()
+        )
+
+    def test_malformed_provider_json_retains_diagnostics(self):
+        service = self.prepared_live()
+        with patch.object(
+            service,
+            "capture",
+            return_value=(
+                None,
+                0,
+                {"stdout": "not json", "stderr": "synthetic warning"},
+            ),
+        ):
+            self.execute(service)
+            result = self.wait(service)
+        self.assertEqual(result["error"], "PROVIDER_OUTPUT_INVALID")
+        self.assertEqual(result["stderr"], "synthetic warning")
+        self.assertEqual(result["exit_code"], 0)
+
+    def test_provider_timeout_retains_diagnostics(self):
+        service = self.prepared_live()
+        with patch.object(
+            service,
+            "capture",
+            return_value=("TIMEOUT", 1, {"stdout": "", "stderr": "probe timeout"}),
+        ):
+            self.execute(service)
+            result = self.wait(service)
+        self.assertEqual(result["error"], "TIMEOUT")
+        self.assertEqual(result["stages"][0]["exit_code"], 1)
+        self.assertEqual(result["stderr"], "probe timeout")
+
+    def test_stop_after_provider_probe_never_dispatches_exec(self):
+        service = self.prepared_live()
+
+        def provider_only(*args):
+            (service.directory / "STOP").touch()
+            return self.provider_reply()
+
+        with patch.object(service, "capture", side_effect=provider_only) as capture:
+            self.execute(service)
+            result = self.wait(service)
+        self.assertEqual(capture.call_count, 1)
+        self.assertEqual(result["error"], "CANCELLED")
+
+    def test_stop_before_spawn_creates_no_child(self):
+        service = self.make()
+        (service.directory / "STOP").touch()
+        with patch("bridge.Child") as child:
+            error, code, _ = service.capture([], self.root, {}, b"never send", 1)
+        child.assert_not_called()
+        self.assertEqual(error, "CANCELLED")
+        self.assertIsNone(code)
+
+    def test_stop_after_spawn_prevents_payload(self):
+        service = self.make()
+        root = self.root / "child-guard"
+        env = isolated_environment(root, self.root / "profile")
+        original, started = Child, []
+
+        def spawn(*args, **kwargs):
+            child = original(*args, **kwargs)
+            started.append(child)
+            (service.directory / "STOP").touch()
+            return child
+
+        with patch("bridge.Child", side_effect=spawn):
+            error, code, output = service.capture(
+                [sys.executable, "-I", str(HERE / "mock_worker.py")],
+                self.repo,
+                env,
+                json.dumps(
+                    {"task": "mock:ok", "files": {}, "head_sha": self.sha}
+                ).encode(),
+                1,
+            )
+        self.assertEqual(error, "CANCELLED")
+        self.assertIsNotNone(code)
+        self.assertEqual(output["stdout"], "")
+        self.assertIsNotNone(started[0].process.poll())
+
+    def test_cancel_after_mock_completion_is_not_success(self):
+        service = self.make()
+
+        def completed(*args):
+            service.cancel("one")
+            return None, 0, {"stdout": '{"ok":true}', "stderr": ""}
+
+        with patch.object(service, "capture", side_effect=completed):
+            self.execute(service)
+            result = self.wait(service)
+        self.assertEqual(result["error"], "CANCELLED")
+        self.assertTrue(service.status()["halted"])
+
+    def test_cancel_signal_does_not_wait_for_state_mutex(self):
+        service = self.make()
+        self.execute(service, task="mock:timeout")
+        with service.mutex:
+            cancel = threading.Thread(target=service.cancel, args=("one",))
+            cancel.start()
+            signalled = service.cancelled.wait(0.5)
+        cancel.join(timeout=2)
+        self.assertTrue(signalled)
+        self.assertFalse(cancel.is_alive())
+        self.assertEqual(self.wait(service)["error"], "CANCELLED")
+
+    def test_expiration_during_provider_probe_stops_exec(self):
+        service = self.prepared_live()
+
+        def expired(*args):
+            service.claim["expires_at"] = (
+                datetime.now(UTC) - timedelta(seconds=1)
+            ).isoformat()
+            return self.provider_reply()
+
+        with patch.object(service, "capture", side_effect=expired) as capture:
+            self.execute(service)
+            result = self.wait(service)
+        self.assertEqual(capture.call_count, 1)
+        self.assertEqual(result["error"], "OWNER_APPROVAL_EXPIRED")
+
+    def test_deadline_not_reset_by_provider_probe(self):
+        service = self.prepared_live()
+
+        def expired(*args):
+            service.deadline = time.monotonic() - 1
+            return self.provider_reply()
+
+        with patch.object(service, "capture", side_effect=expired) as capture:
+            self.execute(service)
+            result = self.wait(service)
+        self.assertEqual(capture.call_count, 1)
+        self.assertEqual(result["error"], "TIMEOUT")
+
+    def test_watchdog_kills_while_git_check_is_blocked(self):
+        service = self.make(timeout_seconds=1)
+        original = service.git
+        killed = []
+        kill = Child.kill
+
+        def blocked(*args):
+            if service.child is not None:
+                time.sleep(1.5)
+            return original(*args)
+
+        def kill_and_record(child):
+            killed.append(time.monotonic())
+            return kill(child)
+
+        with (
+            patch.object(service, "git", side_effect=blocked),
+            patch.object(Child, "kill", kill_and_record),
+        ):
+            self.execute(service, task="mock:timeout")
+            deadline = service.deadline
+            result = self.wait(service)
+        self.assertEqual(result["error"], "TIMEOUT")
+        self.assertTrue(killed)
+        self.assertLess(killed[0] - deadline, 0.5)
+
+    def test_smoke_preparation_and_mcp_denial_without_grant(self):
+        from smoke import prepare, run_once
+
+        service, _ = self.live_request()
+        # This directory is disposable and remains within the explicitly allowed outputs root.
+        with tempfile.TemporaryDirectory(dir=HERE.parents[2] / "outputs") as container:
+            directory = Path(container) / "smoke"
+            with patch(
+                "bridge.Child",
+                side_effect=AssertionError("prepare must never run a CLI"),
+            ):
+                manifest = prepare(
+                    directory,
+                    Path(service.config["node"]),
+                    Path(service.config["cli_js"]),
+                )
+            self.assertEqual(manifest["model_calls"], 0)
+            self.assertFalse((directory / "authority/owner-approval.json").exists())
+            reply = asyncio.run(run_once(directory))
+            self.assertEqual(reply["error"], "OWNER_APPROVAL_REQUIRED")
+            self.assertEqual(
+                json.loads((directory / "state/state.json").read_text())["calls"], 0
+            )
+            self.assertFalse((directory / "state/STOP").exists())
 
 
 class ProtocolTests(Fixture):

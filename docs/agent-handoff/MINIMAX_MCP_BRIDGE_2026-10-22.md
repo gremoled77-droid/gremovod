@@ -4,6 +4,11 @@ Owner scope: separate task branch and Draft PR; no live model calls, dispatcher 
 merge, force-push, main, production data, scheduler activation or global Codex settings.
 Base: `fcac8fda1ed4932be9e77a9d4d29e86d0971e111` (#69).
 
+**Live authorization update:** the original v1 grant described below is superseded
+by the v2 owner authority/claim contract. Use
+[PR72 smoke readiness and commands](PR72_SMOKE_READINESS_2026-10-22.md).
+Old grants are intentionally rejected; no state/budget reset or automatic migration.
+
 ## Research and architecture decision
 
 Checked local launchers: **Codex CLI 0.160.0**, **MiniMax Code CLI 0.6.12**
@@ -174,7 +179,7 @@ New-Item -ItemType File -Force .minimax-mcp\state\STOP
 This does not change or restart the previous dispatcher. Its STOP/budgets and the
 disabled scheduler tasks remain separate and must not be reset as part of Bridge setup.
 
-## First separately authorized real smoke — not run
+## Historical v1 smoke outline — superseded, not run
 
 1. Review this Draft, its exact HEAD, offline evidence and remaining limitations.
 2. Approve **one** subscription-only MiniMax call, at most 120 seconds total runner

@@ -36,9 +36,9 @@ def main():
     )
 
     @mcp.tool(annotations=read_only)
-    def minimax_status() -> dict[str, Any]:
+    async def minimax_status() -> dict[str, Any]:
         """Inspect mode, persistent budget and active request; does not run a CLI."""
-        return service.status()
+        return await asyncio.to_thread(service.status)
 
     @mcp.tool(
         annotations=ToolAnnotations(
@@ -54,18 +54,18 @@ def main():
         )
 
     @mcp.tool(annotations=read_only)
-    def minimax_result(request_id: str) -> dict[str, Any]:
+    async def minimax_result(request_id: str) -> dict[str, Any]:
         """Get a bounded redacted result, exit code and exact input SHA. Never starts work."""
-        return service.result(request_id)
+        return await asyncio.to_thread(service.result, request_id)
 
     @mcp.tool(
         annotations=ToolAnnotations(
             destructiveHint=False, idempotentHint=True, openWorldHint=False
         )
     )
-    def minimax_cancel(request_id: str) -> dict[str, Any]:
+    async def minimax_cancel(request_id: str) -> dict[str, Any]:
         """Cancel only this Bridge's active request; failure/cancellation halts new work."""
-        return service.cancel(request_id)
+        return await asyncio.to_thread(service.cancel, request_id)
 
     mcp.run(transport="stdio")
 
