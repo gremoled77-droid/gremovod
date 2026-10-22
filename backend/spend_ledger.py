@@ -13,6 +13,7 @@ run without the web stack.
 from __future__ import annotations
 
 import json
+import math
 import sqlite3
 from datetime import datetime, timedelta, timezone
 
@@ -144,6 +145,10 @@ def _day(value) -> str:
     return moment.astimezone(MOSCOW).date().isoformat()
 
 
+def _readable(value) -> bool:
+    return type(value) in (int, float) and math.isfinite(value) and value >= 0
+
+
 def state(db, project_id: str) -> dict:
     """Combined view of everything that already holds or spent money.
 
@@ -157,6 +162,9 @@ def state(db, project_id: str) -> dict:
     legacy = legacy_reservations(db)
     p0 = p0_reservations(db)
     llm = llm_reservations(db)
+    # Нечитаемая сумма (llm_guard.UNREADABLE_AMOUNT) не слагаемое и не ноль: её считают отдельно.
+    broken = [r for r in llm if not _readable(r["usd"])]
+    llm = [r for r in llm if _readable(r["usd"])]
     n8n = n8n_reservations(db)
 
     legacy_project = sum(r["estimated_usd"] for r in legacy if r["project_id"] == project_id)
@@ -186,12 +194,18 @@ def state(db, project_id: str) -> dict:
         "p0_reserved_usd": round(p0_project, 6),
         "overrun_reserved_usd": round(overrun_project, 6),
         "day_moscow": today,
+        "llm_unreadable_project": sum(1 for r in broken if r["project_id"] == project_id),
+        # Неизвестная сегодняшняя сумма могла войти в дневной лимит любого проекта.
+        "llm_unreadable_daily": sum(1 for r in broken if _day(r["created_at"]) == today),
     }
 
 
 def check(db, project_id: str, cost_usd: float) -> None:
     """Raise BudgetExceeded when the combined ledger would pass a cap."""
     value = state(db, project_id)
+    if value["llm_unreadable_project"] or value["llm_unreadable_daily"]:
+        raise BudgetExceeded("Учёт расходов повреждён: запись LLM с нечитаемой суммой. "
+                             "Траты остановлены до решения владельца.")
     if value["project_reserved_usd"] + cost_usd > value["project_limit_usd"] + 1e-9:
         raise BudgetExceeded("Превышен серверный бюджет проекта. Измени лимит в разделе «Экономика».")
     if value["daily_reserved_usd"] + cost_usd > value["daily_limit_usd"] + 1e-9:
