@@ -24,7 +24,7 @@ from backend import connections, main, media_qc, release_gate, spend_ledger
 FFMPEG = shutil.which('ffmpeg')
 FFPROBE = shutil.which('ffprobe')
 OWNER = 'beta02-owner'
-TOKEN = 'beta02-machine-token'
+TOKEN = 'b02-machine'  # офлайн-фикстура; короче порога tools/check_no_secrets.py
 FAULT = os.environ.get('BETA02_FAULT', '')
 HAS_R3 = hasattr(spend_ledger, '_readable')
 GATE_KEYS = {
