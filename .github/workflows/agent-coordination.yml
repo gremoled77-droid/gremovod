@@ -17,8 +17,15 @@ on:
       - 'tools/test_agent_coordination.py'
       - 'tools/test_agent_scope.py'
       - 'tools/check_agent_scope.py'
+      - 'tools/check_ci_contracts.py'
+      - 'tools/test_ci_contracts.py'
+      - 'tools/check_no_secrets.py'
+      - 'tools/test_no_secrets.py'
+      - 'tools/minimax_task_scopes.json'
       - '.github/workflows/agent-scope-guard.yml'
       - '.github/workflows/agent-coordination.yml'
+      - '.github/workflows/studio-offline-ci.yml'
+      - '.github/workflows/studio-ci-contract.yml'
   workflow_dispatch:
 
 permissions:
