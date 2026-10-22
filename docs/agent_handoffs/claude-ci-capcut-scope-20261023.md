@@ -48,6 +48,33 @@ python -B -X utf8 -m unittest tools.test_agent_scope -v   # 40 тестов, OK,
 - #95: `skipped` ≠ проверенная область. Его guard/манифест должны прийти из базы, где уже есть capcut-03; до этого scope не проверен.
 - Исходные PR не объявлены merge-ready.
 
+## Статусы проверок (AGENTS.md, «Критерии качества», п. 6)
+
+| Проверка | Статус |
+|---|---|
+| `unittest tools.test_agent_scope` (40 тестов), локально | PASS |
+| red/green harness: #94 (1), #95 (6), #93 (5) файлов, старая → новая policy | PASS (FAIL → PASS по политике; не GitHub-проверка) |
+| GitHub checks на #98: contracts, hooks, secrets, `check-agent-scope`, handoff | PASS |
+| `check-agent-scope` на #94 с новой policy | NOT_RUN: его BASE (#92) без policy, нужен порядок принятия |
+| `check-agent-scope` на #95 | NOT_RUN: до включения capcut-02/03/04 в доверенный манифест он `skipped`, а не проверен |
+| Backend / frontend / media-тесты | NOT_RUN: продуктовый код не менялся |
+| Независимое ревью Codex, решение владельца | NOT_RUN |
+
+## Сверка с AGENTS.md и docs/HANDOFF_CLAUDE_CODE.md
+
+Прочитаны после выполнения (AGENTS.md целиком; HANDOFF — по теме scope/workflow/CapCut, как велит AGENTS.md: файл исторический).
+
+- Сходится: `canon/**`, `skills/`, `AGENTS.md`, `CLAUDE.md` остаются в `common_deny` и всегда побеждают; решение D1 (`mavis/work` — конечная база) не заменено, #87 только база подготовки; `mavis/work`/`main` не трогались; `git add` по точным путям; CapCut как монтаж и приёмка вне студии (D4, решение владельца) согласуется с задачами capcut-02/03/04; новых слоёв оркестрации нет.
+- В HANDOFF_CLAUDE_CODE.md о scope guard, ролях OWNED и `.github/workflows` ничего нет: сверять не с чем, противоречий нет.
+- Расхождение процесса (исправлено этим коммитом): первая версия handoff не использовала словарь статусов PASS/FAIL/BLOCKED/NOT_RUN и не содержала вопросов ревьюеру. Добавлено выше и ниже.
+- Сознательное отступление: AGENTS.md п. 1 («перед задачей `git merge origin/mavis/work`») не выполнялся — Issue #97 требует ветку от #87 `c40f8bd` без merge в неё.
+
+## Вопросы ревьюеру (Codex)
+
+1. Допустимо ли закреплять в `OWNED["claude"]` точное имя `studio-offline-ci.yml`, или нужен отдельный механизм для control-файлов роли?
+2. `capcut-03` и `capcut-04` делят README и не пересекаются по tools — достаточно ли этого, или `capcut-04` должен лишиться README?
+3. Верно ли описан порядок принятия (control → согласованная база → повторный scope-check #94/#95)?
+
 ## Не проверено
 
 - Реальный GitHub scope-check (CI на этом PR судит BASE #87, где нет новой policy; ожидаемо: этот PR меняет CONTROL_FILES — отчёт `CONTROL_FILE_CHANGE`, вердикт по старой политике).
