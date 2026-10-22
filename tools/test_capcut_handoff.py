@@ -870,6 +870,68 @@ class ManifestVerificationTests(unittest.TestCase):
         self.assertFalse(report["ok"], report)
         self.assertNotIn(outside.resolve(), calls)
 
+    # ---------- the same file listed twice under different spellings ----------
+
+    def test_same_file_through_dot_dot_alias_is_rejected(self):
+        """`01_Clips/clip.mp4` and `01_Clips/../01_Clips/clip.mp4` are one file."""
+        self.build_pack()
+        manifest = self.read_manifest()
+        clip = manifest["files"][0]
+        manifest["files"].append(dict(clip, path="01_Clips/../" + clip["path"]))
+        self.write_manifest(manifest)
+
+        report = self.report()
+
+        self.assertFalse(report["ok"], report)
+        self.assertTrue(any("дважды" in m for m in report["mismatches"]), report)
+
+    @unittest.skipUnless(os.name == "nt", "разный регистр — один файл только на Windows")
+    def test_same_file_through_case_alias_is_rejected_on_windows(self):
+        """`01_Clips/clip.mp4` and `01_CLIPS/CLIP.MP4` are one file on Windows."""
+        self.build_pack()
+        manifest = self.read_manifest()
+        clip = manifest["files"][0]
+        manifest["files"].append(dict(clip, path=clip["path"].upper()))
+        self.write_manifest(manifest)
+
+        report = self.report()
+
+        self.assertFalse(report["ok"], report)
+        self.assertTrue(any("дважды" in m for m in report["mismatches"]), report)
+
+    def test_alias_path_still_counts_as_the_listed_file(self):
+        """A path alias must not turn the file into a stray one in the pack."""
+        self.build_pack()
+        manifest = self.read_manifest()
+        for entry in manifest["files"]:
+            entry["path"] = "01_Clips/../" + entry["path"]
+        for entry in manifest["documents"]:
+            entry["path"] = "./" + entry["path"]
+        self.write_manifest(manifest)
+
+        report = capcut_handoff.verify_package(self.pack)
+
+        self.assertTrue(report["ok"], report)
+        self.assertEqual(report["mismatches"], [])
+        self.assertEqual(report["checked"], 4)
+
+    @unittest.skipUnless(os.name == "nt", "разный регистр — один файл только на Windows")
+    def test_case_alias_still_counts_as_the_listed_file_on_windows(self):
+        """A different case must not turn the file into a stray one in the pack."""
+        self.build_pack()
+        manifest = self.read_manifest()
+        for entry in manifest["files"]:
+            entry["path"] = entry["path"].upper()
+        for entry in manifest["documents"]:
+            entry["path"] = entry["path"].upper()
+        self.write_manifest(manifest)
+
+        report = capcut_handoff.verify_package(self.pack)
+
+        self.assertTrue(report["ok"], report)
+        self.assertEqual(report["mismatches"], [])
+        self.assertEqual(report["checked"], 4)
+
 
 if __name__ == "__main__":
     unittest.main()

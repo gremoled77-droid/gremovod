@@ -20,6 +20,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import os
 import shutil
 import sys
 from datetime import datetime, timezone
@@ -668,7 +669,30 @@ def _manifest_structure_problem(manifest):
     return None
 
 
-def _readiness_problems(manifest, target, listed):
+def _path_key(path):
+    """Comparison key with the platform's own path semantics.
+
+    On Windows the file system is case-insensitive, so ``01_CLIPS/CLIP.MP4``
+    and ``01_Clips/clip.mp4`` are one and the same file. On POSIX they are two
+    different files and must not be treated as one.
+    """
+    return os.path.normcase(str(path))
+
+
+def _relative_in_pack(root, resolved, fallback):
+    """Relative posix path of a resolved file inside the pack.
+
+    The resolver keeps every file inside the pack, so the normal answer is the
+    path of the file relative to the pack root. The fallback is a guard for an
+    unexpected path flavour, not a normal branch.
+    """
+    try:
+        return resolved.relative_to(root).as_posix()
+    except ValueError:
+        return Path(fallback).as_posix()
+
+
+def _readiness_problems(manifest, root, listed):
     """Problems that make the manifest's own readiness claim inconsistent."""
     problems = []
     status = manifest.get("status")
@@ -682,9 +706,9 @@ def _readiness_problems(manifest, target, listed):
     elif not ready and status == "READY_FOR_MONTAGE":
         problems.append("status=READY_FOR_MONTAGE, но ready_for_montage=false")
     for name in REQUIRED_DOCUMENTS:
-        if not (target / name).is_file():
+        if not (root / name).is_file():
             problems.append(f"{name}: обязательный документ пакета отсутствует")
-        elif name not in listed:
+        elif _path_key(name) not in listed:
             problems.append(f"{name}: обязательный документ не указан в манифесте")
     if ready is True and not manifest["files"]:
         problems.append("готовый пакет не содержит ни одного файла")
@@ -696,9 +720,11 @@ def verify_package(output_dir):
 
     The manifest is validated before any file is read: it must be a handoff v1
     object, it must list the documents of the exporter, and every path is
-    resolved inside the package before its hash is taken. Integrity and
-    readiness stay apart — a correctly built INCOMPLETE pack keeps ``ok=True``
-    and is still not ready for montage.
+    resolved inside the package before its hash is taken. The same file may not
+    be listed twice — the duplicate is looked for by the resolved path, so
+    ``01_Clips/clip.mp4`` and ``01_Clips/../01_Clips/clip.mp4`` are one file,
+    not two. Integrity and readiness stay apart — a correctly built INCOMPLETE
+    pack keeps ``ok=True`` and is still not ready for montage.
     """
     target = Path(output_dir)
     manifest_path = target / MANIFEST_NAME
@@ -711,10 +737,11 @@ def verify_package(output_dir):
     problem = _manifest_structure_problem(manifest)
     if problem:
         raise HandoffError(f"Манифест пакета имеет неверную структуру: {problem}")
+    root = target.resolve()
     mismatches = []
     checked = 0
     listed = set()
-    seen = set()
+    resolved_paths = {}
     for entry in manifest["files"] + manifest["documents"]:
         if not isinstance(entry, dict):
             mismatches.append("запись манифеста не является объектом")
@@ -723,34 +750,38 @@ def verify_package(output_dir):
         if not isinstance(relative, str) or not relative.strip():
             mismatches.append("запись манифеста без пути")
             continue
-        key = Path(relative).as_posix()
-        if key in seen:
-            mismatches.append(f"{relative}: путь указан в манифесте дважды")
-            continue
-        seen.add(key)
         try:
-            path = resolve_pack_path(target, relative)
+            resolved = resolve_pack_path(root, relative)
         except HandoffError as exc:
             mismatches.append(f"{relative}: {exc}")
             continue
+        # Один и тот же файл можно указать разными записями: через `..` или
+        # через другой регистр на Windows. Повтор ищем по разрешённому пути и
+        # до повторного хеширования файла.
+        key = _path_key(resolved)
+        if key in resolved_paths:
+            mismatches.append(f"{relative}: тот же файл указан в манифесте дважды "
+                              f"({resolved_paths[key]})")
+            continue
+        resolved_paths[key] = relative
         checked += 1
-        listed.add(key)
-        if not path.is_file():
+        listed.add(_path_key(_relative_in_pack(root, resolved, relative)))
+        if not resolved.is_file():
             mismatches.append(f"{relative}: файл отсутствует")
             continue
-        if sha256_file(path) != entry.get("sha256"):
+        if sha256_file(resolved) != entry.get("sha256"):
             mismatches.append(f"{relative}: SHA-256 не совпадает с манифестом")
         size = entry.get("bytes")
-        if size is not None and path.stat().st_size != size:
+        if size is not None and resolved.stat().st_size != size:
             mismatches.append(f"{relative}: размер не совпадает с манифестом")
-    mismatches.extend(_readiness_problems(manifest, target, listed))
+    mismatches.extend(_readiness_problems(manifest, root, listed))
     # A file that is in the pack but not in the manifest is not part of the pack:
     # a stray copy must not be imported by mistake.
     for path in sorted(target.rglob("*")):
         if not path.is_file():
             continue
         relative = path.relative_to(target).as_posix()
-        if relative == MANIFEST_NAME or relative in listed:
+        if relative == MANIFEST_NAME or _path_key(relative) in listed:
             continue
         mismatches.append(f"{relative}: файл есть в пакете, но его нет в манифесте")
     return {"ok": not mismatches, "checked": checked, "mismatches": mismatches,
