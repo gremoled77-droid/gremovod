@@ -7,10 +7,12 @@
  *
  * Стенд. Backend поднимается на отдельном порту (по умолчанию 8001) со своим
  * STUDIO_DATA_DIR — рабочая студия на 8000/5173 не трогается, чужие процессы
- * не останавливаются. Интерфейс отдаёт временный vite: список разрешённых Origin
- * в backend/security.py фиксирован (127.0.0.1/localhost на 5173 и 8000), поэтому
- * страницу нужно открыть на одном из этих портов. Backend такого стенда слушает
- * 8001, а vite проксирует /api на него.
+ * не останавливаются. Интерфейс отдаёт временный vite на своём порту (по
+ * умолчанию 5174): порты 8000/5173 заняты рабочей студией, стенд их не берёт.
+ * Список разрешённых Origin в backend/security.py фиксирован (127.0.0.1/localhost
+ * на 5173 и 8000), поэтому прокси vite снимает заголовки origin и sec-fetch-site
+ * — иначе стенд на своём порту получил бы 403. Backend слушает 8001, vite
+ * проксирует /api на него.
  *
  * Переменные окружения:
  *   API_PORT=8001     порт временного backend
@@ -35,8 +37,11 @@ const API_PORT = Number(process.env.API_PORT || 8001);
 const PYTHON = process.env.PYTHON || (process.platform === 'win32' ? 'python' : 'python3');
 const NODE = process.execPath;
 const OWNER = 'owner-e2e';
-// страницу можно открыть только на порту из разрешённых Origin (см. backend/security.py)
-const UI_PORTS = [5173, 8000];
+// порты рабочей студии (8000/5173) не занимаем: стенд живёт на своих
+const UI_PORTS = (process.env.UI_PORTS || '5174,5175,5176,8081')
+  .split(',')
+  .map(port => Number(port.trim()))
+  .filter(Boolean);
 
 /** playwright может стоять локально, глобально или по явному пути. */
 function loadPlaywright() {
@@ -93,7 +98,8 @@ function portFree(port) {
 function killTree(pid) {
   if (!pid) return;
   try {
-    if (process.platform === 'win32') execFileSync('taskkill', ['/PID', String(pid), '/T', '/F'], {stdio: 'ignore'});
+    if (process.platform === 'win32')
+      execFileSync('taskkill', ['/PID', String(pid), '/T', '/F'], {stdio: 'ignore'});
     else process.kill(-pid, 'SIGKILL');
   } catch {
     /* уже умер */
@@ -180,15 +186,24 @@ if (!uiPort) {
 const viteConfig = path.join(tmp, 'vite.stand.config.mjs');
 fs.writeFileSync(
   viteConfig,
-  `export default {
+  `const target = 'http://127.0.0.1:${API_PORT}';
+// стенд живёт на своём порту: Origin и sec-fetch-site снимаем, иначе
+// backend/security.py отклонит запрос как «с постороннего сайта»
+const stripSiteHeaders = proxy => {
+  proxy.on('proxyReq', proxyReq => {
+    proxyReq.removeHeader('origin');
+    proxyReq.removeHeader('sec-fetch-site');
+  });
+};
+export default {
   root: ${JSON.stringify(path.join(ROOT, 'frontend'))},
   server: {
     host: '127.0.0.1',
     port: ${uiPort},
     strictPort: true,
     proxy: {
-      '/api': {target: 'http://127.0.0.1:${API_PORT}', changeOrigin: false},
-      '/login': {target: 'http://127.0.0.1:${API_PORT}', changeOrigin: false},
+      '/api': {target, changeOrigin: false, configure: stripSiteHeaders},
+      '/login': {target, changeOrigin: false, configure: stripSiteHeaders},
     },
   },
 };
@@ -220,7 +235,10 @@ page.on('request', request => {
 
 try {
   backend = startBackend(dataDir);
-  check(`временный backend поднялся (127.0.0.1:${API_PORT})`, await waitFor(`http://127.0.0.1:${API_PORT}/api/health`, 90000));
+  check(
+    `временный backend поднялся (127.0.0.1:${API_PORT})`,
+    await waitFor(`http://127.0.0.1:${API_PORT}/api/health`, 90000)
+  );
 
   frontend = spawn(
     NODE,
@@ -233,7 +251,10 @@ try {
     }
   );
   frontend.unref();
-  check(`временный интерфейс поднялся (127.0.0.1:${uiPort})`, await waitFor(`http://127.0.0.1:${uiPort}/`, 90000));
+  check(
+    `временный интерфейс поднялся (127.0.0.1:${uiPort})`,
+    await waitFor(`http://127.0.0.1:${uiPort}/`, 90000)
+  );
 
   // проект создаётся заранее на временном сервере: экран выпуска работает с сохранённым проектом
   const token = (await (await fetch(`http://127.0.0.1:${API_PORT}/api/session`)).json()).token;
@@ -249,7 +270,9 @@ try {
   /** Смена состояния проекта двигает ревизию — так получаем честный конфликт импорта. */
   async function bumpRevision() {
     const current = await (
-      await fetch(`http://127.0.0.1:${API_PORT}/api/projects/${projectId}`, {headers: {'x-studio-session': token}})
+      await fetch(`http://127.0.0.1:${API_PORT}/api/projects/${projectId}`, {
+        headers: {'x-studio-session': token},
+      })
     ).json();
     await fetch(`http://127.0.0.1:${API_PORT}/api/projects`, {
       method: 'POST',
@@ -265,14 +288,17 @@ try {
 
   // задержка загрузки: пока запрос импорта висит, ревизия проекта меняется — получаем 409
   let delayUpload = false;
-  await page.route(url => /\/api\/projects\/[^/]+\/release-artifacts$/.test(url.pathname), async route => {
-    if (route.request().method() === 'POST' && delayUpload) {
-      delayUpload = false;
-      await sleep(900);
-      await bumpRevision();
+  await page.route(
+    url => /\/api\/projects\/[^/]+\/release-artifacts$/.test(url.pathname),
+    async route => {
+      if (route.request().method() === 'POST' && delayUpload) {
+        delayUpload = false;
+        await sleep(900);
+        await bumpRevision();
+      }
+      await route.continue();
     }
-    await route.continue();
-  });
+  );
 
   async function openRelease() {
     await page.goto(`http://127.0.0.1:${uiPort}/`);
@@ -299,16 +325,32 @@ try {
 
   // 1. битый файл: русская ошибка, артефакт не создан
   await upload(path.join(fxDir, 'bad.mp4'), 'bad');
-  const errorText = await panel.locator('.rg-error').first().innerText().catch(() => '');
-  check('повреждённый файл: русская ошибка, артефакта нет', /MP4|прочитать|видео/i.test(errorText), errorText);
+  const errorText = await panel
+    .locator('.rg-error')
+    .first()
+    .innerText()
+    .catch(() => '');
+  check(
+    'повреждённый файл: русская ошибка, артефакта нет',
+    /MP4|прочитать|видео/i.test(errorText),
+    errorText
+  );
 
   // 2. конфликт ревизии: 409 по-русски и без автоматического повтора
   delayUpload = true;
   const uploadsBefore = uploads.length;
   await upload(path.join(fxDir, 'ok.mp4'), 'conflict');
-  const conflictText = await panel.locator('.rg-error').first().innerText().catch(() => '');
+  const conflictText = await panel
+    .locator('.rg-error')
+    .first()
+    .innerText()
+    .catch(() => '');
   check('конфликт ревизии: русская ошибка 409', /изменил|ревизи/i.test(conflictText), conflictText);
-  check('409 не повторяется автоматически: один POST', uploads.length - uploadsBefore === 1, `${uploads.length - uploadsBefore}`);
+  check(
+    '409 не повторяется автоматически: один POST',
+    uploads.length - uploadsBefore === 1,
+    `${uploads.length - uploadsBefore}`
+  );
   check('после 409 артефакт не создан', (await page.getByTestId('final-count').innerText()) === '0');
   check('после 409 ожидают приёмки 0', (await page.getByTestId('pending-count').innerText()) === '0');
 
@@ -316,7 +358,10 @@ try {
   await upload(path.join(fxDir, 'ok.mp4'), 'e2e-master');
   await page.waitForTimeout(1500);
   const afterImport = await panel.innerText();
-  check('после повторной загрузки: состояние «не пройдена»', /Загружен, проверка не пройдена/.test(afterImport));
+  check(
+    'после повторной загрузки: состояние «не пройдена»',
+    /Загружен, проверка не пройдена/.test(afterImport)
+  );
   check('импорт не назван финальным', (await page.getByTestId('final-count').innerText()) === '0');
   check('импорт ждёт приёмки', (await page.getByTestId('pending-count').innerText()) === '1');
   const approve = panel.getByTestId('approve');
@@ -406,8 +451,43 @@ try {
   check('ожидают приёмки 2', (await page.getByTestId('pending-count').innerText()) === '2');
   await page.screenshot({path: path.join(tmp, 'shot5_second.png'), fullPage: true});
 
+  // 11. требование аудио при утверждении: мастер без звука, измеренный без требования,
+  //     но утверждаемый с требованием — сервер не пропустит (покрытие N35)
+  await panel.getByLabel(/требовать аудиодорожку/).uncheck();
+  await panel.getByRole('button', {name: 'Проверить N34'}).click();
+  await page.waitForTimeout(2500);
+  const afterNoAudio = await panel.innerText();
+  check('без требования аудио мастер без звука проходит N34', /Пройдена/.test(afterNoAudio));
+  check('экран показывает, чем мерили', /без требования аудиодорожки/.test(afterNoAudio));
+  await panel.getByLabel(/требовать аудиодорожку/).check();
+  await page.waitForTimeout(400);
+  check(
+    'предупреждение о смене требования после проверки',
+    /изменилось после проверки/.test(await panel.innerText())
+  );
+  await panel.getByLabel('Идентификатор владельца').fill(OWNER);
+  await panel.getByLabel(/подтверждаю право/).check();
+  await panel.getByTestId('approve').click();
+  await page.waitForTimeout(2000);
+  const afterDeny = await panel.innerText();
+  check(
+    'сервер не пропускает мастер без звука при требовании аудио',
+    /не покрывает требуемые модальности/.test(afterDeny),
+    afterDeny.slice(0, 120).replace(/\n/g, ' | ')
+  );
+  check('причина от сервера показана', /в мастере нет аудиодорожки/.test(afterDeny));
+  check(
+    'финальных всё ещё 0 после отказа сервера',
+    (await page.getByTestId('final-count').innerText()) === '0'
+  );
+  await page.screenshot({path: path.join(tmp, 'shot6_audio_required.png'), fullPage: true});
+
   const real = consoleErrors.filter(text => !/404|Failed to load resource/.test(text));
-  check('нет JS-ошибок в консоли (4xx на негативных сценариях ожидаемы)', real.length === 0, real.join(' | '));
+  check(
+    'нет JS-ошибок в консоли (4xx на негативных сценариях ожидаемы)',
+    real.length === 0,
+    real.join(' | ')
+  );
 } finally {
   await browser.close();
   if (backend) killTree(backend.pid);

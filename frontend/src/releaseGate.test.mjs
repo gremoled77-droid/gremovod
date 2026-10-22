@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   approveBlockReason,
   approveBody,
+  audioRequirementText,
   errorText,
   ownerNotConfigured,
   qcManifest,
@@ -10,6 +11,8 @@ import {
   rejectBlockReason,
   rejectBody,
   releaseCounts,
+  requirementMismatch,
+  requiredModalities,
   shortSha,
   stateText,
   verdictText,
@@ -48,7 +51,7 @@ const gate = (over = {}) => ({
   history: [],
   ...over,
 });
-const ready = {ownerId: 'owner', rights: true, busy: false};
+const ready = {ownerId: 'owner', rights: true, busy: false, requireAudio: false};
 
 test('финальными считаются только утверждённые владельцем, импорты — отдельно', () => {
   const gates = {
@@ -245,4 +248,46 @@ test('подписи состояний и вердиктов, манифест 
   assert.deepEqual(qcManifest(false), {container: 'mp4', require_audio: false});
   assert.equal(shortSha(SHA), 'aaaaaaaaaaaa…');
   assert.equal(shortSha(''), '—');
+});
+
+test('требование аудио задаёт модальности, которые сервер проверит при утверждении', () => {
+  assert.deepEqual(requiredModalities(false), ['VIDEO']);
+  assert.deepEqual(requiredModalities(true), ['VIDEO', 'AUDIO']);
+  assert.match(audioRequirementText(true), /с требованием аудиодорожки/);
+  assert.match(audioRequirementText(false), /без требования аудиодорожки/);
+});
+
+test('утверждение требует звук на сервере, когда владелец его запросил', () => {
+  const withAudio = approveBody(gate(), {...ready, requireAudio: true});
+  assert.deepEqual(withAudio.required_modalities, ['VIDEO', 'AUDIO']);
+  const withoutAudio = approveBody(gate(), {...ready, requireAudio: false});
+  assert.deepEqual(withoutAudio.required_modalities, ['VIDEO']);
+});
+
+test('расхождение требований видно: вердикт измерен с другим требованием', () => {
+  assert.equal(requirementMismatch(undefined, true), false);
+  assert.equal(requirementMismatch({requireAudio: true}, true), false);
+  assert.equal(requirementMismatch({requireAudio: false}, false), false);
+  assert.equal(requirementMismatch({requireAudio: false}, true), true);
+  assert.equal(requirementMismatch({requireAudio: true}, false), true);
+  assert.equal(requirementMismatch({}, true), false); // манифест неизвестен — расхождения не выдумываем
+});
+
+test('причина сервера из вложенного detail не теряется', () => {
+  const text = errorText(409, {
+    detail: {
+      code: 'MEDIA_NOT_CONFIRMED',
+      message: 'Мастер не покрывает требуемые модальности.',
+      detail: 'AUDIO: в мастере нет аудиодорожки',
+    },
+  });
+  assert.match(text, /не покрывает требуемые модальности/);
+  assert.match(text, /AUDIO: в мастере нет аудиодорожки/);
+  // пустая или нестроковая причина ничего не меняет
+  assert.equal(errorText(409, {detail: {code: 'X', message: 'Текст'}}), 'Текст');
+  assert.equal(errorText(409, {detail: {code: 'X', message: 'Текст', detail: 7}}), 'Текст');
+  // без сообщения сервера сырой вывод FFmpeg в текст не попадает
+  const raw = errorText(422, {detail: {error: 'FFmpeg', detail: 'moov atom not found'}}, true);
+  assert.doesNotMatch(raw, /moov atom/);
+  assert.match(raw, /повреждён/);
 });

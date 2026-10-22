@@ -54,10 +54,10 @@ export type Gate = {
 };
 
 export type QcCheck = {name: string; expected: unknown; actual: unknown; ok: boolean};
-export type QcResult = {verdict: string; reason: string; checks: QcCheck[]};
+export type QcResult = {verdict: string; reason: string; checks: QcCheck[]; requireAudio?: boolean};
 export type QcOutcome = {verdict: string; reason: string; stale: boolean};
 
-export type ApproveInput = {ownerId: string; rights: boolean; busy: boolean};
+export type ApproveInput = {ownerId: string; rights: boolean; busy: boolean; requireAudio: boolean};
 export type RejectInput = {ownerId: string; note: string; busy: boolean};
 export type ApproveBody = {
   decision: 'APPROVED';
@@ -114,6 +114,34 @@ export function releaseCounts(ids: string[], gates: Record<string, Gate | undefi
 export const qcManifest = (requireAudio: boolean) => ({container: 'mp4', require_audio: requireAudio});
 
 /**
+ * Требование аудио словами. Вердикт N34 относится к тому манифесту, которым мерили,
+ * поэтому экран показывает, что именно проверялось — иначе «Пройдена» означала бы
+ * неизвестно что.
+ */
+export const audioRequirementText = (requireAudio: boolean) =>
+  requireAudio ? 'с требованием аудиодорожки' : 'без требования аудиодорожки';
+
+/**
+ * Требования изменились после проверки: показанный вердикт получен с другим
+ * манифестом. Это предупреждение, а не запрет: допуск решает сервер.
+ */
+export function requirementMismatch(
+  measured: {requireAudio?: boolean} | undefined,
+  requireAudio: boolean
+): boolean {
+  if (!measured || measured.requireAudio === undefined) return false;
+  return measured.requireAudio !== requireAudio;
+}
+
+/**
+ * Модальности, которые сервер проверит при утверждении. Видеоблок нужен всегда,
+ * звук — когда владелец его требует: без аудиодорожки утверждение не пройдёт
+ * (сервер вернёт MEDIA_NOT_CONFIRMED по покрытию N35).
+ */
+export const requiredModalities = (requireAudio: boolean): string[] =>
+  requireAudio ? ['VIDEO', 'AUDIO'] : ['VIDEO'];
+
+/**
  * Что показать о проверке N34. Если файл менялся после проверки, сервер сам вернул
  * BLOCKED и qc_stale — тогда показываем серверную формулировку, а не старый вердикт.
  */
@@ -158,7 +186,7 @@ export function approveBody(gate: Gate, input: ApproveInput): ApproveBody | null
     owner_id: input.ownerId.trim(),
     expected_master_sha256: gate.master_sha256,
     processing_rights_confirmed: true,
-    required_modalities: ['VIDEO'],
+    required_modalities: requiredModalities(input.requireAudio),
     note: '',
   };
 }
@@ -195,6 +223,19 @@ const UPLOAD_STATUS_TEXT: Record<number, string> = {
   422: 'Студия не смогла прочитать видео: файл повреждён или без видеопотока.',
 };
 
+/**
+ * Причина от сервера. В ответах релиз-gate причина лежит во вложенном поле
+ * `detail` объекта деталей (например, `AUDIO: в мастере нет аудиодорожки`) —
+ * без неё владелец видел бы «не покрывает требуемые модальности» без объяснения.
+ * Показываем её только вместе с сообщением сервера: иначе в текст попал бы сырой
+ * вывод FFmpeg, а не объяснение по-русски.
+ */
+function serverReason(detail: unknown): string {
+  if (!detail || typeof detail !== 'object') return '';
+  const nested = (detail as {detail?: unknown}).detail;
+  return typeof nested === 'string' ? nested : '';
+}
+
 /** Текст ошибки сервера по-русски. Сообщение сервера важнее общей подписи по статусу. */
 export function errorText(status: number, body: unknown, upload = false): string {
   const detail = (body as {detail?: unknown} | null)?.detail;
@@ -204,13 +245,15 @@ export function errorText(status: number, body: unknown, upload = false): string
       : detail && typeof detail === 'object' && typeof (detail as {message?: unknown}).message === 'string'
         ? (detail as {message: string}).message
         : '';
+  const reason = message ? serverReason(detail) : '';
+  const withReason = (text: string) => (reason ? `${text} ${reason}` : text);
   if (upload && UPLOAD_STATUS_TEXT[status])
-    return message ? `${UPLOAD_STATUS_TEXT[status]} (${message})` : UPLOAD_STATUS_TEXT[status];
+    return withReason(message ? `${UPLOAD_STATUS_TEXT[status]} (${message})` : UPLOAD_STATUS_TEXT[status]);
   if (status === 404 && (!message || message === 'Not Found'))
     return 'Проект или MP4 не найден на сервере. Сохраните проект и обновите страницу.';
   if (status === 401) return 'Сессия студии не принята. Обновите страницу.';
-  if (status === 403) return message || 'Действие запрещено для этой сессии.';
-  if (message) return message;
+  if (status === 403) return withReason(message || 'Действие запрещено для этой сессии.');
+  if (message) return withReason(message);
   return `Ошибка сервера (${status}).`;
 }
 

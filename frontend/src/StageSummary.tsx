@@ -3,12 +3,14 @@ import {apiFetch} from './api';
 import {
   approveBlockReason,
   approveBody,
+  audioRequirementText,
   errorText,
   qcManifest,
   qcOutcome,
   rejectBlockReason,
   rejectBody,
   releaseCounts,
+  requirementMismatch,
   shortSha,
   stateText,
   verdictText,
@@ -200,6 +202,7 @@ function ReleasePanel({
     setNotice('');
     setRights(false);
     setRejectNote('');
+    setRequireAudio(true); // требование к звуку не переносится из другого проекта
   }, [projectId]);
 
   const base = '/api/projects/' + encodeURIComponent(projectId) + '/release-artifacts';
@@ -326,7 +329,13 @@ function ReleasePanel({
         const result = body as {verdict?: string; reason?: string; checks?: QcResult['checks']};
         setMeasured(prev => ({
           ...prev,
-          [id]: {verdict: result.verdict || '', reason: result.reason || '', checks: result.checks || []},
+          // запоминаем манифест, которым мерили: сервер его не хранит, а вердикт относится именно к нему
+          [id]: {
+            verdict: result.verdict || '',
+            reason: result.reason || '',
+            checks: result.checks || [],
+            requireAudio,
+          },
         }));
         setNotice('Техническая проверка N34 завершена.');
       }
@@ -370,13 +379,15 @@ function ReleasePanel({
 
   const selected = artifacts.find(a => a.id === selectedId);
   const gate = selected ? gates[selected.id] : undefined;
-  const outcome = qcOutcome(gate, selected ? measured[selected.id] : undefined);
-  const checks = selected ? (measured[selected.id]?.checks ?? []) : [];
+  const measuredQc = selected ? measured[selected.id] : undefined;
+  const outcome = qcOutcome(gate, measuredQc);
+  const checks = selected ? (measuredQc?.checks ?? []) : [];
+  const mismatch = requirementMismatch(measuredQc, requireAudio);
   const counts = releaseCounts(
     artifacts.map(a => a.id),
     gates
   );
-  const approveInput = {ownerId, rights, busy: !!busy};
+  const approveInput = {ownerId, rights, busy: !!busy, requireAudio};
   const approveBlock = approveBlockReason(gate, approveInput);
   const rejectInput = {ownerId, note: rejectNote, busy: !!busy};
   const rejectBlock = rejectBlockReason(gate, rejectInput);
@@ -476,10 +487,20 @@ function ReleasePanel({
                 Техническая проверка N34: <b>{verdictText(outcome.verdict)}</b>
                 {outcome.verdict ? ` (${outcome.verdict})` : ''}
                 {outcome.reason ? ' — ' + outcome.reason : ''}
+                {measuredQc?.requireAudio !== undefined && (
+                  <span data-testid="qc-requirement"> ({audioRequirementText(measuredQc.requireAudio)})</span>
+                )}
               </p>
               {outcome.stale && (
                 <p className="rg-error" data-testid="qc-stale">
                   Файл изменён после проверки: нужна новая проверка N34.
+                </p>
+              )}
+              {mismatch && measuredQc?.requireAudio !== undefined && (
+                <p className="rg-error" data-testid="qc-requirement-mismatch">
+                  Требование изменилось после проверки: вердикт получен{' '}
+                  {audioRequirementText(measuredQc.requireAudio)}. Проверьте N34 заново, если требование к
+                  звуку обязательно.
                 </p>
               )}
               {checks.length > 0 && (
