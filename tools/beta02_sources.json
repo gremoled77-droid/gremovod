@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "note": "Закреплённые SHA источников кандидата BETA-02 (проверены по git fetch 2026-10-22). Порядок — порядок слияния во временной интеграционной копии. Дрейф HEAD источника = повторная оценка, не слепое переиспользование.",
+  "base": {"branch": "mavis/work", "sha": "57cac59ca790d380d8e68f2f6db82674ca142e92"},
+  "sources": [
+    {"pr": 75, "branch": "mavis/ci-final-2026-10-22", "sha": "bfb57631f24afa705f6b82eb4eb91ccd318fbb77", "role": "CI и хуки"},
+    {"pr": 58, "branch": "minimax/ga-01-llm-settlement", "sha": "c634c0c915a1afbf3d75df5bc897f75ef5b723ea", "role": "GA-01 база"},
+    {"pr": 76, "branch": "minimax/ga-01-money-p0", "sha": "8fb6b76e3bc8dee0f305c0298d510599beba26e2", "role": "GA-01 исправления MiniMax"},
+    {"pr": 79, "branch": "build/claude/ga-01-r3-unreadable-barrier", "sha": "784ea0c7806526a024c369c1802b249178062609", "role": "GA-01 R3, нечитаемая сумма"},
+    {"pr": 78, "branch": "claude/beta-01-20261022", "sha": "b0ea55dab5ea826f095fb2fbe9c7e0d8e995f71b", "role": "BETA-01, фикс B1"},
+    {"pr": 81, "branch": "build/claude/ga-03-release-backend", "sha": "d249dded050c2ccd0b86c7e6bff78ef4a843f7ab", "role": "GA-03 backend gate"},
+    {"pr": 83, "branch": "build/claude/ga-03-ui-e2e", "sha": "59e8196f72b427f76efa162ff1baf70080ac5b18", "role": "GA-03 гонка решений и кэш хеша"}
+  ]
+}

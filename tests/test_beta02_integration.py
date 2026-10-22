@@ -3,7 +3,7 @@
 Без сети и платных вызовов: платный провайдер заменён на ловушку, данные во временной папке,
 ролики собирает локальный ffmpeg. Случаи, зависящие от GA-01 (#79), пропускаются с явной причиной и
 харнесс считает такой пропуск BLOCKED, а не зелёным.
-Режим BETA02_FAULT=b1|owner искусственно ломает продукт — случаи обязаны упасть (проверка самого гейта).
+Режим BETA02_FAULT=b1|owner|ledger искусственно ломает продукт — случаи обязаны упасть (проверка самого гейта).
 """
 import json
 import os
@@ -75,6 +75,10 @@ class Beta02Base(unittest.TestCase):
             self.addCleanup(patcher.stop)
         if FAULT == 'owner':  # владелец не проверяется
             patcher = patch.object(release_gate, 'require_owner', lambda request, owner_id: OWNER)
+            patcher.start()
+            self.addCleanup(patcher.stop)
+        if FAULT == 'ledger' and HAS_R3:  # бухгалтерия принимает нечитаемую сумму за число (дефект до R3)
+            patcher = patch.object(spend_ledger, '_readable', lambda value: True)
             patcher.start()
             self.addCleanup(patcher.stop)
         self.client = None
