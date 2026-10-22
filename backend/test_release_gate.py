@@ -351,6 +351,53 @@ class GateTests(unittest.TestCase):
         self.assertEqual(self.decide('REJECTED', note=note).status_code, 200)
         self.assertEqual(self.gate()['history'][0]['note'], note)
 
+    # --- кэш хеша только для чтения ----------------------------------------------------
+    def digests(self):
+        from backend import media_qc
+        calls = []
+        original = media_qc._digest
+
+        def counting(path):
+            calls.append(str(path))
+            return original(path)
+
+        return calls, patch.object(media_qc, '_digest', counting)
+
+    def test_gate_reads_reuse_the_hash_of_an_unchanged_file(self):
+        from backend import media_qc
+        media_qc._HASH_CACHE.clear()
+        self.qc()
+        calls, counting = self.digests()
+        with counting:
+            first = self.gate()
+            after_first = len(calls)
+            second = self.gate()
+        self.assertEqual(after_first, 1, calls)  # и master_facts, и N35 в одном чтении делят один хеш
+        self.assertEqual(len(calls), after_first, 'второе чтение не должно хешировать файл')
+        self.assertEqual(first['master_sha256'], second['master_sha256'])
+
+    def test_cache_sees_appended_bytes_and_in_place_edits_with_restored_mtime(self):
+        import os
+        self.qc()
+        before = self.gate()['master_sha256']
+        path = self.stored()
+        stat = path.stat()
+        data = bytearray(path.read_bytes())
+        data[len(data) // 2] ^= 0xFF  # тот же размер
+        path.write_bytes(bytes(data))
+        os.utime(path, ns=(stat.st_atime_ns, stat.st_mtime_ns))  # mtime возвращён назад
+        after = self.gate()
+        self.assertNotEqual(after['master_sha256'], before)
+        self.assertTrue(after['qc_stale'])
+
+    def test_decisions_always_rehash_even_when_the_cache_is_warm(self):
+        self.qc()
+        self.gate()  # кэш прогрет
+        calls, counting = self.digests()
+        with counting:
+            self.assertEqual(self.decide().status_code, 200)
+        self.assertGreaterEqual(len(calls), 1)
+
     # --- перезапуск --------------------------------------------------------------------
     def test_state_survives_restart(self):
         self.approved()
