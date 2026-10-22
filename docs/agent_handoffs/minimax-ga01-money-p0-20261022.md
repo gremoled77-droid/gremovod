@@ -12,6 +12,10 @@
 - **Проверки:** `backend.test_llm_settlement` — 52 OK; фикстуры аудита PR #65 — 7 OK;
   `python -m pytest backend` — 539 passed + 26 subtests, 0 падений (230 s); платные API
   не вызывались, сеть не использовалась, всё на временных SQLite.
+  GitHub Actions на PR #76: `validate-agent-handoff` — pass; `check-agent-scope` — skipped,
+  потому что расширение scope guard на префиксы `minimax/`/`mavis/` живёт в PR #62, а база
+  этой ветки — `minimax/ga-01-llm-settlement` и PR #62 туда ещё не влит. Полный backend
+  regression в CI этой ветки появится после принятия PR #62.
 - **Блокировки для Codex:** см. раздел «Что должен проверить Codex».
 
 ## Что было на актуальном head и что осталось открытым
@@ -116,6 +120,20 @@ status=done  usd=0.001014  confirmed_usd=0.001014  unknown_usd=0.0
 `LegacyMoneyRepairTests` (R2, R3, включая старт приложения на старой базе), тест
 `test_reconcile_confirms_the_named_amount_and_leaves_no_unknown` (R4) и уточнение
 контракта `test_reconcile_unconfirmed_amount_adds_to_confirmed`.
+
+## GitHub Actions
+
+PR #76 (`minimax/ga-01-money-p0` → `minimax/ga-01-llm-settlement`):
+
+| Workflow | Итог | Почему |
+|---|---|---|
+| Agent handoff and workflow export checks | pass | валидация handoff и ролей |
+| Agent ownership boundaries (new task branches) | skipped | scope guard на этой базе не знает префикс `minimax/`: расширение живёт в PR #62 |
+
+Backend regression в CI этой ветки не выполнялся: workflow `studio-offline-ci.yml`
+появится на базе после принятия PR #62. До тех пор единственный прогон полного набора —
+локальный (`python -m pytest backend`: 539 passed + 26 subtests). Это BLOCKED по
+инфраструктуре, а не пропуск проверки.
 
 ## Границы изменений
 
