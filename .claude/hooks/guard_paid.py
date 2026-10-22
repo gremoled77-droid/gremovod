@@ -76,6 +76,16 @@ GATED_ENV = "GREMOVOD_ALLOW_GATED_PAID"
 # confirmation token, so it is refused like a direct provider call.
 SPEND_FLAGS = re.compile(r"--(paid|spend|real-spend|live-spend)\b", re.IGNORECASE)
 
+# Shell operators that separate two independent invocations. A dry-run
+# exception belongs to one invocation, never to the whole line.
+SEGMENT_SPLIT = re.compile(r"(?:&&|\|\||;|\||\n)")
+
+
+def segments(command):
+    """Split a shell line into the separate invocations it contains."""
+    parts = [part.strip() for part in SEGMENT_SPLIT.split(command)]
+    return [part for part in parts if part]
+
 
 def read_payload():
     """Read the hook payload from stdin.
@@ -110,16 +120,9 @@ def tool_command(payload):
     return ""
 
 
-def paid_command(command):
-    """Return ``(kind, reason)`` for a shell command.
-
-    ``kind`` is ``""`` when nothing paid is visible, ``"direct"`` for a call
-    that bypasses the Studio gate and ``"gated"`` for a call that goes through
-    it.
-    """
-    if not command:
-        return "", ""
-    lowered = command.lower()
+def _segment_kind(segment):
+    """Return ``(kind, reason)`` for one invocation of the shell line."""
+    lowered = segment.lower()
     for script, what in DIRECT_SCRIPTS.items():
         if script not in lowered:
             continue
@@ -137,7 +140,7 @@ def paid_command(command):
                 "provider call bypasses the Studio budget, approval and idempotency "
                 "gate, so it is refused always and no environment switch opens it."
             )
-    if SPEND_FLAGS.search(command):
+    if SPEND_FLAGS.search(segment):
         return "direct", (
             "The command carries an explicit spend flag. It skips the price "
             "estimate and the confirmation token, so it is refused always."
@@ -148,6 +151,43 @@ def paid_command(command):
                 f"'{script}' {what}. The Studio enforces the budget, the owner "
                 "approval and the idempotency ledger; this guard only keeps the "
                 "session from starting it silently."
+            )
+    return "", ""
+
+
+def paid_command(command):
+    """Return ``(kind, reason)`` for a shell command.
+
+    ``kind`` is ``""`` when nothing paid is visible, ``"direct"`` for a call
+    that bypasses the Studio gate and ``"gated"`` for a call that goes through
+    it.
+
+    Every invocation of the line is judged on its own. ``live_piapi_test.py
+    --dry-run && live_piapi_test.py`` is therefore refused: the second call
+    spends money even though the first one does not.
+    """
+    if not command:
+        return "", ""
+    gated_reason = ""
+    for segment in segments(command):
+        kind, reason = _segment_kind(segment)
+        if kind == "direct":
+            # A direct call anywhere on the line wins over a gated one.
+            return "direct", reason
+        if kind == "gated" and not gated_reason:
+            gated_reason = reason
+    if gated_reason:
+        return "gated", gated_reason
+    # Defence in depth: the separators cannot occur inside a host name, so a
+    # host anywhere on the line is a paid call even if the line was split in
+    # an unexpected way.
+    lowered = command.lower()
+    for host in PAID_API_HOSTS:
+        if host in lowered:
+            return "direct", (
+                f"The command reaches '{host}', a paid provider endpoint. A direct "
+                "provider call bypasses the Studio budget, approval and idempotency "
+                "gate, so it is refused always and no environment switch opens it."
             )
     return "", ""
 

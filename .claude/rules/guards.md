@@ -5,7 +5,7 @@
 
 | Хук | Что отклоняет |
 |---|---|
-| `.claude/hooks/guard_git.py` | запись в защищённую ветку (`main`, `master`, `mavis/work`); `push --force`; `push --mirror`; `push --all` с защищённой веткой в наборе; удаление чужой ветки или worktree; `git clean -f`; массовая отмена изменений; `reset --hard` при незакоммиченных правках |
+| `.claude/hooks/guard_git.py` | запись в защищённую ветку (`main`, `master`, `mavis/work`); `push --force`; `push --mirror`; `push --all` с защищённой веткой в наборе; удаление чужой ветки или worktree; `git clean -f`; массовая отмена изменений (`checkout .`, `checkout -- .`, `restore .`, `restore --worktree .`, `stash clear`); `reset --hard` при незакоммиченных правках |
 | `.claude/hooks/guard_paid.py` | прямые обращения к платным хостам (`api.piapi.ai`, `api.openai.com`, …), `scripts/live_piapi_test.py` без `--dry-run`, флаги `--paid`/`--spend` |
 | `.claude/hooks/guard_files.py` | запись в ключи (`*_API_KEY.txt`, `.env`), приватные ключи, реальные данные (`backend/media/`, `backend/library/`, `backend/character_library/`, `runtime/`, `projects/`), SQLite рабочей студии, `.claude/settings.local.json` |
 
@@ -31,9 +31,13 @@
   запрещён всегда, без исключения.
 - `scripts/live_piapi_test.py --dry-run` разрешён: скрипт возвращается до сетевого
   запроса и печатает только оценку цены. Любой другой вызов скрипта запрещён.
+- Исключение `--dry-run` относится к **одному вызову**, а не к строке целиком.
+  `live_piapi_test.py --dry-run && live_piapi_test.py` запрещён: второй вызов
+  тратит деньги. Разбор идёт по отдельным командам строки (`&&`, `||`, `;`, `|`).
 - `GREMOVOD_ALLOW_GATED_PAID=1` открывает только путь через локальную Studio
   (`scripts/watch_hunyuan_test.py`). Решение о покупке всё равно принимает Studio:
   бюджет, разрешение владельца и idempotency. Переменная не даёт права тратить.
+  Если в той же строке есть прямой вызов провайдера — запрещён он.
 - Если payload не читается, хук отказывает: непроверенное действие не выполняется.
 
 ## Правила

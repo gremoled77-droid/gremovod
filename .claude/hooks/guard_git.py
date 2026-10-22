@@ -170,8 +170,8 @@ def git_commands(command):
     return found
 
 
-def _subcommand(words):
-    """The Git subcommand of an invocation, skipping global options."""
+def _subcommand_index(words):
+    """Index of the Git subcommand inside an invocation, skipping global options."""
     index = 1
     while index < len(words):
         word = words[index]
@@ -181,8 +181,16 @@ def _subcommand(words):
                 continue
             index += 1
             continue
-        return word.lower()
-    return ""
+        return index
+    return None
+
+
+def _subcommand(words):
+    """The Git subcommand of an invocation, skipping global options."""
+    index = _subcommand_index(words)
+    if index is None:
+        return ""
+    return words[index].lower()
 
 
 def _repo_dir(words, cwd):
@@ -214,8 +222,29 @@ def _is_protected(name, protected):
 
 
 def _positional(words):
-    """Arguments of an invocation that are not options."""
-    return [word for word in words[1:] if not word.startswith("-")]
+    """Arguments of an invocation that are not options, without the subcommand."""
+    index = _subcommand_index(words)
+    if index is None:
+        return []
+    return [word for word in words[index + 1:] if not word.startswith("-")]
+
+
+def _is_bulk_path(arg, repo):
+    """True when a path argument names a whole tree rather than a single file.
+
+    ``git checkout .``, ``git checkout tree`` and ``git restore .`` discard the
+    changes of every file below the path, which is what the guard refuses.
+    """
+    if arg in (".", "./", "*", "**", ".\\"):
+        return True
+    normalised = arg.replace("\\", "/")
+    if normalised.endswith("/.") or normalised.endswith("/.."):
+        return True
+    candidate = Path(repo) / normalised
+    try:
+        return candidate.is_dir()
+    except OSError:
+        return False
 
 
 def _push_destinations(words):
@@ -299,18 +328,31 @@ def check(command, cwd):
                         "'git reset --hard' would discard uncommitted work in the "
                         "working tree. Commit or stash the changes first."
                     )
-            if sub == "restore" and "." in _positional(words):
-                return False, (
-                    "'git restore .' would discard every uncommitted change in the "
-                    "working tree. Restore the files one by one instead."
-                )
+            if sub == "restore":
+                index_only = "--staged" in words and "--worktree" not in words
+                paths = _positional(words)
+                if not index_only:
+                    if not paths:
+                        return False, (
+                            "'git restore' without a path would discard every "
+                            "changed file in the working tree. Restore the files "
+                            "one by one instead."
+                        )
+                    for name in paths:
+                        if _is_bulk_path(name, repo):
+                            return False, (
+                                f"'git restore {name}' would discard every "
+                                "uncommitted change below that path. Restore the "
+                                "files one by one instead."
+                            )
         elif sub == "checkout":
-            if "--" in words:
-                return False, (
-                    "'git checkout -- .' would discard every uncommitted change in "
-                    "the working tree. Discard the files one by one instead."
-                )
             for name in _positional(words):
+                if _is_bulk_path(name, repo):
+                    return False, (
+                        f"'git checkout {name}' would discard every uncommitted "
+                        "change below that path. Discard the files one by one "
+                        "instead."
+                    )
                 if _is_protected(name, protected):
                     return False, (
                         f"Switching to the protected branch '{name}' is blocked in an "
@@ -323,6 +365,12 @@ def check(command, cwd):
                         f"Switching to the protected branch '{name}' is blocked in an "
                         "agent worktree. The protected branch belongs to the owner."
                     )
+        elif sub == "stash":
+            if "clear" in [word.lower() for word in words]:
+                return False, (
+                    "'git stash clear' destroys every stashed change, including "
+                    "work another session put aside. Drop the stash you own instead."
+                )
         elif sub == "clean":
             if CLEAN_FORCE.search(" ".join(words)):
                 return False, (

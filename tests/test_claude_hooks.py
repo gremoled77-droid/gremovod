@@ -244,6 +244,36 @@ class GitGuardTests(unittest.TestCase):
         self.assertDenied("git checkout -- .", "discard")
         self.assertDenied("git restore .", "discard")
 
+    def test_checkout_dot_is_denied(self):
+        self.assertDenied("git checkout .", "discard")
+
+    def test_checkout_tree_path_is_denied(self):
+        (self.repo.path / "tree").mkdir()
+        self.assertDenied("git checkout tree", "discard")
+
+    def test_checkout_head_with_dot_is_denied(self):
+        self.assertDenied("git checkout HEAD -- .", "discard")
+
+    def test_restore_tree_path_is_denied(self):
+        (self.repo.path / "tree").mkdir()
+        self.assertDenied("git restore tree", "discard")
+
+    def test_restore_worktree_with_dot_is_denied(self):
+        self.assertDenied("git restore --worktree .", "discard")
+
+    def test_restore_without_a_path_is_denied(self):
+        self.assertDenied("git restore", "discard")
+
+    def test_restore_staged_dot_is_allowed(self):
+        # Index only: the change is not lost, just unstaged.
+        self.assertAllowed("git restore --staged .")
+
+    def test_checkout_single_file_is_allowed(self):
+        self.assertAllowed("git checkout -- notes.txt")
+
+    def test_stash_clear_is_denied(self):
+        self.assertDenied("git stash clear", "stash")
+
     def test_reset_hard_with_uncommitted_changes_is_denied(self):
         repo = TempRepo("feature/work")
         self.addCleanup(repo.close)
@@ -404,6 +434,42 @@ class PaidGuardTests(unittest.TestCase):
 
     def test_live_piapi_dry_run_is_allowed(self):
         self.assertAllowed("python scripts/live_piapi_test.py --dry-run")
+
+    def test_two_dry_runs_are_allowed(self):
+        self.assertAllowed(
+            "python scripts/live_piapi_test.py --dry-run && "
+            "python scripts/live_piapi_test.py --dry-run")
+
+    def test_dry_run_followed_by_a_real_run_is_denied(self):
+        # The dry-run exception belongs to one invocation, not to the whole line.
+        self.assertDenied(
+            "python scripts/live_piapi_test.py --dry-run && "
+            "python scripts/live_piapi_test.py",
+            "money")
+
+    def test_dry_run_and_real_run_split_by_semicolon_is_denied(self):
+        self.assertDenied(
+            "python scripts/live_piapi_test.py --dry-run; "
+            "python scripts/live_piapi_test.py",
+            "money")
+
+    def test_dry_run_and_real_run_split_by_a_pipe_are_denied(self):
+        self.assertDenied(
+            "python scripts/live_piapi_test.py --dry-run | "
+            "python scripts/live_piapi_test.py",
+            "money")
+
+    def test_dry_run_and_real_run_split_by_or_are_denied(self):
+        self.assertDenied(
+            "python scripts/live_piapi_test.py --dry-run || "
+            "python scripts/live_piapi_test.py",
+            "money")
+
+    def test_gated_script_followed_by_a_direct_call_is_denied(self):
+        self.assertDenied(
+            "python scripts/watch_hunyuan_test.py && "
+            "python scripts/live_piapi_test.py",
+            "money")
 
     def test_live_piapi_confirmed_run_is_denied(self):
         self.assertDenied("python scripts/live_piapi_test.py --yes", "money")

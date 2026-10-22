@@ -79,10 +79,31 @@
 владельца.
 
 Рамка и решения: [глобальная приёмка #54](https://github.com/gremoled77-droid/gremovod/pull/54) —
-[реестр решений D1–D4](https://github.com/gremoled77-droid/gremovod/blob/audit/global-acceptance-20261021/docs/audits/global-acceptance-2026-10-21/07_DECISION_REGISTER.md),
+[реестр решений](https://github.com/gremoled77-droid/gremovod/blob/audit/global-acceptance-20261021/docs/audits/global-acceptance-2026-10-21/07_DECISION_REGISTER.md),
 [анализ пробелов беты](https://github.com/gremoled77-droid/gremovod/blob/audit/global-acceptance-20261021/docs/audits/global-acceptance-2026-10-21/05_BETA_GAP_ANALYSIS.md),
 [сценарий, агенты и доступные знания](https://github.com/gremoled77-droid/gremovod/blob/audit/global-acceptance-20261021/docs/audits/global-acceptance-2026-10-21/04_AGENTS_AND_SKILLS.md).
-Сам реестр помечает D1–D4 как рекомендации, а не как утверждённые решения владельца.
+
+**D1–D4 утверждены владельцем** — статус OWNER_APPROVED. Источник:
+[PR #55](https://github.com/gremoled77-droid/gremovod/pull/55) и
+[`docs/decisions/2026-10-21-beta-acceptance-D1-D4.md`](https://github.com/gremoled77-droid/gremovod/blob/decisions/beta-d1-d4-20261021/docs/decisions/2026-10-21-beta-acceptance-D1-D4.md).
+D5–D7 остаются открытыми.
+
+| ID | Утверждённое решение | Следствие для работы |
+|---|---|---|
+| D1 | `mavis/work` — база исправлений первой беты | каждое исправление — отдельная task-ветка/PR от зафиксированного SHA `mavis/work`; `main` не меняется без независимой приёмки |
+| D2 | восстановить MiniMax Task API после GA-01 | сначала денежная безопасность GA-01, затем GA-02 с prepare → permit → execute, идемпотентностью и UNKNOWN |
+| D3 | локальный технический QC и ручное утверждение MP4 владельцем | разнести `imported` / `technical_pass` / `owner_approved`, привязать к одному хешу файла; три платных LLM-критика в первую бету не входят |
+| D4 | первый пилот — локально, монтаж в CapCut | CapCut — монтаж и рендер, GremoVOD — подготовка материалов, учёт, контроль и приёмка; n8n Cloud не блокирует локальный пилот |
+
+**Утверждение продуктовых решений и приёмка реализации — разные вещи.**
+
+- D1–D4 утверждены как **границы первой беты**. Это разрешение рамки, а не одобрение
+  кода, платных вызовов, слияния, публикации или изменения канона.
+- **Приёмка реализации** остаётся частичной: статус глобального аудита #54 —
+  PARTIAL / NO GO для платной беты до подтверждённого закрытия P0 и E2E. Решение
+  D1–D4 этот статус не меняет.
+- Роль Codex — независимая приёмка реализации; роль владельца — утверждение
+  интеграции, денег и финального выпуска.
 
 Из этого следует:
 
