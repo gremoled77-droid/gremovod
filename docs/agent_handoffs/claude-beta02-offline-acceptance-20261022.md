@@ -8,13 +8,14 @@
 python tools/beta_offline_acceptance.py --quick     # адресные проверки (около минуты)
 python tools/beta_offline_acceptance.py --full      # плюс весь backend pytest (около 2,5 минут)
 python tools/beta_offline_acceptance.py --quick --fault b1|owner|ledger   # самопроверка: сломанный продукт обязан дать FAIL (код 1)
-python tools/beta02_candidate.py --dest <папка вне репозитория>           # одноразовая интеграционная копия по закреплённым SHA
+python tools/beta02_candidate.py --dest <папка вне репозитория> --harness <полный SHA ветки #88>   # копия по точным SHA
 ```
 
 Нужны python с зависимостями `backend/requirements.lock.txt` и pytest, ffmpeg и ffprobe (без них шаги BLOCKED, автоустановки нет).
 Код выхода: 0 — все обязательные шаги PASS; 1 — есть FAIL; 2 — есть BLOCKED или NOT_RUN. Отчёты `report.json` и `report.md` пишутся во временную папку или в `--out`.
 `unpaid_calls: 0` пишется только при PASS всех обязательных шагов и нуле сетевых попыток по ловушке `tools/beta02_tripwire.py` (loopback разрешён, любой другой DNS или connect — ошибка и запись в отчёт).
 Данные: временный `STUDIO_DATA_DIR`; реальные файлы ключей изолированы патчами; ролики собирает локальный ffmpeg.
+Перед сборкой копии — `git fetch origin` по всем веткам манифеста: дрейф проверяется по локальным ссылкам `origin/*`.
 
 ## Карта SHA (проверена `git fetch` 2026-10-22)
 
@@ -72,3 +73,45 @@ python tools/beta02_candidate.py --dest <папка вне репозитори�
 - **NOT_RUN:** браузерный smoke и frontend `tsc`/`build` на копии (UI #86 не входит), CapCut и реальный MP4, рабочая SQLite, живые провайдеры, CI с тестами.
 - Каталог `tools/` целиком в `.gitignore`; новые файлы добавлены принудительно (`git add -f`), как прежние `tools/*`.
 - Самопроверка: в отчётах нет секретов и абсолютных домашних путей (тест на редактирование плюс регулярка); сеть закрыта ловушкой; временные папки удаляются, временные worktree удаляются вручную (`git worktree remove --force`).
+
+## Раунд 2: точные SHA и очистка секретов (22.10.2026)
+
+Замечания: сборщик не проверял SHA точно, гейт передавал pytest всё окружение (`{**os.environ}`, убирался только `STUDIO_SERVICE_TOKENS`).
+
+**Сборщик `tools/beta02_candidate.py`.** Манифест принимает только полные SHA (40 hex, нижний регистр), без повторов SHA и PR. Каждый SHA — существующий коммит, `rev-parse` возвращает ровно его. Голова `origin/<ветка>` обязана совпадать с закреплённым SHA: при дрейфе или отсутствии ссылки статус `DRIFT`, копия не создаётся (`--allow-drift` — только для воспроизведения, гейт всё равно даст BLOCKED). После checkout HEAD равен базе, после каждого merge коммит — предок HEAD, в конце все SHA в дереве и копия чистая. Неизвестный коммит — `ERROR`, а не `CONFLICT`. `--harness <sha>` сливает коммит гейта последним с теми же проверками. Переменные `GIT_DIR` и подобные на git не влияют.
+
+**Гейт `tools/beta_offline_acceptance.py`.** Два новых обязательных шага:
+- «Происхождение»: база и каждый SHA манифеста существуют, совпадают с `origin/<ветка>` и входят в HEAD, дерево чистое; иначе BLOCKED с причиной по каждому SHA;
+- «Секреты»: файлы ключей в дереве (`*_API_KEY.txt`, `.env`, `.env.*` кроме шаблонов `*.example`, `kie-access/api-key.dpapi`) — BLOCKED, pytest не запускается.
+
+pytest получает окружение по списку разрешённых переменных (PATH, системные Windows, локаль); всё похожее на ключ, токен, пароль, сессию отбрасывается. HOME, USERPROFILE, APPDATA и временные каталоги — пустая песочница: ключ ElevenLabs из `~/Documents` и KIE DPAPI не читаются. В отчёте — только имена убранных переменных; их значения и строки вида `sk-…`, `Bearer …`, `api_key=…` маскируются.
+
+**Тесты.** `tests/test_beta02_exact.py`: манифест (короткий, заглавный, повторный SHA, повтор PR), временный git-репозиторий (чистая сборка, дрейф, нет ссылки, неизвестный коммит, конфликт с файлами, harness, нет в HEAD, грязное дерево), реальный дочерний процесс не видит канареек-секретов, маскировка, поиск файлов ключей. Сквозной тест гейта ставит канарейку `PIAPI_API_KEY` и проверяет, что она не попала в отчёт. Фикстура `TOKEN` в `tests/test_beta02_integration.py` укорочена: скан секретов #75 принимал её за литерал секрета.
+
+**Независимый прогон.** Свежий venv строго по `backend/requirements.lock.txt` (fastapi 0.143.1, pydantic 2.14.1, httpx 0.28.1, pytest 9.1.1, Python 3.13, Linux). Копия собрана новым сборщиком: база `57cac59` + 7 источников + гейт `90fe1a9`, все 8 слияний CLEAN, дрейфа нет, HEAD копии `9968ce3`. В окружении — канарейки (`PIAPI_API_KEY`, `OPENAI_API_KEY`, `GITHUB_TOKEN`, `STUDIO_SERVICE_TOKENS`, `ELEVENLABS_API_KEY`).
+
+| Шаг (`--full`) | Статус | Тесты | Сеть |
+|---|---|---|---|
+| Происхождение: точные SHA, дрейф, чистое дерево | PASS | — | — |
+| Секреты: нет файлов ключей, окружение очищено | PASS | — | — |
+| GA-03: release gate | PASS | 34/0/0/0 | 0 |
+| N34/N35 и приёмка QA | PASS | 56/0/0/0 | 0 |
+| BETA-02: контракт HTTP, перезапуск, резервная копия | PASS | 6/0/0/0 | 0 |
+| BETA-02: fail-closed матрица, токен, гонка | PASS | 15/0/0/0 | 0 |
+| GA-01 рядом с выпуском | PASS | 4/0/0/0 | 0 |
+| GA-01: тесты денег | PASS | 117/0/0/0 | 0 |
+| Весь backend pytest | PASS | 628/0/0/0 | 0 |
+
+Технический вердикт PASS, релизный NO_GO, `unpaid_calls = 0`, код выхода 0. Канареек в `report.json`, `report.md` и выводе нет; `PIAPI_API_KEY` значится среди убранных переменных.
+
+Самопроверка на той же копии (гейт `90fe1a9`):
+- `--fault b1` → FAIL (`integration-failclosed`), код 1; `--fault owner` → FAIL (`integration-failclosed`), код 1; `--fault ledger` → FAIL (`ga01-money-coexistence`), код 1; во всех `unpaid_calls = unknown`;
+- два `--quick` подряд: PASS, код 0, статусы и счётчики всех шагов совпадают;
+- `BETA02_SLOW=1 pytest tests/test_beta_offline_acceptance.py tests/test_beta02_exact.py` — 23 passed (со сквозными прогонами гейта подпроцессом).
+
+- Ветка #88 без GA-01: шаг «Происхождение» BLOCKED (#75, #58, #76, #79 отсутствуют в HEAD), код 2.
+- Первый прогон раунда 2 дал ложный BLOCKED на отслеживаемых шаблонах `.env.example`, `.env.cloud.example` — исправлено (`1f18f6e`).
+- Скан секретов #75 (`check_change` на диффе `origin/build/claude/ga-03-ui-e2e...HEAD`) — OK; scope guard — `role=claude`, 8 файлов, forbidden 0.
+- Грабли: `tools/check_no_secrets.py` считает дифф в папке, где лежит сам инструмент, а не в текущей; запускать его из проверяемого дерева. Тесты хуков #75 требуют `TMPDIR` вне рабочей копии.
+
+Статусы раздельно: CODE_COMPLETE — да; CI_PASS — NOT_RUN; OWNER_ACCEPTED — нет; RELEASE_GO — нет.
