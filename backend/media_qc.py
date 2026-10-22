@@ -373,7 +373,7 @@ def master_facts(studio, project_id, artifact_id):
     Единый источник истины для технической проверки и для заморозки медиа в
     QA-контуре: и там, и там мастер — это один и тот же файл в библиотеке.
     """
-    facts = {'exists': False, 'path': None, 'sha256': '', 'qc_verdict': '', 'measurements': {},
+    facts = {'exists': False, 'path': None, 'sha256': '', 'qc_verdict': '', 'qc_stale': False, 'measurements': {},
              'observations': {}, 'reason': 'итоговый артефакт не найден'}
     with studio.connect() as db:
         row = db.execute('SELECT * FROM release_artifacts WHERE id=? AND project_id=?',
@@ -402,6 +402,9 @@ def master_facts(studio, project_id, artifact_id):
         facts['reason'] = 'файл мастера отсутствует на диске'
     if qc is not None:
         facts['qc_verdict'] = qc['verdict'] or ''
+        if facts['exists'] and (qc['master_sha256'] or '') != facts['sha256']:
+            # QC относится к другим байтам: файл изменён после проверки, старый вердикт не наследуется
+            facts['qc_verdict'], facts['qc_stale'] = BLOCKED, True
         for field, key in (('measurements', 'measurements'), ('observations', 'observations')):
             try:
                 facts[key] = json.loads(qc[field])

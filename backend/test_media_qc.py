@@ -205,6 +205,18 @@ class RouteTests(unittest.TestCase):
                                     json={'report': report, 'signature': signature, 'manifest': MASTER})
         self.assertEqual(response.status_code, 400, response.text)
 
+    def test_file_changed_after_qc_does_not_inherit_the_verdict(self):
+        """BETA-01: изменённый после QC файл не должен получать старый PASS при заморозке."""
+        self.assertEqual(self.measure().json()['verdict'], media_qc.PASS_TECHNICAL)
+        fresh = media_qc.master_facts(main, self.project_id, self.artifact_id)
+        self.assertEqual(fresh['qc_verdict'], media_qc.PASS_TECHNICAL)
+        with next(Path(main.LIBRARY_ROOT).glob('*.mp4')).open('ab') as stored:
+            stored.write(b'tail')
+        changed = media_qc.master_facts(main, self.project_id, self.artifact_id)
+        self.assertEqual(changed['qc_verdict'], media_qc.BLOCKED)
+        self.assertTrue(changed['qc_stale'])
+        self.assertNotEqual(changed['sha256'], fresh['sha256'])
+
     def test_verdict_is_not_stored_without_a_check(self):
         response = self.client.get(f'/api/projects/{self.project_id}/release-artifacts/{self.artifact_id}/qc')
         self.assertEqual(response.status_code, 404, response.text)
