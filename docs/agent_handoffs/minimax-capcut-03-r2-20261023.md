@@ -96,8 +96,11 @@ GitHub Actions на финальном HEAD ветки:
 
 | Прогон | Статус |
 |---|---|
-| `validate-agent-handoff` — run `39857287707` | **success** (шаг «Validate handoff files, role boundaries and seven safe MOCK n8n JSON files») |
-| `check-agent-scope` — run `39857287516` | **skipped** — `LEGACY_BRANCH_NOT_ENFORCED`, см. раздел «Scope». Skipped — это не PASS |
+| `validate-agent-handoff` — run `39857469918` | **success** (шаг «Validate handoff files, role boundaries and seven safe MOCK n8n JSON files») |
+| `check-agent-scope` — run `39857469881` | **skipped** — `LEGACY_BRANCH_NOT_ENFORCED`, см. раздел «Scope». Skipped — это не PASS |
+
+Прогоны выше — на HEAD `db1e127`; следующий коммит меняет только эти две строки, код и тесты не
+трогаются, результат прогонов тот же.
 
 Все данные — временные синтетические файлы в `TemporaryDirectory`; сети, production, SQLite,
 реальных медиа и платных вызовов не было.
