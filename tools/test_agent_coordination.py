@@ -101,6 +101,69 @@ class CoordinationContractTests(unittest.TestCase):
         self.assertIn("AGENT_BUILD_MANUAL.md", agents)
         self.assertIn("STATUS.md", agents)
 
+    # These are text-contract checks, not a live Codex behavior or sandbox test.
+    def test_codex_root_instructions_are_discoverable(self):
+        agents = ROOT / "AGENTS.md"
+        self.assertTrue(agents.is_file())
+        self.assertFalse((ROOT / "AGENTS.override.md").exists())
+        self.assertLess(len(agents.read_bytes()), 32768)
+
+    def test_codex_role_is_explicitly_loaded_early(self):
+        agents = (ROOT / "AGENTS.md").read_text(encoding="utf8")
+        self.assertLess(agents.index(".codex/CODEX_ROLE.md"),
+                        agents.index("## Рабочие каталоги"))
+        role = (ROOT / ".codex/CODEX_ROLE.md").read_text(encoding="utf8")
+        self.assertIn("Сначала читать **корневой `AGENTS.md`", role)
+        self.assertIn("не загружается автоматически", role)
+
+    def test_codex_recommends_model_before_analysis_without_config_changes(self):
+        role = (ROOT / ".codex/CODEX_ROLE.md").read_text(encoding="utf8")
+        self.assertIn("ШАГ 0 — выбор модели", role)
+        self.assertIn("До глубокого анализа", role)
+        self.assertIn("model_reasoning_effort", role)
+        self.assertIn("~/.codex/config.toml", role)
+        self.assertIn("существующие профили", role)
+        self.assertFalse((ROOT / ".codex/config.toml").exists())
+
+    def test_codex_verdict_is_bound_to_github_head(self):
+        role = (ROOT / ".codex/CODEX_ROLE.md").read_text(encoding="utf8")
+        for term in ("GitHub", "base/head SHA", "текущий HEAD", "retest",
+                     "PASS", "CHANGES_REQUESTED", "BLOCKED"):
+            self.assertIn(term, role)
+
+    def test_codex_preserves_other_agents_and_owner_merge_gate(self):
+        role = (ROOT / ".codex/CODEX_ROLE.md").read_text(encoding="utf8")
+        agents = (ROOT / "AGENTS.md").read_text(encoding="utf8")
+        self.assertIn("не редактировать ветку автора", role)
+        self.assertIn("не трогать чужие worktree/PR", role)
+        self.assertIn("Merge любого PR — только по явному решению владельца", agents)
+        self.assertIn("main", role)
+        self.assertIn("master", role)
+        self.assertIn("mavis/work", role)
+
+    def test_codex_uses_d1_without_automatic_merge(self):
+        agents = (ROOT / "AGENTS.md").read_text(encoding="utf8")
+        role = (ROOT / ".codex/CODEX_ROLE.md").read_text(encoding="utf8")
+        self.assertNotIn("git merge origin/main", agents)
+        self.assertNotIn("git merge origin/mavis/work", agents)
+        self.assertIn("зафиксированного SHA `mavis/work`", agents)
+        self.assertIn("не выполнять автоматический merge", agents)
+        self.assertIn("stacked", role)
+        self.assertIn("D1–D4", role)
+
+    def test_codex_requires_independent_severity_and_honest_evidence(self):
+        role = (ROOT / ".codex/CODEX_ROLE.md").read_text(encoding="utf8")
+        for term in ("независимый", "P0 —", "P1 —", "P2 —", "NOT_RUN",
+                     "LOCAL_PASS", "CI_PASS", "INDEPENDENT_REVIEW", "OWNER_ACCEPTED",
+                     "собственные изменения", "реально включёнными sandbox/approval"):
+            self.assertIn(term, role)
+
+    def test_codex_does_not_authorize_paid_or_production_actions(self):
+        role = (ROOT / ".codex/CODEX_ROLE.md").read_text(encoding="utf8")
+        for term in ("Никаких платных запросов", "рабочей SQLite", "canon/**",
+                     "без явного разрешения владельца", "model_provider"):
+            self.assertIn(term, role)
+
     def test_no_automerge_or_approval_claims(self):
         status = (ROOT / "STATUS.md").read_text(encoding="utf8")
         self.assertIn("READY_FOR_CODEX_REVIEW", status)
