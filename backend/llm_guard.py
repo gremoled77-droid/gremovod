@@ -249,18 +249,36 @@ def split_held(held_usd, confirmed_usd):
     return confirmed, unknown
 
 
+def token_count(value):
+    """Достоверное число токенов из старой базы. None — счётчику верить нельзя.
+
+    Испорченное значение ('bad', True, -5) количеством токенов не является. Раньше
+    такое значение роняло расчёт с TypeError, а расчёт идёт на старте Studio: одна
+    испорченная строка в журнале не должна мешать приложению подняться.
+    """
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    if not math.isfinite(value) or value < 0:
+        return None
+    return float(value)
+
+
 def confirmed_from_tokens(model, tokens_in, tokens_out):
     """Подтверждённая часть по записанным токенам: 0, если модель или токены неизвестны.
 
     Нужен для старой базы: там подтверждённая часть не хранилась отдельной колонкой.
+    Испорченные счётчики не ломают расчёт: подтверждённой части просто нет, а резерв
+    остаётся удержанным до ручной сверки.
     """
-    if tokens_in is None or tokens_out is None:
+    counted_in = token_count(tokens_in)
+    counted_out = token_count(tokens_out)
+    if counted_in is None or counted_out is None:
         return 0.0
     prices = PRICES.get(model)
     if prices is None:
         return 0.0
     price_in, price_out = prices
-    usd = (tokens_in * price_in + tokens_out * price_out) / 1_000_000
+    usd = (counted_in * price_in + counted_out * price_out) / 1_000_000
     if not math.isfinite(usd) or usd < 0:
         return 0.0
     return round(usd, 6)
@@ -417,18 +435,37 @@ def actual_cost(price_in, price_out, usage):
     return round(usd, 6), tokens_in, tokens_out
 
 
+def money(value):
+    """Сумма в долларах: конечное неотрицательное число. Всё остальное — ноль."""
+    try:
+        amount = float(value)
+    except (TypeError, ValueError):
+        return 0.0
+    if not math.isfinite(amount) or amount < 0:
+        return 0.0
+    return round(amount, 6)
+
+
 def settle_from_usage(price_in, price_out, usage, estimate):
     """Единое решение по деньгам: (status, usd, tokens_in, tokens_out, reason).
 
     Достоверный usage — подтверждённый факт, сумма полная. Отсутствующий или
     повреждённый usage не доказывает $0: резерв остаётся в руках под статусом
     'submission_unknown' с причиной, а сумма не может быть отрицательной.
+
+    Причина называет, что именно не сработало: счётчики провайдера или цену. Раньше
+    нечисловая цена приходила в ту же ветку, что и отсутствующий usage, а причина
+    склеивалась с None: вызов падал вместо того, чтобы удержать резерв до сверки.
     """
     usd, tokens_in, tokens_out = actual_cost(price_in, price_out, usage)
     if usd is not None:
         return 'done', usd, tokens_in, tokens_out, ''
-    return ('submission_unknown', round(estimate, 6), None, None,
-            'провайдер не отдал достоверный usage: ' + usage_problem(usage))
+    problem = usage_problem(usage)
+    if problem is not None:
+        reason = 'провайдер не отдал достоверный usage: ' + problem
+    else:
+        reason = 'цена провайдера нечисловая или неконечная: стоимость факта не вычислима'
+    return 'submission_unknown', money(estimate), None, None, reason
 
 
 def provider_key(authorization, direct):
@@ -608,6 +645,51 @@ def ensure_confirmed_usd(db):
     return pending
 
 
+def append_note(old, reason):
+    """Причина добавляется к существующей заметке, а не заменяет её."""
+    text = (old or '').strip()
+    return f'{text} | {reason}' if text else reason
+
+
+def repair_legacy_money(db):
+    """Старые записи с невозможной суммой: денежного факта из них нет.
+
+    Отрицательная сумма — не «списание», а испорченная запись. Она не должна уменьшать
+    доступный бюджет, но и не доказывает $0: удерживающая строка переводится в
+    неопределённый исход с резервом по оценке и ждёт ручной сверки, а не удерживающая
+    приводится к нулю. Ноль здесь не подставляется вместо неизвестного списания.
+
+    Идемпотентно: повторный запуск ничего не меняет. Вызывается на старте, когда
+    колонки confirmed_usd и note уже гарантированно есть.
+    """
+    columns = {row['name'] for row in db.execute('PRAGMA table_info(llm_calls)')}
+    if 'confirmed_usd' not in columns:
+        return 0
+    has_note = 'note' in columns
+    select = ('SELECT id,status,usd,estimated_usd,confirmed_usd' + (',note' if has_note else '') +
+              ' FROM llm_calls WHERE usd<0 OR confirmed_usd<0')
+    repaired = 0
+    for old in db.execute(select).fetchall():
+        held = float(old['usd'] or 0.0)
+        estimate = float(old['estimated_usd'] or 0.0)
+        if held < 0:
+            if old['status'] in spend_ledger.LLM_HOLDING_STATUSES:
+                reason = 'старая запись с отрицательной суммой: резерв восстановлен по оценке, исход не подтверждён'
+                values = {'status': 'submission_unknown', 'usd': money(estimate), 'confirmed_usd': 0.0}
+            else:
+                reason = 'старая запись с отрицательной суммой: сумма приведена к нулю'
+                values = {'usd': 0.0, 'confirmed_usd': 0.0}
+        else:
+            reason = 'старая запись с отрицательной подтверждённой частью: часть приведена к нулю'
+            values = {'confirmed_usd': 0.0}
+        if has_note:
+            values['note'] = append_note(old['note'] if 'note' in old.keys() else None, reason)
+        assignments = ','.join(f'{name}=?' for name in values)
+        db.execute(f'UPDATE llm_calls SET {assignments} WHERE id=?', (*values.values(), old['id']))
+        repaired += 1
+    return repaired
+
+
 def register(app, studio):
     @app.on_event('startup')
     def setup():
@@ -626,6 +708,8 @@ def register(app, studio):
             # Миграция атомарна и возобновляема: незавершённые строки добиваются
             # при каждом старте, а не только в момент появления колонки.
             ensure_confirmed_usd(db)
+            # Старые записи с невозможной суммой не уменьшают бюджет и ждут сверки.
+            repair_legacy_money(db)
 
     @app.post('/api/llm/estimate')
     def estimate(body: Estimate):
@@ -783,6 +867,13 @@ def register(app, studio):
                 held = round(confirmed + unknown, 6)
                 status = 'done'
             held = max(0.0, round(held, 6))
+            # Явная сверка с владельцем называет факт: после исхода 'done' вся удержанная
+            # сумма подтверждена, неопределённого остатка не остаётся. Подтверждённая
+            # часть при этом не уменьшается — она растёт до названной суммы, поэтому
+            # сводка не показывает расход, который не объяснён ни подтверждённым, ни
+            # неопределённым остатком.
+            if status == 'done':
+                confirmed = held
             note = body.note
             if body.outcome == 'failed' and confirmed > 0:
                 note = f'{body.note} (неопределённый резерв снят, подтверждённая часть {confirmed} сохранена)'
