@@ -27,7 +27,9 @@ tmp/
 exports/
 output/
 runtime/
-tools/
+# tools/ is a source directory (CI checkers). Local tool payloads stay ignored via
+# the tools/downloads/ and tools/ffmpeg/ rules above; the previous bare "tools/"
+# rule silently hid new source files from git add.
 _archive/
 model-studio/data/
 frontend/tsconfig.tsbuildinfo
