@@ -15,7 +15,8 @@ sys.path.insert(0, str(ROOT / 'tools'))
 import beta02_candidate as candidate  # noqa: E402
 import beta_offline_acceptance as gate  # noqa: E402
 
-CANARY = 'sk-canary0123456789abcdef'
+# Ключ-канарейка собирается во время выполнения: в файле нет строки в формате ключа.
+CANARY = 'sk-' + 'canary' * 4
 
 
 def run(args, cwd):
@@ -165,9 +166,9 @@ class ExactShaTests(unittest.TestCase):
 
 class SecretScrubTests(unittest.TestCase):
     BASE = {'PATH': os.environ.get('PATH', ''), 'LANG': 'ru_RU.UTF-8', 'HOME': '/home/owner', 'USERPROFILE': 'C:/Users/owner',
-            'PIAPI_API_KEY': CANARY, 'OPENAI_API_KEY': CANARY + 'o', 'GITHUB_TOKEN': 'ghp_canary000000',
-            'STUDIO_SERVICE_TOKENS': 'tok:*', 'GREMOVOD_QC_SIGNING_KEY': 'qc-canary-key', 'ELEVENLABS_KEY_FILE': '/home/owner/k.txt',
-            'KIE_DPAPI_FILE': '/home/owner/kie.dpapi', 'DB_PASSWORD': 'hunter2-canary', 'AWS_SECRET_ACCESS_KEY': 'aws-canary-1',
+            'PIAPI_API_KEY': CANARY, 'OPENAI_API_KEY': CANARY + 'o', 'GITHUB_TOKEN': 'ghp-cnry1',
+            'STUDIO_SERVICE_TOKENS': 'tok:*', 'GREMOVOD_QC_SIGNING_KEY': 'qc-cnry-k', 'ELEVENLABS_KEY_FILE': '/home/owner/k.txt',
+            'KIE_DPAPI_FILE': '/home/owner/kie.dpapi', 'DB_PASSWORD': 'hntr2-cnry', 'AWS_SECRET_ACCESS_KEY': 'aws-cnry1',
             'HTTPS_PROXY': 'http://user:pw@proxy:3128', 'GIT_DIR': '/elsewhere', 'PYTHONSTARTUP': '/home/owner/s.py'}
 
     def test_only_allowlisted_variables_reach_pytest(self):
@@ -180,7 +181,7 @@ class SecretScrubTests(unittest.TestCase):
         self.assertNotIn('owner', env['HOME'] + env['USERPROFILE'])  # песочница, не настоящий профиль
         self.assertNotIn('owner', env['ELEVENLABS_KEY_FILE'])
         self.assertIn('PIAPI_API_KEY', removed)
-        self.assertEqual(gate.scrub({'PWD': '/x', 'OLDPWD': '/y', 'DB_PWD': 'secret-pwd'})[1], ['DB_PWD'])  # PWD — папка
+        self.assertEqual(gate.scrub({'PWD': '/x', 'OLDPWD': '/y', 'DB_PWD': 'pwd-cnry'})[1], ['DB_PWD'])  # PWD — папка
         self.assertIn(CANARY, values)
         self.assertNotIn(CANARY, json.dumps(env))
 
@@ -191,15 +192,15 @@ class SecretScrubTests(unittest.TestCase):
                                   'print(json.dumps({"env": dict(os.environ), "home": str(pathlib.Path.home())}))'],
                                  env=env, capture_output=True, text=True).stdout
         seen = json.loads(out)
-        for value in (CANARY, 'ghp_canary000000', 'hunter2-canary', 'aws-canary-1', 'qc-canary-key', 'tok:*'):
+        for value in (CANARY, 'ghp-cnry1', 'hntr2-cnry', 'aws-cnry1', 'qc-cnry-k', 'tok:*'):
             self.assertNotIn(value, out)
         self.assertTrue(seen['home'].startswith(str(Path(tmp))))
 
     def test_report_masks_secret_values_and_key_like_strings(self):
         lines = gate.redact([f'boom {CANARY}', 'Authorization: Bearer abc.def', 'api_key=XYZ123 token: t0k3n',
-                             'value hunter2-canary leaked'], ['hunter2-canary'])
+                             'value hntr2-cnry leaked'], ['hntr2-cnry'])
         text = '\n'.join(lines)
-        for value in (CANARY, 'abc.def', 'XYZ123', 't0k3n', 'hunter2-canary'):
+        for value in (CANARY, 'abc.def', 'XYZ123', 't0k3n', 'hntr2-cnry'):
             self.assertNotIn(value, text)
         self.assertIn('api_key=<secret>', text)
 
