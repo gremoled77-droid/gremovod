@@ -111,7 +111,12 @@ def _aspect(width, height):
 
 
 def probe_media(path):
-    """Duration, resolution and FPS of one media file, or ``None`` when unknown."""
+    """Duration, resolution and FPS of one media file.
+
+    ``None`` means "cannot judge" — ffprobe is not installed, and that never
+    blocks the pack. A dict with ``probe_error`` means the file could not be
+    read as video: a broken master must not pass through as a ready pack.
+    """
     binary = ffprobe_path()
     if not binary:
         return None
@@ -120,13 +125,16 @@ def probe_media(path):
                                        "-show_streams", "-of", "json", str(path)])
         data = json.loads(raw)
     except (mock_media_pilot.MockMediaError, OSError, json.JSONDecodeError):
-        return None
+        return {"duration_seconds": None, "width": None, "height": None, "fps": None,
+                "aspect_ratio": None, "audio_streams": 0,
+                "probe_error": "файл не читается как видео"}
     streams = data.get("streams") or []
     video = next((s for s in streams if s.get("codec_type") == "video"), None)
     audio = [s for s in streams if s.get("codec_type") == "audio"]
     if video is None:
         return {"duration_seconds": _duration(data), "width": None, "height": None,
-                "fps": None, "aspect_ratio": None, "audio_streams": len(audio)}
+                "fps": None, "aspect_ratio": None, "audio_streams": len(audio),
+                "probe_error": "в файле нет видеопотока"}
     width, height = video.get("width"), video.get("height")
     return {"duration_seconds": _duration(data), "width": width, "height": height,
             "fps": _fps(video), "aspect_ratio": _aspect(width, height),
@@ -168,12 +176,18 @@ def read_edit_list(edit_list_path):
 
 
 def _ordered_rows(rows):
-    """Rows in edit-list order: the explicit ``order`` field first, file order otherwise."""
-    def key(item):
-        index, row = item
-        order = row.get("order") if isinstance(row, dict) else None
-        return (0, order, index) if isinstance(order, int) else (1, 0, index)
-    return [row for _, row in sorted(enumerate(rows), key=key)]
+    """Rows in edit-list order with the number each of them gets in the montage.
+
+    An explicit ``order`` wins. A row without it keeps its position in the file:
+    it never jumps to the end of the montage and never takes a number that
+    belongs to another row.
+    """
+    numbered = []
+    for index, row in enumerate(rows):
+        explicit = row.get("order") if isinstance(row, dict) else None
+        numbered.append((_number(explicit, index + 1), index, row))
+    numbered.sort(key=lambda item: (item[0], item[1]))
+    return [(order, index, row) for order, index, row in numbered]
 
 
 def _normalise_tracks(audio_tracks):
@@ -282,10 +296,9 @@ def export_handoff(edit_list_path, media_root, output_dir, *, audio_tracks=None,
     # Resolve every referenced path BEFORE touching the filesystem: a path that
     # escapes the allowed root must not leave a half-written pack behind.
     plan = []
-    for index, row in enumerate(rows):
+    for order, file_index, row in rows:
         if not isinstance(row, dict):
-            raise HandoffError(f"Строка {index + 1} монтажного листа не является объектом")
-        order = _number(row.get("order"), index + 1)
+            raise HandoffError(f"Строка {file_index + 1} монтажного листа не является объектом")
         scene = _number(row.get("scene"), order)
         frame = _number(row.get("frame"), order)
         clip_relative = str(row.get("video") or "")
@@ -313,6 +326,9 @@ def export_handoff(edit_list_path, media_root, output_dir, *, audio_tracks=None,
     _prepare_folders(target)
 
     issues = []
+    if not rows:
+        issues.append(_issue("EMPTY_EDIT_LIST", "blocking",
+                             "Монтажный лист пуст: в пакете нечего монтировать"))
     clips, references = [], []
     audio_entries = {name: [] for name in AUDIO_TRACKS}
     files = []
@@ -342,12 +358,16 @@ def export_handoff(edit_list_path, media_root, output_dir, *, audio_tracks=None,
                                  order=item["order"], source=item["clip_relative"]))
         else:
             name = stem + clip_source.suffix.lower()
-            if name in taken_names:
+            # The occupied name is the destination path: two clips in 01_Clips
+            # really collide, the same file name in 02_Audio/voice and
+            # 02_Audio/sfx does not.
+            destination_key = f"{CLIPS_DIR}/{name}"
+            if destination_key in taken_names:
                 issues.append(_issue("DUPLICATE_DESTINATION_NAME", "blocking",
                                      f"Кадр {item['order']}: имя {name} уже занято в пакете — файл не скопирован",
                                      order=item["order"], name=name))
             else:
-                taken_names.add(name)
+                taken_names.add(destination_key)
                 destination = target / CLIPS_DIR / name
                 packed = _pack_file(clip_source, destination, issues,
                                     f"Кадр {item['order']} ({item['clip_relative']})")
@@ -355,6 +375,11 @@ def export_handoff(edit_list_path, media_root, output_dir, *, audio_tracks=None,
                 clip_entry["sha256"] = packed["sha256"]
                 clip_entry["bytes"] = packed["bytes"]
                 clip_entry["media"] = probe_media(destination)
+                if clip_entry["media"] is not None and clip_entry["media"].get("probe_error"):
+                    issues.append(_issue("UNSUPPORTED_MEDIA", "blocking",
+                                         f"Кадр {item['order']}: {clip_entry['media']['probe_error']}: "
+                                         f"{item['clip_relative']}",
+                                         order=item["order"], source=item["clip_relative"]))
                 files.append({"path": clip_entry["path"], "sha256": packed["sha256"],
                               "bytes": packed["bytes"], "role": "clip"})
                 usage = source_usage.setdefault(item["clip_relative"], item["order"])
@@ -371,15 +396,22 @@ def export_handoff(edit_list_path, media_root, output_dir, *, audio_tracks=None,
                                      order=item["order"]))
             else:
                 name = stem + VERTICAL_SUFFIX + vertical_source.suffix.lower()
-                if name in taken_names:
+                destination_key = f"{CLIPS_DIR}/{name}"
+                if destination_key in taken_names:
                     issues.append(_issue("DUPLICATE_DESTINATION_NAME", "blocking",
                                          f"Кадр {item['order']}: имя {name} уже занято в пакете — файл не скопирован",
                                          order=item["order"], name=name))
                 else:
-                    taken_names.add(name)
+                    taken_names.add(destination_key)
                     destination = target / CLIPS_DIR / name
                     packed = _pack_file(vertical_source, destination, issues,
                                         f"Кадр {item['order']} 9:16 ({vertical_source.name})")
+                    vertical_media = probe_media(destination)
+                    if vertical_media is not None and vertical_media.get("probe_error"):
+                        issues.append(_issue("UNSUPPORTED_MEDIA", "blocking",
+                                             f"Кадр {item['order']} 9:16: {vertical_media['probe_error']}: "
+                                             f"{vertical_source.name}",
+                                             order=item["order"], source=vertical_source.name))
                     clip_entry["variant_9x16"] = f"{CLIPS_DIR}/{name}"
                     files.append({"path": clip_entry["variant_9x16"], "sha256": packed["sha256"],
                                   "bytes": packed["bytes"], "role": "clip_9x16"})
@@ -396,12 +428,13 @@ def export_handoff(edit_list_path, media_root, output_dir, *, audio_tracks=None,
                                      f"{item['image_relative']}", order=item["order"]))
             else:
                 name = stem + image_source.suffix.lower()
-                if name in taken_names:
+                destination_key = f"{REFERENCES_DIR}/{name}"
+                if destination_key in taken_names:
                     issues.append(_issue("DUPLICATE_DESTINATION_NAME", "blocking",
                                          f"Кадр {item['order']}: имя {name} уже занято в пакете — файл не скопирован",
                                          order=item["order"], name=name))
                 else:
-                    taken_names.add(name)
+                    taken_names.add(destination_key)
                     destination = target / REFERENCES_DIR / name
                     packed = _pack_file(image_source, destination, issues,
                                         f"Референс кадра {item['order']} ({item['image_relative']})")
@@ -435,12 +468,13 @@ def export_handoff(edit_list_path, media_root, output_dir, *, audio_tracks=None,
                                      track=name, source=relative))
                 continue
             file_name = source_path.name
-            if file_name in taken_names:
+            destination_key = f"{AUDIO_DIR}/{name}/{file_name}"
+            if destination_key in taken_names:
                 issues.append(_issue("DUPLICATE_DESTINATION_NAME", "blocking",
-                                     f"Звуковая дорожка {name}: имя {file_name} уже занято в пакете — файл не скопирован",
-                                     track=name, name=file_name))
+                                     f"Звуковая дорожка {name}: имя {file_name} уже занято в этой дорожке — "
+                                     f"файл не скопирован", track=name, name=file_name))
                 continue
-            taken_names.add(file_name)
+            taken_names.add(destination_key)
             destination = target / AUDIO_DIR / name / file_name
             packed = _pack_file(source_path, destination, issues,
                                 f"Звук {name} ({relative})")
@@ -571,6 +605,13 @@ def _readme(manifest, rows):
                       f"не считается готовым к монтажу."]
     else:
         lines.append("Замечаний нет.")
+    lines += ["", "## Замечания монтажного листа", ""]
+    edit_warnings = manifest["source"].get("edit_list_warnings") or []
+    if edit_warnings:
+        for warning in edit_warnings:
+            lines.append(f"- {warning}")
+    else:
+        lines.append("Замечаний монтажного листа нет.")
     lines += [
         "",
         "## Ограничения версии 1",
@@ -601,12 +642,14 @@ def verify_package(output_dir):
         raise HandoffError(f"Манифест пакета не читается: {exc}") from exc
     mismatches = []
     checked = 0
+    listed = set()
     for entry in list(manifest.get("files") or []) + list(manifest.get("documents") or []):
         relative = entry.get("path")
         if not relative:
             mismatches.append("запись манифеста без пути")
             continue
         checked += 1
+        listed.add(relative)
         path = target / relative
         if not path.is_file():
             mismatches.append(f"{relative}: файл отсутствует")
@@ -616,6 +659,15 @@ def verify_package(output_dir):
         size = entry.get("bytes")
         if size is not None and path.stat().st_size != size:
             mismatches.append(f"{relative}: размер не совпадает с манифестом")
+    # A file that is in the pack but not in the manifest is not part of the pack:
+    # a stray copy must not be imported by mistake.
+    for path in sorted(target.rglob("*")):
+        if not path.is_file():
+            continue
+        relative = path.relative_to(target).as_posix()
+        if relative == MANIFEST_NAME or relative in listed:
+            continue
+        mismatches.append(f"{relative}: файл есть в пакете, но его нет в манифесте")
     return {"ok": not mismatches, "checked": checked, "mismatches": mismatches,
             "status": manifest.get("status"), "ready_for_montage": manifest.get("ready_for_montage")}
 

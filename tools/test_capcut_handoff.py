@@ -386,6 +386,19 @@ class CapCutHandoffTests(unittest.TestCase):
         self.assertFalse((self.output / "01_Clips/001_scene01_shot01_9x16.mp4").exists())
         self.assertTrue(manifest["ready_for_montage"])
 
+    def test_without_ffprobe_the_pack_is_not_blocked(self):
+        self.make_clip("clips/shot01.mp4")
+        self.write_edit_list([make_row(1, "clips/shot01.mp4")])
+        original = capcut_handoff.ffprobe_path
+        capcut_handoff.ffprobe_path = lambda: None
+        self.addCleanup(setattr, capcut_handoff, "ffprobe_path", original)
+
+        manifest = self.export()
+
+        self.assertTrue(manifest["ready_for_montage"])
+        self.assertIsNone(manifest["clips"][0]["media"])
+        self.assertNotIn("UNSUPPORTED_MEDIA", self.issue_codes(manifest))
+
     def test_explicit_vertical_map_is_used(self):
         self.make_clip("clips/shot01.mp4")
         self.make_clip("vertical/portrait.mp4", color="teal")
@@ -444,6 +457,144 @@ class CapCutHandoffTests(unittest.TestCase):
     def test_missing_edit_list_file_is_rejected(self):
         with self.assertRaises(capcut_handoff.HandoffError):
             capcut_handoff.export_handoff(self.root / "absent.json", self.media, self.output)
+
+
+    # ---------- 10. broken media must not pass as a ready pack ----------
+
+    def test_corrupt_clip_blocks_montage(self):
+        self.make_clip("clips/shot01.mp4")
+        (self.media / "clips/shot02.mp4").write_bytes(b"\x00" * 4096)
+        self.write_edit_list([make_row(1, "clips/shot01.mp4"), make_row(2, "clips/shot02.mp4")])
+
+        manifest = self.export()
+
+        self.assertFalse(manifest["ready_for_montage"])
+        self.assertEqual(manifest["status"], "INCOMPLETE")
+        self.assertIn("UNSUPPORTED_MEDIA", self.issue_codes(manifest, "blocking"))
+        broken = [i for i in manifest["issues"] if i["code"] == "UNSUPPORTED_MEDIA"]
+        self.assertIn("shot02.mp4", broken[0]["message"])
+
+    def test_clip_without_video_stream_blocks_montage(self):
+        self.make_clip("clips/shot01.mp4")
+        self.make_voice("clips/only_audio.mp4", frequency=330)
+        self.write_edit_list([make_row(1, "clips/shot01.mp4"), make_row(2, "clips/only_audio.mp4")])
+
+        manifest = self.export()
+
+        self.assertFalse(manifest["ready_for_montage"])
+        self.assertIn("UNSUPPORTED_MEDIA", self.issue_codes(manifest, "blocking"))
+
+    def test_missing_audio_file_blocks_montage(self):
+        self.make_clip("clips/shot01.mp4")
+        self.write_edit_list([make_row(1, "clips/shot01.mp4")])
+
+        manifest = self.export(audio_tracks={"voice": ["audio/absent.wav"]})
+
+        self.assertFalse(manifest["ready_for_montage"])
+        self.assertIn("MISSING_AUDIO", self.issue_codes(manifest, "blocking"))
+        self.assertEqual(manifest["counts"]["audio"], 0)
+
+    # ---------- 11. same file name in different audio tracks ----------
+
+    def test_same_audio_name_in_two_tracks_is_not_a_conflict(self):
+        self.make_clip("clips/shot01.mp4")
+        self.make_voice("audio/vo.wav", frequency=330)
+        self.make_voice("audio/same.wav", frequency=660)
+        self.write_edit_list([make_row(1, "clips/shot01.mp4")])
+
+        manifest = self.export(audio_tracks={"voice": ["audio/same.wav"],
+                                              "music": ["audio/same.wav"]})
+
+        self.assertNotIn("DUPLICATE_DESTINATION_NAME", self.issue_codes(manifest))
+        self.assertTrue(manifest["ready_for_montage"])
+        self.assertTrue((self.output / "02_Audio/voice/same.wav").is_file())
+        self.assertTrue((self.output / "02_Audio/music/same.wav").is_file())
+        self.assertEqual(manifest["counts"]["audio"], 2)
+
+    def test_same_audio_name_in_one_track_is_blocking(self):
+        self.make_clip("clips/shot01.mp4")
+        self.make_voice("audio/one/same.wav", frequency=330)
+        self.make_voice("audio/two/same.wav", frequency=660)
+        self.write_edit_list([make_row(1, "clips/shot01.mp4")])
+
+        manifest = self.export(audio_tracks={"voice": ["audio/one/same.wav", "audio/two/same.wav"]})
+
+        self.assertFalse(manifest["ready_for_montage"])
+        self.assertIn("DUPLICATE_DESTINATION_NAME", self.issue_codes(manifest, "blocking"))
+        self.assertEqual(manifest["counts"]["audio"], 1)
+
+    # ---------- 12. rows without an explicit order ----------
+
+    def test_row_without_order_keeps_its_file_position(self):
+        self.make_clip("clips/a.mp4", color="navy")
+        self.make_clip("clips/b.mp4", color="teal")
+        self.make_clip("clips/c.mp4", color="purple")
+        rows = [make_row(1, "clips/a.mp4"),
+                {"scene": 1, "frame": 2, "title": "Б", "video": "clips/b.mp4", "image": ""},
+                make_row(3, "clips/c.mp4")]
+        self.write_edit_list(rows)
+
+        manifest = self.export()
+
+        self.assertEqual([c["order"] for c in manifest["clips"]], [1, 2, 3])
+        self.assertEqual([c["path"] for c in manifest["clips"]],
+                         ["01_Clips/001_scene01_shot01.mp4",
+                          "01_Clips/002_scene01_shot02.mp4",
+                          "01_Clips/003_scene01_shot03.mp4"])
+        self.assertTrue(manifest["ready_for_montage"])
+
+    # ---------- 13. empty edit list ----------
+
+    def test_empty_edit_list_blocks_montage(self):
+        self.write_edit_list([])
+
+        manifest = self.export()
+
+        self.assertFalse(manifest["ready_for_montage"])
+        self.assertEqual(manifest["status"], "INCOMPLETE")
+        self.assertIn("EMPTY_EDIT_LIST", self.issue_codes(manifest, "blocking"))
+
+    # ---------- 14. extra files in a finished pack ----------
+
+    def test_verify_package_reports_a_file_that_is_not_in_the_manifest(self):
+        self.make_clip("clips/shot01.mp4")
+        self.write_edit_list([make_row(1, "clips/shot01.mp4")])
+        self.export()
+
+        self.assertTrue(capcut_handoff.verify_package(self.output)["ok"])
+        (self.output / "01_Clips" / "stray.mp4").write_bytes(b"not in the manifest")
+
+        report = capcut_handoff.verify_package(self.output)
+        self.assertFalse(report["ok"])
+        self.assertTrue(any("stray.mp4" in mismatch for mismatch in report["mismatches"]))
+
+    # ---------- 15. Windows: cyrillic paths ----------
+
+    def test_cyrillic_paths_are_packed_and_readable(self):
+        self.make_clip("клипы/кадр_один.mp4", color="navy")
+        self.make_voice("озвучка/голос_два.wav", frequency=330)
+        self.write_edit_list([make_row(1, "клипы/кадр_один.mp4")])
+
+        manifest = self.export(audio_tracks={"voice": ["озвучка/голос_два.wav"]})
+
+        self.assertTrue(manifest["ready_for_montage"])
+        self.assertTrue((self.output / "01_Clips/001_scene01_shot01.mp4").is_file())
+        self.assertTrue((self.output / "02_Audio/voice/голос_два.wav").is_file())
+        sheet = (self.output / "edit-list.csv").read_text(encoding="utf-8-sig")
+        self.assertIn("01_Clips/001_scene01_shot01.mp4", sheet)
+
+    # ---------- 16. edit-list warnings reach the person who montages ----------
+
+    def test_edit_list_warnings_are_visible_in_the_pack_readme(self):
+        self.make_clip("clips/shot01.mp4")
+        self.write_edit_list([make_row(1, "clips/shot01.mp4")],
+                             warnings=["Кадр 1.1 длится 12 с: монтажный ритм на таком кадре не ощущается."])
+
+        self.export()
+
+        readme = (self.output / "README_RU.md").read_text(encoding="utf-8")
+        self.assertIn("12 с", readme)
+        self.assertIn("монтажный ритм", readme)
 
 
 if __name__ == "__main__":
