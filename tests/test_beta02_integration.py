@@ -19,7 +19,7 @@ from unittest.mock import AsyncMock, patch
 
 from fastapi.testclient import TestClient
 
-from backend import main, media_qc, release_gate, spend_ledger
+from backend import connections, main, media_qc, release_gate, spend_ledger
 
 FFMPEG = shutil.which('ffmpeg')
 FFPROBE = shutil.which('ffprobe')
@@ -53,7 +53,14 @@ class Beta02Base(unittest.TestCase):
             'DB': patch.object(main, 'DB', self.root / 'studio.sqlite3'),
             'LIB': patch.object(main, 'LIBRARY_ROOT', self.root / 'library'),
             'PROD': patch.object(main, 'PRODUCTIONS_ROOT', self.root / 'projects'),
-            'KEY': patch.object(main, 'PIAPI_KEY_FILE', self.root / 'piapi.txt'),
+            'KEY': patch.object(main, 'PIAPI_KEY_FILE', self.root / 'PIAPI_API_KEY.txt'),
+            'MEDIA': patch.object(main, 'MEDIA', self.root / 'media'),
+            'CHAR': patch.object(main, 'CHAR_ROOT', self.root / 'characters'),
+            'CROOT': patch.object(connections, 'ROOT', self.root),  # реальные файлы ключей не читаются
+            'LEGACY': patch.object(connections, 'ELEVENLABS_LEGACY_FILE', self.root / 'legacy-key.txt'),
+            'DPAPI': patch.object(connections, 'KIE_DPAPI_FILES', []),
+            'CHECKS': patch.object(connections, 'CHECKS', {}),
+            'KEYENV': patch.dict(main.os.environ, {p['env']: '' for p in connections.PROVIDERS.values()}),
             'PAID': patch.object(main, 'request_piapi', self.paid),
             'ENV': patch.dict(os.environ, {'GREMOVOD_OWNER_ID': OWNER}),
         }
@@ -350,12 +357,12 @@ class MoneyCoexistenceTests(Beta02Base):
     @unittest.skipUnless(HAS_R3, 'GA-01 R3 (#79) нет в этом дереве: проверка денег BLOCKED')
     def test_unreadable_amount_blocks_spend_survives_restart_and_leaves_release_working(self):
         self.seed_unreadable(self.pid)
-        for phase in ('до перезапуска', 'после перезапуска'):
+        for number, phase in enumerate(('до перезапуска', 'после перезапуска')):
             with self.subTest(phase):
                 budget = self.client.get('/api/budgets/' + self.pid)
                 self.assertEqual(budget.status_code, 200, budget.text)
                 self.assertEqual(budget.json()['llm_unreadable_project'], 1)
-                response = self.media(self.pid, 'beta02-request-' + phase[:2] + '-12345')
+                response = self.media(self.pid, f'beta02-money-request-{number}-123456')
                 self.assertEqual(response.status_code, 400, response.text)
                 self.assertIn('повреждён', response.text)
                 report = self.client.get('/api/economics', params={'project_id': self.pid}).json()
