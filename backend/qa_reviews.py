@@ -71,6 +71,9 @@ def freeze_media(studio, body):
     if not facts['exists']:
         manifest['reason'] = facts['reason'] or 'мастер недоступен'
         return manifest
+    if facts['qc_stale']:
+        manifest['reason'] = 'файл изменён после технической проверки N34: повтори проверку'
+        return manifest
     if facts['qc_verdict'] != 'PASS_TECHNICAL':
         manifest['reason'] = f'техническая проверка N34 не пройдена ({facts["qc_verdict"] or "не проводилась"})'
         return manifest
