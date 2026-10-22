@@ -4,6 +4,8 @@
 **Рабочая копия:** `C:\AI_Workflow_Studio\.worktrees\minimax-capcut-02`
 **База:** HEAD PR #71 `experiment/capcut-handoff-v1` = `8ea6cbb36c41f88b5872d7e861346f7894908454`
 (ожидаемый SHA сверен и совпал).
+**Draft PR:** #93 (база `experiment/capcut-handoff-v1`, стек на PR #71).
+**HEAD этой ветки:** `a31c684` — `fix(capcut): битый мастер, одноимённое аудио и порядок строк в пакете CapCut`.
 
 **Что делалось:** read-only разбор существующего экспорта, воспроизведение основного пути и 31
 отрицательного сценария на синтетических материалах, точечное исправление подтверждённых
@@ -115,6 +117,12 @@ README. Три новых теста (отсутствующая дорожка,
 | Аудит сценариев | 31 сценарий (временный скрипт, вне репозитория) | 31 PASS, 0 FAIL, 1 известное ограничение |
 | Целостность пакета | `verify_package()` на собранном пакете | `ok: true`, `checked: 11` |
 | CLI end-to-end | `python -X utf8 -m tools.capcut_handoff --edit-list … --media-root … --output …` | код 0, `READY_FOR_MONTAGE` |
+| GitHub Actions | `validate-agent-handoff` (run `39846060048`) | **pass**, 6 s — `python -m unittest tools.test_agent_coordination tools.test_agent_scope`, 14 тестов локально тоже OK |
+| Scope guard | `check-agent-scope` (run `39846060196`) | **skipped** — guard в этой цепочке не знает префиксы `minimax/*` (`LEGACY_BRANCH_NOT_ENFORCED`), см. раздел «Scope» |
+
+CI на этой ветке ограничен: в цепочке PR #71 нет воркфлоу, который гоняет `pytest` и тесты
+экспорта (offline-CI приезжает вместе с PR #87 / PR #62). Поэтому все прогоны тестов выше —
+локальные; GitHub Actions проверил только координационные тесты.
 
 ## Что осталось непроверенным
 
