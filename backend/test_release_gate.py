@@ -139,6 +139,24 @@ class GateTests(unittest.TestCase):
                                         files={'file': ('bad.mp4', source, 'video/mp4')})
         self.assertIn(response.status_code, (415, 422), response.text)
 
+    def test_import_with_stale_project_revision_is_a_conflict(self):
+        stale = self.revision()
+        self.save_state({'a': 9})  # revision вырос
+        with self.video.open('rb') as source:
+            response = self.client.post(f'/api/projects/{self.pid}/release-artifacts',
+                                        data={'project_revision': str(stale), 'title': 'Старый'},
+                                        files={'file': ('master.mp4', source, 'video/mp4')})
+        self.assertEqual(response.status_code, 409, response.text)
+        self.assertEqual(response.json()['detail']['code'], 'PROJECT_REVISION_CONFLICT')
+        self.assertEqual(len(self.client.get(f'/api/projects/{self.pid}/release-artifacts').json()), 1)
+
+    def test_revision_growth_alone_keeps_approval(self):
+        self.approved()
+        before = self.revision()
+        self.save_state({'a': 1, 'b': 2})  # то же содержимое: revision растёт, якорь содержимого — нет
+        self.assertGreater(self.revision(), before)
+        self.assertEqual(self.gate()['state'], 'OWNER_APPROVED')
+
     # --- B1: байты изменены после QC ----------------------------------------------------
     def test_bytes_changed_after_qc_is_not_technical_pass(self):
         self.qc()
