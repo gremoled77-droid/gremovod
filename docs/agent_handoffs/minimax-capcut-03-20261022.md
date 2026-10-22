@@ -159,7 +159,7 @@ CI на этой ветке ограничен: в цепочке PR #93 нет 
    всегда пишет `edit-list.csv`, `edit-list.json` и `README_RU.md`, поэтому настоящий пакет этому
    требованию отвечает; рукотворный пакет без документов — расхождение.
 6. **Scope:** области `capcut-03` в манифесте нет, сам манифест в PR не менялся намеренно — это
-   control-файл guard'а. См. `docs/capcut-handoff/SCOPE-REQUEST.md`.
+   control-файл guard'а. Точный патч и три внешние зависимости — в разделе «Scope» этого отчёта.
 
 ## Рекомендации Claude Code по следующему реальному тесту CapCut
 
@@ -175,12 +175,49 @@ CI на этой ветке ограничен: в цепочке PR #93 нет 
 
 ## Scope
 
-Область `capcut-03` в `tools/minimax_task_scopes.json` отсутствует: в этой цепочке (PR #93) такого
-манифеста вообще нет — есть только `tools/check_agent_scope.py`, который знает префиксы
-`build/claude/`, `build/argon/`, `codex/review-`, `codex/spec-`, `coordination/`. Ветка
-`minimax/*` получает `LEGACY_BRANCH_NOT_ENFORCED`, и проверка не выполняется. Манифест в этом PR
-не менялся: это control-файл, и ветка задачи не должна расширять свою область тем же PR. Точный
-патч и порядок — `docs/capcut-handoff/SCOPE-REQUEST.md`.
+Область `capcut-03` не согласована, и это не «забыли добавить строку», а отсутствие самого слоя
+в базе. Факты, проверенные на текущих remote-ветках после `git fetch origin --prune`:
+
+| Факт | Проверка |
+|---|---|
+| `tools/minimax_task_scopes.json` есть на tip в 7 ветках | `build/claude/ci-media-verify-20261022`, `build/claude/ga-03-scope-ext`, `claude/ffmpeg-ci-timeout-fix-31ceac`, `codex/role-setup-20261022`, `docs/claude-model-effort-rule`, `mavis/ci-final-2026-10-22`, `minimax/ga-04-studio-offline-ci` |
+| В интеграционной базе манифеста нет | `git ls-tree origin/main -- tools/` и `origin/mavis/work` — пусто |
+| `capcut-02` и `capcut-03` не встречаются ни в одной из 7 веток | 0 совпадений в каждой |
+| Guard в базе этой ветки — старая версия (76 строк) | нет `MANIFEST_PATH`, `task_key_for_branch`, `UNKNOWN_TASK_SCOPE`; только захардкоженные префиксы `build/claude/`, `build/argon/`, `codex/*`, `coordination/` → ветка `minimax/*` получает `LEGACY_BRANCH_NOT_ENFORCED`, проверка не выполняется |
+| Enforced-версия guard'а (305 строк) читает манифест из базовой ревизии | `build/claude/ga-03-scope-ext` (PR #87) и перечисленные выше ветки |
+
+Из этого следуют три зависимости, и все — **вне** этого PR:
+
+1. **Манифест должен попасть в интеграционную базу.** Сейчас его нет ни в `main`, ни в
+   `mavis/work`, а только в task-ветках.
+2. **Запись `capcut-03` должна быть добавлена** в `tasks` манифеста — точный патч ниже.
+3. **База PR #95 должна содержать enforced-guard и манифест.** Guard читает манифест из базовой
+   ревизии (`origin/<base>`), а база PR #95 — ветка `minimax/capcut-02-retest`, в которой манифеста
+   нет. Поэтому даже после слияния PR #87/#92 в `mavis/work` проверка этой ветки останется
+   холостой, пока ветка-база не будет обновлена (или PR не перебазирован на ветку с манифестом).
+
+Патч, который нужно внести — одна запись в `tasks` манифеста
+`tools/minimax_task_scopes.json`:
+
+```json
+"capcut-03": {
+  "summary": "Строгая проверка манифеста офлайн-пакета CapCut: структура, обязательные документы, границы путей.",
+  "allow": [
+    "tools/capcut_handoff.py",
+    "tools/test_capcut_handoff.py",
+    "docs/capcut-handoff/README.md",
+    "docs/agent_handoffs/minimax-capcut-03-20261022.md"
+  ]
+}
+```
+
+Ключ `capcut-03` соответствует `task_key_pattern` (`^[a-z]+-[0-9]+$`), префикс ветки `minimax/`
+входит в `branch_prefixes`. Разрешённые записи в этом PR совпадают с этим списком один в один.
+
+`tools/minimax_task_scopes.json` в этом PR **не меняется**: манифест — control-файл guard'а, и
+ветка задачи не должна расширять собственную область тем же PR. `docs/capcut-handoff/SCOPE-REQUEST.md`
+тоже не менялся — он не входит в разрешённый набор файлов этой задачи (в нём описан запрос для
+`capcut-02`); запрос для `capcut-03` — здесь.
 
 ## Границы
 
