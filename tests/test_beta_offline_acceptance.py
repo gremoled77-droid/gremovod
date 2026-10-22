@@ -64,6 +64,7 @@ class EndToEndTests(unittest.TestCase):
 
     def run_gate(self, *extra, out):
         env = {key: value for key, value in os.environ.items() if key != 'BETA02_FAULT'}
+        env['PIAPI_API_KEY'] = 'sk-canary0123456789abcdef'  # канарейка: не должна дойти ни до pytest, ни до отчёта
         done = subprocess.run([sys.executable, str(ROOT / 'tools' / 'beta_offline_acceptance.py'), '--quick', '--out', out,
                                '--timestamp', '2026-01-01T00:00:00Z', *extra], cwd=ROOT, env=env, capture_output=True, text=True)
         return done.returncode, json.loads((Path(out) / 'report.json').read_text(encoding='utf-8'))
@@ -91,6 +92,8 @@ class EndToEndTests(unittest.TestCase):
             self.assertIn(key, first)
         self.assertNotIn(str(Path.home()), text)
         self.assertFalse(re.search(r'sk-[A-Za-z0-9]{8,}|studio_session|Bearer ', text))
+        self.assertIn('PIAPI_API_KEY', first['environment']['secrets']['removed_env'])
+        self.assertEqual([s['id'] for s in first['steps'][:2]], ['provenance', 'secrets-isolation'])
         self.assertEqual(first['dataset'], 'temp')
 
 
