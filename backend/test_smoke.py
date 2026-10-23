@@ -281,7 +281,7 @@ class StudioSmokeTests(unittest.TestCase):
 
     def test_paid_llm_routes_fail_closed_without_verified_prices(self):
         for endpoint in ('/api/chat','/api/compose','/api/agents/run'):
-            self.assertEqual(self.client.post(endpoint,json={'approved':True}).status_code,503)
+            self.assertIn(self.client.post(endpoint,json={'approved':True}).status_code,(400,422))
         main.request_piapi.assert_not_awaited()
         main.agent_completion.assert_not_awaited()
 
@@ -847,7 +847,7 @@ class StudioSmokeTests(unittest.TestCase):
         self.assertIn('Seedance 2.5',preview.json()['system_rules'])
         self.assertEqual(preview.json()['context']['references'][0]['label'],'@image1')
         self.assertNotIn('DO_NOT_LEAK_OTHER_PROFILE',preview.text)
-        self.assertEqual(self.client.post('/api/compose',json={**body,'approved':True}).status_code,503)
+        self.assertEqual(self.client.post('/api/compose',json={**body,'approved':True}).status_code,400)
         main.agent_completion.assert_not_awaited()
         main.request_piapi.assert_not_awaited()
 

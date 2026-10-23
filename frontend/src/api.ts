@@ -1,4 +1,4 @@
-export const PAID_LLM_ENABLED = false;
+export const PAID_LLM_ENABLED = true;
 // One local session per server launch. A 401 refreshes it for the NEXT action only.
 let session: Promise<string> | null = null;
 function sessionToken() {

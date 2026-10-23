@@ -1,3 +1,4 @@
+import json
 import unittest
 from unittest.mock import AsyncMock, patch
 from backend import llm_guard, main, test_production, test_smoke
@@ -88,7 +89,209 @@ class LlmGuardTests(unittest.TestCase):
 
     def test_other_paid_llm_routes_stay_closed(self):
         for endpoint in ('/api/chat', '/api/compose', '/api/agents/run'):
-            self.assertEqual(self.client.post(endpoint, json={'approved': True}).status_code, 503)
+            self.assertIn(self.client.post(endpoint, json={'approved': True}).status_code, (400, 422))
+
+
+class PaidLlmRouteGuardTests(unittest.TestCase):
+    """Контроль платных LLM-вызовов на маршрутах /api/chat, /api/compose и /api/agents/run."""
+    setUp = test_smoke.StudioSmokeTests.setUp
+    tearDown = test_smoke.StudioSmokeTests.tearDown
+
+    def prepare(self):
+        main.PIAPI_KEY_FILE.write_text('test-key', encoding='utf-8')
+        self.pid = self.client.post('/api/projects', json={'title': 'Paid', 'state': {'brief': 'Грэм входит в комнату'}}).json()['id']
+
+    def compose_body(self, **extra):
+        return {'project_id': self.pid, 'model': 'gpt-5.6-luna', 'provider': 'piapi', 'target': 'seedream-5-pro', **extra}
+
+    def agents_body(self, **extra):
+        return {'project_id': self.pid, 'model': 'gpt-5.6-luna', 'provider': 'piapi', 'brief': 'Грэм входит в комнату',
+                'character': {'identity': {'name': 'Грэм'}}, 'style': {}, 'target_models': ['seedream-5-pro'], **extra}
+
+    def reply(self, content='Грэм входит в кадр, статичный кадр'):
+        return content, {'prompt_tokens': 100, 'completion_tokens': 20}
+
+    def test_paid_routes_refuse_without_a_signed_estimate(self):
+        self.prepare()
+        with patch.object(main, 'agent_completion', AsyncMock(return_value=self.reply())) as call, \
+             patch.object(main, 'request_piapi', AsyncMock(side_effect=AssertionError('External API forbidden'))) as raw:
+            chat = {'provider': 'piapi', 'project_id': self.pid, 'model': 'gpt-5.6-luna',
+                    'messages': [{'role': 'user', 'content': 'привет'}], 'max_tokens': 500, 'approved': True,
+                    'max_cost_usd': 1, 'request_id': 'paid-no-quote-chat'}
+            self.assertEqual(self.client.post('/api/chat', json=chat).status_code, 400)
+            # Лимит стоимости подтверждён, но подписанной оценки нет: провайдер вызываться не должен.
+            self.assertEqual(self.client.post('/api/compose', json=self.compose_body(approved=True, max_cost_usd=1,
+                                                                                     request_id='paid-no-quote-compose')).status_code, 400)
+            self.assertEqual(self.client.post('/api/agents/run', json=self.agents_body(approved=True, max_cost_usd=1,
+                                                                                       request_id='paid-no-quote-agents')).status_code, 400)
+            # Подделанная подпись: цена подтверждена, но оценка не от сервера.
+            forged = 'a.b'
+            self.assertEqual(self.client.post('/api/compose', json=self.compose_body(approved=True, quote_token=forged,
+                                                                                     max_cost_usd=1, request_id='paid-forged-compose')).status_code, 400)
+            self.assertEqual(self.client.post('/api/agents/run', json=self.agents_body(approved=True, quote_token=forged,
+                                                                                       max_cost_usd=1, request_id='paid-forged-agents')).status_code, 400)
+            # Без явного подтверждения владельца — тоже отказ.
+            self.assertEqual(self.client.post('/api/compose', json=self.compose_body(request_id='paid-no-approval-compose')).status_code, 400)
+            self.assertEqual(self.client.post('/api/agents/run', json=self.agents_body(request_id='paid-no-approval-agents')).status_code, 400)
+            self.assertEqual(call.await_count, 0)
+            self.assertEqual(raw.await_count, 0)
+        with main.connect() as db:
+            self.assertEqual(db.execute('SELECT count(*) FROM llm_calls').fetchone()[0], 0)
+
+    def test_paid_routes_refuse_when_the_project_budget_is_exceeded(self):
+        self.prepare()
+        quote = self.client.post('/api/compose/estimate', json=self.compose_body()).json()
+        self.assertGreater(quote['estimated_usd'], 0.00001)
+        self.client.put('/api/budgets/limits', json={'project_usd': 0.00001, 'daily_usd': 0.00001})
+        with patch.object(main, 'agent_completion', AsyncMock(return_value=self.reply())) as call:
+            r = self.client.post('/api/compose', json=self.compose_body(approved=True, quote_token=quote['quote_token'],
+                                                                        max_cost_usd=quote['estimated_usd'], request_id='paid-budget-compose'))
+            self.assertEqual(r.status_code, 400)
+            self.assertIn('бюджет', r.text.lower())
+            self.assertEqual(call.await_count, 0)
+
+    def test_paid_routes_refuse_when_the_daily_budget_is_exceeded(self):
+        self.prepare()
+        quote = self.client.post('/api/compose/estimate', json=self.compose_body()).json()
+        self.client.put('/api/budgets/limits', json={'project_usd': 100, 'daily_usd': 0.00001})
+        with patch.object(main, 'agent_completion', AsyncMock(return_value=self.reply())) as call:
+            r = self.client.post('/api/compose', json=self.compose_body(approved=True, quote_token=quote['quote_token'],
+                                                                        max_cost_usd=quote['estimated_usd'], request_id='paid-daily-compose'))
+            self.assertEqual(r.status_code, 400)
+            self.assertIn('суточный', r.text.lower())
+            self.assertEqual(call.await_count, 0)
+
+    def test_repeated_request_id_is_refused(self):
+        self.prepare()
+        quote = self.client.post('/api/compose/estimate', json=self.compose_body()).json()
+        body = self.compose_body(approved=True, quote_token=quote['quote_token'], max_cost_usd=quote['estimated_usd'],
+                                  request_id='paid-duplicate-compose')
+        with patch.object(main, 'agent_completion', AsyncMock(return_value=self.reply())) as call:
+            first = self.client.post('/api/compose', json=body)
+            self.assertEqual(first.status_code, 200, first.text)
+            second = self.client.post('/api/compose', json=body)
+            self.assertEqual(second.status_code, 409)
+            self.assertEqual(call.await_count, 1)
+
+    def test_repeated_request_id_is_refused_for_the_whole_agent_sequence(self):
+        self.prepare()
+        quote = self.client.post('/api/agents/estimate', json=self.agents_body()).json()
+        body = self.agents_body(approved=True, quote_token=quote['quote_token'], max_cost_usd=quote['estimated_usd'],
+                                request_id='paid-duplicate-agents')
+        with patch.object(main, 'agent_completion', AsyncMock(return_value=self.reply())) as call:
+            first = self.client.post('/api/agents/run', json=body)
+            self.assertEqual(first.status_code, 200, first.text)
+            self.assertEqual(call.await_count, 3)
+            second = self.client.post('/api/agents/run', json=body)
+            self.assertEqual(second.status_code, 409)
+            self.assertEqual(call.await_count, 3)
+
+    def test_provider_error_frees_the_reservation(self):
+        self.prepare()
+        quote = self.client.post('/api/compose/estimate', json=self.compose_body()).json()
+        failing = AsyncMock(side_effect=main.HTTPException(502, 'PiAPI вернул ошибку'))
+        with patch.object(main, 'agent_completion', failing):
+            r = self.client.post('/api/compose', json=self.compose_body(approved=True, quote_token=quote['quote_token'],
+                                                                        max_cost_usd=quote['estimated_usd'], request_id='paid-provider-compose'))
+            self.assertEqual(r.status_code, 502)
+        with main.connect() as db:
+            row = db.execute('SELECT status,usd FROM llm_calls').fetchone()
+            self.assertEqual((row['status'], row['usd']), ('failed', 0))
+            self.assertEqual(llm_guard.spent(db, self.pid), (0.0, 0.0))
+
+    def test_partial_agent_failure_keeps_paid_work_accounted(self):
+        self.prepare()
+        quote = self.client.post('/api/agents/estimate', json=self.agents_body()).json()
+        answers = [self.reply('режиссёрский план'), main.HTTPException(502, 'PiAPI вернул ошибку')]
+
+        async def side_effect(*args, **kwargs):
+            item = answers.pop(0)
+            if isinstance(item, Exception):
+                raise item
+            return item
+
+        with patch.object(main, 'agent_completion', AsyncMock(side_effect=side_effect)) as call:
+            r = self.client.post('/api/agents/run', json=self.agents_body(approved=True, quote_token=quote['quote_token'],
+                                                                         max_cost_usd=quote['estimated_usd'], request_id='paid-partial-agents'))
+            self.assertEqual(r.status_code, 502)
+            detail = r.json()['detail']
+            self.assertEqual(detail['code'], 'AGENT_SEQUENCE_PARTIAL')
+            self.assertEqual(detail['completed'], ['director'])
+            self.assertEqual(detail['failed_role'], 'continuity')
+            self.assertEqual(call.await_count, 2)  # третий агент не запускался
+        with main.connect() as db:
+            self.assertEqual(db.execute('SELECT count(*) FROM llm_calls').fetchone()[0], 2)
+            done = db.execute("SELECT usd FROM llm_calls WHERE request_id=? AND status='done'",
+                              ('paid-partial-agents#director',)).fetchone()
+            failed = db.execute("SELECT usd FROM llm_calls WHERE request_id=? AND status='failed'",
+                                ('paid-partial-agents#continuity',)).fetchone()
+            self.assertGreater(done['usd'], 0)
+            self.assertEqual(failed['usd'], 0)
+            self.assertGreater(llm_guard.spent(db, self.pid)[0], 0)
+
+    def test_agent_sequence_checks_the_aggregate_forecast_before_any_call(self):
+        self.prepare()
+        quote = self.client.post('/api/agents/estimate', json=self.agents_body()).json()
+        self.assertEqual(quote['calls'], ['director', 'continuity', 'prompt'])
+        calls, forecast = main.agent_plan(main.AgentRunRequest(**self.agents_body()))
+        one = calls[0]['cost']
+        self.assertLess(one, forecast)  # один агент дешевле всей последовательности
+        # Лимит помещается для одного агента, но не для суммарного прогноза.
+        self.client.put('/api/budgets/limits', json={'project_usd': one * 1.5, 'daily_usd': forecast * 4})
+        with patch.object(main, 'agent_completion', AsyncMock(return_value=self.reply())) as call:
+            r = self.client.post('/api/agents/run', json=self.agents_body(approved=True, quote_token=quote['quote_token'],
+                                                                         max_cost_usd=quote['estimated_usd'], request_id='paid-forecast-agents'))
+            self.assertEqual(r.status_code, 400)
+            self.assertIn('бюджет', r.text.lower())
+            self.assertEqual(call.await_count, 0)
+        with main.connect() as db:
+            self.assertEqual(db.execute('SELECT count(*) FROM llm_calls').fetchone()[0], 0)
+
+    def test_chat_alias_is_guarded_like_the_main_llm_route(self):
+        self.prepare()
+        body = {'project_id': self.pid, 'model': 'gpt-5.6-luna', 'messages': [{'role': 'user', 'content': 'привет'}], 'max_tokens': 500}
+        quote = self.client.post('/api/llm/estimate', json=body).json()
+        with patch.object(main, 'request_piapi', AsyncMock(return_value=REPLY)) as raw:
+            without = self.client.post('/api/chat', json={**body, 'provider': 'piapi', 'approved': True,
+                                                          'max_cost_usd': quote['estimated_usd'],
+                                                          'request_id': 'paid-chat-no-quote'})
+            self.assertEqual(without.status_code, 400)
+            self.assertEqual(raw.await_count, 0)
+            allowed = self.client.post('/api/chat', json={**body, 'provider': 'piapi', 'approved': True,
+                                                          'quote_token': quote['quote_token'],
+                                                          'max_cost_usd': quote['estimated_usd'], 'request_id': 'paid-chat-with-quote'})
+            self.assertEqual(allowed.status_code, 200, allowed.text)
+            self.assertEqual(raw.await_count, 1)
+
+    def test_paid_calls_carry_a_token_ceiling(self):
+        self.prepare()
+        quote = self.client.post('/api/compose/estimate', json=self.compose_body()).json()
+        with patch.object(main, 'agent_completion', AsyncMock(return_value=self.reply())) as call:
+            r = self.client.post('/api/compose', json=self.compose_body(approved=True, quote_token=quote['quote_token'],
+                                                                        max_cost_usd=quote['estimated_usd'], request_id='paid-ceiling-compose'))
+            self.assertEqual(r.status_code, 200, r.text)
+            self.assertEqual(call.await_args.args[4], main.COMPOSE_MAX_TOKENS)
+            self.assertLessEqual(main.COMPOSE_MAX_TOKENS, llm_guard.MAX_OUTPUT_TOKENS)
+
+    def test_estimate_stops_working_when_the_project_context_changes(self):
+        self.prepare()
+        quote = self.client.post('/api/compose/estimate', json=self.compose_body()).json()
+        with main.connect() as db:
+            db.execute('UPDATE projects SET state=? WHERE id=?', (json.dumps({'brief': 'Другая сцена'}), self.pid))
+        with patch.object(main, 'agent_completion', AsyncMock(return_value=self.reply())) as call:
+            r = self.client.post('/api/compose', json=self.compose_body(approved=True, quote_token=quote['quote_token'],
+                                                                        max_cost_usd=quote['estimated_usd'], request_id='paid-stale-compose'))
+            self.assertEqual(r.status_code, 400)
+            self.assertEqual(call.await_count, 0)
+
+    def test_unpriced_model_or_provider_is_refused(self):
+        self.prepare()
+        for body in (self.compose_body(provider='openai'), self.compose_body(model='gpt-9-unknown')):
+            self.assertEqual(self.client.post('/api/compose', json=body).status_code, 400)
+        for body in (self.agents_body(provider='openai'), self.agents_body(model='gpt-9-unknown')):
+            self.assertEqual(self.client.post('/api/agents/run', json=body).status_code, 400)
+        with patch.object(main, 'agent_completion', AsyncMock(return_value=self.reply())) as call:
+            self.assertEqual(call.await_count, 0)
 
 
 class LlmEconomicsTests(unittest.TestCase):

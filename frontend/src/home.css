@@ -12,6 +12,7 @@
   margin: 0 auto;
   padding: 36px 28px 64px;
   isolation: isolate;
+  overflow-x: clip;
 }
 .home::before {
   content: '';

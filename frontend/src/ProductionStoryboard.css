@@ -210,6 +210,9 @@
   .ps-pick {
     grid-template-columns: 1fr;
   }
+  .ps-scene-head {
+    flex-wrap: wrap;
+  }
 }
 main.storyboard-main {
   grid-template-columns: minmax(0, 1fr);

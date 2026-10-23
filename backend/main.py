@@ -107,10 +107,6 @@ def save_project(p:Project):
     production_folders.sync_project(sys.modules[__name__],pid)
     return {'id':pid,'saved':True,'revision':revision}
 
-class ChatRequest(BaseModel):
-    model:str='gpt-5.6-luna'
-    messages:list[dict[str,Any]]
-
 class TaskRequest(BaseModel):
     project_id:str|None=None
     kind:str='image'
@@ -149,6 +145,7 @@ class UnifiedChatRequest(BaseModel):
     request_id:str|None=Field(default=None,min_length=8,max_length=100,pattern=r'^[a-zA-Z0-9_-]+$')
 
 @app.post('/api/llm/chat')
+@app.post('/api/chat')
 async def unified_chat(body:UnifiedChatRequest, x_api_key:str|None=Header(default=None)):
     if body.provider!='piapi': raise HTTPException(400,'Платный LLM доступен только через PiAPI')
     key=get_key(x_api_key)
@@ -166,12 +163,6 @@ def diagnostics():
             'ffprobe':bool(shutil.which('ffprobe')), 'sqlite':sqlite3.sqlite_version,
             'database_writable':os.access(DB.parent,os.W_OK),'piapi_base':BASE,
             'warning':'Удалённые API не проверяются; Cloudflare 1010 требует обращения в поддержку PiAPI.'}
-
-@app.post('/api/chat')
-async def chat(body:ChatRequest,x_api_key:str|None=Header(default=None)):
-    if body.model not in ALLOWED_CHAT: raise HTTPException(400,'Неизвестная модель GPT')
-    if not body.messages or len(body.messages)>50: raise HTTPException(400,'Ожидалось 1–50 сообщений')
-    return await request_piapi('POST','/v1/chat/completions',get_key(x_api_key),body.model_dump())
 
 @app.post('/api/tasks')
 async def create_task(req:TaskRequest,x_api_key:str|None=Header(default=None)):
@@ -213,6 +204,9 @@ class ComposeRequest(BaseModel):
     approved:bool=False
     use_scene:bool=False
     scene_override:dict[str,Any]|None=None  # готовая «сцена» вместо сохранённой: промпт и референсы из «Кадров»
+    quote_token:str|None=None
+    max_cost_usd:float|None=Field(default=None,ge=0,le=100,allow_inf_nan=False)
+    request_id:str|None=Field(default=None,min_length=16,max_length=100,pattern=r'^[a-zA-Z0-9_-]+$')
 
 class PromptDraftRequest(BaseModel):
     brief:str=Field(min_length=1,max_length=12000)
@@ -308,14 +302,52 @@ def compose_preview(body:ComposeRequest):
     context=compose_context(body)
     return {'context':context,'system_rules':system_rules(MODEL_SPECS[body.target]),'external_calls':0}
 
+COMPOSE_MAX_TOKENS=1400
+
+def compose_call(body):
+    """Один платный вызов LLM для подготовки промпта: системные правила и контекст проекта."""
+    context=compose_context(body)
+    return {'role':'compose','system':system_rules(MODEL_SPECS[body.target]),'prompt':json.dumps(context,ensure_ascii=False),
+            'max_tokens':COMPOSE_MAX_TOKENS,'context':context}
+
+def compose_messages(call):
+    from backend import llm_guard
+    return llm_guard.clean_messages([{'role':'system','content':call['system']},{'role':'user','content':call['prompt']}])
+
+@app.post('/api/compose/estimate')
+def compose_estimate(body:ComposeRequest):
+    """Шаг 1 платного вызова: бесплатная подписанная оценка цены. Без неё провайдер не вызывается."""
+    from backend import llm_guard
+    if body.provider!='piapi': raise HTTPException(400,'Платный LLM доступен только через PiAPI')
+    if body.model not in ALLOWED_CHAT: raise HTTPException(400,'Недопустимая LLM-модель PiAPI')
+    project(body.project_id)
+    call=compose_call(body)
+    messages=compose_messages(call)
+    cost=llm_guard.estimate_usd(body.model,messages,call['max_tokens'])
+    payload=llm_guard.payload_of(body.model,messages,call['max_tokens'])
+    return {'estimated_usd':cost,'quote_token':security.quote(body.project_id,payload,cost),'max_tokens':call['max_tokens'],'model':body.model}
+
 @app.post('/api/compose')
 async def compose(body:ComposeRequest, x_api_key:str|None=Header(default=None)):
-    context=compose_context(body)
+    from backend import llm_guard
     if not body.approved: raise HTTPException(400,'Нужно подтверждение платного LLM-запроса')
-    if body.provider=='piapi' and body.model not in ALLOWED_CHAT: raise HTTPException(400,'Недопустимая LLM-модель PiAPI')
-    if body.provider not in {'piapi','openai'}: raise HTTPException(400,'Неизвестный LLM-провайдер')
-    key=get_key(x_api_key) if body.provider=='piapi' else provider_key('openai',x_api_key)
-    content,usage=await agent_completion(body.provider,body.model,key,system_rules(MODEL_SPECS[body.target]),json.dumps(context,ensure_ascii=False))
+    if body.provider!='piapi': raise HTTPException(400,'Платный LLM доступен только через PiAPI')
+    if body.model not in ALLOWED_CHAT: raise HTTPException(400,'Недопустимая LLM-модель PiAPI')
+    project(body.project_id)
+    key=get_key(x_api_key)
+    if not key or not key.isascii() or any(c.isspace() for c in key):
+        raise HTTPException(400,'Введи корректный API-ключ PiAPI')
+    call=compose_call(body)
+    context=call['context']
+    messages=compose_messages(call)
+    cost=llm_guard.estimate_usd(body.model,messages,call['max_tokens'])
+    payload=llm_guard.payload_of(body.model,messages,call['max_tokens'])
+    results,error=await llm_guard.execute_plan(sys.modules[__name__],body.project_id,body.model,1,
+                                                lambda index,previous:[call][index],key,body.request_id,body.quote_token,
+                                                body.max_cost_usd,payload,cost)
+    if error is not None: raise error
+    content=results[0]['content']
+    usage=results[0]['usage']
     if not content.strip(): raise HTTPException(502,'LLM вернула пустой промпт')
     try: validate_prompt(body.target,content,len(context['references']))
     except HTTPException as exc: raise HTTPException(502,exc.detail)
@@ -330,7 +362,7 @@ async def compose(body:ComposeRequest, x_api_key:str|None=Header(default=None)):
         current=json.loads(row['state'])
         current.setdefault('prompts',{})[body.target]=content
         db.execute('UPDATE projects SET state=?,updated_at=? WHERE id=?',(json.dumps(current,ensure_ascii=False),now(),body.project_id))
-    return {'prompt':content,'usage':usage,'version_id':version_id,'rules_version':RULES_VERSION,'references':context['references']}
+    return {'prompt':content,'usage':usage,'version_id':version_id,'rules_version':RULES_VERSION,'references':context['references'],'cost_usd':results[0]['cost_usd']}
 
 @app.get('/api/projects/{project_id}/prompt-versions')
 def prompt_versions(project_id:str):
@@ -625,53 +657,116 @@ AGENT_ROLES = {
 class AgentRunRequest(BaseModel):
     project_id: str|None = None
     brief: str = Field(min_length=3,max_length=12000)
-    provider: str = 'openai'
-    model: str = 'gpt-4.1-mini'
+    provider: str = 'piapi'
+    model: str = 'gpt-5.6-luna'
     character: dict[str,Any] = Field(default_factory=dict)
     style: dict[str,Any] = Field(default_factory=dict)
     target_models: list[str] = Field(default_factory=lambda:['seedream-5-pro','seedance-2.5'])
+    approved: bool = False
+    quote_token: str|None = None
+    max_cost_usd: float|None = Field(default=None,ge=0,le=100,allow_inf_nan=False)
+    request_id: str|None = Field(default=None,min_length=16,max_length=100,pattern=r'^[a-zA-Z0-9_-]+$')
 
 @app.get('/api/agents/config')
 def agent_config():
-    return {'roles':list(AGENT_ROLES),'providers':['openai','piapi'],'note':'Only LLM planning is executed. Generation requires separate approval. No API keys are saved.'}
+    return {'roles':list(AGENT_ROLES),'providers':['piapi'],'note':'Only LLM planning is executed. Generation requires separate approval. No API keys are saved.'}
 
-async def agent_completion(provider:str,model:str,key:str,system:str,prompt:str):
-    if provider=='openai':
-        if not model.startswith(('gpt-','o')): raise HTTPException(400,'Unknown OpenAI model')
-        try:
-            async with httpx.AsyncClient(timeout=90) as client:
-                response=await client.post('https://api.openai.com/v1/responses',headers={'Authorization':'Bearer '+key,'Content-Type':'application/json'},json={'model':model,'instructions':system,'input':prompt,'max_output_tokens':1400})
-        except httpx.RequestError as e: raise HTTPException(502,'OpenAI connection failed: '+type(e).__name__)
-        if response.is_error: raise HTTPException(response.status_code,{'provider':'openai','error':response.text[:1200]})
-        value=response.json()
-        fragments=[c.get('text','') for item in value.get('output',[]) if item.get('type')=='message' for c in item.get('content',[]) if c.get('type')=='output_text']
-        return '\n'.join(fragments).strip(),value.get('usage',{})
-    if provider=='piapi':
-        if model not in ALLOWED_CHAT: raise HTTPException(400,'Unknown PiAPI LLM model')
-        value=await request_piapi('POST','/v1/chat/completions',key,{'model':model,'messages':[{'role':'system','content':system},{'role':'user','content':prompt}]})
-        return chat_text(value),value.get('usage',{})
-    raise HTTPException(400,'Unknown provider')
+AGENT_MAX_TOKENS=1400
+AGENT_PREVIOUS_CHARS=4000
+
+async def agent_completion(provider:str,model:str,key:str,messages:list[dict],max_tokens:int):
+    """Единственная точка обращения студии к платному LLM: только PiAPI, с потолком токенов."""
+    from backend import llm_guard
+    if provider!='piapi': raise HTTPException(400,'Платный LLM доступен только через PiAPI')
+    if model not in ALLOWED_CHAT: raise HTTPException(400,'Unknown PiAPI LLM model')
+    if not max_tokens or max_tokens>llm_guard.MAX_OUTPUT_TOKENS: raise HTTPException(400,f'max_tokens обязателен и не больше {llm_guard.MAX_OUTPUT_TOKENS}')
+    value=await request_piapi('POST','/v1/chat/completions',key,{'model':model,'messages':messages,'max_tokens':max_tokens})
+    return chat_text(value),value.get('usage',{})
+
+def agent_context(body):
+    return {'brief':body.brief,'character_identity':body.character.get('identity',{}),'model_profiles':body.character.get('profiles',{}),
+            'project_style_bible':body.style,'target_models':{m:MODEL_SPECS[m] for m in body.target_models}}
+
+def agent_previous(output):
+    """Сводка предыдущих специалистов ограничена по объёму: вход каждого вызова остаётся предсказуемым."""
+    trimmed={role:{'content':item['content'][-AGENT_PREVIOUS_CHARS//4:],'usage':item['usage']} for role,item in output.items()}
+    return json.dumps(trimmed,ensure_ascii=False)[-AGENT_PREVIOUS_CHARS:]
+
+def agent_call(body,index,previous):
+    role=list(AGENT_ROLES)[index]
+    instructions=AGENT_ROLES[role]
+    if role=='prompt': instructions+=' Respond with labelled sections for each target model, then a short list of required references and parameters.'
+    prompt=json.dumps(agent_context(body),ensure_ascii=False)+'\nPREVIOUS SPECIALISTS:\n'+previous
+    return {'role':role,'system':instructions,'prompt':prompt,'max_tokens':AGENT_MAX_TOKENS}
+
+def agent_plan(body):
+    """Прогноз расходов команды до начала работы: каждый вызов оценён по максимальному объёму предыдущих ответов."""
+    from backend import llm_guard
+    calls=[agent_call(body,index,json.dumps({},ensure_ascii=False) if index==0 else 'x'*AGENT_PREVIOUS_CHARS) for index in range(len(AGENT_ROLES))]
+    costs,forecast=llm_guard.plan_estimate(calls,body.model)
+    for call,cost in zip(calls,costs): call['cost']=cost
+    return calls,forecast
+
+def agent_payload(body):
+    """Подписываемое описание плана команды: модель, роли и неизменяемый контекст."""
+    from backend import llm_guard
+    return llm_guard.plan_payload({'kind':'llm.agents','model':body.model,'provider':body.provider,'roles':list(AGENT_ROLES),
+                                   'max_tokens':AGENT_MAX_TOKENS,'context':llm_guard.digest_of(agent_context(body))})
+
+def agent_builder(body):
+    """Следующий вызов строится по результатам предыдущих специалистов."""
+    def build(index,results):
+        previous=agent_previous({r['role']:{'content':r['content'],'usage':r['usage']} for r in results})
+        return agent_call(body,index,previous)
+    return build
+
+@app.post('/api/agents/estimate')
+def agents_estimate(body:AgentRunRequest):
+    """Шаг 1 платного вызова команды: бесплатная подписанная оценка суммарного прогноза расходов."""
+    from backend import llm_guard
+    if body.provider!='piapi': raise HTTPException(400,'Платный LLM доступен только через PiAPI')
+    if body.model not in ALLOWED_CHAT: raise HTTPException(400,'Недопустимая LLM-модель PiAPI')
+    if not body.project_id: raise HTTPException(400,'Укажи проект для учёта расхода')
+    project(body.project_id)
+    for target in body.target_models:
+        if target not in MODEL_SPECS: raise HTTPException(400,'No verified API schema for '+target)
+    calls,forecast=agent_plan(body)
+    return {'estimated_usd':forecast,'quote_token':security.quote(body.project_id,agent_payload(body),forecast),
+            'max_tokens':AGENT_MAX_TOKENS,'model':body.model,'calls':[c['role'] for c in calls]}
 
 @app.post('/api/agents/run')
 async def run_agents(body:AgentRunRequest,x_api_key:str|None=Header(default=None)):
-    key=get_key(x_api_key) if body.provider=='piapi' else provider_key(body.provider,x_api_key)
+    from backend import llm_guard
+    if not body.approved: raise HTTPException(400,'Нужно подтверждение платного LLM-запроса')
+    if body.provider!='piapi': raise HTTPException(400,'Платный LLM доступен только через PiAPI')
+    if body.model not in ALLOWED_CHAT: raise HTTPException(400,'Недопустимая LLM-модель PiAPI')
+    if not body.project_id: raise HTTPException(400,'Укажи проект для учёта расхода')
+    project(body.project_id)
+    key=get_key(x_api_key)
     if not key or not key.isascii() or any(x.isspace() for x in key): raise HTTPException(400,'Enter a valid API key (ASCII, no spaces)')
     if len(body.target_models)>8:raise HTTPException(400,'Limit 8 target models')
     for target in body.target_models:
         if target not in MODEL_SPECS:raise HTTPException(400,'No verified API schema for '+target)
-    context={'brief':body.brief,'character_identity':body.character.get('identity',{}),'model_profiles':body.character.get('profiles',{}),'project_style_bible':body.style,'target_models':{m:MODEL_SPECS[m] for m in body.target_models}}
-    output={}
-    for role,instructions in AGENT_ROLES.items():
-        previous=json.dumps(output,ensure_ascii=False)
-        prompt=json.dumps(context,ensure_ascii=False)+'\nPREVIOUS SPECIALISTS:\n'+previous
-        if role=='prompt': instructions+=' Respond with labelled sections for each target model, then a short list of required references and parameters.'
-        content,usage=await agent_completion(body.provider,body.model,key,instructions,prompt)
-        output[role]={'content':content,'usage':usage}
+    calls,forecast=agent_plan(body)
+    payload=agent_payload(body)
+    results,error=await llm_guard.execute_plan(sys.modules[__name__],body.project_id,body.model,len(AGENT_ROLES),agent_builder(body),
+                                                key,body.request_id,body.quote_token,body.max_cost_usd,payload,forecast)
+    output={r['role']:{'content':r['content'],'usage':r['usage']} for r in results}
     run_id=uuid.uuid4().hex
-    record={'id':run_id,'created_at':now(),'provider':body.provider,'model':body.model,'brief':body.brief,'target_models':body.target_models,'output':output,'status':'awaiting_user_approval','generation_started':False}
+    record={'id':run_id,'created_at':now(),'provider':body.provider,'model':body.model,'brief':body.brief,'target_models':body.target_models,'output':output,
+            'status':'awaiting_user_approval' if error is None else 'partial','generation_started':False,
+            'cost_usd':round(sum(r['cost_usd'] for r in results),6),'request_id':body.request_id}
+    if error is not None:
+        record['error']='Команда не завершена: оплаченные вызовы учтены, автоматического платного повтора нет.'
     with connect() as db:
         db.execute('CREATE TABLE IF NOT EXISTS agent_runs(id TEXT PRIMARY KEY,project_id TEXT,created_at TEXT,data TEXT)')
         db.execute('INSERT INTO agent_runs VALUES(?,?,?,?)',(run_id,body.project_id,record['created_at'],json.dumps(record,ensure_ascii=False)))
+    if error is not None:
+        detail=getattr(error,'detail',None)
+        raise HTTPException(502,{'code':'AGENT_SEQUENCE_PARTIAL','completed':list(output),
+                                 'failed_role':next((r for r in AGENT_ROLES if r not in output),None),
+                                 'message':detail if isinstance(detail,str) else str(detail or error),
+                                 'cost_usd':record['cost_usd']})
     return record
 
 @app.get('/api/agents/runs')
@@ -796,6 +891,8 @@ from backend import reference_upload
 reference_upload.register(app,sys.modules[__name__])
 from backend import production_folders
 production_folders.register(app,sys.modules[__name__])
+from backend import release_artifacts
+release_artifacts.register(app,sys.modules[__name__])
 from backend import storyboard
 storyboard.register(app,sys.modules[__name__])
 from backend import production_entities

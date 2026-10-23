@@ -13,6 +13,9 @@ export default function PromptComposer({
   const [preview, setPreview] = useState<{context: Record<string, unknown>; system_rules: string} | null>(
     null
   );
+  const [quote, setQuote] = useState<{estimated_usd: number; quote_token: string; max_tokens: number} | null>(
+    null
+  );
   const [approved, setApproved] = useState(false);
   const [busy, setBusy] = useState(false);
   const [attempted, setAttempted] = useState(false);
@@ -32,6 +35,19 @@ export default function PromptComposer({
       } catch (e) {
         if (active) setError(e instanceof Error ? e.message : String(e));
       }
+      try {
+        // Шаг 1 платного вызова: бесплатная подписанная оценка цены. Без неё сервер не отправит запрос.
+        const r = await apiFetch('/api/compose/estimate', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify(request),
+        });
+        const d = await r.json();
+        if (!r.ok) throw Error(typeof d.detail === 'string' ? d.detail : JSON.stringify(d.detail));
+        if (active) setQuote(d);
+      } catch (e) {
+        if (active) setQuote(null);
+      }
     })();
     return () => {
       active = false;
@@ -42,10 +58,17 @@ export default function PromptComposer({
     setAttempted(true);
     setError('');
     try {
+      if (!quote) throw Error('Оценка стоимости недоступна. Получи новую оценку и подтверди запуск.');
       const r = await apiFetch('/api/compose', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({...request, approved: true}),
+        body: JSON.stringify({
+          ...request,
+          approved: true,
+          quote_token: quote.quote_token,
+          max_cost_usd: quote.estimated_usd,
+          request_id: crypto.randomUUID(),
+        }),
       });
       const d = await r.json();
       if (!r.ok) throw Error(typeof d.detail === 'string' ? d.detail : JSON.stringify(d.detail));
@@ -68,8 +91,9 @@ export default function PromptComposer({
       >
         <h2 id="compose-title">Подготовка промпта через API</h2>
         <p className="notice">
-          API-резерв временно отключён до настройки оценки стоимости. Контекст можно просмотреть, а промпт
-          подготовить в основном чате Codex.
+          Платный резерв под контролем: сервер сначала считает цену по проверенному тарифу модели, показывает
+          оценку и только после твоего подтверждения отправляет запрос. Бюджет проекта и суточный лимит
+          проверяются до вызова провайдера.
         </p>
         <p>
           {request.provider} · {request.model} → {request.target}
@@ -92,9 +116,10 @@ export default function PromptComposer({
           </>
         )}
         <p className="muted">
-          Один платный LLM-запрос, ответ до 1400 токенов. Точная стоимость зависит от тарифа выбранной модели
-          и длины контекста; долларовая оценка пока недоступна. Видео автоматически не запускается. Промпт и
-          фактический usage сохраняются в истории проекта.
+          {quote
+            ? `Один платный LLM-запрос, ответ до ${quote.max_tokens} токенов. Оценка: $${quote.estimated_usd.toFixed(6)}.`
+            : 'Оценка стоимости недоступна: платный резерв работает только через PiAPI с моделью из каталога.'}{' '}
+          Видео автоматически не запускается. Промпт и фактический usage сохраняются в истории проекта.
         </p>
         <label className="inline-checkbox">
           <input
@@ -113,7 +138,7 @@ export default function PromptComposer({
         <div className="chips">
           <button
             className="primary"
-            disabled={!PAID_LLM_ENABLED || !preview || !approved || busy || attempted}
+            disabled={!PAID_LLM_ENABLED || !preview || !quote || !approved || busy || attempted}
             onClick={compose}
           >
             {busy ? 'LLM готовит промпт…' : 'Подготовить через API'}

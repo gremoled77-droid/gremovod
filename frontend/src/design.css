@@ -168,17 +168,39 @@ section.panel {
 .nav-brand {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 4px 8px 14px;
+  gap: 12px;
+  padding: 6px 8px 16px;
+  background: none;
+  border: 0;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.nav-brand b {
+  font-size: 20px;
 }
 .nav-brand small {
   display: block;
   color: var(--muted);
-  font-size: 11px;
+  font-size: 12px;
 }
 .nav-logo {
   color: var(--accent);
-  font-size: 24px;
+  font-size: 38px;
+  line-height: 1;
+}
+.topbar-home {
+  display: none;
+  flex: none;
+  width: 36px;
+  height: 40px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font-size: 28px;
+  line-height: 1;
+  cursor: pointer;
 }
 .nav-group-title {
   margin: 12px 8px 4px;

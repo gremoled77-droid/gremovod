@@ -139,6 +139,9 @@
     gap: 8px;
     padding: 8px 12px;
   }
+  .topbar-home {
+    display: block;
+  }
   .topbar-project {
     flex: 1;
     min-width: 0;
@@ -190,16 +193,15 @@
     font-size: 13px;
   }
   .topbar .topbar-status {
-    width: auto;
-    padding: 0;
-    border: 0;
-    background: none;
-    font-size: 0;
-    gap: 0;
+    display: none;
   }
   .topbar .top-actions button {
     height: 40px;
     padding: 0 12px;
+  }
+  .topbar .top-actions .dock-toggle {
+    padding: 0 8px;
+    font-size: 12px;
   }
   .topbar .project-global-actions > button:first-child,
   .topbar .project-global-actions > .settings-button {

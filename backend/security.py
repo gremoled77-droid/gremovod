@@ -1,4 +1,4 @@
-"""Loopback browser session and signed, short-lived generation quotes."""
+﻿"""Loopback browser session and signed, short-lived generation quotes."""
 import hashlib
 import hmac
 import json
@@ -33,6 +33,42 @@ def verify_quote(token, project_id, payload, cost):
         valid = False
     if not valid:
         raise HTTPException(400, 'Оценка отсутствует, устарела или параметры изменены. Получи новую оценку и подтверди запуск.')
+
+
+def execution_permit(task_id, revision, project_id, model, cost):
+    """Подписывает короткоживущее разрешение на исполнение конкретной ревизии задания."""
+    data = json.dumps({
+        'purpose': 'minimax.text.execute',
+        'task_id': task_id,
+        'revision': revision,
+        'project_id': project_id,
+        'model': model,
+        'cost': cost,
+        'nonce': secrets.token_hex(16),
+        'expires': int(time.time()) + 600,
+    }, sort_keys=True, separators=(',', ':'), ensure_ascii=False)
+    signature = hmac.new(SIGNING_KEY, data.encode(), hashlib.sha256).hexdigest()
+    return data + '.' + signature
+
+
+def verify_execution_permit(token, task_id, revision, project_id, model, cost):
+    """Проверяет подпись, назначение, срок и неизменность параметров разрешения."""
+    try:
+        data, signature = token.rsplit('.', 1)
+        expected = hmac.new(SIGNING_KEY, data.encode(), hashlib.sha256).hexdigest()
+        value = json.loads(data)
+        valid = hmac.compare_digest(signature, expected)
+        valid = valid and value.get('purpose') == 'minimax.text.execute'
+        valid = valid and value.get('task_id') == task_id
+        valid = valid and value.get('revision') == revision
+        valid = valid and value.get('project_id') == project_id
+        valid = valid and value.get('model') == model
+        valid = valid and value.get('cost') == cost
+        valid = valid and value.get('expires', 0) >= time.time()
+    except (ValueError, TypeError, KeyError, AttributeError):
+        valid = False
+    if not valid:
+        raise HTTPException(400, 'Разрешение на исполнение отсутствует, устарело или параметры задания изменены.')
 
 
 class BudgetLimits(BaseModel):
@@ -75,12 +111,13 @@ def budget_state(db, project_id):
 
 
 def check_budget(db, project_id, cost):
-    from backend import series_economics
+    from backend import llm_guard, series_economics
     series_economics.check_budget(db,project_id,cost)
     value = budget_state(db, project_id)
-    if value['project_reserved_usd'] + cost > value['project_limit_usd'] + 1e-9:
+    project_llm, daily_llm = llm_guard.spent(db, project_id)
+    if value['project_reserved_usd'] + project_llm + cost > value['project_limit_usd'] + 1e-9:
         raise HTTPException(400, 'Превышен серверный бюджет проекта. Измени лимит в разделе «Экономика».')
-    if value['daily_reserved_usd'] + cost > value['daily_limit_usd'] + 1e-9:
+    if value['daily_reserved_usd'] + daily_llm + cost > value['daily_limit_usd'] + 1e-9:
         raise HTTPException(400, 'Превышен дневной серверный бюджет. Измени лимит в разделе «Экономика».')
 
 
@@ -103,8 +140,6 @@ def register(app, studio):
         supplied = request.headers.get('x-studio-session') or request.cookies.get('studio_session', '')
         if not public and not worker and not secrets.compare_digest(supplied.encode(), LAUNCH_TOKEN.encode()):
             return JSONResponse({'detail':'Локальная сессия отсутствует. Обнови страницу студии.'}, status_code=401)
-        if request.method == 'POST' and request.url.path in {'/api/chat','/api/compose','/api/agents/run'}:
-            return JSONResponse({'detail':'Платный LLM-резерв временно отключён: для него ещё нет проверенной серверной оценки и лимита стоимости. Используй основной чат Codex.'}, status_code=503)
         return await call_next(request)
 
 

@@ -26,6 +26,7 @@ import ProductionPanel from './ProductionPanel';
 import RecoverJob from './RecoverJob';
 import {mergeProject} from './projectMerge';
 import {apiFetch, PAID_LLM_ENABLED} from './api';
+import {LLM_MAX_TOKENS} from './llmPricing';
 import NativeGallery from './NativeGallery';
 import {type CharacterVersion} from './ReplaceCharacterButton';
 import RefinePanel, {EMPTY_REFINE, type RefineDraft} from './RefinePanel';
@@ -723,21 +724,42 @@ function App() {
       const next = [...messages, {role: 'user', content: chatText}];
       setMessages(next);
       setChatText('');
+      const prompt = [
+        {
+          role: 'system',
+          content:
+            'Ты режиссёр AI-видеостудии. Помогай создавать точные сцены и промпты; сохраняй внешность персонажей.',
+        },
+        ...next,
+      ];
+      // Платный вызов идёт в два шага: подписанная оценка цены, затем запуск по подтверждению.
+      const id = projectId || (await ensureProject());
+      const quote = await json(
+        await apiFetch(url + '/llm/estimate', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            project_id: id,
+            model: llm,
+            messages: prompt,
+            max_tokens: LLM_MAX_TOKENS,
+          }),
+        })
+      );
       const d = await json(
         await apiFetch(url + '/llm/chat', {
           method: 'POST',
           headers,
           body: JSON.stringify({
-            provider,
+            provider: 'piapi',
+            project_id: id,
             model: llm,
-            messages: [
-              {
-                role: 'system',
-                content:
-                  'Ты режиссёр AI-видеостудии. Помогай создавать точные сцены и промпты; сохраняй внешность персонажей.',
-              },
-              ...next,
-            ],
+            max_tokens: LLM_MAX_TOKENS,
+            messages: prompt,
+            approved: true,
+            quote_token: quote.quote_token,
+            max_cost_usd: quote.estimated_usd,
+            request_id: crypto.randomUUID(),
           }),
         })
       );
@@ -1314,6 +1336,9 @@ function App() {
           )}
         </Suspense>
         <header className="topbar">
+          <button className="topbar-home" aria-label="GremoVOD Studio: старт" onClick={() => setMode('home')}>
+            ◆
+          </button>
           <div className="topbar-project">
             <select
               className="topbar-project-picker"
@@ -1770,6 +1795,18 @@ function App() {
               ) : mode === 'storyboard' ? (
                 <>
                   <IdeaRefs projectId={projectId} ids={state.ideaRefs || []} />
+                  <FrameBuilder
+                    projectId={projectId}
+                    ensureProject={ensureProject}
+                    heroes={state.characters}
+                    world={state.style}
+                    brief={state.brief}
+                    locationAssetIds={(state.scene || EMPTY_SCENE).assets
+                      .filter(a => a.role === 'location')
+                      .map(a => a.asset_id)}
+                    revision={libraryRevision}
+                    onSent={() => setLibraryRevision(x => x + 1)}
+                  />
                   <ProductionStoryboard
                     onInspect={(productionId, nodeId) => {
                       setProductionTarget({productionId, nodeId});
@@ -1935,20 +1972,6 @@ function App() {
                   onNext={() => setMode('storyboard')}
                   revision={libraryRevision}
                   onLibrary={() => setLibraryRevision(x => x + 1)}
-                  builder={
-                    <FrameBuilder
-                      projectId={projectId}
-                      ensureProject={ensureProject}
-                      heroes={state.characters}
-                      world={state.style}
-                      brief={state.brief}
-                      locationAssetIds={(state.scene || EMPTY_SCENE).assets
-                        .filter(a => a.role === 'location')
-                        .map(a => a.asset_id)}
-                      revision={libraryRevision}
-                      onSent={() => setMode('storyboard')}
-                    />
-                  }
                   results={
                     <AssetLibrary
                       {...replacementControls}
@@ -1966,22 +1989,50 @@ function App() {
               ) : mode === 'reels' ? (
                 <ReelsScreen onUse={useReelRecipe} />
               ) : mode === 'create' ? (
-                <CreateScreen
-                  projectId={projectId}
-                  heroes={state.characters.map(c => ({
-                    id: c.id,
-                    name: c.name,
-                    assetId: c.working_asset_id,
-                  }))}
-                  world={[
-                    state.style?.look,
-                    state.style?.palette,
-                    state.style?.lighting,
-                    state.style?.environment,
-                  ]
-                    .filter(Boolean)
-                    .join('. ')}
-                />
+                <>
+                  <CreateScreen
+                    projectId={projectId}
+                    heroes={state.characters.map(c => ({
+                      id: c.id,
+                      name: c.name,
+                      assetId: c.working_asset_id,
+                    }))}
+                    world={[
+                      state.style?.look,
+                      state.style?.palette,
+                      state.style?.lighting,
+                      state.style?.environment,
+                    ]
+                      .filter(Boolean)
+                      .join('. ')}
+                  />
+                  <section className="panel photo-setup" aria-label="Фото">
+                    <h2>Фото · постановка и промпт</h2>
+                    <FrameSelector
+                      catalogue={frameCatalogue}
+                      value={state.composition}
+                      onChange={chooseComposition}
+                      onCatalogue={() => setCatalogue('frame')}
+                    />
+                    {frameError && <p role="alert">{frameError}</p>}
+                    <ChatGPTPanel
+                      {...replacementControls}
+                      projectId={projectId}
+                      ensureProject={ensureProject}
+                      onPrompt={(prompt, target, _movement, frame) =>
+                        setState(s => ({
+                          ...s,
+                          prompts: {...s.prompts, [target]: prompt},
+                          compositionPromptBasis: {
+                            ...s.compositionPromptBasis,
+                            [target]: frameBasis(frame),
+                          },
+                        }))
+                      }
+                      onAsset={() => setLibraryRevision(x => x + 1)}
+                    />
+                  </section>
+                </>
               ) : mode === 'video' ? (
                 <VideoScreen
                   projectId={projectId}
@@ -2027,32 +2078,6 @@ function App() {
                         onNext={() => setMode('styles')}
                         onScene={() => setMode('scene')}
                       />
-                      <section className="panel photo-setup" aria-label="Фото">
-                        <h2>Фото · постановка и промпт</h2>
-                        <FrameSelector
-                          catalogue={frameCatalogue}
-                          value={state.composition}
-                          onChange={chooseComposition}
-                          onCatalogue={() => setCatalogue('frame')}
-                        />
-                        {frameError && <p role="alert">{frameError}</p>}
-                        <ChatGPTPanel
-                          {...replacementControls}
-                          projectId={projectId}
-                          ensureProject={ensureProject}
-                          onPrompt={(prompt, target, _movement, frame) =>
-                            setState(s => ({
-                              ...s,
-                              prompts: {...s.prompts, [target]: prompt},
-                              compositionPromptBasis: {
-                                ...s.compositionPromptBasis,
-                                [target]: frameBasis(frame),
-                              },
-                            }))
-                          }
-                          onAsset={() => setLibraryRevision(x => x + 1)}
-                        />
-                      </section>
                       <section className="panel idea-world" aria-label="Мир по заданию">
                         <AttachmentMenu
                           projectId={projectId}

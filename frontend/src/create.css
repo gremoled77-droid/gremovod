@@ -359,7 +359,10 @@
   min-height: 0;
   padding: 16px 20px;
   gap: 12px;
-  overflow: hidden;
+  overflow-y: auto;
+}
+.create-main .photo-setup {
+  flex: none;
 }
 .create-main .workspace-trail,
 .create-main .content > .alert,
@@ -370,10 +373,10 @@
   display: none;
 }
 .create-main .cs {
-  flex: 1;
+  flex: none;
   width: 100%;
-  height: auto;
-  min-height: 0;
+  height: calc(100dvh - var(--topbar-height, 64px) - 150px);
+  min-height: 480px;
   grid-template-columns: 200px minmax(0, 1fr) 250px;
   border: 1px solid var(--border);
   border-radius: 16px;

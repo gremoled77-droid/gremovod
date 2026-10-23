@@ -18,28 +18,55 @@ type Props = {
 };
 const options = ['seedream-5-pro', 'seedream-5-lite', 'nano-banana-2.1', 'seedance-2.5'];
 export default function AgentPanel({projectId, brief, character, style, onApply}: Props) {
-  const [provider, setProvider] = useState('openai');
-  const [model, setModel] = useState('gpt-4.1-mini');
+  const [provider, setProvider] = useState('piapi');
+  const [model, setModel] = useState('gpt-5.6-luna');
   const [styleNotes, setStyleNotes] = useState('');
   const [targets, setTargets] = useState<string[]>(['seedream-5-pro', 'seedance-2.5']);
   const [result, setResult] = useState<AgentResult | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [approved, setApproved] = useState(false);
+  const [quote, setQuote] = useState<{estimated_usd: number; quote_token: string} | null>(null);
+  const requestBody = () => ({
+    project_id: projectId || null,
+    brief,
+    provider,
+    model,
+    character: character || {},
+    style: {...style, agent_notes: styleNotes},
+    target_models: targets,
+  });
+  const estimate = async () => {
+    setError('');
+    setQuote(null);
+    try {
+      // Шаг 1 платного вызова: бесплатная подписанная оценка суммарного прогноза расходов.
+      const response = await apiFetch('/api/agents/estimate', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(requestBody()),
+      });
+      const data = await response.json();
+      if (!response.ok) throw Error(JSON.stringify(data.detail || data));
+      setQuote(data);
+    } catch (e: any) {
+      setError(String(e.message || e));
+    }
+  };
   const run = async () => {
     setBusy(true);
     setError('');
     try {
+      if (!quote) throw Error('Оценка стоимости недоступна. Получи оценку и подтверди запуск.');
       const response = await apiFetch('/api/agents/run', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({
-          project_id: projectId || null,
-          brief,
-          provider,
-          model,
-          character: character || {},
-          style: {...style, agent_notes: styleNotes},
-          target_models: targets,
+          ...requestBody(),
+          approved: true,
+          quote_token: quote.quote_token,
+          max_cost_usd: quote.estimated_usd,
+          request_id: crypto.randomUUID(),
         }),
       });
       const data = await response.json();
@@ -68,10 +95,10 @@ export default function AgentPanel({projectId, brief, character, style, onApply}
   return (
     <section className="sc">
       <div className="ag-state" role="status">
-        <b>Платные API-агенты выключены</b>
+        <b>Платные API-агенты под контролем бюджета</b>
         <span>
-          Пока для них нет оценки стоимости и лимита. Основной чат Codex доступен в студии, а форма ниже
-          показывает, как будет работать команда.
+          Перед запуском сервер считает суммарный прогноз расходов всей команды и проверяет лимит проекта и
+          суточный лимит. Без твоего подтверждения и подписанной оценки провайдер не вызывается.
         </span>
       </div>
       <p className="muted sc-lede">
@@ -89,9 +116,10 @@ export default function AgentPanel({projectId, brief, character, style, onApply}
                 const p = e.target.value;
                 setProvider(p);
                 setModel(p === 'openai' ? 'gpt-4.1-mini' : 'gpt-5.6-luna');
+                setQuote(null);
+                setApproved(false);
               }}
             >
-              <option value="openai">OpenAI напрямую</option>
               <option value="piapi">PiAPI</option>
             </select>
           </label>
@@ -128,19 +156,44 @@ export default function AgentPanel({projectId, brief, character, style, onApply}
       <article className="sc-step">
         {stepHead(4, 'Запуск', 'Задание берётся из «Идеи». Один запуск — 3 вызова LLM')}
         <div className="rf-actions">
+          <button className="secondary" disabled={busy || !brief.trim() || targets.length === 0} onClick={estimate}>
+            {quote ? 'Пересчитать оценку' : 'Посчитать стоимость'}
+          </button>
           <button
             className="primary"
-            disabled={!PAID_LLM_ENABLED || busy || !brief.trim() || targets.length === 0}
+            disabled={
+              !PAID_LLM_ENABLED ||
+              busy ||
+              !brief.trim() ||
+              targets.length === 0 ||
+              !quote ||
+              !approved
+            }
             onClick={run}
           >
             {busy ? 'Агенты работают…' : '▶ Создать план и промпты'}
           </button>
         </div>
+        {quote && (
+          <p className="muted">
+            Прогноз на три вызова: ${quote.estimated_usd.toFixed(6)}. Фактическое списание считается по
+            токенам и всегда не выше оценки.
+          </p>
+        )}
+        <label className="inline-checkbox">
+          <input
+            type="checkbox"
+            checked={approved}
+            onChange={e => setApproved(e.target.checked)}
+            disabled={!quote || busy}
+          />{' '}
+          Разрешаю платный запуск команды из трёх LLM-вызовов
+        </label>
         {!brief.trim() && <small className="muted">Сначала напиши задание ролика на экране «Идея».</small>}
         {error && (
           <div className="alert">
             {error.includes('1010')
-              ? 'PiAPI заблокировал клиент (Cloudflare 1010). Можно выбрать OpenAI напрямую. '
+              ? 'PiAPI заблокировал клиент (Cloudflare 1010). Обратись в поддержку PiAPI. '
               : ''}
             {error}
           </div>

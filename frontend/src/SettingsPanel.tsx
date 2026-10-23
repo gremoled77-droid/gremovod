@@ -1,5 +1,4 @@
 import type {ReactNode} from 'react';
-import {PAID_LLM_ENABLED} from './api';
 import ArchivedProjects from './ArchivedProjects';
 import ChatLinkSetting from './ChatLinkSetting';
 
@@ -51,12 +50,10 @@ export default function SettingsPanel({
       )}
       <article className="sc-step">
         {card('✎', 'Модель для промптов', 'Резервный API: провайдер и модель')}
-        {!PAID_LLM_ENABLED && (
-          <p className="notice">
-            Платный LLM-резерв временно отключён до настройки оценки стоимости. Основной чат доступен в
-            студии.
-          </p>
-        )}
+        <p className="notice">
+          Платный LLM-резерв работает через PiAPI: перед каждым платным вызовом сервер считает цену по
+          проверенному тарифу, сверяет её с лимитом проекта и суточным лимитом и ждёт твоего подтверждения.
+        </p>
         <div className="param-grid">
           <label>
             LLM-провайдер
@@ -65,17 +62,13 @@ export default function SettingsPanel({
               disabled={busy}
               onChange={e => onProvider(e.target.value as 'openai' | 'piapi')}
             >
-              <option value="openai">OpenAI напрямую</option>
               <option value="piapi">PiAPI</option>
             </select>
           </label>
           <label>
             LLM
             <select value={model} disabled={busy} onChange={e => onModel(e.target.value)}>
-              {(provider === 'openai'
-                ? ['gpt-4.1-mini', 'gpt-4.1', 'gpt-5-mini']
-                : ['gpt-5.6-luna', 'gpt-5.6-terra', 'gpt-5.6-sol', 'gpt-6-astra']
-              ).map(item => (
+              {['gpt-5.6-luna', 'gpt-5.6-terra', 'gpt-5.6-sol', 'gpt-6-astra'].map(item => (
                 <option key={item}>{item}</option>
               ))}
             </select>

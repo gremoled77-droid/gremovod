@@ -36,7 +36,6 @@ export default function CharactersScreen({
   onToWorld,
   onNext,
   onLibrary,
-  builder,
   results,
   revision,
 }: {
@@ -50,7 +49,6 @@ export default function CharactersScreen({
   onToWorld: () => void;
   onNext: () => void;
   onLibrary: () => void;
-  builder: ReactNode;
   results: ReactNode;
   revision: number;
 }) {
@@ -206,7 +204,6 @@ export default function CharactersScreen({
           )}
         />
       )}
-      {builder}
       {results}
       {creating && (
         <CreateEntityDialog
