@@ -23,6 +23,7 @@ def register(app, studio):
         with studio.connect() as db:
             job=db.execute('SELECT * FROM jobs WHERE id=?',(job_id,)).fetchone()
         if not job:raise HTTPException(404,'Задание не найдено')
+        if job['provider']=='kie':raise HTTPException(409,'Привязка Task ID пока только для PiAPI; задание KIE проверь в кабинете kie.ai')
         if job['task_id']==body.task_id:
             return {'attached':True,'job_id':job_id,'status':job['status'],'upstream':json.loads(job['response'])}
         if job['status'] not in {'submission_unknown','submitting'} or job['task_id']:

@@ -39,7 +39,7 @@ class RefProfilesTest(unittest.TestCase):
         self.assertEqual(MODEL_SPECS['seedance-2.0']['ref_limits']['video_total_s'], 15.4)
 
     def test_existing_launch_flags_untouched(self):
-        self.assertTrue(MODEL_SPECS['seedance-2.5']['launch_enabled'])
+        self.assertFalse(MODEL_SPECS['seedance-2.5']['launch_enabled'])  # живого вызова не было
         self.assertTrue(MODEL_SPECS['minimax-h3']['launch_enabled'])
 
 

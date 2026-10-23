@@ -4,6 +4,7 @@ import {responseJson} from './ChatGPTPanel';
 export type EntityPatch = Partial<{
   character_node_ids: string[];
   location_node_id: string | null;
+  location_angle_file_id: string | null;
   selected_image_file_id: string | null;
   selected_video_file_id: string | null;
 }>;
@@ -30,6 +31,11 @@ export async function patchEntity(pid: string, nid: string, patch: EntityPatch) 
         notes: editor.node.notes,
         character_node_ids: d.character_node_ids,
         location_node_id: d.location_node_id,
+        // Ракурс принадлежит локации: при смене локации без явного ракурса он сбрасывается.
+        location_angle_file_id:
+          patch.location_node_id !== undefined && patch.location_node_id !== d.location_node_id
+            ? null
+            : (d.location_angle_file_id ?? null),
         selected_image_file_id: d.selected_image_file_id,
         selected_video_file_id: d.selected_video_file_id,
         ...patch,

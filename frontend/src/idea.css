@@ -128,6 +128,95 @@
     padding: 0 12px;
   }
 }
+.world-llm {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line, rgba(255, 255, 255, 0.08));
+  display: grid;
+  gap: 8px;
+}
+.world-llm-quote {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.world-llm-conflicts {
+  display: grid;
+  gap: 8px;
+}
+.world-llm-conflicts p {
+  margin: 2px 0 6px;
+  white-space: pre-wrap;
+}
+
+.att {
+  margin-top: 12px;
+  display: grid;
+  gap: 8px;
+}
+.att-bar {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.att-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 5;
+  display: grid;
+  min-width: 220px;
+  gap: 2px;
+  padding: 6px;
+  border-radius: 10px;
+  background: var(--panel, #1b1b1f);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+.att-menu button {
+  text-align: left;
+}
+.att-pick,
+.att-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.att-tile {
+  display: grid;
+  gap: 4px;
+  width: 92px;
+  padding: 4px;
+}
+.att-tile img {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border-radius: 8px;
+}
+.att-chip {
+  display: grid;
+  grid-template-columns: 56px 1fr auto;
+  align-items: center;
+  gap: 6px;
+  padding: 4px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+.att-chip img {
+  width: 56px;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border-radius: 8px;
+}
+.att-ro .att-chip {
+  grid-template-columns: 56px auto;
+}
 
 /* «Идея»: задание, отправка в LLM, результат */
 .idea-head {
@@ -308,4 +397,37 @@
   .idea-main > .content {
     padding-top: 58px;
   }
+}
+
+.idea-bg {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 40px;
+  padding: 0 12px;
+  border-radius: 99px;
+  border: 1px solid var(--border);
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.idea-bg.on {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.idea-bg input {
+  accent-color: var(--accent);
+}
+.idea-bg-info {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+}
+.idea-bg-note {
+  margin: 8px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
 }

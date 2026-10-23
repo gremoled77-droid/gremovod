@@ -8,6 +8,7 @@ import GenerationReview, {type GenerationRequest} from './GenerationReview';
 import {AddReferenceModal, LibraryPickModal, LocationModal} from './FrameSources';
 import {cents, price} from './PriceTable';
 import {loadVideoDraft, saveVideoDraft} from './videoDraft';
+import {modePrompt, seedanceCost, usesSource, VIDEO_MODES, type VideoMode} from './videoMode';
 
 type OptionSpec = {values?: (string | number)[]; default?: string | number; min?: number; max?: number};
 type Spec = {
@@ -70,10 +71,15 @@ function VideoScreenBody({projectId, world = ''}: {projectId: string; world?: st
   const [library, setLibrary] = useState<LibAsset[]>([]);
   const [prompt, setPrompt] = useState(restored.prompt ?? '');
   const [base, setBase] = useState(restored.base ?? '');
+  const [finish, setFinish] = useState(restored.finish ?? '');
+  const [clip, setClip] = useState(restored.clip ?? '');
+  const [clipSec, setClipSec] = useState<number | null>(null);
+  const [mode, setMode] = useState<VideoMode>(restored.mode ?? 'new');
+  const [back, setBack] = useState(restored.back ?? false);
   const [refs, setRefs] = useState<string[]>(restored.refs ?? []);
   const [model, setModel] = useState(restored.model ?? 'seedance-2.5');
   const [values, setValues] = useState<Record<string, string | number>>(restored.values ?? {});
-  const [source, setSource] = useState<'' | 'hero' | 'location' | 'base'>('');
+  const [source, setSource] = useState<'' | 'hero' | 'location' | 'base' | 'finish' | 'clip'>('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -81,8 +87,8 @@ function VideoScreenBody({projectId, world = ''}: {projectId: string; world?: st
   const [cost, setCost] = useState<number | null>(null);
 
   useEffect(() => {
-    saveVideoDraft(projectId, {prompt, base, refs, model, values});
-  }, [projectId, prompt, base, refs, model, values]);
+    saveVideoDraft(projectId, {prompt, base, finish, clip, mode, back, refs, model, values});
+  }, [projectId, prompt, base, finish, clip, mode, back, refs, model, values]);
 
   const loadLibrary = async () => {
     if (projectId)
@@ -112,13 +118,42 @@ function VideoScreenBody({projectId, world = ''}: {projectId: string; world?: st
     string | number
   >;
   const isSeedance = model === 'seedance-2.5';
-  const maxRefs = Math.max(0, (spec?.max_refs ?? 1) - (base ? 1 : 0));
+  const activeMode: VideoMode = isSeedance ? mode : 'new';
+  const fromClip = usesSource(activeMode);
   const refLimit = spec?.max_refs ?? 1;
-  const total = (base ? 1 : 0) + refs.length;
-  const signature = JSON.stringify([model, current]);
+  const total = (base ? 1 : 0) + (activeMode === 'frames' && finish ? 1 : 0) + refs.length;
+  const maxRefs = Math.max(0, refLimit - total + refs.length);
+  const videos = library.filter(a => a.metadata.kind === 'video');
+  const rateUsd = isSeedance ? spec?.price_per_second_usd?.[String(value('resolution'))] : undefined;
+  const sec = Number(value('duration') ?? 0);
+  const outSec = activeMode === 'edit' ? (clipSec ?? 0) : sec;
+  const signature = JSON.stringify([model, current, activeMode, clipSec]);
+
+  /** Длину исходного ролика читает браузер: сервер файлы не измеряет. */
+  useEffect(() => {
+    setClipSec(null);
+    const a = clip ? byId[clip] : undefined;
+    if (!a) return;
+    const probe = document.createElement('video');
+    probe.preload = 'metadata';
+    probe.onloadedmetadata = () =>
+      setClipSec(Number.isFinite(probe.duration) ? Math.round(probe.duration * 10) / 10 : null);
+    probe.src = a.url;
+    return () => {
+      probe.onloadedmetadata = null;
+      probe.removeAttribute('src');
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clip, !!byId[clip]]);
 
   useEffect(() => {
     if (!spec) return;
+    if (rateUsd !== undefined) {
+      setCost(
+        fromClip && clipSec === null ? null : seedanceCost(rateUsd, outSec, fromClip ? (clipSec ?? 0) : 0)
+      );
+      return;
+    }
     let live = true;
     setCost(null);
     void price(model, current).then(p => live && setCost(p));
@@ -137,7 +172,7 @@ function VideoScreenBody({projectId, world = ''}: {projectId: string; world?: st
   );
 
   const addRef = (id: string) =>
-    setRefs(r => (r.includes(id) || id === base || r.length >= maxRefs ? r : [...r, id]));
+    setRefs(r => (r.includes(id) || id === base || id === finish || r.length >= maxRefs ? r : [...r, id]));
   const trash = async (id: string) => {
     if (!window.confirm('Убрать ролик из библиотеки? Он хранится в корзине 30 дней и восстанавливается.'))
       return;
@@ -180,7 +215,7 @@ function VideoScreenBody({projectId, world = ''}: {projectId: string; world?: st
   };
   const cloudUrl = async (assetId: string) => {
     const a = byId[assetId];
-    if (a?.provider_reference_url) return a.provider_reference_url;
+    if (a?.provider_reference_url?.startsWith('https://')) return a.provider_reference_url;
     const r = await json(
       await apiFetch(`/api/library/${assetId}/upload-reference`, {
         method: 'POST',
@@ -196,21 +231,35 @@ function VideoScreenBody({projectId, world = ''}: {projectId: string; world?: st
     setNotice('');
     if (!prompt.trim()) return setError('Опиши, что происходит в ролике');
     if (!isSeedance && total > 1) return setError('Эта модель принимает один кадр');
+    if (activeMode === 'frames' && (!base || !finish)) return setError('Выбери стартовый и финишный кадры');
+    if (fromClip) {
+      if (!clip) return setError('Выбери исходный ролик');
+      if (clipSec === null) return setError('Длина ролика ещё не определена, подожди секунду');
+      if (clipSec > 30) return setError('Исходный ролик длиннее 30 секунд');
+      if (activeMode === 'edit' && clipSec < 4)
+        return setError('Для правки ролик должен быть не короче 4 секунд');
+    }
     setBusy(true);
     try {
-      const ids = [...(base ? [base] : []), ...refs];
+      const ids = fromClip
+        ? []
+        : [base, ...(activeMode === 'frames' ? [finish] : []), ...refs].filter(Boolean);
       const urls = await Promise.all(ids.map(cloudUrl));
-      // У Seedance роль картинки задаёт тег в промпте: кадр-основа это @image1.
-      const text =
-        isSeedance && base && !/@image1/i.test(prompt)
-          ? `@image1 is the first frame of the video.\n${prompt.trim()}`
-          : prompt.trim();
+      const videoUrls = fromClip ? [await cloudUrl(clip)] : [];
+      const options: Record<string, string | number> = {...current};
+      if (fromClip) {
+        options.aspect_ratio = 'adaptive';
+        options.task = activeMode;
+        options.video_seconds = clipSec as number;
+        if (activeMode === 'edit') delete options.duration;
+      }
       setRequest({
         project_id: projectId,
         model_id: model,
-        prompt: text,
-        options: current as Record<string, string | number>,
+        prompt: isSeedance ? modePrompt(activeMode, prompt, {hasBase: !!base, back}) : prompt.trim(),
+        options,
         reference_urls: urls,
+        ...(videoUrls.length ? {video_urls: videoUrls} : {}),
       });
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -234,11 +283,7 @@ function VideoScreenBody({projectId, world = ''}: {projectId: string; world?: st
   const provider = spec?.provider || 'piapi';
   const pageUrl = spec?.page_urls?.[provider];
   const range = (key: string) => schema[key];
-  const sec = Number(value('duration') ?? 0);
-  const rate =
-    isSeedance && spec?.price_per_second_usd?.[String(value('resolution'))]
-      ? Math.round(spec.price_per_second_usd[String(value('resolution'))] * 1000) / 10
-      : null;
+  const rate = rateUsd !== undefined ? Math.round(rateUsd * 1000) / 10 : null;
 
   return (
     <section className="video-screen vs">
@@ -254,55 +299,137 @@ function VideoScreenBody({projectId, world = ''}: {projectId: string; world?: st
           </div>
         )}
 
-        <div className="vs-block">
-          <b>Кадр-основа</b>
-          <small className="muted">с него начинается ролик</small>
-          <div className="vs-row">
-            {base ? (
-              thumb(base, () => setBase(''), 'Кадр-основа')
-            ) : (
-              <button type="button" className="vs-add" onClick={() => setSource('base')}>
-                Выбрать кадр
+        {isSeedance && (
+          <div className="vs-modes" role="tablist" aria-label="Режим ролика">
+            {VIDEO_MODES.map(m => (
+              <button
+                key={m.id}
+                type="button"
+                role="tab"
+                aria-selected={activeMode === m.id}
+                className={activeMode === m.id ? 'on' : ''}
+                onClick={() => setMode(m.id)}
+              >
+                {m.label}
               </button>
-            )}
-            {base && (
-              <button type="button" onClick={() => setSource('base')}>
-                Заменить
-              </button>
-            )}
+            ))}
           </div>
-        </div>
+        )}
 
-        <div className="vs-block">
-          <b>Референсы</b>
-          <div className="vs-row">
-            {refs.map(id => thumb(id, () => setRefs(r => r.filter(x => x !== id))))}
-            <button
-              type="button"
-              className="vs-add"
-              disabled={total >= refLimit || !isSeedance}
-              title={
-                isSeedance
-                  ? 'Добавить персонажа или загрузить свой референс'
-                  : 'Эта модель принимает только кадр-основу'
-              }
-              onClick={() => setSource('hero')}
-            >
-              ＋
-            </button>
-            <button
-              type="button"
-              disabled={total >= refLimit || !isSeedance}
-              title="Выбрать готовую локацию"
-              onClick={() => setSource('location')}
-            >
-              Локация
-            </button>
-            <span className="muted vs-count">
-              {total} из {refLimit}
-            </span>
+        {fromClip ? (
+          <div className="vs-block">
+            <b>Исходный ролик</b>
+            <small className="muted">
+              {activeMode === 'edit'
+                ? 'длина результата равна длине исходника'
+                : 'формат результата берётся из исходника'}
+            </small>
+            <div className="vs-row">
+              {clip && byId[clip] ? (
+                <video className="vs-clip" src={byId[clip].url} controls preload="metadata" />
+              ) : (
+                <button type="button" className="vs-add" onClick={() => setSource('clip')}>
+                  Выбрать ролик
+                </button>
+              )}
+              {clip && (
+                <button type="button" onClick={() => setSource('clip')}>
+                  Заменить
+                </button>
+              )}
+              {clip && (
+                <span className="vs-seconds">
+                  {clipSec === null ? 'считаю длину…' : String(clipSec).replace('.', ',') + ' с'}
+                </span>
+              )}
+            </div>
+            {activeMode === 'extend' && (
+              <div className="vs-row vs-dir" role="radiogroup" aria-label="Направление">
+                <label>
+                  <input type="radio" name="dir" checked={!back} onChange={() => setBack(false)} /> вперёд
+                </label>
+                <label>
+                  <input type="radio" name="dir" checked={back} onChange={() => setBack(true)} /> назад
+                </label>
+              </div>
+            )}
           </div>
-        </div>
+        ) : (
+          <>
+            <div className="vs-block">
+              <b>{activeMode === 'frames' ? 'Старт' : 'Кадр-основа'}</b>
+              <small className="muted">
+                {activeMode === 'frames' ? 'первый кадр ролика' : 'с него начинается ролик'}
+              </small>
+              <div className="vs-row">
+                {base ? (
+                  thumb(base, () => setBase(''), 'Кадр-основа')
+                ) : (
+                  <button type="button" className="vs-add" onClick={() => setSource('base')}>
+                    Выбрать кадр
+                  </button>
+                )}
+                {base && (
+                  <button type="button" onClick={() => setSource('base')}>
+                    Заменить
+                  </button>
+                )}
+              </div>
+            </div>
+            {activeMode === 'frames' && (
+              <>
+                <div className="vs-block">
+                  <b>Финиш</b>
+                  <small className="muted">последний кадр ролика (подсказка для модели)</small>
+                  <div className="vs-row">
+                    {finish ? (
+                      thumb(finish, () => setFinish(''), 'Финиш')
+                    ) : (
+                      <button type="button" className="vs-add" onClick={() => setSource('finish')}>
+                        Выбрать кадр
+                      </button>
+                    )}
+                    {finish && (
+                      <button type="button" onClick={() => setSource('finish')}>
+                        Заменить
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </>
+            )}
+            <div className="vs-block">
+              <b>Референсы</b>
+              <div className="vs-row">
+                {refs.map(id => thumb(id, () => setRefs(r => r.filter(x => x !== id))))}
+                <button
+                  type="button"
+                  className="vs-add"
+                  disabled={total >= refLimit || !isSeedance}
+                  title={
+                    isSeedance
+                      ? 'Добавить персонажа или загрузить свой референс'
+                      : 'Эта модель принимает только кадр-основу'
+                  }
+                  onClick={() => setSource('hero')}
+                >
+                  ＋
+                </button>
+                <button
+                  type="button"
+                  disabled={total >= refLimit || !isSeedance}
+                  title="Выбрать готовую локацию"
+                  onClick={() => setSource('location')}
+                >
+                  Локация
+                </button>
+                <span className="muted vs-count">
+                  {total} из {refLimit}
+                </span>
+              </div>
+            </div>
+          </>
+        )}
 
         <label className="vs-block">
           <b>Промпт</b>
@@ -359,7 +486,7 @@ function VideoScreenBody({projectId, world = ''}: {projectId: string; world?: st
                 </select>
               </label>
             )}
-            {range('aspect_ratio')?.values && (
+            {range('aspect_ratio')?.values && !fromClip && (
               <label>
                 Формат
                 <select
@@ -372,7 +499,7 @@ function VideoScreenBody({projectId, world = ''}: {projectId: string; world?: st
                 </select>
               </label>
             )}
-            {range('duration')?.min !== undefined && (
+            {range('duration')?.min !== undefined && activeMode !== 'edit' && (
               <label className="vs-length">
                 Длина: {sec} с
                 <input
@@ -393,7 +520,10 @@ function VideoScreenBody({projectId, world = ''}: {projectId: string; world?: st
             {rate !== null && (
               <small className="muted">
                 {' '}
-                {String(rate).replace('.', ',')} ¢/с × {sec} с
+                {String(rate).replace('.', ',')} ¢/с × {outSec} с
+                {fromClip && clipSec
+                  ? ` + ${String(rate / 2).replace('.', ',')} ¢/с × ${clipSec} с входа`
+                  : ''}
               </small>
             )}
           </span>
@@ -464,6 +594,23 @@ function VideoScreenBody({projectId, world = ''}: {projectId: string; world?: st
           title="Кадр-основа"
           assets={frames}
           onPick={setBase}
+          onClose={() => setSource('')}
+        />
+      )}
+      {source === 'finish' && (
+        <LibraryPickModal
+          title="Финишный кадр"
+          assets={frames}
+          onPick={setFinish}
+          onClose={() => setSource('')}
+        />
+      )}
+      {source === 'clip' && (
+        <LibraryPickModal
+          title="Исходный ролик"
+          assets={videos}
+          video
+          onPick={setClip}
           onClose={() => setSource('')}
         />
       )}

@@ -1,0 +1,59 @@
+{
+  "source": "https://www.blackmagicdesign.com/products/davinciresolve/training",
+  "edition": "DaVinci Resolve 20",
+  "checked_on": "2026-10-19",
+  "pdf": [
+    {
+      "title": "The Beginner's Guide to DaVinci Resolve 20",
+      "filename": "DaVinci-Resolve-20-Beginners-Guide.pdf",
+      "url": "https://documents.blackmagicdesign.com/UserManuals/DaVinci-Resolve-20-Beginners-Guide.pdf"
+    },
+    {
+      "title": "The Editor's Guide to DaVinci Resolve 20",
+      "filename": "DaVinci-Resolve-20-Editors-Guide.pdf",
+      "url": "https://documents.blackmagicdesign.com/UserManuals/DaVinci-Resolve-20-Editors-Guide.pdf"
+    },
+    {
+      "title": "The Fairlight Audio Guide to DaVinci Resolve 20",
+      "filename": "DaVinci-Resolve-20-Fairlight-Audio-Post.pdf",
+      "url": "https://documents.blackmagicdesign.com/UserManuals/DaVinci-Resolve-20-Fairlight-Audio-Post.pdf"
+    },
+    {
+      "title": "The Colorist Guide to DaVinci Resolve 20",
+      "filename": "DaVinci-Resolve-20-Colorist-Guide.pdf",
+      "url": "https://documents.blackmagicdesign.com/UserManuals/DaVinci-Resolve-20-Colorist-Guide.pdf"
+    },
+    {
+      "title": "The Visual Effects Guide to DaVinci Resolve 20",
+      "filename": "DaVinci-Resolve-20-Fusion-Visual-Effects.pdf",
+      "url": "https://documents.blackmagicdesign.com/UserManuals/DaVinci-Resolve-20-Fusion-Visual-Effects.pdf"
+    },
+    {
+      "title": "Advanced Visual Effects in DaVinci Resolve 20",
+      "filename": "DaVinci-Resolve-20-Advanced-Visual-Effects.pdf",
+      "url": "https://documents.blackmagicdesign.com/UserManuals/DaVinci-Resolve-20-Advanced-Visual-Effects.pdf"
+    }
+  ],
+  "fairlight_archives": [
+    {
+      "title": "Fairlight lesson files, part 1",
+      "filename": "fairlight-audio-part-01.zip",
+      "url": "https://www.blackmagicdesign.com/dvres/audio-post-resolve20-pt1"
+    },
+    {
+      "title": "Fairlight lesson files, part 2",
+      "filename": "fairlight-audio-part-02.zip",
+      "url": "https://www.blackmagicdesign.com/dvres/audio-post-resolve20-pt2"
+    },
+    {
+      "title": "Fairlight lesson files, part 3",
+      "filename": "fairlight-audio-part-03.zip",
+      "url": "https://www.blackmagicdesign.com/dvres/audio-post-resolve20-pt3"
+    },
+    {
+      "title": "Fairlight lesson files, part 4",
+      "filename": "fairlight-audio-part-04.zip",
+      "url": "https://www.blackmagicdesign.com/dvres/audio-post-resolve20-pt4"
+    }
+  ]
+}

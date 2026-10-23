@@ -1,0 +1,15 @@
+node_modules/
+dist/
+build/
+.next/
+venv/
+.venv/
+__pycache__/
+*.lock
+*-lock.json
+*.min.js
+*.svg
+*.sql
+migrations/
+docs/
+tests/fixtures/

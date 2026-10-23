@@ -30,6 +30,12 @@ import NativeGallery from './NativeGallery';
 import {type CharacterVersion} from './ReplaceCharacterButton';
 import RefinePanel, {EMPTY_REFINE, type RefineDraft} from './RefinePanel';
 import ChatGPTPanel from './ChatGPTPanel';
+import WorldFromBrief from './WorldFromBrief';
+import {passportText} from './worldBible';
+import AttachmentMenu, {AttachmentStrip} from './AttachmentMenu';
+import CharactersScreen from './CharactersScreen';
+import SoundScreen from './SoundScreen';
+import FrameBuilder from './FrameBuilder';
 import ScenePanel, {EMPTY_SCENE, type Scene} from './ScenePanel';
 import EconomicsPanel from './EconomicsPanel';
 import PromptComposer, {type PromptRequest} from './PromptComposer';
@@ -106,6 +112,10 @@ type StyleBible = {
   lighting: string;
   camera: string;
   environment: string;
+  time: string;
+  tech: string;
+  textures: string;
+  mood: string;
   rules: string;
   avoid: string;
 };
@@ -121,6 +131,7 @@ type Studio = {
   ideaResult?: string;
   ideaModel?: string;
   ideaRefs?: string[];
+  worldDraft?: Partial<StyleBible>;
   prompts: Record<string, string>;
   parameters: Record<string, Record<string, string | number>>;
   characters: Character[];
@@ -139,6 +150,10 @@ const INITIAL: Studio = {
     lighting: 'Ночной Минск; теплые фонари, прохладный ambient',
     camera: 'Согласованные пропорции и ракурсы',
     environment: 'Минск, дворики, панельки, гаражи, улицы',
+    time: '',
+    tech: '',
+    textures: '',
+    mood: '',
     rules: 'Грэм и автомобиль соответствуют утвержденным референсам',
     avoid: 'Случайные изменения внешности, формы машины, цвета и стилистики',
   },
@@ -1394,7 +1409,7 @@ function App() {
                           ? 'workflow-main'
                           : mode === 'reels'
                             ? 'reels-main'
-                            : mode === 'styles'
+                            : mode === 'styles' || mode === 'characters'
                               ? 'world-main'
                               : mode === 'studio'
                                 ? 'idea-main'
@@ -1763,6 +1778,12 @@ function App() {
                       setMode('files');
                     }}
                     location={workspaceLocation}
+                    outlineContext={{
+                      projectId,
+                      brief: state.brief,
+                      passport: passportText(state.style),
+                      heroes: state.characters.map(c => c.name),
+                    }}
                     onOpenProject={id => {
                       void load(id, 'create');
                     }}
@@ -1843,14 +1864,19 @@ function App() {
                       Единый стиль сохраняется вместе с проектом и держит все кадры серии в одном мире.
                       Заполни коротко и по делу: эти поля подставляются в промпты и проверку результатов.
                     </p>
+                    <AttachmentStrip items={(state.scene || EMPTY_SCENE).assets} />
                     <div className="world-fields">
                       {(
                         [
-                          ['look', 'Визуальный стиль', 'Техника, жанр, общее настроение'],
+                          ['look', 'Визуальный стиль', 'Техника, жанр, общий образ'],
+                          ['environment', 'Архитектура и среда', 'Где происходит действие, какие здания'],
+                          ['time', 'Время суток и сезон', 'Когда: ночь, рассвет, зима, дождь'],
+                          ['tech', 'Уровень технологий', 'Эпоха, транспорт, устройства'],
+                          ['textures', 'Фактуры и материалы', 'Металл, стекло, ткань, поверхности'],
                           ['palette', 'Палитра', 'Главные цвета и оттенки'],
-                          ['lighting', 'Освещение', 'Свет, время суток, источники'],
+                          ['lighting', 'Освещение', 'Направление, температура, источники света'],
                           ['camera', 'Камера и оптика', 'Ракурсы, объективы, движение'],
-                          ['environment', 'Среда и локации', 'Где происходит действие'],
+                          ['mood', 'Настроение', 'Эмоция и атмосфера ролика'],
                           ['rules', 'Неизменные правила', 'Что одинаково в каждом кадре'],
                           ['avoid', 'Что запрещено', 'Чего не должно быть в кадре'],
                         ] as [keyof StyleBible, string, string][]
@@ -1874,7 +1900,16 @@ function App() {
                       <button className="primary" disabled={!!busy} onClick={save}>
                         Сохранить стиль проекта
                       </button>
-                      <button onClick={() => setMode('storyboard')}>Дальше: раскадровка →</button>
+                      <button
+                        onClick={() =>
+                          void navigator.clipboard
+                            ?.writeText(passportText(state.style))
+                            .then(() => setNotice('Паспорт мира скопирован'))
+                        }
+                      >
+                        Копировать паспорт
+                      </button>
+                      <button onClick={() => setMode('characters')}>Дальше: персонажи →</button>
                     </div>
                     <p className="muted">
                       Герои справа: добавь утверждённые референсы в Character Vault. Библия мира не заменяет
@@ -1889,6 +1924,47 @@ function App() {
                   projects={projects}
                   onMode={setMode}
                   onOpenProject={id => void load(id, 'home')}
+                />
+              ) : mode === 'characters' ? (
+                <CharactersScreen
+                  projectId={projectId}
+                  ensureProject={ensureProject}
+                  heroes={state.characters}
+                  selectedId={state.selectedCharacter}
+                  world={state.style}
+                  onSelect={id => change({selectedCharacter: id})}
+                  onCreate={mkChar}
+                  onToWorld={() => setMode('styles')}
+                  onNext={() => setMode('storyboard')}
+                  revision={libraryRevision}
+                  onLibrary={() => setLibraryRevision(x => x + 1)}
+                  builder={
+                    <FrameBuilder
+                      projectId={projectId}
+                      ensureProject={ensureProject}
+                      heroes={state.characters}
+                      world={state.style}
+                      brief={state.brief}
+                      locationAssetIds={(state.scene || EMPTY_SCENE).assets
+                        .filter(a => a.role === 'location')
+                        .map(a => a.asset_id)}
+                      revision={libraryRevision}
+                      onSent={() => setMode('storyboard')}
+                    />
+                  }
+                  results={
+                    <AssetLibrary
+                      {...replacementControls}
+                      onRefine={refineAsset}
+                      onScene={addToScene}
+                      projectId={projectId}
+                      revision={libraryRevision}
+                      onUse={(link, id) => {
+                        change({videoReference: link, videoAssetId: id});
+                        setNotice('Изображение из библиотеки выбрано для Video Lab');
+                      }}
+                    />
+                  }
                 />
               ) : mode === 'reels' ? (
                 <ReelsScreen onUse={useReelRecipe} />
@@ -1922,7 +1998,7 @@ function App() {
                     .join('. ')}
                 />
               ) : mode === 'audio' ? (
-                <>{audioPanel()}</>
+                <SoundScreen projectId={projectId} audioLab={audioPanel()} />
               ) : mode === 'archive' ? (
                 <AssetLibrary
                   {...replacementControls}
@@ -1978,6 +2054,29 @@ function App() {
                             }))
                           }
                           onAsset={() => setLibraryRevision(x => x + 1)}
+                        />
+                      </section>
+                      <section className="panel idea-world" aria-label="Мир по заданию">
+                        <AttachmentMenu
+                          projectId={projectId}
+                          ensureProject={ensureProject}
+                          heroes={state.characters}
+                          items={(state.scene || EMPTY_SCENE).assets}
+                          revision={libraryRevision}
+                          onChange={assets =>
+                            setState(s => ({...s, scene: {...(s.scene || EMPTY_SCENE), assets}}))
+                          }
+                          onAsset={() => setLibraryRevision(x => x + 1)}
+                        />
+                        <WorldFromBrief
+                          projectId={projectId}
+                          brief={state.brief}
+                          style={state.style}
+                          conflicts={state.worldDraft || {}}
+                          onConflicts={worldDraft => setState(s => ({...s, worldDraft}))}
+                          ensureProject={ensureProject}
+                          onApply={fields => setState(s => ({...s, style: {...s.style, ...fields}}))}
+                          onDone={() => setMode('styles')}
                         />
                       </section>
                     </div>

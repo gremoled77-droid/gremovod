@@ -11,7 +11,7 @@ MODEL_SPECS = {
  'seedream-5-pro': {'launch_enabled':False,'kind':'image','model':'seedream','task_type':'seedream-5-pro','size':['1K','2K'],'aspect_ratio':['16:9','9:16','1:1','4:3','3:4','3:2','2:3','4:5','5:4','21:9'],'output_format':['png','jpeg','webp'],'max_refs':10,'ref_field':'image_urls','docs':'https://app.piapi.ai/docs/seedream-api/seedream-5'},
  'seedream-5-lite': {'launch_enabled':True,'verified_at':'2026-10-15','price_usd':0.052,'kind':'image','model':'seedream','task_type':'seedream-5-lite','size':['2K','3K'],'aspect_ratio':['16:9','9:16','1:1','4:3','3:4','3:2','2:3','4:5','5:4','21:9'],'output_format':['png','jpeg','webp'],'max_refs':10,'ref_field':'image_urls','docs':'https://app.piapi.ai/docs/seedream-api/seedream-5'},
  'nano-banana-2.1': {'launch_enabled':False,'kind':'image','model':'gemini','task_type':'nano-banana-2.1','resolution':['1K','2K','4K'],'aspect_ratio':['16:9','9:16','1:1','4:3','3:4'],'output_format':['png','jpg','webp'],'max_refs':10,'ref_field':'image_urls','docs':'https://piapi.ai/docs/gemini-api/nano-banana-2'},
- 'seedance-2.5': {'launch_enabled':True,'verified_at':'2026-10-15','price_per_second_usd':{'480p':0.15,'720p':0.35,'1080p':0.8},'kind':'video','model':'seedance','task_type':'seedance-2.5','resolution':['480p','720p','1080p'],'aspect_ratio':['16:9','9:16','4:3','3:4','21:9','1:1','adaptive'],'duration_min':4,'duration_max':30,'max_refs':30,'ref_field':'image_urls','docs':'https://piapi.ai/docs/seedance-api/seedance-25'}
+ 'seedance-2.5': {'launch_enabled':False,'price_per_second_usd':{'480p':0.15,'720p':0.35,'1080p':0.8},'kind':'video','model':'seedance','task_type':'seedance-2.5','resolution':['480p','720p','1080p'],'aspect_ratio':['16:9','9:16','4:3','3:4','21:9','1:1','adaptive'],'duration_min':4,'duration_max':30,'max_refs':30,'ref_field':'image_urls','docs':'https://piapi.ai/docs/seedance-api/seedance-25'}
 }
 
 # Prompt-only profiles do not enable or invent a paid provider schema.
@@ -66,9 +66,12 @@ MODEL_SPECS['minimax-h3']={
     'price_per_second_usd':{'480p':0.03,'768p':0.05,'1080p':0.07},
     'options':{'resolution':{'values':['480p','768p','1080p'],'default':'480p'},
                'duration':{'min':5,'max':15,'default':5},
-               'aspect_ratio':{'values':['16:9','9:16','1:1'],'default':'16:9'}}}
+               'aspect_ratio':{'values':['16:9','9:16','1:1'],'default':'16:9'},
+               # seed: по документации PiAPI необязательное целое «для воспроизводимости»; диапазон в доках не указан, не проверялся вживую.
+               'seed':{'min':0,'max':2147483647,'optional':True}}}
 
 
+# Seedance 2.5: живого вызова не было (docs/SEEDANCE_25_480P_5S_PROMPT.md), запуск выключен до проверки.
 # Seedance 2.5: адаптер сам валидирует картинки, видео, аудио, edit/extend и draft (backend/adapters.py).
 MODEL_SPECS['seedance-2.5']['adapter']='seedance_25'
 
@@ -77,6 +80,19 @@ MODEL_SPECS['seedance-2.5']['adapter']='seedance_25'
 # gpt-image-2.5-sunburst (правки) и референсы GPT Image не проверялись и остаются выключенными.
 for _id in ('seedream-5-pro','nano-banana-2.1','qwen-image-2.1','gpt-image-2','gpt-image-2.5','minimax-h3'):
     MODEL_SPECS[_id].update({'launch_enabled':True,'verified_at':'2026-10-16','prompt_only':False})
+
+# --- Апскейл изображений PiAPI (docs: piapi.ai/docs/image-editing-api/super-resolution-api, прочитано 16.10.2026).
+# Параметры и цена взяты из документации, живой вызов НЕ делался: launch_enabled=False, только предпросмотр.
+# Расхождение в доках: пример ответа показывает data.output, схема описывает data.task_result.task_output.image_url.
+MODEL_SPECS['image-upscale']={
+    'launch_enabled':False,'kind':'image','tool':True,'adapter':'image_upscale','prompt_only':False,
+    'model':'Qubico/image-toolkit','task_type':'upscale','max_refs':1,'api_refs':1,'ref_field':'image',
+    'price_per_mpx_usd':0.001,'min_price_usd':0.001,'max_input_px':2048,
+    'options':{'scale':{'values':[2,4],'default':2},
+               'in_width':{'min':1,'max':2048,'default':2048},
+               'in_height':{'min':1,'max':2048,'default':2048}},
+    'docs':'https://piapi.ai/docs/image-editing-api/super-resolution-api'}
+
 
 
 # --- Референсы и синтаксис тегов видеомоделей (16.10.2026). Справочные поля из инструкций владельца
@@ -158,10 +174,38 @@ for _base, _prices in (('seedream-5-lite', {'2K':0.065,'3K':0.065}), ('seedream-
     MODEL_SPECS[_base+'-less-restriction'] = _spec
 
 
+# --- KIE (второй провайдер, 18.10.2026). Схемы: model-studio/seedream-schema.json и qwen-schema.json (каталог KIE 15.10.2026).
+# --- Цены со страниц kie.ai/seedream-5-pro и kie.ai/qwen-image-2.1 (18.10.2026): 1 кредит = $0.005.
+# --- Обе модели image-to-image: нужен хотя бы один публичный референс.
+_KIE_COMMON={'launch_enabled':False,'prompt_only':False,'provider':'kie','kind':'image','adapter':'kie_image',
+             'task_type':'image-to-image','submit_path':'/api/v1/jobs/createTask','max_refs':10,'api_refs':10,'ref_field':'image_urls'}
+MODEL_SPECS['kie-seedream-5-pro']={**_KIE_COMMON,'model':'seedream/5-pro-image-to-image',
+    'tier_field':'quality','price_by_tier':{'basic':0.035,'high':0.07},'extra_ref_usd':0.0025,
+    'fixed_input':{'nsfw_checker':True},
+    'options':{'quality':{'values':['basic','high'],'default':'basic'},  # basic = 1K, high = 2K
+               'aspect_ratio':{'values':['16:9','9:16','1:1','4:3','3:4','3:2','2:3','21:9'],'default':'16:9'},
+               'output_format':{'values':['png','jpeg'],'default':'png'}},
+    'docs':'https://kie.ai/seedream-5-pro'}
+MODEL_SPECS['kie-qwen-image-2.1']={**_KIE_COMMON,'model':'qwen2-1/image-to-image',
+    'tier_field':'resolution','price_by_tier':{'1K':0.02,'2K':0.04},
+    'fixed_input':{'nsfw_checker':True,'enhance_prompt':False},  # промпт пишет студия, без переписывания у провайдера
+    'options':{'resolution':{'values':['1K','2K'],'default':'1K'},
+               'aspect_ratio':{'values':['auto','16:9','9:16','1:1','4:3','3:4','3:2','2:3','21:9','9:21'],'default':'auto'},
+               'output_format':{'values':['png','webp','jpeg'],'default':'png'}},
+    'docs':'https://kie.ai/qwen-image-2.1'}
+# Живая проверка 18.10.2026 (разрешил владелец): по одному запуску с одним референсом, 16:9.
+# Seedream basic: 7 кредитов, 134 с, PNG 1376×768; Qwen 1K: 4 кредита, 29 с, PNG 1376×768. Списание = оценка ($0.055).
+# Режимы high и 2K не запускались: до своей проверки они убраны из параметров, цены оставлены в таблице.
+for _id, _tier in (('kie-seedream-5-pro', 'quality'), ('kie-qwen-image-2.1', 'resolution')):
+    _rule = MODEL_SPECS[_id]['options'][_tier]
+    _rule['values'] = [_rule['default']]
+    MODEL_SPECS[_id].update({'launch_enabled':True,'verified_at':'2026-10-18'})
+
+
 # --- Страница модели у провайдера (кнопка «i» в «Кадрах»). Интерфейс берёт ссылку из page_urls[provider],
 # --- поэтому при втором API-сервисе достаточно добавить его ключ и ссылки; код экрана не меняется.
 # --- Ссылки на страницы моделей владелец даст позже: пока берём только адреса docs на домене провайдера.
-PROVIDER_HOSTS = {'piapi': 'piapi.ai'}
+PROVIDER_HOSTS = {'piapi': 'piapi.ai', 'kie': 'kie.ai'}
 _GPT_PAGE = 'https://piapi.ai/docs/gpt-image/gpt-image-api'
 PAGE_URLS = {  # {model_id: {provider: url}}: явные ссылки имеют приоритет над docs
     'gpt-image-2': {'piapi': _GPT_PAGE},

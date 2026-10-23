@@ -1,6 +1,12 @@
+import type {VideoMode} from './videoMode';
+
 export type VideoDraft = {
   prompt: string;
   base: string;
+  finish: string;
+  clip: string;
+  mode: VideoMode;
+  back: boolean;
   refs: string[];
   model: string;
   values: Record<string, string | number>;

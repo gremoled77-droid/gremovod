@@ -1,5 +1,5 @@
 import {useEffect, useRef, useState} from 'react';
-import {Mic, Paperclip, RotateCw, Send, Square, X} from 'lucide-react';
+import {Info, Mic, Paperclip, RotateCw, Send, Square, X} from 'lucide-react';
 import {apiFetch} from './api';
 import {responseJson} from './ChatGPTPanel';
 import {IDEA_LLM_MODELS, LLM_MAX_TOKENS, ideaEstimate} from './llmPricing';
@@ -8,6 +8,17 @@ type Asset = {id: string; url: string; thumbnail_url?: string | null; metadata?:
 
 const SYSTEM =
   'Ты сценарист-помощник мультсериала про таксиста Грэма (ВАЗ-2106, Минск). По заданию режиссёра составь компактный план ролика на русском: логлайн, настроение, 4-6 кадров (что в кадре, камера, свет), реплики героев. Без вступлений и пояснений.';
+
+/** Сценарный фон: выжимка из skills/gremovod-screenplay, её отдаёт бэкенд. */
+type Background = {text: string; chars: number; topics: string[]};
+const BACKGROUND_KEY = 'studio:idea-background:v1';
+const backgroundOn = () => {
+  try {
+    return localStorage.getItem(BACKGROUND_KEY) !== 'off';
+  } catch {
+    return true;
+  }
+};
 
 type Recognition = {
   lang: string;
@@ -56,6 +67,9 @@ export default function IdeaBrief({
   const [error, setError] = useState('');
   const [listening, setListening] = useState(false);
   const [assets, setAssets] = useState<Asset[]>([]);
+  const [background, setBackground] = useState<Background | null>(null);
+  const [useBackground, setUseBackground] = useState(backgroundOn);
+  const [bgInfo, setBgInfo] = useState(false);
   const area = useRef<HTMLTextAreaElement>(null);
   const resultArea = useRef<HTMLTextAreaElement>(null);
   const files = useRef<HTMLInputElement>(null);
@@ -79,13 +93,35 @@ export default function IdeaBrief({
       .catch(() => undefined);
   }, [refs, projectId]);
   useEffect(() => () => rec.current?.stop(), []);
+  useEffect(() => {
+    void apiFetch('/api/idea/background')
+      .then(r => (r.ok ? r.json() : null))
+      .then((v: Background | null) => setBackground(v && v.text ? v : null))
+      .catch(() => setBackground(null));
+  }, []);
+  const withBackground = useBackground && !!background;
+  const toggleBackground = (on: boolean) => {
+    setUseBackground(on);
+    try {
+      localStorage.setItem(BACKGROUND_KEY, on ? 'on' : 'off');
+    } catch {
+      /* настройка живёт до перезагрузки */
+    }
+  };
 
   const messages = () => [
-    {role: 'system', content: SYSTEM + (world.trim() ? '\nМир проекта: ' + world.trim() : '')},
+    {
+      role: 'system',
+      content:
+        SYSTEM +
+        (withBackground ? '\n\n' + background!.text : '') +
+        (world.trim() ? '\nМир проекта: ' + world.trim() : ''),
+    },
     {role: 'user', content: brief.trim()},
   ];
   const chars = messages().reduce((n, m) => n + m.content.length, 0);
   const price = ideaEstimate(model, chars);
+  const backgroundCost = background ? ideaEstimate(model, background.chars + 2) - ideaEstimate(model, 2) : 0;
 
   const send = async () => {
     setError('');
@@ -207,6 +243,27 @@ export default function IdeaBrief({
       />
       <div className="idea-send">
         <small className="muted">{brief.trim() ? `≈ до $${price.toFixed(4)}` : ''}</small>
+        <label
+          className={'idea-bg' + (withBackground ? ' on' : '')}
+          title={background ? 'Сценарные правила уходят в LLM скрытым фоном' : 'Сценарный фон недоступен'}
+        >
+          <input
+            type="checkbox"
+            checked={withBackground}
+            disabled={!background}
+            onChange={e => toggleBackground(e.target.checked)}
+          />
+          Сценарный фон
+        </label>
+        <button
+          type="button"
+          className="idea-bg-info"
+          aria-expanded={bgInfo}
+          aria-label="Что входит в сценарный фон"
+          onClick={() => setBgInfo(v => !v)}
+        >
+          <Info size={15} />
+        </button>
         <select value={model} onChange={e => onModel(e.target.value)} aria-label="Модель LLM">
           {Object.entries(IDEA_LLM_MODELS).map(([id, m]) => (
             <option key={id} value={id}>
@@ -233,6 +290,15 @@ export default function IdeaBrief({
           <Send size={15} /> {busy ? 'Думаю…' : 'Отправить в LLM'}
         </button>
       </div>
+      {bgInfo && background && (
+        <p className="idea-bg-note muted">
+          Учтено: {background.topics.join(' · ')}. Выжимка из skills/gremovod-screenplay, {background.chars}{' '}
+          символов
+          {withBackground
+            ? `, добавляет к запросу ≈ $${backgroundCost.toFixed(4)}.`
+            : `; выключена, добавила бы ≈ $${backgroundCost.toFixed(4)}.`}
+        </p>
+      )}
       {error && (
         <p className="alert" role="alert">
           {error}

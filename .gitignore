@@ -54,3 +54,6 @@ docs/*.jpg
 *.sqlite3-wal
 *.sqlite3-shm
 *.sqlite3-journal
+.aider.tags.cache.v3/
+.aider.chat.history.md
+.aider.input.history

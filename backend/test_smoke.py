@@ -10,7 +10,7 @@ from pathlib import Path
 from unittest.mock import AsyncMock, patch
 from fastapi.testclient import TestClient
 from backend import main
-from backend import connections, image_assets, native_chat, job_delivery, reference_upload
+from backend import connections, image_assets, native_chat, job_delivery, reference_upload, kie
 import httpx
 from PIL import Image
 
@@ -34,6 +34,8 @@ class StudioSmokeTests(unittest.TestCase):
                         patch.object(main, 'LIBRARY_ROOT', root/'library'),
                         patch.object(connections, 'ROOT', root),
                         patch.object(connections, 'ELEVENLABS_LEGACY_FILE', root/'legacy-key.txt'),
+                        patch.object(connections, 'KIE_DPAPI_FILES', []),
+                        patch.object(kie, 'request', AsyncMock(side_effect=AssertionError('External KIE forbidden'))),
                         patch.object(connections, 'CHECKS', {}),
                         patch.dict(main.os.environ, {p['env']:'' for p in connections.PROVIDERS.values()}),
                         patch.object(main, 'request_piapi', AsyncMock(side_effect=AssertionError('External API forbidden'))),
@@ -151,6 +153,40 @@ class StudioSmokeTests(unittest.TestCase):
         with Image.open(io.BytesIO(thumbnail.content)) as preview:
             self.assertLessEqual(max(preview.size),512)
         self.assertLess(len(thumbnail.content),len(content))
+
+    def test_kie_job_uses_kie_key_quote_budget_and_delivers_without_piapi(self):
+        pid=self.client.post('/api/projects',json={'title':'KIE','state':{}}).json()['id']
+        body={'project_id':pid,'model_id':'kie-seedream-5-pro','prompt':'Ночной Минск','reference_urls':['https://cdn.example.test/a.png','https://cdn.example.test/b.png'],
+              'options':{'quality':'high'},'request_id':'kie-request-123456789','approved':True}
+        self.assertEqual(self.client.post('/api/model-jobs/estimate',json=body).status_code,400)  # high (2K) ещё не проверен вживую
+        body['options']={'quality':'basic'}
+        estimate=self.client.post('/api/model-jobs/estimate',json=body).json()
+        self.assertEqual(estimate['estimated_usd'],0.0375)
+        body.update(quote_token=estimate['quote_token'],max_cost_usd=0.0375)
+        missing=self.client.post('/api/model-jobs',json=body)
+        self.assertEqual(missing.status_code,400)
+        self.assertIn('KIE_API_KEY.txt',missing.text)
+        kie.request.assert_not_awaited()
+        (connections.ROOT/'KIE_API_KEY.txt').write_text('test-kie-key',encoding='utf-8')
+        kie.request.side_effect=None
+        kie.request.return_value={'code':200,'msg':'success','data':{'taskId':'kie-task-1'}}
+        created=self.client.post('/api/model-jobs',json={**body,'request_id':'kie-request-987654321'})
+        self.assertEqual(created.status_code,200,created.text)
+        method,path,key,wire=kie.request.await_args.args
+        self.assertEqual((method,path,key),('POST','/api/v1/jobs/createTask','test-kie-key'))
+        self.assertEqual(wire,{'model':'seedream/5-pro-image-to-image','input':{'prompt':'Ночной Минск','image_urls':body['reference_urls'],
+                               'quality':'basic','aspect_ratio':'16:9','output_format':'png','nsfw_checker':True}})
+        kie.request.return_value={'code':200,'msg':'success','data':{'taskId':'kie-task-1','state':'success','creditsConsumed':14.5,
+                                  'resultJson':json.dumps({'resultUrls':['https://cdn.example.test/kie.png']})}}
+        image=io.BytesIO();Image.new('RGB',(640,360),'teal').save(image,format='PNG')
+        with patch.object(main,'download_image',AsyncMock(return_value=image.getvalue())):
+            asyncio.run(job_delivery.cycle(main))
+        self.assertEqual(kie.request.await_args.args[:2],('GET','/api/v1/jobs/recordInfo?taskId=kie-task-1'))
+        main.request_piapi.assert_not_awaited()
+        job=self.client.get('/api/jobs').json()[0]
+        self.assertEqual((job['provider'],job['status'],job['delivery']['state']),('kie','completed','saved'))
+        self.assertEqual(len(self.client.get('/api/library',params={'project_id':pid}).json()),1)
+        self.assertEqual(self.client.post(f"/api/jobs/{job['id']}/recover",json={'task_id':'kie-task-1'}).status_code,409)
 
     def test_reference_upload_requires_approval_caches_and_feeds_scene(self):
         pid=self.client.post('/api/projects',json={'state':{}}).json()['id']
@@ -744,6 +780,7 @@ class StudioSmokeTests(unittest.TestCase):
             self.assertEqual(asyncio.run(image_assets.download_image('https://cdn.example.test/start')),b'image bytes')
         self.assertEqual([c.args[0] for c in guard.call_args_list],['https://cdn.example.test/start','https://other.example.test/image'])
 
+    @patch.dict(main.MODEL_SPECS['seedance-2.5'], {'launch_enabled': True})  # конвейер, не проверка модели
     def test_seedance_schema_estimate_approval_and_submission(self):
         body=self.image_request(model_id='seedance-2.5',prompt='Slow forward dolly in @image1',
                                 reference_urls=['https://cdn.example.test/frame.png'],
@@ -769,6 +806,7 @@ class StudioSmokeTests(unittest.TestCase):
         self.assertEqual(self.client.post('/api/model-jobs',json=body).json()['duplicate'],True)
         main.request_piapi.assert_awaited_once()
 
+    @patch.dict(main.MODEL_SPECS['seedance-2.5'], {'launch_enabled': True})  # конвейер, не проверка модели
     def test_seedance_draft_then_final_uses_project_queue(self):
         draft_body=self.image_request(model_id='seedance-2.5',prompt='Slow forward dolly',options={'draft':True,'duration':4},
                                       max_cost_usd=0.6,request_id='draft-request-1234567')
@@ -814,6 +852,7 @@ class StudioSmokeTests(unittest.TestCase):
         main.request_piapi.assert_not_awaited()
 
     @unittest.skipUnless(shutil.which('ffmpeg') and shutil.which('ffprobe'),'FFmpeg unavailable')
+    @patch.dict(main.MODEL_SPECS['seedance-2.5'], {'launch_enabled': True})  # конвейер, не проверка модели
     def test_video_download_validate_library_and_reopen(self):
         body=self.image_request(model_id='seedance-2.5',options={'resolution':'480p','duration':5},max_cost_usd=0.75)
         main.request_piapi.side_effect=None
