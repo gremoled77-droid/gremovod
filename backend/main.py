@@ -473,6 +473,31 @@ def preview_model_job(body:ModelJobRequest):
             'wire_body':adapters.wire_body(spec,payload),'estimated_usd':cost,'lines':adapters.describe(spec,payload),'external_calls':0,
             'note':'Сухой прогон. Запуск выключен, пока параметры и цена не проверены реальным вызовом.' if not spec.get('launch_enabled') else 'Сухой прогон.'}
 
+FINAL_JOB_STATUSES=('completed','failed','cancelled','canceled','succeeded','done','expired')
+def same_request(request_json):
+    # Одинаковый платный запрос: модель + промпт + референсы + параметры; узел и request_id не важны.
+    data=json.loads(request_json or '{}')
+    return json.dumps([data.get('model_id'),data.get('payload')],ensure_ascii=False,sort_keys=True)
+
+def waiting_duplicate(db,project_id,request_data):
+    key=same_request(request_data)
+    marks=','.join('?'*len(FINAL_JOB_STATUSES))
+    rows=db.execute(f'SELECT id,request FROM jobs WHERE project_id=? AND lower(status) NOT IN ({marks}) ORDER BY created_at',(project_id,*FINAL_JOB_STATUSES))
+    return next((r['id'] for r in rows if same_request(r['request'])==key),None)
+
+@app.post('/api/jobs/{job_id}/stop-waiting')
+def stop_waiting(job_id:str):
+    """Владелец проверил историю провайдера и снимает зависшее задание: оно становится ошибкой, резерв бюджета
+    освобождается, такой же запрос снова можно отправить. Провайдера не вызывает и ничего не перезапускает."""
+    with connect() as db:
+        db.execute('BEGIN IMMEDIATE')
+        job=db.execute('SELECT status,response FROM jobs WHERE id=?',(job_id,)).fetchone()
+        if not job: raise HTTPException(404,'Задание не найдено')
+        if str(job['status']).lower() in FINAL_JOB_STATUSES: raise HTTPException(409,'Задание уже завершено')
+        response={'detail':'Ожидание снято владельцем после проверки истории провайдера','stopped_at':now(),'previous_status':job['status'],'previous':json.loads(job['response'] or '{}')}
+        db.execute("UPDATE jobs SET status='failed',response=? WHERE id=?",(json.dumps(response,ensure_ascii=False),job_id))
+    return {'job_id':job_id,'status':'failed'}
+
 @app.post('/api/model-jobs')
 async def model_job(body:ModelJobRequest,x_api_key:str|None=Header(default=None)):
     payload=image_payload(body)
@@ -494,6 +519,8 @@ async def model_job(body:ModelJobRequest,x_api_key:str|None=Header(default=None)
     # Reserve before upstream I/O. Never retry a submission with an uncertain result.
     with connect() as db:
         db.execute('BEGIN IMMEDIATE')
+        waiting=waiting_duplicate(db,body.project_id,request_data)
+        if waiting: raise HTTPException(409,f'Такой запрос уже ждёт ответа (задание {waiting}). Дождись результата или ошибки; если в истории PiAPI задачи нет, нажми «Снять ожидание» у задания в очереди.')
         security.check_budget(db,body.project_id,cost)
         try:
             db.execute('INSERT INTO jobs VALUES(?,?,?,?,?,?,?,?,?)',(jid,body.project_id,spec['kind'],spec['provider'],None,'submitting',request_data,'{}',now()))
