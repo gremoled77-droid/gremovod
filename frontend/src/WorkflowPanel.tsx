@@ -31,6 +31,7 @@ import {
   type Step,
   VIDEO_MODELS,
 } from './workflowPlan';
+import {imageLabels} from './modelCatalog';
 import {useNodePrices} from './workflowPrices';
 import {LLM_MAX_TOKENS, LLM_MODELS, llmEstimate} from './llmPricing';
 import {missingAssetIds} from './workflowLibrary';
@@ -69,15 +70,6 @@ const STATUS_LABEL: Record<string, string> = {
   failed: 'ошибка',
   error: 'ошибка',
 };
-const IMAGE_MODELS: Record<string, string> = {
-  'seedream-5-lite': 'Seedream 5 Lite',
-  'seedream-5-pro': 'Seedream 5 Pro',
-  'gpt-image-2': 'GPT Image 2.0',
-  'gpt-image-2.5': 'GPT Image 2.5',
-  'nano-banana-2.1': 'Nano Banana 2.1',
-  'qwen-image-2.1': 'Qwen Image 2.1',
-};
-
 /** Колонка по типу (вход слева, результат справа); новые узлы встают под уже стоящими в колонке. */
 const COLUMN_X: Record<NodeKind, number> = {
   text: 40,
@@ -155,7 +147,7 @@ function Block({id, data, selected}: {id: string; data: Record<string, any>; sel
   const audios = ctx.library.filter(a => libKind(a) === 'audio');
   const modelName =
     kind === 'image'
-      ? IMAGE_MODELS[data.model]
+      ? ctx.specs[data.model]?.label
       : kind === 'video'
         ? VIDEO_MODELS[data.model]?.label
         : kind === 'llm'
@@ -395,10 +387,12 @@ function Block({id, data, selected}: {id: string; data: Record<string, any>; sel
                   onChange={e => ctx.patch(id, {model: e.target.value, options: {}})}
                 >
                   <option value="">Модель…</option>
-                  {Object.entries(IMAGE_MODELS)
+                  {Object.entries(imageLabels(ctx.specs))
                     .filter(
                       ([k]) =>
-                        !Object.keys(ctx.specs).length || ctx.specs[k]?.launch_enabled || k === data.model
+                        (!ctx.specs[k]?.family && !Object.keys(ctx.specs).length) ||
+                        ctx.specs[k]?.launch_enabled ||
+                        k === data.model
                     )
                     .map(([k, v]) => (
                       <option key={k} value={k}>
@@ -1233,7 +1227,7 @@ export default function WorkflowPanel({
                 ))}
                 {review.steps.map(s => (
                   <li key={s.nodeId}>
-                    {IMAGE_MODELS[s.model] || VIDEO_MODELS[s.model]?.label || s.model} · референсов:{' '}
+                    {specs[s.model]?.label || VIDEO_MODELS[s.model]?.label || s.model} · референсов:{' '}
                     {s.refAssetIds.length + s.waitFor.length}
                     {s.waitFor.length ? ' (после предыдущего шага)' : ''} · $
                     {review.estimates[s.nodeId].toFixed(3)}

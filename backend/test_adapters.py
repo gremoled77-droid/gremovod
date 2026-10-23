@@ -227,3 +227,134 @@ class KieTests(unittest.TestCase):
         failed = kie.status({'code': 200, 'data': {'state': 'fail', 'failMsg': 'nsfw'}})['data']
         self.assertEqual((failed['status'], failed['error']['message']), ('failed', 'nsfw'))
         self.assertEqual(kie.submitted({'code': 200, 'data': {}})['data'], {})
+
+
+class GptImageEditTests(unittest.TestCase):
+    """Режим «GPT Image 2.5 + референс»: эндпоинт edits PiAPI (поля model, prompt, size, quality, image[])."""
+    MODEL = 'gpt-image-2.5-ref'
+
+    def setUp(self):
+        self.assertIn(self.MODEL, main.MODEL_SPECS)  # без этого тесты на отказ проходили бы впустую
+
+    def test_defaults_are_the_maximum_settings(self):
+        payload, _ = preview(self.MODEL, reference_urls=[REF])
+        self.assertEqual(payload['model'], 'gpt-image-2.5-sunburst')
+        self.assertEqual(payload['task_type'], 'gpt-image-edit')
+        self.assertEqual(payload['input']['quality'], 'high')
+        self.assertEqual(payload['input']['size'], '1536x1024')
+        self.assertEqual(payload['input']['image'], [REF])
+
+    def test_wire_body_has_only_the_documented_edit_fields(self):
+        spec = main.MODEL_SPECS[self.MODEL]
+        payload, _ = preview(self.MODEL, reference_urls=[REF, REF], prompt='Same character')
+        wire = adapters.wire_body(spec, payload)
+        self.assertEqual(wire, {'model': 'gpt-image-2.5-sunburst', 'prompt': 'Same character',
+                                'image': [REF, REF], 'size': '1536x1024', 'quality': 'high'})
+        self.assertEqual(adapters.submit_path(spec), '/api/v1/images/edits/async')
+
+    def test_variant_and_quality_are_selectable(self):
+        payload, _ = preview(self.MODEL, reference_urls=[REF],
+                             options={'variant': 'flare', 'quality': 'low', 'size': '1024x1024'})
+        self.assertEqual((payload['model'], payload['input']['quality'], payload['input']['size']),
+                         ('gpt-image-2.5-flare', 'low', '1024x1024'))
+
+    def test_cost_counts_quality_size_and_every_reference(self):
+        _, high = preview(self.MODEL, reference_urls=[REF])
+        self.assertEqual(high, 0.0635)  # high 0.04 × 1.5 для 1536×1024 + 1 референс 0.0035
+        _, medium = preview(self.MODEL, reference_urls=[REF], options={'variant': 'flare', 'quality': 'medium'})
+        self.assertEqual(medium, 0.0185)
+        _, three = preview(self.MODEL, reference_urls=[REF] * 3, options={'variant': 'flare', 'quality': 'medium'})
+        self.assertEqual(three, 0.0255)
+
+    def test_a_reference_is_required_and_limited(self):
+        with self.assertRaises(HTTPException):
+            preview(self.MODEL)
+        with self.assertRaises(HTTPException):
+            preview(self.MODEL, reference_urls=[REF] * 5)
+
+    def test_references_must_be_public_https(self):
+        for bad in ('http://example.test/a.png', 'https://localhost/a.png', 'file:///C:/a.png'):
+            with self.assertRaises(HTTPException):
+                preview(self.MODEL, reference_urls=[bad])
+
+    def test_provider_rejected_values_are_refused_before_the_call(self):
+        for options in ({'quality': 'standard'}, {'quality': 'xhigh'}, {'variant': 'standard'}, {'size': '2048x2048'}):
+            with self.assertRaises(HTTPException):
+                preview(self.MODEL, reference_urls=[REF], options=options)
+
+    def test_the_mode_was_verified_live_and_the_estimate_is_not_below_the_real_price(self):
+        spec = main.MODEL_SPECS[self.MODEL]
+        self.assertTrue(spec['launch_enabled'])
+        self.assertEqual(spec['verified_at'], '2026-10-23')
+        _, cost = preview(self.MODEL, reference_urls=[REF])
+        self.assertGreaterEqual(cost, 0.0356)  # реальное списание живого вызова (355650 из 10 млн единиц на $1)
+
+    def test_plain_gpt_image_still_refuses_references_and_text_only_works(self):
+        with self.assertRaises(HTTPException):
+            preview('gpt-image-2.5', reference_urls=[REF])
+        payload, cost = preview('gpt-image-2.5')
+        self.assertEqual((payload['task_type'], cost), ('gpt-image-generation', 0.010))
+
+
+class CatalogLabelsTests(unittest.TestCase):
+    """Названия и порядок карточек моделей приходят из каталога: во фронтенде своих словарей нет."""
+    SHOWN = ('seedream-5-pro', 'seedream-5-lite', 'seedream-5-lite-less-restriction',
+             'seedream-5-pro-less-restriction', 'gpt-image-2', 'gpt-image-2.5', 'gpt-image-2.5-ref',
+             'nano-banana-2.1', 'nano-banana-2', 'qwen-image-2.1', 'seedance-2.5', 'minimax-h3', 'hunyuan-i2v')
+
+    def test_every_model_the_screens_show_has_a_label_and_a_unique_order(self):
+        orders = []
+        for model in self.SHOWN:
+            spec = main.MODEL_SPECS[model]
+            self.assertTrue(spec.get('label'), model)
+            orders.append(spec['ui_order'])
+        self.assertEqual(orders, sorted(set(orders)))
+
+    def test_family_members_name_their_base_and_carry_a_variant_label(self):
+        for member, base in (('seedream-5-lite-less-restriction', 'seedream-5-lite'),
+                             ('seedream-5-pro-less-restriction', 'seedream-5-pro')):
+            self.assertEqual(main.MODEL_SPECS[member]['family'], base)
+            self.assertTrue(main.MODEL_SPECS[member]['variant_label'])
+            self.assertTrue(main.MODEL_SPECS[base]['variant_label'])
+            self.assertNotIn('family', main.MODEL_SPECS[base])
+
+    def test_the_model_specs_endpoint_exposes_labels(self):
+        specs = main.model_specs()
+        self.assertEqual(specs['gpt-image-2.5-ref']['label'], 'GPT Image 2.5 + референс')
+
+
+class NanoBananaParametersTests(unittest.TestCase):
+    """Параметры Nano Banana по странице PiAPI (docs/gemini-api/nano-banana-2, прочитана 23.10.2026)."""
+    RATIOS = ['1:1', '16:9', '9:16', '4:3', '3:4', '21:9', '3:2', '2:3', '5:4', '4:5', '1:4', '1:8', '4:1', '8:1']
+
+    def test_every_aspect_ratio_of_the_provider_is_offered(self):
+        schema = main.MODEL_SPECS['nano-banana-2.1']['options']['aspect_ratio']
+        self.assertEqual(sorted(schema['values']), sorted(self.RATIOS))
+        for ratio in self.RATIOS:
+            payload, _ = preview('nano-banana-2.1', options={'aspect_ratio': ratio})
+            self.assertEqual(payload['input']['aspect_ratio'], ratio)
+        with self.assertRaises(HTTPException):
+            preview('nano-banana-2.1', options={'aspect_ratio': '7:5'})
+
+    def test_up_to_fourteen_references_are_accepted(self):
+        payload, _ = preview('nano-banana-2.1', reference_urls=[REF] * 14)
+        self.assertEqual(len(payload['input']['image_urls']), 14)
+        with self.assertRaises(HTTPException):
+            preview('nano-banana-2.1', reference_urls=[REF] * 15)
+
+    def test_the_price_depends_on_resolution_and_not_on_aspect_ratio(self):
+        for resolution, price in (('1K', 0.03), ('2K', 0.04), ('4K', 0.09)):
+            _, cost = preview('nano-banana-2.1', options={'resolution': resolution, 'aspect_ratio': '21:9'})
+            self.assertEqual(cost, price)
+
+    def test_nano_banana_2_is_an_unverified_variant_with_its_own_prices(self):
+        spec = main.MODEL_SPECS['nano-banana-2']
+        self.assertEqual((spec['family'], spec['task_type'], spec['label']),
+                         ('nano-banana-2.1', 'nano-banana-2', 'Nano Banana 2'))
+        self.assertFalse(spec['launch_enabled'])
+        self.assertNotIn('verified_at', spec)
+        for resolution, price in (('1K', 0.06), ('2K', 0.08), ('4K', 0.12)):
+            _, cost = preview('nano-banana-2', options={'resolution': resolution})
+            self.assertEqual(cost, price)
+        with self.assertRaises(HTTPException):
+            main.image_payload(job('nano-banana-2'))  # запуск выключен до живой проверки

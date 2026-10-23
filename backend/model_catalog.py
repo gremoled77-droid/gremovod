@@ -88,12 +88,20 @@ MODEL_SPECS['seedream-5-pro'].update({
     'options':{'size':{'values':['1K','2K'],'default':'1K'},
                'aspect_ratio':{'values':_ASPECT,'default':'1:1'},
                'output_format':{'values':['png','jpeg','webp'],'default':'png'}}})
+# Параметры Nano Banana по странице PiAPI (docs/gemini-api/nano-banana-2, 23.10.2026): 14 соотношений сторон,
+# до 14 референсов, цена зависит только от разрешения. Значения сверх проверенных 16.10 в живую ещё не пробовались.
+_NANO_ASPECT=['16:9','9:16','1:1','4:3','3:4','21:9','3:2','2:3','5:4','4:5','1:4','1:8','4:1','8:1']
 MODEL_SPECS['nano-banana-2.1'].update({
-    'adapter':'unified_image','api_refs':10,'ref_field':'image_urls',
+    'adapter':'unified_image','api_refs':14,'max_refs':14,'ref_field':'image_urls',
     'price_by_size':{'1K':0.03,'2K':0.04,'4K':0.09},
     'options':{'resolution':{'values':['1K','2K','4K'],'default':'1K'},
-               'aspect_ratio':{'values':['16:9','9:16','1:1','4:3','3:4'],'default':'16:9'},
+               'aspect_ratio':{'values':_NANO_ASPECT,'default':'16:9'},
                'output_format':{'values':['png','jpg','webp'],'default':'png'}}})
+# Nano Banana 2 (не 2.1): те же параметры, другие цены. Запуск выключен до живой проверки.
+MODEL_SPECS['nano-banana-2']={**MODEL_SPECS['nano-banana-2.1'],
+    'task_type':'nano-banana-2','price_by_size':{'1K':0.06,'2K':0.08,'4K':0.12},
+    'launch_enabled':False,'prompt_only':False,'family':'nano-banana-2.1'}
+MODEL_SPECS['nano-banana-2'].pop('verified_at',None)
 MODEL_SPECS['qwen-image-2.1'].update({
     'adapter':'unified_image','model':'Qubico/qwen-image-2.1','task_type':'txt2img','api_refs':0,
     'price_usd':0.015,'max_pixels':1763584,
@@ -112,6 +120,18 @@ MODEL_SPECS['gpt-image-2.5'].update({**_GPT_COMMON,'price_standard_max_usd':0.01
     'variant':{'values':['flare','standard','sunburst'],'default':'flare'},
     'size':{'values':['1024x1024','1024x1536','1536x1024'],'default':'1024x1024'},
     'quality':{'values':['low','medium','high'],'default':'medium'}}})
+# GPT Image 2.5 + референс: эндпоинт edits PiAPI (поля model, prompt, size, quality, image[]). Отдельная запись, чтобы у
+# правок были свои умолчания (максимум: sunburst, high, 1536x1024) и свой флаг запуска. Запуск выключен до живой проверки.
+MODEL_SPECS['gpt-image-2.5-ref']={**MODEL_SPECS['gpt-image-2.5'],
+    'edit':True,'submit_path':'/api/v1/images/edits/async','api_refs':4,'ref_field':'image',
+    'price_image_input_usd':0.0035,  # 560 токенов входной картинки × $0.006 за 1k (страница PiAPI), округлено вверх
+    'launch_enabled':True,'verified_at':'2026-10-23','prompt_only':False,  # живой вызов 23.10.2026: sunburst, high, 1536x1024, 1 референс; факт $0.0356 при оценке $0.0635
+    'variants':{'flare':'gpt-image-2.5-flare','sunburst':'gpt-image-2.5-sunburst'},
+    'options':{'variant':{'values':['flare','sunburst'],'default':'sunburst'},
+               'size':{'values':['1024x1024','1024x1536','1536x1024'],'default':'1536x1024'},
+               'quality':{'values':['low','medium','high'],'default':'high'}}}
+for _stale in ('price_standard_max_usd','edit_variant'):
+    MODEL_SPECS['gpt-image-2.5-ref'].pop(_stale,None)
 MODEL_SPECS['minimax-h3']={
     'launch_enabled':False,'kind':'video','model':'Qubico/minimax-h3','task_type':'txt2video','adapter':'minimax_h3',
     'max_refs':1,'ref_field':'image','docs':'https://piapi.ai/minimax-h3',
@@ -274,3 +294,27 @@ for _id, _spec in MODEL_SPECS.items():
         if _name not in _urls and _docs.startswith('https://') and len(_parts) > 2 and _parts[2].endswith(_host):
             _urls[_name] = _docs
     _spec['page_urls'] = _urls
+
+
+# Названия и порядок карточек для интерфейса: фронтенд берёт их из /api/model-specs и своих словарей не держит.
+# Новая модель появляется на экранах, когда ей задана запись здесь; variant_label — подпись в выборе варианта семейства.
+_UI = [
+    ('seedream-5-pro', 'Seedream 5 Pro', 'Pro'),
+    ('seedream-5-lite', 'Seedream 5 Lite', 'Lite'),
+    ('seedream-5-lite-less-restriction', 'Seedream 5 Lite · less restriction', 'Lite · less restriction'),
+    ('seedream-5-pro-less-restriction', 'Seedream 5 Pro · less restriction', 'Pro · less restriction'),
+    ('gpt-image-2', 'GPT Image 2.0', None),
+    ('gpt-image-2.5', 'GPT Image 2.5', None),
+    ('gpt-image-2.5-ref', 'GPT Image 2.5 + референс', None),
+    ('nano-banana-2.1', 'Nano Banana 2.1', '2.1'),
+    ('nano-banana-2', 'Nano Banana 2', '2'),
+    ('qwen-image-2.1', 'Qwen Image 2.1', None),
+    ('seedance-2.5', 'Seedance 2.5', None),
+    ('minimax-h3', 'MiniMax H3', None),
+    ('hunyuan-i2v', 'Hunyuan I2V', None),
+]
+for _order, (_id, _label, _variant) in enumerate(_UI):
+    MODEL_SPECS[_id]['label'] = _label
+    MODEL_SPECS[_id]['ui_order'] = _order
+    if _variant:
+        MODEL_SPECS[_id]['variant_label'] = _variant
