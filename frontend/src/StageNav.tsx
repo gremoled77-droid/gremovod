@@ -93,8 +93,6 @@ const TABS: {mode: Mode; label: string; icon: string}[] = [
 const TOOLS: Item[] = [
   {key: 'reels', mode: 'reels', label: 'Рилсы', hint: 'рецепты сценариев', icon: '▶'},
   {key: 'graph', mode: 'graph', label: 'Узлы', icon: '⌁'},
-  {key: 'scene', mode: 'scene', label: 'Сцена', icon: '▣'},
-  {key: 'refine', mode: 'refine', label: 'Допилить', icon: '✎'},
   {key: 'agents', mode: 'agents', label: 'Агенты', icon: '☁'},
   {key: 'connections', mode: 'connections', label: 'Подключения', icon: '⚷'},
 ];
@@ -102,11 +100,11 @@ const TOOLS: Item[] = [
 export default function StageNav({
   mode,
   onMode,
-  onDemo,
 }: {
   mode: Mode;
   onMode: (m: Mode) => void;
-  onDemo: () => void;
+  /** Демо раскадки убрано из меню; проп оставлен, пока App.tsx его передаёт. */
+  onDemo?: () => void;
 }) {
   const [hidden, setHidden] = useState(false);
   const [more, setMore] = useState(false);
@@ -176,14 +174,6 @@ export default function StageNav({
         {STAGES.map(s => render(s, s.key === activeStage))}
         <div className="nav-group-title">Инструменты</div>
         {TOOLS.map(t => render(t, t.mode === mode))}
-        <button className="nav-item nav-demo" onClick={onDemo}>
-          <span className="nav-icon" aria-hidden="true">
-            ▷
-          </span>
-          <span className="nav-text">
-            <b>Раскадровка · демо</b>
-          </span>
-        </button>
       </nav>
       <nav className={'mobile-tabs' + (hidden ? ' nav-hidden' : '')} aria-label="Быстрые разделы">
         {TABS.map(t => (
