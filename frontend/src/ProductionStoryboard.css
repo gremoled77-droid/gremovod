@@ -595,3 +595,110 @@ main.storyboard-main {
     grid-template-columns: 1fr;
   }
 }
+
+/* Инспектор кадра в фокусе: доска слева, свойства справа; на телефоне — нижний лист. */
+.ps-workspace.with-inspector {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 330px;
+  gap: 18px;
+  align-items: start;
+}
+.ps-scenes {
+  min-width: 0;
+}
+.ps-frame {
+  cursor: pointer;
+}
+.ps-frame.focused .ps-shot {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent);
+}
+.ps-title {
+  padding: 0;
+  border: 0;
+  background: none;
+  text-align: left;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+}
+.ps-title:hover,
+.ps-title[aria-pressed='true'] {
+  color: var(--accent);
+}
+.ps-inspector {
+  position: sticky;
+  top: calc(var(--topbar-height, 0px) + 12px);
+  max-height: calc(100vh - var(--topbar-height, 0px) - 24px);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--border-strong);
+  border-radius: 16px;
+  background: var(--surface);
+}
+.ps-inspector header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+}
+.ps-inspector h3 {
+  margin: 0;
+  font-size: 14px;
+}
+.ps-inspector h4 {
+  margin: 4px 0 6px;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.ps-inspector section {
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+}
+.ps-insp-shot {
+  position: relative;
+  aspect-ratio: 16 / 10;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #0b0c0f;
+  border: 1px solid var(--border);
+}
+.ps-insp-shot img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.ps-insp-fa {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+}
+.ps-insp-cues {
+  margin: 0;
+  padding-left: 16px;
+  font-size: 12px;
+}
+.ps-insp-cues small {
+  color: var(--muted);
+}
+@media (max-width: 760px) {
+  .ps-workspace.with-inspector {
+    display: block;
+  }
+  .ps-inspector {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    top: auto;
+    z-index: 40;
+    max-height: 70vh;
+    border-radius: 16px 16px 0 0;
+  }
+}

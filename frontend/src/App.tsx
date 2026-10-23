@@ -208,6 +208,8 @@ function App() {
   const [dockOpen, setDockOpen] = useState(false);
   const [demoVisited, setDemoVisited] = useState(false);
   const [mode, setMode] = useState<Mode>(() => readWorkspaceRoute(window.location.hash)?.mode || 'home');
+  // Кадр в фокусе живёт в адресе: переживает смену инструмента и перезагрузку.
+  const [focusFrame, setFocusFrame] = useState(() => readWorkspaceRoute(window.location.hash)?.frameId || '');
   const [workspaceLocation, setWorkspaceLocation] = useState<WorkspaceLocation | null>(null);
   useEffect(() => {
     const header = document.querySelector<HTMLElement>('header.topbar');
@@ -674,6 +676,7 @@ function App() {
       setConflict('');
     }
     if (target.type === 'new') setRecovery(null);
+    setFocusFrame('');
     setCatalogue(null);
     setPromptRequest(null);
     setGenerationRequest(null);
@@ -702,10 +705,10 @@ function App() {
     requestProjectChange({type: 'load', id, mode: destination, characterId});
   useEffect(() => {
     if (startup === 'ready' && projectId) {
-      const hash = workspaceHash(projectId, mode);
+      const hash = workspaceHash(projectId, mode, focusFrame);
       if (hash && window.location.hash !== hash) window.history.replaceState(null, '', hash);
     }
-  }, [projectId, mode, startup]);
+  }, [projectId, mode, focusFrame, startup]);
   const finishProjectChange = (saveFirst: boolean) =>
     work('switch-project', async () => {
       if (!pendingProjectChange) return;
@@ -1778,6 +1781,9 @@ function App() {
                       setMode('files');
                     }}
                     location={workspaceLocation}
+                    focus={focusFrame}
+                    onFocus={setFocusFrame}
+                    onOpenSound={() => setMode('audio')}
                     outlineContext={{
                       projectId,
                       brief: state.brief,

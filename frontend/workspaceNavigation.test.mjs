@@ -6,8 +6,16 @@ async function module(file){const source=await readFile(new URL(file,import.meta
 const {readWorkspaceRoute,workspaceHash}=await module('./src/workspaceRoute.ts');
 const {startActivityFeed}=await module('./src/activityFeed.ts');
 test('workspace route keeps the chosen project and separate media pages',()=>{
- for(const mode of ['create','video','audio','storyboard'])assert.deepEqual(readWorkspaceRoute(workspaceHash('frame_project-1',mode)),{projectId:'frame_project-1',mode});
- for(const hash of ['#/project/a/unknown','#/project/../../x/create','#https://evil.test','#/project/a/create?pay=true'])assert.equal(readWorkspaceRoute(hash),null);
+ for(const mode of ['create','video','audio','storyboard'])assert.deepEqual(readWorkspaceRoute(workspaceHash('frame_project-1',mode)),{projectId:'frame_project-1',mode,frameId:''});
+ for(const hash of ['#/project/a/unknown','#/project/../../x/create','#https://evil.test','#/project/a/create?pay=true','#/project/a/storyboard/frame/','#/project/a/storyboard/frame/../x','#/project/a/storyboard/scene/f1'])assert.equal(readWorkspaceRoute(hash),null);
+});
+test('frame focus survives switching tools and ignores unsafe ids',()=>{
+ const hash=workspaceHash('p1','storyboard','f_2-a');
+ assert.equal(hash,'#/project/p1/storyboard/frame/f_2-a');
+ assert.deepEqual(readWorkspaceRoute(hash),{projectId:'p1',mode:'storyboard',frameId:'f_2-a'});
+ assert.deepEqual(readWorkspaceRoute(workspaceHash('p1','audio','f_2-a')),{projectId:'p1',mode:'audio',frameId:'f_2-a'});
+ assert.equal(workspaceHash('p1','storyboard','../x'),'#/project/p1/storyboard');
+ assert.equal(workspaceHash('p1','storyboard'),'#/project/p1/storyboard');
 });
 test('a late response cannot deliver results after leaving the project',async()=>{
  let resolve;const received=[];
