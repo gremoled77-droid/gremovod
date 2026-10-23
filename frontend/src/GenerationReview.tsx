@@ -1,3 +1,4 @@
+import {rememberRequest} from './jobRequests';
 import {useEffect, useRef, useState} from 'react';
 import {apiFetch} from './api';
 import LimitPicker from './LimitPicker';
@@ -93,6 +94,7 @@ export default function GenerationReview({
       });
       const d = await r.json();
       if (!r.ok) throw Error(typeof d.detail === 'string' ? d.detail : JSON.stringify(d.detail));
+      rememberRequest(requestId.current, request);
       onSubmitted();
     } catch (e) {
       setError(

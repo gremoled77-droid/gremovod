@@ -1,3 +1,4 @@
+import {rememberRequest} from './jobRequests';
 import {useEffect, useRef, useState} from 'react';
 import {apiFetch} from './api';
 import type {GenerationRequest} from './GenerationReview';
@@ -72,6 +73,7 @@ export default function BatchReview({
             request_id: ids.current[i],
           })
         );
+        rememberRequest(ids.current[i], items[i].request);
         setStates(s => s.map((x, j) => (j === i ? 'sent' : x)));
       } catch (e) {
         setStates(s => s.map((x, j) => (j === i ? 'failed' : x)));

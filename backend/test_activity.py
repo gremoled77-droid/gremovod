@@ -56,3 +56,18 @@ class RefreshTests(unittest.TestCase):
 
     def test_refresh_unknown_job_is_404_and_done_job_is_noop(self):
         self.assertEqual(self.client.post('/api/activity/refresh/nope').status_code, 404)
+
+    def test_failed_job_can_be_hidden_but_active_one_cannot(self):
+        from backend import main
+        pid = self.client.post('/api/projects', json={'state': {}}).json()['id']
+        with main.connect() as db:
+            for jid, status in (('job-failed', 'failed'), ('job-running', 'processing')):
+                db.execute('INSERT INTO jobs VALUES(?,?,?,?,?,?,?,?,?)', (jid, pid, 'image', 'piapi', None, status, '{}', '{}', main.now()))
+        ids = lambda: {i['id'] for i in self.client.get('/api/activity', params={'project_id': pid}).json()['items']}
+        self.assertEqual(ids(), {'job-failed', 'job-running'})
+        self.assertEqual(self.client.post('/api/activity/job-running/hide').status_code, 409)
+        self.assertEqual(self.client.post('/api/activity/nope/hide').status_code, 404)
+        self.assertEqual(self.client.post('/api/activity/job-failed/hide').status_code, 200)
+        self.assertEqual(ids(), {'job-running'})
+        with main.connect() as db:  # данные задания остаются
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM jobs WHERE id='job-failed'").fetchone()[0], 1)

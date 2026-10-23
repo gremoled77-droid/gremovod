@@ -29,9 +29,15 @@ def _prompt_of(request_json):
     return str((payload.get('input') or {}).get('prompt') or data.get('prompt') or '')[:200]
 
 
+HIDEABLE = {'failed', 'attention', 'cancelled'}
+HIDDEN_DDL = 'CREATE TABLE IF NOT EXISTS activity_hidden(job_id TEXT PRIMARY KEY, hidden_at TEXT NOT NULL)'
+
+
 def collect(studio, project_id):
     items = []
     with studio.connect() as db:
+        db.execute(HIDDEN_DDL)
+        hidden = {r['job_id'] for r in db.execute('SELECT job_id FROM activity_hidden')}
         delivery = {d['job_id']: d for d in db.execute('SELECT * FROM job_delivery')}
         assets = {}
         for a in db.execute('SELECT id,job_id FROM library_assets WHERE project_id=?', (project_id,)):
@@ -57,6 +63,7 @@ def collect(studio, project_id):
                           'provider': 'codex_chat', 'model': r['target'], 'status': NATIVE_STATUS.get(r['status'], 'running'),
                           'raw_status': r['status'], 'created_at': r['created_at'], 'prompt': (r['prompt'] or '')[:200],
                           'asset_ids': [r['asset_id']] if r['asset_id'] else []})
+    items = [i for i in items if i['id'] not in hidden]
     items.sort(key=lambda x: x['created_at'], reverse=True)
     return items
 
@@ -69,6 +76,26 @@ def version_of(items):
 
 
 def register(app, studio):
+    @app.post('/api/activity/{job_id}/hide')
+    def hide(job_id: str):
+        """«Корзина» очереди: неудачное задание убирается из ленты. Данные задания и расход остаются в базе."""
+        with studio.connect() as db:
+            db.execute(HIDDEN_DDL)
+            row = db.execute('SELECT status FROM jobs WHERE id=?', (job_id,)).fetchone()
+            status = API_STATUS.get(row['status'], 'running') if row else None
+            if not row:
+                row = db.execute('SELECT status FROM external_jobs WHERE id=?', (job_id,)).fetchone()
+                status = EXTERNAL_STATUS.get(row['status'], row['status']) if row else None
+            if not row:
+                row = db.execute('SELECT status FROM native_chat_jobs WHERE id=?', (job_id,)).fetchone()
+                status = NATIVE_STATUS.get(row['status'], 'running') if row else None
+            if not row:
+                raise HTTPException(404, 'Задание не найдено')
+            if status not in HIDEABLE:
+                raise HTTPException(409, 'Убрать можно только неудачное или отменённое задание')
+            db.execute('INSERT OR IGNORE INTO activity_hidden VALUES(?,?)', (job_id, studio.now()))
+        return {'job_id': job_id, 'hidden': True}
+
     @app.post('/api/activity/refresh/{job_id}')
     async def refresh(job_id: str):
         """Опрос провайдера по одному заданию и сохранение готового результата в библиотеку.
