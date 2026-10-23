@@ -11,14 +11,14 @@ test('workspace route keeps the chosen project and separate media pages',()=>{
 });
 test('a late response cannot deliver results after leaving the project',async()=>{
  let resolve;const received=[];
- const feed=startActivityFeed('old',()=>new Promise(done=>{resolve=done}),items=>received.push(items),()=>{});
+ const feed=startActivityFeed('/api/activity?project_id=old',()=>new Promise(done=>{resolve=done}),items=>received.push(items),()=>{});
  feed.stop();resolve(new Response(JSON.stringify({version:'1',changed:true,items:[{id:'old-job'}]})));
  await new Promise(done=>setImmediate(done));assert.deepEqual(received,[]);
 });
 test('refresh cancels the waiting GET and immediately fetches new results',async()=>{
  const requests=[];const received=[];let resolveInitial;
  const first=new Promise(done=>{resolveInitial=done});
- const feed=startActivityFeed('project',async(url,{signal})=>{
+ const feed=startActivityFeed('/api/productions/p/activity',async(url,{signal})=>{
   requests.push(url);
   if(requests.length===1)return first;
   if(requests.length===2)return new Promise((_,reject)=>signal.addEventListener('abort',()=>reject(Error('aborted')),{once:true}));
@@ -26,6 +26,7 @@ test('refresh cancels the waiting GET and immediately fetches new results',async
  },items=>{received.push(items);if(items[0]?.id==='ready')feed.stop()},()=>{});
  resolveInitial(new Response(JSON.stringify({version:'old',changed:true,items:[]})));
  await new Promise(done=>setImmediate(done));
+ assert.equal(requests[0],'/api/productions/p/activity?since=&wait=0');
  assert.match(requests[1],/since=old&wait=20/);
  feed.refresh();await new Promise(done=>setImmediate(done));
  assert.match(requests[2],/since=&wait=0/);

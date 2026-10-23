@@ -16,7 +16,9 @@ import SceneCast from './SceneCast';
 import AnimateDialog from './AnimateDialog';
 import FrameCast from './FrameCast';
 import {soundLabel, sceneSound, type Cue, type FrameSound} from './soundCues';
-import {frameStatus, photoLabel, sceneVideoCount, videoLabel, type Pending} from './frameStatus';
+import {frameStatus, generatingFrames, photoLabel, sceneVideoCount, videoLabel} from './frameStatus';
+import {startActivityFeed} from './activityFeed';
+import type {ActivityItem} from './useActivity';
 import UpscaleButton from './UpscaleButton';
 import {moveItem} from './boardOrder';
 import {patchEntity, putOrder, type EntityPatch} from './boardApi';
@@ -117,7 +119,7 @@ export default function ProductionStoryboard({
     [showScript, setShowScript] = useState(false),
     [showOutline, setShowOutline] = useState(false),
     [animate, setAnimate] = useState<{frame: Frame; heroes: {name: string}[]} | null>(null),
-    [pending, setPending] = useState<Record<string, Pending>>(() => readLocal('studio:video-pending', {})),
+    [generating, setGenerating] = useState<Set<string>>(() => new Set()),
     [onlyNoVideo, setOnlyNoVideo] = useState(false),
     [importMode, setImportMode] = useState<'append' | 'update'>('append');
   const visual = useVisualPlans(pid, sid);
@@ -332,16 +334,31 @@ export default function ProductionStoryboard({
       setNotice(message);
     });
   }
-  /** Пока идёт генерация видео, доска сама обновляется раз в 20 секунд: готовый клип появится в карточке кадра. */
+  /** Лента заданий всей постановки: статус «генерируется» с сервера; при любом изменении доска перечитывает папки кадров. */
+  const feed = useRef<{refresh: () => void} | null>(null);
   useEffect(() => {
-    if (!Object.keys(pending).length) return;
-    const timer = setInterval(() => setTick(t => t + 1), 20000);
-    return () => clearInterval(timer);
-  }, [pending]);
-  function launched(frame: Frame, videosBefore: number) {
-    const next = {...pending, [frame.id]: {since: Date.now(), videosBefore}};
-    setPending(next);
-    writeLocal('studio:video-pending', next);
+    if (!pid) return;
+    let first = true;
+    const started = startActivityFeed<ActivityItem>(
+      `/api/productions/${encodeURIComponent(pid)}/activity`,
+      apiFetch,
+      items => {
+        setGenerating(generatingFrames(items));
+        if (!first) setTick(t => t + 1);
+        first = false;
+      },
+      // Лента сама повторяет запрос; без неё доска просто не показывает «генерируется».
+      () => {}
+    );
+    feed.current = started;
+    return () => {
+      started.stop();
+      feed.current = null;
+      setGenerating(new Set());
+    };
+  }, [pid]);
+  function launched() {
+    feed.current?.refresh();
     setAnimate(null);
     setNotice('Видео запущено. Готовый клип появится в карточке кадра: доска обновляется сама.');
   }
@@ -485,7 +502,7 @@ export default function ProductionStoryboard({
               frame={animate.frame}
               heroes={animate.heroes}
               onClose={() => setAnimate(null)}
-              onLaunched={before => launched(animate.frame, before)}
+              onLaunched={launched}
             />
           )}
           {showOutline && outlineContext && board && (
@@ -769,7 +786,7 @@ export default function ProductionStoryboard({
                           : 'запланирован'}
                       </small>
                       {(() => {
-                        const st = frameStatus(frame.files, frame.selection, pending[frame.id], Date.now());
+                        const st = frameStatus(frame.files, frame.selection, generating.has(frame.id));
                         return (
                           <div className="ps-badges" aria-label="Статус кадра">
                             <span className={'ps-badge ' + st.photo}>{photoLabel(st)}</span>

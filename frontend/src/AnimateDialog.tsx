@@ -63,7 +63,7 @@ export default function AnimateDialog({
   frame: VideoFrame;
   heroes: {name: string; look?: string}[];
   onClose: () => void;
-  onLaunched: (videosBefore: number) => void;
+  onLaunched: () => void;
 }) {
   const [specs, setSpecs] = useState<Record<string, Spec>>({}),
     [model, setModel] = useState(DEFAULT_MODEL),
@@ -79,7 +79,6 @@ export default function AnimateDialog({
     [error, setError] = useState(''),
     [busy, setBusy] = useState(false);
   const mainFile = frame.files.find(f => f.id === frame.selection.selected_image_file_id);
-  const videosBefore = frame.files.filter(f => f.kind === 'video').length;
   useEffect(() => {
     let active = true;
     void apiFetch('/api/model-specs')
@@ -350,7 +349,7 @@ export default function AnimateDialog({
             onClose={() => setBatch(null)}
             onSubmitted={() => {
               setBatch(null);
-              onLaunched(videosBefore);
+              onLaunched();
             }}
           />
         )}
