@@ -618,7 +618,7 @@ main.storyboard-main {
 }
 .snd-card {
   display: grid;
-  align-content: start;
+  grid-template-rows: auto 1fr auto;
   border: 1px solid var(--border);
   border-radius: 12px;
   background: var(--surface);
@@ -641,12 +641,17 @@ main.storyboard-main {
   color: var(--accent);
   opacity: 0.85;
 }
+.snd-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
 .snd-play {
-  position: absolute;
-  right: 8px;
-  bottom: 8px;
-  width: 34px;
-  height: 34px;
+  position: relative;
+  flex: none;
+  width: 30px;
+  height: 30px;
   padding: 0;
   display: grid;
   place-items: center;
@@ -676,9 +681,11 @@ main.storyboard-main {
 .snd-actions {
   display: flex;
   gap: 8px;
-  padding: 0 10px 10px;
+  padding: 14px 10px 10px;
 }
-.snd-btn {
+.snd-card .snd-btn {
+  background: transparent;
+  border-color: var(--border-strong);
   position: relative;
   flex: 1;
   display: grid;

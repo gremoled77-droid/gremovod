@@ -209,24 +209,22 @@ export default function VoicesTab({
           <article key={v.id} className="snd-card">
             <div className="snd-cover">
               <span>{v.name.slice(0, 1).toUpperCase()}</span>
-              {v.provider === 'elevenlabs' && (
-                <button
-                  className="snd-play"
-                  aria-label={playing === v.id ? 'Стоп' : 'Прослушать'}
-                  aria-pressed={playing === v.id}
-                  data-tip={playing === v.id ? 'Стоп' : 'Прослушать'}
-                  onClick={() => void preview(v)}
-                >
-                  {playing === v.id ? <Square size={14} /> : <Play size={14} />}
-                </button>
-              )}
             </div>
             <div className="snd-body">
-              <b>{v.name}</b>
-              <small>
-                {PROVIDER_LABEL[v.provider]} · {v.model}
-              </small>
-              <small>ID {v.voice_id}</small>
+              <div className="snd-title">
+                <b>{v.name}</b>
+                {v.provider === 'elevenlabs' && (
+                  <button
+                    className="snd-play"
+                    aria-label={playing === v.id ? 'Стоп' : 'Прослушать'}
+                    aria-pressed={playing === v.id}
+                    data-tip={playing === v.id ? 'Стоп' : 'Прослушать'}
+                    onClick={() => void preview(v)}
+                  >
+                    {playing === v.id ? <Square size={14} /> : <Play size={14} />}
+                  </button>
+                )}
+              </div>
               {(v.assigned.length > 0 || v.note) && (
                 <div className="snd-tags">
                   {v.assigned.map(a => (
