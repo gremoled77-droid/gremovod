@@ -55,6 +55,7 @@ import {readLocal, writeLocal, clearLocal} from './localDrafts';
 import Dock, {countActive} from './Dock';
 import useActivity from './useActivity';
 import FrameContextBar, {openFrameWorkspace, type FrameWorkspace} from './FrameContextBar';
+import AssistantDock, {type AssistantCard} from './AssistantDock';
 import AgentPanel from './AgentPanel';
 import IdeaBrief from './IdeaBrief';
 import IdeaRefs from './IdeaRefs';
@@ -213,6 +214,21 @@ function App() {
   const [mode, setMode] = useState<Mode>(() => readWorkspaceRoute(window.location.hash)?.mode || 'home');
   // Кадр в фокусе живёт в адресе: переживает смену инструмента и перезагрузку.
   const [focusFrame, setFocusFrame] = useState(() => readWorkspaceRoute(window.location.hash)?.frameId || '');
+  const [animateRequest, setAnimateRequest] = useState('');
+  /** Карточка помощника открывает нужный инструмент для своего кадра; платное — только через оценку и подтверждение. */
+  const runCard = (card: AssistantCard) => {
+    setFocusFrame(card.node_id);
+    const target: Partial<Record<string, Mode>> = {
+      open_create: 'create',
+      open_sound: 'audio',
+      export: 'files',
+      pick_photo: 'storyboard',
+      pick_video: 'storyboard',
+      animate: 'storyboard',
+    };
+    if (card.action === 'animate') setAnimateRequest(card.node_id);
+    if (target[card.action]) setMode(target[card.action]!);
+  };
   const [workspaceLocation, setWorkspaceLocation] = useState<WorkspaceLocation | null>(null);
   useEffect(() => {
     const header = document.querySelector<HTMLElement>('header.topbar');
@@ -1819,6 +1835,8 @@ function App() {
                     onFocus={setFocusFrame}
                     onOpenSound={() => setMode('audio')}
                     onOpenStudio={() => setMode('create')}
+                    animateRequest={animateRequest}
+                    onAnimateHandled={() => setAnimateRequest('')}
                     outlineContext={{
                       projectId,
                       brief: state.brief,
@@ -2392,6 +2410,17 @@ function App() {
           />
         )}
       </div>
+      {startup === 'ready' && workspaceLocation?.production_id && (
+        <AssistantDock
+          pid={workspaceLocation.production_id}
+          frameId={focusFrame}
+          onCard={runCard}
+          onFrame={id => {
+            setFocusFrame(id);
+            setMode('storyboard');
+          }}
+        />
+      )}
     </ActivityProvider>
   );
 }

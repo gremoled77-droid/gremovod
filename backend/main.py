@@ -806,6 +806,8 @@ from backend import frame_analysis
 frame_analysis.register(app,sys.modules[__name__])
 from backend import edit_list
 edit_list.register(app,sys.modules[__name__])
+from backend import assistant
+assistant.register(app,sys.modules[__name__])
 from backend import motion
 motion.register(app,sys.modules[__name__])
 from backend import clip_chain

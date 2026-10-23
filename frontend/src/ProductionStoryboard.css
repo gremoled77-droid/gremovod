@@ -747,3 +747,76 @@ main.storyboard-main {
 .capcut-result p {
   margin: 0 0 4px;
 }
+
+/* Помощник внизу экрана: вкладка в свёрнутом виде, панель с историей и карточками в раскрытом. */
+.assistant-tab {
+  position: fixed;
+  right: 18px;
+  bottom: 14px;
+  z-index: 30;
+  padding: 8px 14px;
+  border-radius: 99px;
+  border: 1px solid var(--accent);
+  background: var(--surface);
+}
+.assistant-dock {
+  position: fixed;
+  right: 18px;
+  bottom: 0;
+  z-index: 30;
+  width: min(460px, calc(100vw - 24px));
+  max-height: 55vh;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--border-strong);
+  border-bottom: 0;
+  border-radius: 16px 16px 0 0;
+  background: var(--surface);
+  box-shadow: 0 -8px 24px #0006;
+}
+.assistant-dock header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.assistant-dock header button {
+  margin-left: auto;
+}
+.assistant-log {
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.assistant-msg p {
+  margin: 2px 0;
+  font-size: 13px;
+}
+.assistant-msg.user p {
+  color: var(--muted);
+}
+.assistant-ref {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font-size: 11px;
+}
+.assistant-cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.assistant-cards button {
+  padding: 5px 10px;
+  font-size: 12px;
+}
+.assistant-dock form {
+  display: flex;
+  gap: 6px;
+}
+.assistant-dock form input {
+  flex: 1;
+}

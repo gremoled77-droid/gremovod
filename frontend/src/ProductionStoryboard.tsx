@@ -79,6 +79,8 @@ export default function ProductionStoryboard({
   onFocus,
   onOpenSound,
   onOpenStudio,
+  animateRequest = '',
+  onAnimateHandled,
 }: {
   location?: WorkspaceLocation | null;
   /** Кадр в фокусе (из адреса) и смена фокуса. */
@@ -87,6 +89,9 @@ export default function ProductionStoryboard({
   onOpenSound?: () => void;
   /** «В студию» из инспектора: открыть «Кадры» для кадра в фокусе, не переключая проект приложения. */
   onOpenStudio?: () => void;
+  /** Карточка помощника «Оживить»: открыть диалог для этого кадра, когда доска его покажет. */
+  animateRequest?: string;
+  onAnimateHandled?: () => void;
   outlineContext?: OutlineContext;
   onInspect: (productionId: string, nodeId: string) => void;
   onOpenProject: (id: string) => void;
@@ -384,6 +389,12 @@ export default function ProductionStoryboard({
       setGenerating(new Set());
     };
   }, [pid]);
+  useEffect(() => {
+    if (!animateRequest || focused?.frame.id !== animateRequest) return;
+    onAnimateHandled?.();
+    if (focused.frame.selection.selected_image_file_id) animateFrame(focused.frame, focused.scene);
+    else setNotice('Сначала выбери главное фото кадра в дублях.');
+  });
   function launched() {
     feed.current?.refresh();
     setAnimate(null);
