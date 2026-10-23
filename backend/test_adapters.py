@@ -227,3 +227,70 @@ class KieTests(unittest.TestCase):
         failed = kie.status({'code': 200, 'data': {'state': 'fail', 'failMsg': 'nsfw'}})['data']
         self.assertEqual((failed['status'], failed['error']['message']), ('failed', 'nsfw'))
         self.assertEqual(kie.submitted({'code': 200, 'data': {}})['data'], {})
+
+
+class GptImageEditTests(unittest.TestCase):
+    """Режим «GPT Image 2.5 + референс»: эндпоинт edits PiAPI (поля model, prompt, size, quality, image[])."""
+    MODEL = 'gpt-image-2.5-ref'
+
+    def setUp(self):
+        self.assertIn(self.MODEL, main.MODEL_SPECS)  # без этого тесты на отказ проходили бы впустую
+
+    def test_defaults_are_the_maximum_settings(self):
+        payload, _ = preview(self.MODEL, reference_urls=[REF])
+        self.assertEqual(payload['model'], 'gpt-image-2.5-sunburst')
+        self.assertEqual(payload['task_type'], 'gpt-image-edit')
+        self.assertEqual(payload['input']['quality'], 'high')
+        self.assertEqual(payload['input']['size'], '1536x1024')
+        self.assertEqual(payload['input']['image'], [REF])
+
+    def test_wire_body_has_only_the_documented_edit_fields(self):
+        spec = main.MODEL_SPECS[self.MODEL]
+        payload, _ = preview(self.MODEL, reference_urls=[REF, REF], prompt='Same character')
+        wire = adapters.wire_body(spec, payload)
+        self.assertEqual(wire, {'model': 'gpt-image-2.5-sunburst', 'prompt': 'Same character',
+                                'image': [REF, REF], 'size': '1536x1024', 'quality': 'high'})
+        self.assertEqual(adapters.submit_path(spec), '/api/v1/images/edits/async')
+
+    def test_variant_and_quality_are_selectable(self):
+        payload, _ = preview(self.MODEL, reference_urls=[REF],
+                             options={'variant': 'flare', 'quality': 'low', 'size': '1024x1024'})
+        self.assertEqual((payload['model'], payload['input']['quality'], payload['input']['size']),
+                         ('gpt-image-2.5-flare', 'low', '1024x1024'))
+
+    def test_cost_counts_quality_size_and_every_reference(self):
+        _, high = preview(self.MODEL, reference_urls=[REF])
+        self.assertEqual(high, 0.0635)  # high 0.04 × 1.5 для 1536×1024 + 1 референс 0.0035
+        _, medium = preview(self.MODEL, reference_urls=[REF], options={'variant': 'flare', 'quality': 'medium'})
+        self.assertEqual(medium, 0.0185)
+        _, three = preview(self.MODEL, reference_urls=[REF] * 3, options={'variant': 'flare', 'quality': 'medium'})
+        self.assertEqual(three, 0.0255)
+
+    def test_a_reference_is_required_and_limited(self):
+        with self.assertRaises(HTTPException):
+            preview(self.MODEL)
+        with self.assertRaises(HTTPException):
+            preview(self.MODEL, reference_urls=[REF] * 5)
+
+    def test_references_must_be_public_https(self):
+        for bad in ('http://example.test/a.png', 'https://localhost/a.png', 'file:///C:/a.png'):
+            with self.assertRaises(HTTPException):
+                preview(self.MODEL, reference_urls=[bad])
+
+    def test_provider_rejected_values_are_refused_before_the_call(self):
+        for options in ({'quality': 'standard'}, {'quality': 'xhigh'}, {'variant': 'standard'}, {'size': '2048x2048'}):
+            with self.assertRaises(HTTPException):
+                preview(self.MODEL, reference_urls=[REF], options=options)
+
+    def test_the_mode_was_verified_live_and_the_estimate_is_not_below_the_real_price(self):
+        spec = main.MODEL_SPECS[self.MODEL]
+        self.assertTrue(spec['launch_enabled'])
+        self.assertEqual(spec['verified_at'], '2026-10-23')
+        _, cost = preview(self.MODEL, reference_urls=[REF])
+        self.assertGreaterEqual(cost, 0.0356)  # реальное списание живого вызова (355650 из 10 млн единиц на $1)
+
+    def test_plain_gpt_image_still_refuses_references_and_text_only_works(self):
+        with self.assertRaises(HTTPException):
+            preview('gpt-image-2.5', reference_urls=[REF])
+        payload, cost = preview('gpt-image-2.5')
+        self.assertEqual((payload['task_type'], cost), ('gpt-image-generation', 0.010))

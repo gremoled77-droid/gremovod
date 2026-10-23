@@ -112,6 +112,18 @@ MODEL_SPECS['gpt-image-2.5'].update({**_GPT_COMMON,'price_standard_max_usd':0.01
     'variant':{'values':['flare','standard','sunburst'],'default':'flare'},
     'size':{'values':['1024x1024','1024x1536','1536x1024'],'default':'1024x1024'},
     'quality':{'values':['low','medium','high'],'default':'medium'}}})
+# GPT Image 2.5 + референс: эндпоинт edits PiAPI (поля model, prompt, size, quality, image[]). Отдельная запись, чтобы у
+# правок были свои умолчания (максимум: sunburst, high, 1536x1024) и свой флаг запуска. Запуск выключен до живой проверки.
+MODEL_SPECS['gpt-image-2.5-ref']={**MODEL_SPECS['gpt-image-2.5'],
+    'edit':True,'submit_path':'/api/v1/images/edits/async','api_refs':4,'ref_field':'image',
+    'price_image_input_usd':0.0035,  # 560 токенов входной картинки × $0.006 за 1k (страница PiAPI), округлено вверх
+    'launch_enabled':True,'verified_at':'2026-10-23','prompt_only':False,  # живой вызов 23.10.2026: sunburst, high, 1536x1024, 1 референс; факт $0.0356 при оценке $0.0635
+    'variants':{'flare':'gpt-image-2.5-flare','sunburst':'gpt-image-2.5-sunburst'},
+    'options':{'variant':{'values':['flare','sunburst'],'default':'sunburst'},
+               'size':{'values':['1024x1024','1024x1536','1536x1024'],'default':'1536x1024'},
+               'quality':{'values':['low','medium','high'],'default':'high'}}}
+for _stale in ('price_standard_max_usd','edit_variant'):
+    MODEL_SPECS['gpt-image-2.5-ref'].pop(_stale,None)
 MODEL_SPECS['minimax-h3']={
     'launch_enabled':False,'kind':'video','model':'Qubico/minimax-h3','task_type':'txt2video','adapter':'minimax_h3',
     'max_refs':1,'ref_field':'image','docs':'https://piapi.ai/minimax-h3',

@@ -74,6 +74,7 @@ const IMAGE_MODELS: Record<string, string> = {
   'seedream-5-pro': 'Seedream 5 Pro',
   'gpt-image-2': 'GPT Image 2.0',
   'gpt-image-2.5': 'GPT Image 2.5',
+  'gpt-image-2.5-ref': 'GPT Image 2.5 + референс',
   'nano-banana-2.1': 'Nano Banana 2.1',
   'qwen-image-2.1': 'Qwen Image 2.1',
 };

@@ -12,6 +12,7 @@ const LABELS: Record<string, string> = {
   'seedream-5-lite': 'Seedream 5 Lite',
   'gpt-image-2': 'GPT Image 2.0',
   'gpt-image-2.5': 'GPT Image 2.5',
+  'gpt-image-2.5-ref': 'GPT Image 2.5 + референс',
   'nano-banana-2.1': 'Nano Banana 2.1',
   'qwen-image-2.1': 'Qwen Image 2.1',
   'seedance-2.5': 'Seedance 2.5',

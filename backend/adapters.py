@@ -74,12 +74,20 @@ def cost_unified_image(spec, payload):
 
 # ---------- GPT Image (async-эндпоинты PiAPI) ----------
 def build_gpt_image(spec, body):
-    if body.reference_urls:
-        _bad('Правки и референсы GPT Image подключаются после проверки эндпоинта edits '
-             '(для правок планируется gpt-image-2.5-sunburst)')
+    edit = spec.get('edit')
+    if edit:  # правка по референсам: эндпоинт edits, картинки обязательны
+        if not body.reference_urls:
+            _bad('Для «GPT Image 2.5 + референс» нужна хотя бы одна картинка-референс')
+        check_refs(body.reference_urls, spec['api_refs'])
+    elif body.reference_urls:
+        _bad('Референсы GPT Image принимает только режим «GPT Image 2.5 + референс» (gpt-image-2.5-ref)')
     options = pick_options(spec, body.options)
     variants = spec.get('variants')
     model = variants[options['variant']] if variants else spec['model']
+    if edit:  # только поля, описанные в документации PiAPI; n и response_format в edits не передаём
+        return {'model': model, 'task_type': 'gpt-image-edit',
+                'input': {'prompt': body.prompt, 'image': list(body.reference_urls),
+                          'size': options['size'], 'quality': options['quality']}}
     inp = {'prompt': body.prompt, 'n': 1, 'response_format': 'url', 'output_format': 'png'}
     if model != 'gpt-image-2.5':  # без суффикса модель сама выбирает размер и качество
         inp['size'] = options['size']
@@ -92,8 +100,10 @@ def cost_gpt_image(spec, payload):
     model = payload['model']
     if model == 'gpt-image-2.5':
         return spec['price_standard_max_usd']
-    price = spec['price_by_quality'][model][inp['quality']]
-    return round(price * (1 if inp['size'] == '1024x1024' else 1.5), 4)
+    price = spec['price_by_quality'][model][inp['quality']] * (1 if inp['size'] == '1024x1024' else 1.5)
+    if spec.get('edit'):  # входные картинки тарифицируются отдельно, по числу референсов
+        price += len(inp['image']) * spec['price_image_input_usd']
+    return round(price, 4)
 
 
 # ---------- MiniMax H3 (видео) ----------
