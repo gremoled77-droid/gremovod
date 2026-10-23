@@ -1832,7 +1832,7 @@ function App() {
                 </>
               ) : mode === 'files' ? (
                 <>
-                  <MontageSummary projectId={projectId} onMode={setMode} />
+                  <MontageSummary projectId={projectId} onMode={setMode} location={workspaceLocation} />
                   <ProductionPanel
                     initialLocation={productionTarget}
                     projectId={projectId}

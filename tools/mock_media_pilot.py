@@ -22,7 +22,8 @@ def require_tools():
 
 
 def invoke(args):
-    p = subprocess.run(args, capture_output=True, text=True, timeout=90, check=False)
+    # ffprobe/ffmpeg печатают UTF-8 (в т.ч. кириллические пути); кодировка Windows по умолчанию их не читает.
+    p = subprocess.run(args, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=90, check=False)
     if p.returncode != 0:
         raise MockMediaError(f"Media command failed: {args[0]}: {p.stderr[-1400:]}")
     return p.stdout

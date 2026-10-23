@@ -4,10 +4,13 @@ import io
 import json
 import shutil
 import subprocess
+import uuid
+from datetime import datetime
 from pathlib import Path
 
 from fastapi import HTTPException
 from fastapi.responses import Response
+from pydantic import BaseModel
 
 from backend import frame_analysis, production_folders as folders, visual_plan
 
@@ -81,8 +84,11 @@ def build(studio, pid, sid):
 
                 plan = visual_plan.clean(visual_plan.stored(db, 'visual_plans', frame['id']))
                 (image, image_choice), (video, video_choice) = choose(files['image'], selection['selected_image_file_id']), choose(files['video'], selection['selected_video_file_id'])
+                sound = [dict(c) for c in db.execute('''SELECT c.kind,c.text,c.level_db,c.start_s,c.duration_s,COALESCE(f.relative_path,'') AS file
+                    FROM frame_sound_cues c LEFT JOIN production_files f ON f.id=c.file_id WHERE c.frame_id=? AND c.archived=0
+                    ORDER BY c.start_s,c.created_at''', (frame['id'],))]
                 rows.append({'scene': scene, 'frame': frame, 'image': image, 'video': video, 'image_choice': image_choice,
-                             'video_choice': video_choice, 'plan': plan})
+                             'video_choice': video_choice, 'plan': plan, 'sound': sound})
     analyses = []
     for row in rows:
         result = None
@@ -116,7 +122,7 @@ def build(studio, pid, sid):
             'video': video['relative_path'] if video else '', 'image': row['image']['relative_path'] if row['image'] else '',
             'duration': seconds, 'sector_start': plan['sector_start'], 'sector_end': plan['sector_end'], 'sector_cut': jump,
             'image_cut': cut, 'space': plan['space'], 'line': plan['line'], 'story': plan['story'], 'visual': plan['visual'], 'note': plan['note'],
-            'image_choice': row['image_choice'], 'video_choice': row['video_choice'],
+            'image_choice': row['image_choice'], 'video_choice': row['video_choice'], 'sound': row['sound'],
         })
     timed = [r['duration'] for r in out if r['duration']]
     warnings = []
@@ -141,8 +147,15 @@ def build(studio, pid, sid):
 
 
 CHOICE = {'main': 'главное', 'candidate': 'предварительно', 'none': ''}
+SOUND_KIND = {'voice': 'Реплика', 'ambience': 'Атмосфера', 'sfx': 'SFX', 'music': 'Музыка'}
 HEADER = ['№', 'Сцена', 'Кадр', 'Название', 'Видео', 'Выбор видео', 'Картинка', 'Длительность, с', 'Сектор начало', 'Сектор конец', 'Склейка по сектору',
-          'Склейка по картинке', 'Пространство', 'Линия', 'Сюжет 0-10', 'Картинка 0-10', 'Заметка']
+          'Склейка по картинке', 'Пространство', 'Линия', 'Сюжет 0-10', 'Картинка 0-10', 'Заметка', 'Звук']
+
+
+def sound_text(cues):
+    """Звук кадра одной ячейкой: тип, уровень, смещение от начала кадра и файл."""
+    return '; '.join(f"{SOUND_KIND.get(c['kind'], c['kind'])} {c['level_db']:g} дБ с {c['start_s']:g} с: "
+                     + (Path(c['file']).name if c['file'] else 'нет файла') + (f" «{c['text']}»" if c['text'] else '') for c in cues)
 
 
 def to_csv(data):
@@ -152,7 +165,8 @@ def to_csv(data):
     for r in data['rows']:
         writer.writerow([r['order'], r['scene'], r['frame'], r['title'], r['video'], CHOICE[r['video_choice']], r['image'], r['duration'] if r['duration'] is not None else '',
                          r['sector_start'] or '', r['sector_end'] or '', r['sector_cut'] or '', r['image_cut']['label'] if r['image_cut'] else '',
-                         r['space'], r['line'], '' if r['story'] is None else r['story'], '' if r['visual'] is None else r['visual'], r['note']])
+                         r['space'], r['line'], '' if r['story'] is None else r['story'], '' if r['visual'] is None else r['visual'], r['note'],
+                         sound_text(r['sound'])])
     return '﻿' + stream.getvalue()
 
 
@@ -170,6 +184,54 @@ def vertical_prompt(db, pid, nid):
     return '\n'.join(parts) + ('\n\n' + rules if rules else '')
 
 
+# Дорожки пакета CapCut; атмосфера идёт фоном вместе с шумами.
+CAPCUT_TRACK = {'voice': 'voice', 'music': 'music', 'sfx': 'sfx', 'ambience': 'sfx'}
+
+
+class CapcutExport(BaseModel):
+    draft: bool = False
+
+
+def export_capcut(studio, pid, sid, draft):
+    """Пакет для ручного монтажа в 03_Монтаж серии: выбранные клипы, звук кадров и проверка пакета.
+    Без draft выгружаются только кадры с главным видео; черновик явно помечен в имени папки."""
+    from tools import capcut_handoff  # tools/ лежит в репозитории рядом с backend и не входит в облачный образ
+    data = build(studio, pid, sid)
+    if not data['rows']:
+        raise HTTPException(409, 'В серии нет кадров: выгружать нечего')
+    waiting = [f"{r['scene']}.{r['frame']}" for r in data['rows'] if r['video_choice'] != 'main']
+    if waiting and not draft:
+        raise HTTPException(409, f"Не выбрано главное видео у кадров {', '.join(waiting)}. Выбери главные дубли на доске или собери черновой пакет.")
+    series = folders.node(studio, pid, sid)
+    episodes = Path(series['relative_dir']) / '02_Эпизоды'
+    media_root = folders.checked_path(studio, str(episodes))
+    montage = folders.checked_path(studio, str(Path(series['relative_dir']) / '03_Монтаж'))
+    name = f"CapCut_{datetime.now():%Y%m%d-%H%M%S}_{uuid.uuid4().hex[:4]}" + ('_ЧЕРНОВИК' if draft else '')
+
+    def inside(relative):
+        return str(Path(relative).relative_to(episodes)) if relative else ''
+    rows = [{**r, 'video': inside(r['video']), 'image': inside(r['image']),
+             'sound': [{**c, 'file': inside(c['file'])} for c in r['sound']]} for r in data['rows']]
+    tracks = {}
+    for row in rows:
+        for cue in row['sound']:
+            if cue['file']:
+                tracks.setdefault(CAPCUT_TRACK.get(cue['kind'], 'sfx'), []).append(cue['file'])
+    # Студийный лист со звуком по кадрам лежит рядом с пакетом: сам пакет звук по кадрам не описывает.
+    montage.mkdir(parents=True, exist_ok=True)
+    sheet = montage / (name + '_монтажный_лист.json')
+    sheet.write_text(json.dumps({**data, 'rows': rows, 'draft': draft}, ensure_ascii=False, indent=2), encoding='utf-8')
+    (montage / (name + '_монтажный_лист.csv')).write_text(to_csv(data), encoding='utf-8')
+    try:
+        manifest = capcut_handoff.export_handoff(sheet, media_root, montage / name, audio_tracks=tracks or None)
+    except capcut_handoff.HandoffError as exc:
+        raise HTTPException(400, f'Пакет не собран: {exc}') from exc
+    check = capcut_handoff.verify_package(montage / name)
+    return {'folder': str(montage / name), 'relative': str(Path(series['relative_dir']) / '03_Монтаж' / name),
+            'draft': draft, 'waiting': waiting, 'status': manifest['status'], 'ready_for_montage': manifest['ready_for_montage'],
+            'counts': manifest['counts'], 'issues': manifest['issues'], 'verify': check}
+
+
 def register(app, studio):
     @app.get('/api/productions/{pid}/series/{sid}/edit-list')
     def edit_list(pid: str, sid: str, format: str = 'json'):
@@ -180,6 +242,10 @@ def register(app, studio):
         if format != 'json':
             raise HTTPException(400, 'Формат должен быть json или csv')
         return data
+
+    @app.post('/api/productions/{pid}/series/{sid}/capcut')
+    def capcut(pid: str, sid: str, body: CapcutExport):
+        return export_capcut(studio, pid, sid, body.draft)
 
     @app.get('/api/productions/{pid}/nodes/{nid}/vertical-prompt')
     def vertical(pid: str, nid: str):

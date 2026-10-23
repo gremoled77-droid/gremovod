@@ -730,3 +730,20 @@ main.storyboard-main {
   border-color: var(--accent);
   box-shadow: 0 0 0 1px var(--accent);
 }
+
+/* «Выгрузить в CapCut» в шапке «Монтажа». */
+.capcut-export {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+.capcut-result {
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+}
+.capcut-result p {
+  margin: 0 0 4px;
+}
