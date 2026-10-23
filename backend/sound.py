@@ -141,7 +141,12 @@ async def fetch_preview(voice_id, key):
     if r.status_code == 404:
         raise HTTPException(404, 'Голос не найден в аккаунте ElevenLabs. Добавь его в «Мои голоса» на сайте сервиса.')
     if r.status_code != 200:
-        raise HTTPException(502, f'ElevenLabs отклонил запрос (HTTP {r.status_code}). Проверь ключ и права.')
+        try:
+            detail = r.json().get('detail')
+            reason = (detail.get('message') or detail.get('status')) if isinstance(detail, dict) else str(detail or '')
+        except ValueError:
+            reason = ''
+        raise HTTPException(502, f'ElevenLabs отклонил запрос (HTTP {r.status_code}): {reason[:200] or "без пояснения"}. Проверь ключ, его права (чтение голосов) и Voice ID.')
     url = r.json().get('preview_url') or ''
     if not url.startswith('https://'):
         raise HTTPException(404, 'У голоса нет готового примера.')

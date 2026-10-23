@@ -94,6 +94,17 @@ class SoundTests(unittest.TestCase):
             self.assertEqual(self.client.get(url + fish + '/preview').status_code, 400)
             self.assertEqual(self.client.get(url + 'nope/preview').status_code, 404)
 
+    def test_preview_error_shows_service_reason(self):
+        response = type('R', (), {'status_code': 400, 'json': lambda self: {'detail': {'status': 'invalid_voice', 'message': 'Voice id is not valid'}}})()
+        client = type('C', (), {'__aenter__': AsyncMock(return_value=None), '__aexit__': AsyncMock(return_value=None)})()
+        client.__aenter__ = AsyncMock(return_value=client)
+        client.get = AsyncMock(return_value=response)
+        with patch.object(sound.httpx, 'AsyncClient', return_value=client):
+            with self.assertRaises(sound.HTTPException) as caught:
+                import asyncio
+                asyncio.run(sound.fetch_preview('x', 'k'))
+        self.assertIn('Voice id is not valid', caught.exception.detail)
+
     def cue(self, frame, **extra):
         body = {'kind': 'sfx', 'text': 'хлопок двери', **extra}
         return self.client.post(f'/api/productions/{self.pid}/nodes/{frame}/sound', json=body)
