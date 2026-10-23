@@ -84,9 +84,9 @@ export const STAGES: Item[] = [
 ];
 /** Нижние вкладки на телефоне (макет Mobile): пять частых действий и «Ещё». */
 const TABS: {mode: Mode; label: string; icon: string}[] = [
-  {mode: 'create', label: 'Создать', icon: '✦'},
-  {mode: 'storyboard', label: 'Сцены', icon: '▦'},
-  {mode: 'characters', label: 'Герои', icon: '☺'},
+  {mode: 'create', label: 'Кадры', icon: '✦'},
+  {mode: 'storyboard', label: 'Раскадровка', icon: '▦'},
+  {mode: 'characters', label: 'Персонажи', icon: '☺'},
   {mode: 'archive', label: 'Архив', icon: '▤'},
   {mode: 'economics', label: 'Бюджет', icon: '$'},
 ];

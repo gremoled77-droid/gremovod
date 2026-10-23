@@ -156,7 +156,6 @@ export default function EconomicsPanel({projectId, revision}: {projectId: string
   return (
     <section className="panel">
       <div className="panel-title">
-        <h2>Экономика ролика</h2>
         <button onClick={() => setTick(x => x + 1)}>Обновить</button>
       </div>
       <p className="muted">

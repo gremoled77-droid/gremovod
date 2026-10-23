@@ -1634,15 +1634,13 @@ function App() {
               )}
             </aside>
             <div className="content">
-              {mode !== 'studio' && (
-                <WorkspaceTrail
-                  projectId={projectId}
-                  mode={mode}
-                  onMode={setMode}
-                  onLocation={setWorkspaceLocation}
-                  onOpenProject={id => void load(id, 'home')}
-                />
-              )}
+              <WorkspaceTrail
+                projectId={projectId}
+                mode={mode}
+                onMode={setMode}
+                onLocation={setWorkspaceLocation}
+                onOpenProject={id => void load(id, 'home')}
+              />
               {!projectDraftSaved && (
                 <p className="alert" role="alert">
                   Черновик проекта не сохранён браузером. Сохрани проект перед перезагрузкой.
@@ -1856,7 +1854,6 @@ function App() {
                   <IdeaRefs projectId={projectId} ids={state.ideaRefs || []} />
                   <section className="panel world-bible">
                     <div className="panel-title">
-                      <h2>Библия мира</h2>
                       <CinemaInfo topic="world" />
                       <Palette size={22} />
                     </div>
