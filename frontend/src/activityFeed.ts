@@ -1,6 +1,6 @@
-/** Read-only activity polling. Refresh cancels the outstanding GET, never submits work. */
+/** Read-only activity polling of a feed URL (project or production). Refresh cancels the outstanding GET, never submits work. */
 export function startActivityFeed<T>(
-  projectId: string,
+  url: string,
   fetcher: (url: string, init: {signal: AbortSignal}) => Promise<Response>,
   onItems: (items: T[]) => void,
   onError: (error: string) => void
@@ -18,7 +18,7 @@ export function startActivityFeed<T>(
       current = controller;
       try {
         const response = await fetcher(
-          `/api/activity?project_id=${encodeURIComponent(projectId)}&since=${encodeURIComponent(version)}&wait=${version ? 20 : 0}`,
+          `${url}${url.includes('?') ? '&' : '?'}since=${encodeURIComponent(version)}&wait=${version ? 20 : 0}`,
           {signal: controller.signal}
         );
         if (!response.ok) throw Error('Лента заданий недоступна');

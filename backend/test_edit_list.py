@@ -1,5 +1,8 @@
 import io
+import json
 import unittest
+from pathlib import Path
+from unittest.mock import patch
 from PIL import Image, ImageDraw
 from backend import edit_list, test_production
 
@@ -61,6 +64,102 @@ class EditListTests(unittest.TestCase):
         self.assertIn('Крупный', csv_response.text)
         self.assertEqual(self.client.get(url, params={'format': 'xml'}).status_code, 400)
         self.assertEqual(self.client.get(f'/api/productions/{self.pid}/series/{scene["id"]}/edit-list').status_code, 404)
+
+    def test_new_candidate_does_not_replace_main_video(self):
+        series, scene, frames = self.build()
+        url = f'/api/productions/{self.pid}/series/{series["id"]}/edit-list'
+        upload = lambda name: self.client.post(f'/api/productions/{self.pid}/nodes/{frames[0]["id"]}/upload', data={'category': '03_Видео'},
+                                               files={'file': (name, b'not-a-real-video', 'video/mp4')})
+        data = self.client.get(url).json()
+        self.assertEqual(data['rows'][0]['video_choice'], 'candidate')
+        self.assertEqual(data['rows'][1]['video_choice'], 'none')
+        self.assertTrue(any('1.1' in w and 'предварительно' in w for w in data['warnings']))
+        self.assertEqual((data['summary']['approved_videos'], data['summary']['ready']), (0, False))
+        self.assertIn('предварительно', self.client.get(url, params={'format': 'csv'}).text)
+        # Без выбора новый файл подменяет прежний, но лист честно помечает его как предварительный.
+        upload('second.mp4')
+        data = self.client.get(url).json()
+        self.assertTrue(data['rows'][0]['video'].endswith('second.mp4'))
+        self.assertEqual(data['rows'][0]['video_choice'], 'candidate')
+        editor = self.client.get(f'/api/productions/{self.pid}/nodes/{frames[0]["id"]}/editor').json()
+        clip = next(f for f in editor['files'] if f['filename'] == 'clip.mp4')
+        saved = self.client.put(f'/api/productions/{self.pid}/nodes/{frames[0]["id"]}/editor',
+                                json={**editor['data'], 'base_revision': editor['revision'], 'notes': editor['node']['notes'], 'selected_video_file_id': clip['id']})
+        self.assertEqual(saved.status_code, 200, saved.text)
+        upload('new-unapproved.mp4')
+        data = self.client.get(url).json()
+        self.assertTrue(data['rows'][0]['video'].endswith('clip.mp4'))
+        self.assertEqual(data['rows'][0]['video_choice'], 'main')
+        self.assertEqual(data['summary']['approved_videos'], 1)
+        self.assertFalse(any('1.1' in w and 'предварительно' in w for w in data['warnings']))
+
+    def main_video(self, frame, name):
+        r = self.client.post(f'/api/productions/{self.pid}/nodes/{frame["id"]}/upload', data={'category': '03_Видео'},
+                             files={'file': (name, b'not-a-real-video', 'video/mp4')})
+        self.assertEqual(r.status_code, 200, r.text)
+        editor = self.client.get(f'/api/productions/{self.pid}/nodes/{frame["id"]}/editor').json()
+        clip = next(f for f in editor['files'] if f['filename'].endswith(name))
+        saved = self.client.put(f'/api/productions/{self.pid}/nodes/{frame["id"]}/editor',
+                                json={**editor['data'], 'base_revision': editor['revision'], 'notes': editor['node']['notes'], 'selected_video_file_id': clip['id']})
+        self.assertEqual(saved.status_code, 200, saved.text)
+
+    def cue(self, frame, kind, text, filename):
+        cid = self.client.post(f'/api/productions/{self.pid}/nodes/{frame["id"]}/sound', json={
+            'kind': kind, 'text': text, 'hero_node_id': self.char['id'] if kind == 'voice' else None,
+            'level_db': None, 'start_s': 1.5, 'duration_s': None}).json()['id']
+        if filename:
+            r = self.client.post(f'/api/productions/{self.pid}/sound/{cid}/file', files={'file': (filename, b'RIFF-not-real', 'audio/wav')})
+            self.assertEqual(r.status_code, 200, r.text)
+
+    def test_capcut_export_blocks_unready_frames_and_allows_marked_draft(self):
+        series, scene, frames = self.build()
+        url = f'/api/productions/{self.pid}/series/{series["id"]}/capcut'
+        blocked = self.client.post(url, json={})
+        self.assertEqual(blocked.status_code, 409)
+        self.assertIn('1.1, 1.2, 1.3', blocked.json()['detail'])
+        with patch('tools.capcut_handoff.probe_media', return_value=None):
+            draft = self.client.post(url, json={'draft': True})
+        self.assertEqual(draft.status_code, 200, draft.text)
+        got = draft.json()
+        self.assertTrue(got['draft'])
+        self.assertTrue(got['folder'].endswith('_ЧЕРНОВИК'))
+        self.assertEqual(got['waiting'], ['1.1', '1.2', '1.3'])
+        # Кадры без видео честно делают черновой пакет неполным, но сам пакет целый.
+        self.assertEqual((got['status'], got['ready_for_montage']), ('INCOMPLETE', False))
+        self.assertTrue(got['verify']['ok'], got['verify'])
+        self.assertEqual(got['counts']['clips'], 1)
+        self.assertEqual(Path(got['folder']).parent.name, '03_Монтаж')
+
+    def test_capcut_export_packs_main_takes_and_frame_sound(self):
+        series, scene, frames = self.build()
+        for frame, name in zip(frames, ('a.mp4', 'b.mp4', 'c.mp4')):
+            self.main_video(frame, name)
+        self.cue(frames[0], 'voice', 'Садитесь', 'line.wav')
+        self.cue(frames[1], 'ambience', 'вокзал', 'station.wav')
+        self.cue(frames[2], 'sfx', 'гудок', None)
+        rows = self.client.get(f'/api/productions/{self.pid}/series/{series["id"]}/edit-list').json()['rows']
+        self.assertEqual([c['kind'] for c in rows[0]['sound']], ['voice'])
+        self.assertTrue(rows[0]['sound'][0]['file'].endswith('line.wav'))
+        self.assertEqual(rows[2]['sound'][0]['file'], '')
+        csv_text = self.client.get(f'/api/productions/{self.pid}/series/{series["id"]}/edit-list', params={'format': 'csv'}).text
+        self.assertIn(';Звук', csv_text.splitlines()[0])
+        self.assertIn('Реплика 0 дБ с 1.5 с:', csv_text)
+        self.assertIn('SFX -6 дБ с 1.5 с: нет файла «гудок»', csv_text)
+        with patch('tools.capcut_handoff.probe_media', return_value=None):
+            r = self.client.post(f'/api/productions/{self.pid}/series/{series["id"]}/capcut', json={})
+        self.assertEqual(r.status_code, 200, r.text)
+        got = r.json()
+        self.assertFalse(got['draft'])
+        self.assertNotIn('ЧЕРНОВИК', got['folder'])
+        self.assertEqual((got['status'], got['ready_for_montage'], got['waiting']), ('READY_FOR_MONTAGE', True, []))
+        self.assertEqual((got['counts']['clips'], got['counts']['audio']), (3, 2))
+        self.assertTrue(got['verify']['ok'], got['verify'])
+        pack = Path(got['folder'])
+        self.assertEqual({p.name: len(list(p.iterdir())) for p in (pack / '02_Audio').iterdir()}, {'music': 0, 'sfx': 1, 'voice': 1})
+        sheet = json.loads((pack.parent / (pack.name + '_монтажный_лист.json')).read_text(encoding='utf-8'))
+        self.assertEqual(Path(sheet['rows'][0]['sound'][0]['file']).name.split('_', 1)[1], 'line.wav')
+        self.assertFalse(Path(sheet['rows'][0]['video']).is_absolute())
+        self.assertTrue((pack.parent / (pack.name + '_монтажный_лист.csv')).is_file())
 
     def test_vertical_prompt_and_project_rules(self):
         series, scene, frames = self.build()

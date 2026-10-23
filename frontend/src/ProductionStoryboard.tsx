@@ -11,13 +11,13 @@ import {analyzeAsset, shotPoints, TensionGraph, useVisualPlans, VisualPlanForm} 
 import {emptyPlan, planFromAnalysis} from './visualPlan';
 import VisualRulesForm from './VisualRulesForm';
 import EditListPanel from './EditListPanel';
-import FrameTakes from './FrameTakes';
 import SceneCast from './SceneCast';
 import AnimateDialog from './AnimateDialog';
-import FrameCast from './FrameCast';
+import FrameInspector from './FrameInspector';
 import {soundLabel, sceneSound, type Cue, type FrameSound} from './soundCues';
-import {frameStatus, photoLabel, sceneVideoCount, videoLabel, type Pending} from './frameStatus';
-import UpscaleButton from './UpscaleButton';
+import {frameStatus, generatingFrames, photoLabel, sceneVideoCount, videoLabel} from './frameStatus';
+import {startActivityFeed} from './activityFeed';
+import type {ActivityItem} from './useActivity';
 import {moveItem} from './boardOrder';
 import {patchEntity, putOrder, type EntityPatch} from './boardApi';
 import OutlineDialog, {type OutlineContext} from './OutlineDialog';
@@ -75,8 +75,23 @@ export default function ProductionStoryboard({
   onOpenProject,
   location,
   outlineContext,
+  focus = '',
+  onFocus,
+  onOpenSound,
+  onOpenStudio,
+  animateRequest = '',
+  onAnimateHandled,
 }: {
   location?: WorkspaceLocation | null;
+  /** Кадр в фокусе (из адреса) и смена фокуса. */
+  focus?: string;
+  onFocus: (frameId: string) => void;
+  onOpenSound?: () => void;
+  /** «В студию» из инспектора: открыть «Кадры» для кадра в фокусе, не переключая проект приложения. */
+  onOpenStudio?: () => void;
+  /** Карточка помощника «Оживить»: открыть диалог для этого кадра, когда доска его покажет. */
+  animateRequest?: string;
+  onAnimateHandled?: () => void;
   outlineContext?: OutlineContext;
   onInspect: (productionId: string, nodeId: string) => void;
   onOpenProject: (id: string) => void;
@@ -117,10 +132,26 @@ export default function ProductionStoryboard({
     [showScript, setShowScript] = useState(false),
     [showOutline, setShowOutline] = useState(false),
     [animate, setAnimate] = useState<{frame: Frame; heroes: {name: string}[]} | null>(null),
-    [pending, setPending] = useState<Record<string, Pending>>(() => readLocal('studio:video-pending', {})),
+    [generating, setGenerating] = useState<Set<string>>(() => new Set()),
     [onlyNoVideo, setOnlyNoVideo] = useState(false),
     [importMode, setImportMode] = useState<'append' | 'update'>('append');
   const visual = useVisualPlans(pid, sid);
+  const focused = (() => {
+    for (const scene of board?.scenes || []) {
+      const frame = scene.frames.find(f => f.id === focus);
+      if (frame) return {scene, frame};
+    }
+    return null;
+  })();
+  // Кадр из адреса открывает свою серию один раз; дальше серию можно переключать вручную.
+  const shownFocus = useRef('');
+  useEffect(() => {
+    if (!focus || shownFocus.current === focus) return;
+    const scene = nodes.find(n => n.id === nodes.find(n => n.id === focus && n.kind === 'frame')?.parent_id);
+    if (!scene?.parent_id) return;
+    shownFocus.current = focus;
+    setSid(scene.parent_id);
+  }, [focus, nodes]);
   const [estimating, setEstimating] = useState(false);
   const estimateEmpty = async () => {
     if (!board) return;
@@ -179,9 +210,11 @@ export default function ProductionStoryboard({
     };
   }, []);
   useEffect(() => {
-    let live = true;
     setNodes([]);
     setBoard(null);
+  }, [pid]);
+  useEffect(() => {
+    let live = true;
     if (pid)
       void request('/api/productions/' + pid)
         .then(t => {
@@ -201,9 +234,10 @@ export default function ProductionStoryboard({
       live = false;
     };
   }, [pid, tick]);
+  // Старую доску держим на экране, пока грузится обновление: иначе инспектор мигает после каждого выбора.
+  useEffect(() => setBoard(null), [pid, sid]);
   useEffect(() => {
     let live = true;
-    setBoard(null);
     if (pid && sid)
       void request(path)
         .then(b => {
@@ -332,18 +366,48 @@ export default function ProductionStoryboard({
       setNotice(message);
     });
   }
-  /** Пока идёт генерация видео, доска сама обновляется раз в 20 секунд: готовый клип появится в карточке кадра. */
+  /** Лента заданий всей постановки: статус «генерируется» с сервера; при любом изменении доска перечитывает папки кадров. */
+  const feed = useRef<{refresh: () => void} | null>(null);
   useEffect(() => {
-    if (!Object.keys(pending).length) return;
-    const timer = setInterval(() => setTick(t => t + 1), 20000);
-    return () => clearInterval(timer);
-  }, [pending]);
-  function launched(frame: Frame, videosBefore: number) {
-    const next = {...pending, [frame.id]: {since: Date.now(), videosBefore}};
-    setPending(next);
-    writeLocal('studio:video-pending', next);
+    if (!pid) return;
+    let first = true;
+    const started = startActivityFeed<ActivityItem>(
+      `/api/productions/${encodeURIComponent(pid)}/activity`,
+      apiFetch,
+      items => {
+        setGenerating(generatingFrames(items));
+        if (!first) setTick(t => t + 1);
+        first = false;
+      },
+      // Лента сама повторяет запрос; без неё доска просто не показывает «генерируется».
+      () => {}
+    );
+    feed.current = started;
+    return () => {
+      started.stop();
+      feed.current = null;
+      setGenerating(new Set());
+    };
+  }, [pid]);
+  useEffect(() => {
+    if (!animateRequest || focused?.frame.id !== animateRequest) return;
+    onAnimateHandled?.();
+    if (focused.frame.selection.selected_image_file_id) animateFrame(focused.frame, focused.scene);
+    else setNotice('Сначала выбери главное фото кадра в дублях.');
+  });
+  function launched() {
+    feed.current?.refresh();
     setAnimate(null);
     setNotice('Видео запущено. Готовый клип появится в карточке кадра: доска обновляется сама.');
+  }
+  function animateFrame(frame: Frame, scene: {selection: Selection}) {
+    const own = frame.selection.character_node_ids.length || frame.selection.location_node_id;
+    setAnimate({
+      frame,
+      heroes: (own ? frame.selection.character_node_ids : scene.selection.character_node_ids)
+        .map(id => ({name: nodes.find(n => n.id === id)?.title || ''}))
+        .filter(h => h.name),
+    });
   }
   function openFrame(frame: Frame) {
     void perform(async () => {
@@ -485,7 +549,7 @@ export default function ProductionStoryboard({
               frame={animate.frame}
               heroes={animate.heroes}
               onClose={() => setAnimate(null)}
-              onLaunched={before => launched(animate.frame, before)}
+              onLaunched={launched}
             />
           )}
           {showOutline && outlineContext && board && (
@@ -619,285 +683,281 @@ export default function ProductionStoryboard({
               estimating={estimating}
             />
           )}
-          {board.scenes.map((scene, sceneIndex) => (
-            <article key={scene.id} className="ps-scene">
-              <div className="ps-scene-head">
-                <span className="ps-order" role="group" aria-label={`Порядок сцены ${scene.title}`}>
-                  <button
-                    disabled={busy || sceneIndex === 0}
-                    title="Сцену выше"
-                    aria-label="Сцену выше"
-                    onClick={() =>
-                      shift(
-                        sid,
-                        board.scenes.map(s => s.id),
-                        sceneIndex,
-                        -1
-                      )
-                    }
-                  >
-                    ▲
-                  </button>
-                  <button
-                    disabled={busy || sceneIndex === board.scenes.length - 1}
-                    title="Сцену ниже"
-                    aria-label="Сцену ниже"
-                    onClick={() =>
-                      shift(
-                        sid,
-                        board.scenes.map(s => s.id),
-                        sceneIndex,
-                        1
-                      )
-                    }
-                  >
-                    ▼
-                  </button>
-                </span>
-                <button className="ps-heading" onClick={() => inspect(scene.id)}>
-                  <small>СЦЕНА {String(scene.number).padStart(2, '0')}</small>
-                  <h3>{scene.title} ↗</h3>
-                </button>
-                {(() => {
-                  const done = scene.frames.filter(f => f.files.some(x => x.kind === 'image')).length;
-                  const all = scene.frames.length;
-                  return (
-                    <span className={'ps-prog' + (all && done === all ? ' ok' : '')}>
-                      {done} из {all} с фото
-                    </span>
-                  );
-                })()}
-                {(() => {
-                  const {done, all} = sceneVideoCount(scene.frames);
-                  return (
-                    <span className={'ps-prog' + (all && done === all ? ' ok' : '')}>
-                      видео {done} из {all}
-                    </span>
-                  );
-                })()}
-                {(() => {
-                  const {done, all} = sceneSound(scene.frames.map(f => ({cues: sound[f.id] || []})));
-                  return (
-                    <span className={'ps-prog' + (all && done === all ? ' ok' : '')}>
-                      звук {done} из {all}
-                    </span>
-                  );
-                })()}
-              </div>
-              <p className="ps-text">{scene.notes || 'Описание пока не добавлено'}</p>
-              <SceneCast
-                catalogue={nodes}
-                characterIds={scene.selection.character_node_ids}
-                locationId={scene.selection.location_node_id}
-                busy={busy}
-                onOpen={inspect}
-                onChange={patch => savePatch(scene.id, patch, 'Состав сцены сохранён.')}
-              />
-              <VisualPlanForm
-                kind="scene"
-                plan={visual.plans[scene.id]}
-                onSave={plan => visual.save(scene.id, plan)}
-              />
-              <div className="ps-frames">
-                {scene.frames.map((frame, frameIndex) => {
-                  if (onlyNoVideo && frame.selection.selected_video_file_id) return null;
-                  const image =
-                      frame.files.find(f => f.id === frame.selection.selected_image_file_id) ||
-                      frame.files.find(f => f.kind === 'image'),
-                    video =
-                      frame.files.find(f => f.id === frame.selection.selected_video_file_id) ||
-                      frame.files.find(f => f.kind === 'video');
-                  return (
-                    <article key={frame.id} className={'ps-frame' + (image ? '' : ' none')}>
-                      <div className="ps-shot">
-                        {image ? (
-                          <button
-                            className="ps-zoom"
-                            title="Открыть крупно"
-                            onClick={() => {
-                              const list = scene.frames
-                                .map(fr => {
-                                  const im =
-                                    fr.files.find(f => f.id === fr.selection.selected_image_file_id) ||
-                                    fr.files.find(f => f.kind === 'image');
-                                  return im
-                                    ? {
-                                        url: im.asset_id ? `/api/library/${im.asset_id}/file` : im.url,
-                                        title: `${scene.number}.${fr.number} · ${fr.title}`,
-                                        id: fr.id,
-                                      }
-                                    : null;
-                                })
-                                .filter(Boolean) as (LightboxItem & {id: string})[];
-                              setView({
-                                items: list,
-                                index: Math.max(
-                                  0,
-                                  list.findIndex(x => x.id === frame.id)
-                                ),
-                              });
-                            }}
-                          >
-                            <img
-                              src={image.asset_id ? `/api/library/${image.asset_id}/thumbnail` : image.url}
-                              alt={frame.title}
-                              loading="lazy"
-                            />
-                          </button>
-                        ) : (
-                          <div className="ps-empty">нет изображения</div>
-                        )}
-                        <span className="ps-tag">
-                          {scene.number}.{frame.number}
-                        </span>
-                        {image && frame.selection.selected_image_file_id && (
-                          <span className="ps-main">главный</span>
-                        )}
-                        {video && (
-                          <span className="ps-vid">
-                            {frame.selection.selected_video_file_id ? 'видео ✓' : 'видео'}
-                          </span>
-                        )}
-                      </div>
-                      <b>{frame.title}</b>
-                      {changeOf(frame.notes) && <p className="ps-change">{changeOf(frame.notes)}</p>}
-                      <small>
-                        {image
-                          ? frame.selection.selected_image_file_id
-                            ? 'основное фото утверждено'
-                            : 'последнее фото · не утверждено'
-                          : 'запланирован'}
-                      </small>
-                      {(() => {
-                        const st = frameStatus(frame.files, frame.selection, pending[frame.id], Date.now());
-                        return (
-                          <div className="ps-badges" aria-label="Статус кадра">
-                            <span className={'ps-badge ' + st.photo}>{photoLabel(st)}</span>
-                            <span className={'ps-badge v-' + st.video}>{videoLabel(st)}</span>
-                            <span className={'ps-badge s-' + (sound[frame.id]?.length ? 'on' : 'off')}>
-                              {soundLabel(sound[frame.id] || [])}
-                            </span>
-                          </div>
-                        );
-                      })()}
-                      <FrameCast
-                        id={frame.id}
-                        pid={pid}
-                        catalogue={nodes}
-                        own={frame.selection}
-                        scene={scene.selection}
-                        busy={busy}
-                        onChange={(patch, message) => savePatch(frame.id, patch, message)}
-                      />
-                      {frame.selection.selected_image_file_id && (
-                        <UpscaleButton fileId={frame.selection.selected_image_file_id} />
-                      )}
-                      <FrameTakes
-                        files={frame.files}
-                        imageId={frame.selection.selected_image_file_id}
-                        videoId={frame.selection.selected_video_file_id}
-                        busy={busy}
-                        onPick={(kind, id) =>
-                          savePatch(
-                            frame.id,
-                            kind === 'image' ? {selected_image_file_id: id} : {selected_video_file_id: id},
-                            id
-                              ? kind === 'image'
-                                ? 'Главное фото выбрано.'
-                                : 'Главное видео выбрано.'
-                              : 'Выбор снят.'
+          <div className={'ps-workspace' + (focused ? ' with-inspector' : '')}>
+            <div className="ps-scenes">
+              {board.scenes.map((scene, sceneIndex) => (
+                <article key={scene.id} className="ps-scene">
+                  <div className="ps-scene-head">
+                    <span className="ps-order" role="group" aria-label={`Порядок сцены ${scene.title}`}>
+                      <button
+                        disabled={busy || sceneIndex === 0}
+                        title="Сцену выше"
+                        aria-label="Сцену выше"
+                        onClick={() =>
+                          shift(
+                            sid,
+                            board.scenes.map(s => s.id),
+                            sceneIndex,
+                            -1
                           )
                         }
-                      />
-                      <div className="ps-acts">
-                        <button
-                          className="primary"
-                          disabled={busy || !frame.selection.selected_image_file_id}
-                          title={
-                            frame.selection.selected_image_file_id
-                              ? 'Оживить главное фото кадра'
-                              : 'Сначала утверди главное фото'
-                          }
-                          onClick={() =>
-                            setAnimate({
-                              frame,
-                              heroes: (frame.selection.character_node_ids.length ||
-                              frame.selection.location_node_id
-                                ? frame.selection.character_node_ids
-                                : scene.selection.character_node_ids
-                              )
-                                .map(id => ({name: nodes.find(n => n.id === id)?.title || ''}))
-                                .filter(h => h.name),
-                            })
-                          }
-                        >
-                          Оживить
-                        </button>
-                        <button disabled={busy} onClick={() => openFrame(frame)}>
-                          В студию
-                        </button>
-                        <button onClick={() => inspect(frame.id)}>Файлы ↗</button>
-                        <span className="ps-order" role="group" aria-label={`Порядок кадра ${frame.title}`}>
-                          <button
-                            disabled={busy || frameIndex === 0}
-                            title="Кадр раньше"
-                            aria-label="Кадр раньше"
-                            onClick={() =>
-                              shift(
-                                scene.id,
-                                scene.frames.map(f => f.id),
-                                frameIndex,
-                                -1
-                              )
-                            }
-                          >
-                            ◀
-                          </button>
-                          <button
-                            disabled={busy || frameIndex === scene.frames.length - 1}
-                            title="Кадр позже"
-                            aria-label="Кадр позже"
-                            onClick={() =>
-                              shift(
-                                scene.id,
-                                scene.frames.map(f => f.id),
-                                frameIndex,
-                                1
-                              )
-                            }
-                          >
-                            ▶
-                          </button>
+                      >
+                        ▲
+                      </button>
+                      <button
+                        disabled={busy || sceneIndex === board.scenes.length - 1}
+                        title="Сцену ниже"
+                        aria-label="Сцену ниже"
+                        onClick={() =>
+                          shift(
+                            sid,
+                            board.scenes.map(s => s.id),
+                            sceneIndex,
+                            1
+                          )
+                        }
+                      >
+                        ▼
+                      </button>
+                    </span>
+                    <button className="ps-heading" onClick={() => inspect(scene.id)}>
+                      <small>СЦЕНА {String(scene.number).padStart(2, '0')}</small>
+                      <h3>{scene.title} ↗</h3>
+                    </button>
+                    {(() => {
+                      const done = scene.frames.filter(f => f.files.some(x => x.kind === 'image')).length;
+                      const all = scene.frames.length;
+                      return (
+                        <span className={'ps-prog' + (all && done === all ? ' ok' : '')}>
+                          {done} из {all} с фото
                         </span>
-                      </div>
-                      <VisualPlanForm
-                        kind="frame"
-                        assetId={image?.asset_id}
-                        verticalUrl={`/api/productions/${pid}/nodes/${frame.id}/vertical-prompt`}
-                        plan={visual.plans[frame.id]}
-                        onSave={plan => visual.save(frame.id, plan)}
-                      />
-                    </article>
-                  );
-                })}
-              </div>
-              <details>
-                <summary>＋ Кадр сцены</summary>
-                <label>
-                  Название нового кадра
-                  <input
-                    disabled={busy}
-                    value={name}
-                    onChange={e => setName(e.target.value)}
-                    placeholder="Например: реакция гостя"
+                      );
+                    })()}
+                    {(() => {
+                      const {done, all} = sceneVideoCount(scene.frames);
+                      return (
+                        <span className={'ps-prog' + (all && done === all ? ' ok' : '')}>
+                          видео {done} из {all}
+                        </span>
+                      );
+                    })()}
+                    {(() => {
+                      const {done, all} = sceneSound(scene.frames.map(f => ({cues: sound[f.id] || []})));
+                      return (
+                        <span className={'ps-prog' + (all && done === all ? ' ok' : '')}>
+                          звук {done} из {all}
+                        </span>
+                      );
+                    })()}
+                  </div>
+                  <p className="ps-text">{scene.notes || 'Описание пока не добавлено'}</p>
+                  <SceneCast
+                    catalogue={nodes}
+                    characterIds={scene.selection.character_node_ids}
+                    locationId={scene.selection.location_node_id}
+                    busy={busy}
+                    onOpen={inspect}
+                    onChange={patch => savePatch(scene.id, patch, 'Состав сцены сохранён.')}
                   />
-                </label>
-                <button disabled={busy || !name.trim()} onClick={() => createFrame(scene)}>
-                  Создать кадр
-                </button>
-              </details>
-            </article>
-          ))}
+                  <VisualPlanForm
+                    kind="scene"
+                    plan={visual.plans[scene.id]}
+                    onSave={plan => visual.save(scene.id, plan)}
+                  />
+                  <div className="ps-frames">
+                    {scene.frames.map((frame, frameIndex) => {
+                      if (onlyNoVideo && frame.selection.selected_video_file_id) return null;
+                      const image =
+                          frame.files.find(f => f.id === frame.selection.selected_image_file_id) ||
+                          frame.files.find(f => f.kind === 'image'),
+                        video =
+                          frame.files.find(f => f.id === frame.selection.selected_video_file_id) ||
+                          frame.files.find(f => f.kind === 'video');
+                      return (
+                        <article
+                          key={frame.id}
+                          id={'board-frame-' + frame.id}
+                          className={
+                            'ps-frame' + (image ? '' : ' none') + (frame.id === focus ? ' focused' : '')
+                          }
+                          onClick={e => {
+                            // Клик по свободному месту карточки выбирает кадр; кнопки и поля работают как раньше.
+                            if (
+                              !(e.target as HTMLElement).closest(
+                                'button,a,input,select,textarea,summary,label'
+                              )
+                            )
+                              onFocus(frame.id);
+                          }}
+                        >
+                          <div className="ps-shot">
+                            {image ? (
+                              <button
+                                className="ps-zoom"
+                                title="Открыть крупно"
+                                onClick={() => {
+                                  const list = scene.frames
+                                    .map(fr => {
+                                      const im =
+                                        fr.files.find(f => f.id === fr.selection.selected_image_file_id) ||
+                                        fr.files.find(f => f.kind === 'image');
+                                      return im
+                                        ? {
+                                            url: im.asset_id ? `/api/library/${im.asset_id}/file` : im.url,
+                                            title: `${scene.number}.${fr.number} · ${fr.title}`,
+                                            id: fr.id,
+                                          }
+                                        : null;
+                                    })
+                                    .filter(Boolean) as (LightboxItem & {id: string})[];
+                                  setView({
+                                    items: list,
+                                    index: Math.max(
+                                      0,
+                                      list.findIndex(x => x.id === frame.id)
+                                    ),
+                                  });
+                                }}
+                              >
+                                <img
+                                  src={
+                                    image.asset_id ? `/api/library/${image.asset_id}/thumbnail` : image.url
+                                  }
+                                  alt={frame.title}
+                                  loading="lazy"
+                                />
+                              </button>
+                            ) : (
+                              <div className="ps-empty">нет изображения</div>
+                            )}
+                            <span className="ps-tag">
+                              {scene.number}.{frame.number}
+                            </span>
+                            {image && frame.selection.selected_image_file_id && (
+                              <span className="ps-main">главный</span>
+                            )}
+                            {video && (
+                              <span className="ps-vid">
+                                {frame.selection.selected_video_file_id ? 'видео ✓' : 'видео'}
+                              </span>
+                            )}
+                          </div>
+                          <button
+                            type="button"
+                            className="ps-title"
+                            aria-pressed={frame.id === focus}
+                            title="Свойства кадра"
+                            onClick={() => onFocus(frame.id === focus ? '' : frame.id)}
+                          >
+                            {frame.title}
+                          </button>
+                          {changeOf(frame.notes) && <p className="ps-change">{changeOf(frame.notes)}</p>}
+                          <small>
+                            {image
+                              ? frame.selection.selected_image_file_id
+                                ? 'основное фото утверждено'
+                                : 'последнее фото · не утверждено'
+                              : 'запланирован'}
+                          </small>
+                          {(() => {
+                            const st = frameStatus(frame.files, frame.selection, generating.has(frame.id));
+                            return (
+                              <div className="ps-badges" aria-label="Статус кадра">
+                                <span className={'ps-badge ' + st.photo}>{photoLabel(st)}</span>
+                                <span className={'ps-badge v-' + st.video}>{videoLabel(st)}</span>
+                                <span className={'ps-badge s-' + (sound[frame.id]?.length ? 'on' : 'off')}>
+                                  {soundLabel(sound[frame.id] || [])}
+                                </span>
+                              </div>
+                            );
+                          })()}
+                          <div className="ps-acts">
+                            <span
+                              className="ps-order"
+                              role="group"
+                              aria-label={`Порядок кадра ${frame.title}`}
+                            >
+                              <button
+                                disabled={busy || frameIndex === 0}
+                                title="Кадр раньше"
+                                aria-label="Кадр раньше"
+                                onClick={() =>
+                                  shift(
+                                    scene.id,
+                                    scene.frames.map(f => f.id),
+                                    frameIndex,
+                                    -1
+                                  )
+                                }
+                              >
+                                ◀
+                              </button>
+                              <button
+                                disabled={busy || frameIndex === scene.frames.length - 1}
+                                title="Кадр позже"
+                                aria-label="Кадр позже"
+                                onClick={() =>
+                                  shift(
+                                    scene.id,
+                                    scene.frames.map(f => f.id),
+                                    frameIndex,
+                                    1
+                                  )
+                                }
+                              >
+                                ▶
+                              </button>
+                            </span>
+                          </div>
+                          <VisualPlanForm
+                            kind="frame"
+                            assetId={image?.asset_id}
+                            verticalUrl={`/api/productions/${pid}/nodes/${frame.id}/vertical-prompt`}
+                            plan={visual.plans[frame.id]}
+                            onSave={plan => visual.save(frame.id, plan)}
+                          />
+                        </article>
+                      );
+                    })}
+                  </div>
+                  <details>
+                    <summary>＋ Кадр сцены</summary>
+                    <label>
+                      Название нового кадра
+                      <input
+                        disabled={busy}
+                        value={name}
+                        onChange={e => setName(e.target.value)}
+                        placeholder="Например: реакция гостя"
+                      />
+                    </label>
+                    <button disabled={busy || !name.trim()} onClick={() => createFrame(scene)}>
+                      Создать кадр
+                    </button>
+                  </details>
+                </article>
+              ))}
+            </div>
+            {focused && (
+              <FrameInspector
+                key={focused.frame.id}
+                pid={pid}
+                sceneNumber={focused.scene.number}
+                sceneSelection={focused.scene.selection}
+                frame={focused.frame}
+                catalogue={nodes}
+                cues={sound[focused.frame.id] || []}
+                generating={generating.has(focused.frame.id)}
+                busy={busy}
+                onPatch={(patch, message) => savePatch(focused.frame.id, patch, message)}
+                onAnimate={() => animateFrame(focused.frame, focused.scene)}
+                onStudio={onOpenStudio || (() => openFrame(focused.frame))}
+                onFiles={() => inspect(focused.frame.id)}
+                onSound={onOpenSound}
+                onClose={() => onFocus('')}
+              />
+            )}
+          </div>
           <details>
             <summary>Общие персонажи и локации проекта</summary>
             <p className="muted">

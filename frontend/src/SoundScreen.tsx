@@ -11,22 +11,31 @@ const TABS = [
 type Tab = (typeof TABS)[number]['id'];
 
 /** Экран «Звук»: библиотека голосов, звуковые заметки кадров и прежний Audio Lab. */
-export default function SoundScreen({projectId, audioLab}: {projectId: string; audioLab: ReactNode}) {
-  const [tab, setTab] = useState<Tab>('voices'),
+export default function SoundScreen({
+  projectId,
+  audioLab,
+  focus,
+}: {
+  projectId: string;
+  audioLab: ReactNode;
+  /** Кадр в фокусе: открываем его серию и сразу «Звук по кадрам». */
+  focus?: {frameId: string; seriesId: string};
+}) {
+  const [tab, setTab] = useState<Tab>(focus ? 'frames' : 'voices'),
     [ctx, setCtx] = useState<SoundContext | null>(null),
     [loaded, setLoaded] = useState(false),
     [error, setError] = useState(''),
     [busy, setBusy] = useState(false);
   const reload = useCallback(async () => {
     try {
-      setCtx(projectId ? await loadSound(projectId) : null);
+      setCtx(projectId ? await loadSound(projectId, focus?.seriesId) : null);
       setError('');
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setLoaded(true);
     }
-  }, [projectId]);
+  }, [projectId, focus?.seriesId]);
   useEffect(() => {
     void reload();
   }, [reload]);
@@ -74,7 +83,7 @@ export default function SoundScreen({projectId, audioLab}: {projectId: string; a
           run={run}
         />
       ) : (
-        <FrameSoundTab ctx={ctx} onChanged={() => void reload()} run={run} />
+        <FrameSoundTab ctx={ctx} focus={focus?.frameId} onChanged={() => void reload()} run={run} />
       )}
     </section>
   );

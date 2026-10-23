@@ -1,7 +1,6 @@
-/** Статус кадра на доске: фото, видео и счётчик сцены. «Генерируется» помним локально: у кадра свой рабочий проект, общей ленты заданий для него нет. */
+/** Статус кадра на доске: фото, видео и счётчик сцены. «Генерируется» приходит из ленты заданий постановки. */
 export type StatusFile = {id: string; kind: string};
 export type StatusSelection = {selected_image_file_id: string | null; selected_video_file_id: string | null};
-export type Pending = {since: number; videosBefore: number};
 
 export type FrameStatus = {
   photo: 'none' | 'latest' | 'approved';
@@ -9,20 +8,27 @@ export type FrameStatus = {
   takes: number;
 };
 
-export const PENDING_MS = 15 * 60 * 1000;
+/** Задание ещё идёт или его результат ещё сохраняется в папку кадра. */
+export const ACTIVE = new Set(['queued', 'running', 'saving']);
+
+/** Кадры, у которых в ленте постановки есть незавершённое задание на видео. */
+export function generatingFrames(
+  items: {kind: string; status: string; node_id?: string | null}[]
+): Set<string> {
+  return new Set(
+    items.flatMap(i => (i.kind === 'video' && ACTIVE.has(i.status) && i.node_id ? [i.node_id] : []))
+  );
+}
 
 export function frameStatus(
   files: StatusFile[],
   selection: StatusSelection,
-  pending: Pending | undefined,
-  now: number
+  generating: boolean
 ): FrameStatus {
   const images = files.filter(f => f.kind === 'image').length;
   const takes = files.filter(f => f.kind === 'video').length;
   const photo = selection.selected_image_file_id ? 'approved' : images ? 'latest' : 'none';
-  // Задание считается идущим, пока не появилось новое видео и не прошло 15 минут.
-  const waiting = !!pending && takes <= pending.videosBefore && now - pending.since < PENDING_MS;
-  const video = selection.selected_video_file_id ? 'main' : waiting ? 'pending' : takes ? 'takes' : 'none';
+  const video = selection.selected_video_file_id ? 'main' : generating ? 'pending' : takes ? 'takes' : 'none';
   return {photo, video, takes};
 }
 

@@ -1,4 +1,4 @@
-import {useRef, useState} from 'react';
+import {useEffect, useRef, useState} from 'react';
 import {apiFetch} from './api';
 import VoiceLineDialog from './VoiceLineDialog';
 import {addCue, archiveCue, saveCue, uploadCueFile, type SoundContext} from './soundApi';
@@ -136,14 +136,19 @@ function CueRow({
 /** Звук по кадрам: реплики, атмосфера, SFX и музыка с рекомендуемыми уровнями, файлами и озвучкой реплик. */
 export default function FrameSoundTab({
   ctx,
+  focus,
   onChanged,
   run,
 }: {
   ctx: SoundContext;
+  focus?: string;
   onChanged: () => void;
   run: Run;
 }) {
   const [voiceCue, setVoiceCue] = useState<Cue | null>(null);
+  useEffect(() => {
+    if (focus) document.getElementById('snd-frame-' + focus)?.scrollIntoView({block: 'center'});
+  }, [focus]);
   if (!ctx.sid) return <p className="muted">В проекте ещё нет серии. Отправьте кадры в раскадровку.</p>;
   if (!ctx.frames.length)
     return <p className="muted">В серии нет кадров. Создайте сцены и кадры на экране «Раскадровка».</p>;
@@ -170,7 +175,12 @@ export default function FrameSoundTab({
         </small>
       </div>
       {ctx.frames.map(f => (
-        <article key={f.frame_id} className="snd-frame">
+        <article
+          key={f.frame_id}
+          id={'snd-frame-' + f.frame_id}
+          className={'snd-frame' + (f.frame_id === focus ? ' focused' : '')}
+          aria-current={f.frame_id === focus ? 'true' : undefined}
+        >
           <header>
             <h3>
               {f.scene_number}. {f.scene} · {f.scene_number}.{f.frame_number} {f.frame}

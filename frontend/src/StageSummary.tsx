@@ -1,6 +1,8 @@
 import {useEffect, useState} from 'react';
 import {apiFetch} from './api';
 import type {Mode} from './StageNav';
+import CapCutExport from './CapCutExport';
+import type {WorkspaceLocation} from './WorkspaceTrail';
 
 type Budget = {
   project_limit_usd: number;
@@ -31,7 +33,15 @@ function useCounts(projectId: string) {
 }
 
 /** Шапка «Монтажа»: что готово к выгрузке в CapCut по этапам. */
-export function MontageSummary({projectId, onMode}: {projectId: string; onMode: (m: Mode) => void}) {
+export function MontageSummary({
+  projectId,
+  onMode,
+  location,
+}: {
+  projectId: string;
+  onMode: (m: Mode) => void;
+  location: WorkspaceLocation | null;
+}) {
   const {images, videos, audio} = useCounts(projectId);
   const cards: {mode: Mode; title: string; count: number; unit: string; hint: string}[] = [
     {mode: 'create', title: 'Кадры', count: images, unit: 'картинок', hint: 'основа клипов'},
@@ -58,9 +68,7 @@ export function MontageSummary({projectId, onMode}: {projectId: string; onMode: 
           </button>
         ))}
       </div>
-      <p className="ss-note">
-        Кнопка «Выгрузить в CapCut» появится, когда будем настраивать выгрузку на компьютере.
-      </p>
+      <CapCutExport location={location} />
     </section>
   );
 }

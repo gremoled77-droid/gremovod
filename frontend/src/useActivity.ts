@@ -31,7 +31,7 @@ export default function useActivity(projectId: string) {
     setSnapshot({project: projectId, items: EMPTY, error: '', ready: false});
     if (!projectId) return;
     const feed = startActivityFeed<ActivityItem>(
-      projectId,
+      `/api/activity?project_id=${encodeURIComponent(projectId)}`,
       apiFetch,
       items => setSnapshot({project: projectId, items, error: '', ready: true}),
       error => setSnapshot(current => (current.project === projectId ? {...current, error} : current))

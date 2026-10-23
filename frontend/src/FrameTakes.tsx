@@ -1,22 +1,24 @@
 type Take = {id: string; asset_id: string | null; kind: string; filename: string; url: string};
 
-/** Дубли кадра: фото и видео по одному плиточному ряду, клик назначает или снимает «главный». */
+/** Дубли кадра: фото и видео по одному плиточному ряду, клик назначает или снимает «главный». В инспекторе открыты всегда. */
 export default function FrameTakes({
+  open = false,
   files,
   imageId,
   videoId,
   busy,
   onPick,
 }: {
+  open?: boolean;
   files: Take[];
   imageId: string | null;
   videoId: string | null;
   busy: boolean;
   onPick: (kind: 'image' | 'video', id: string | null) => void;
 }) {
-  if (files.length < 2 && !imageId && !videoId) return null;
+  if (!files.length || (!open && files.length < 2 && !imageId && !videoId)) return null;
   return (
-    <details className="ps-takes">
+    <details className="ps-takes" open={open}>
       <summary>Дубли ({files.length}) · выбрать главный</summary>
       <div className="ps-take-row">
         {files.map(f => {
