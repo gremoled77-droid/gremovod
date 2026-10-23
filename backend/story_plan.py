@@ -194,7 +194,7 @@ def register(app, studio):
                         note = directory / folders.NOTE_FILES['episode']
                         created_files.append(note)
                         note.write_text(f'# {card["title"]}\n\n{card["summary"]}\n', encoding='utf-8')
-                        db.execute('INSERT INTO production_nodes VALUES(?,?,?,?,?,?,?,?,?,?,?)',
+                        db.execute('INSERT INTO production_nodes(id,production_id,parent_id,kind,title,number,guest,relative_dir,notes,character_id,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)',
                                    (nid, pid, sid, 'episode', card['title'], number, '', str(relative), card['summary'], None, studio.now()))
                         selection = {'character_node_ids': card['character_ids'], 'location_node_id': card['location_id'],
                                      'selected_image_file_id': None, 'selected_video_file_id': None}

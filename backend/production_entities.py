@@ -46,9 +46,14 @@ def validate(db,pid,node,body):
     if node['kind'] not in ('episode','frame') and (body.character_node_ids or body.location_node_id or body.location_angle_file_id):raise HTTPException(400,'Состав закрепляется за сценой или кадром')
     if body.location_angle_file_id and (not body.location_node_id or not db.execute("SELECT 1 FROM production_files WHERE id=? AND node_id=? AND production_id=? AND kind='image'",(body.location_angle_file_id,body.location_node_id,pid)).fetchone()):
         raise HTTPException(400,'Ракурс должен быть изображением выбранной локации')
-    if len(set(body.character_node_ids))!=len(body.character_node_ids):raise HTTPException(400,'Персонаж выбран дважды')
-    for nid,kind in [(nid,'character') for nid in body.character_node_ids]+([(body.location_node_id,'location')] if body.location_node_id else []):
-        if not db.execute('SELECT 1 FROM production_nodes WHERE id=? AND production_id=? AND kind=?',(nid,pid,kind)).fetchone():raise HTTPException(400,'Персонаж или локация не принадлежат проекту')
+    heroes=[]
+    for nid in body.character_node_ids:
+        row=db.execute("SELECT kind,parent_id FROM production_nodes WHERE id=? AND production_id=? AND kind IN ('character','look')",(nid,pid)).fetchone()
+        if not row:raise HTTPException(400,'Персонаж или локация не принадлежат проекту')
+        heroes.append(row['parent_id'] if row['kind']=='look' else nid)
+    if len(set(heroes))!=len(heroes):raise HTTPException(400,'Персонаж выбран дважды: оставь один образ героя')
+    if body.location_node_id and not db.execute("SELECT 1 FROM production_nodes WHERE id=? AND production_id=? AND kind='location'",(body.location_node_id,pid)).fetchone():
+        raise HTTPException(400,'Персонаж или локация не принадлежат проекту')
     for fid,kind in [(body.selected_image_file_id,'image'),(body.selected_video_file_id,'video')]:
         if fid and not db.execute('SELECT 1 FROM production_files WHERE id=? AND node_id=? AND production_id=? AND kind=?',(fid,node['id'],pid,kind)).fetchone():raise HTTPException(400,'Выбранный файл другого типа или не относится к этой карточке')
 
@@ -70,16 +75,25 @@ def context(studio,body):
             if data['character_node_ids'] or data['location_node_id']:scene_data=data
         for nid in scene_data['character_node_ids']+([scene_data['location_node_id']] if scene_data['location_node_id'] else []):
             item=db.execute('SELECT * FROM production_nodes WHERE id=? AND production_id=?',(nid,body.production_id)).fetchone()
-            if item:related.append(dict(item))
-        refs=[];seen=set()
+            if not item:continue
+            related.append(dict(item))
+            # Образ берёт лицо у героя, вариант места — геометрию у самого места.
+            parent=db.execute('SELECT * FROM production_nodes WHERE id=?',(item['parent_id'],)).fetchone() if item['kind']=='look' or item['variant'] else None
+            if parent:related.append(dict(parent))
+        refs=[];seen=set();missing=[]
         for item in related:
             _,selection,_=state(db,body.production_id,item['id'])
             files=db.execute("SELECT * FROM production_files WHERE node_id=? AND kind='image' ORDER BY created_at,id",(item['id'],)).fetchall()
             # Prefer the explicit approved image; older output variants are not identity references.
             primary=selection['selected_image_file_id']
             if item['kind']=='location' and item['id']==scene_data.get('location_node_id') and scene_data.get('location_angle_file_id'):primary=scene_data['location_angle_file_id']
-            imported={r['id'] for r in db.execute("SELECT f.id FROM production_files f JOIN library_assets a ON a.id=f.asset_id WHERE f.node_id=? AND json_extract(a.metadata,'$.provider')='local_import'",(item['id'],))}
-            chosen=[f for f in files if f['id']==primary] if primary else [f for f in files if f['id'] in imported or any(part in Path(f['relative_path']).parts for part in ['01_Основной_образ','02_Референсы','01_Референсы','01_Исходники'])]
+            if item['kind'] in ('character','look','location'):
+                # Материалы мира уходят в запрос только утверждённым изображением: без угадывания по папкам.
+                chosen=[f for f in files if f['id']==primary]
+                if not chosen:missing.append(item['title'])
+            else:
+                imported={r['id'] for r in db.execute("SELECT f.id FROM production_files f JOIN library_assets a ON a.id=f.asset_id WHERE f.node_id=? AND json_extract(a.metadata,'$.provider')='local_import'",(item['id'],))}
+                chosen=[f for f in files if f['id']==primary] if primary else [f for f in files if f['id'] in imported or any(part in Path(f['relative_path']).parts for part in ['01_Исходники'])]
             for f in chosen:
                 path=folders.checked_path(studio,f['relative_path'])
                 if not path.is_file() or str(path) in seen:continue
@@ -95,6 +109,7 @@ def context(studio,body):
     return {'brief':node['notes']+('\n\n'+style if style else '')+'\n\nЗАДАНИЕ: '+body.entity_instruction,'references':refs,'character':character,
             'scene':{'participants':[{'id':n['id'],'kind':n['kind'],'name':n['title'],'description':n['notes']} for n in related]},
             'entity':{'production_id':body.production_id,'node_id':node['id'],'kind':node['kind'],'title':node['title'],'character_id':node.get('character_id'),'revision':revision},
+            'missing_approved':missing,
             'capabilities':studio.MODEL_SPECS[body.target],'rules_version':studio.RULES_VERSION,
             'preservation':'Preserve character identity, selected location geometry, seating and reference design. Make only the requested changes.'}
 
@@ -103,7 +118,7 @@ def deliver(studio,item,asset_id):
     recipient=json.loads(item['request']).get('context',{}).get('entity')
     if not recipient:return
     node=folders.node(studio,recipient['production_id'],recipient['node_id'])
-    category={'episode':'02_Раскадровка','frame':'02_Изображения','character':'03_Архив','location':'02_Изображения'}.get(node['kind'])
+    category={'episode':'02_Раскадровка','frame':'02_Изображения','character':'03_Архив','location':'02_Изображения','look':'02_Изображения'}.get(node['kind'])
     if category:folders.copy_asset(studio,recipient['production_id'],node['id'],asset_id,category)
 
 

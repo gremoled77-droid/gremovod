@@ -16,8 +16,11 @@ GROUPS={
     'series':['01_Сценарий','02_Эпизоды','03_Монтаж','04_Экспорт'],
     'episode':['01_Сценарий','02_Раскадровка','03_Кадры'],
     'frame':['01_Исходники','02_Изображения','03_Видео','04_Звук','05_Промпты','06_Выбранное'],
+    'look':['01_Референсы','02_Изображения'],
 }
-NOTE_FILES={'character':'ПЕРСОНАЖ.md','location':'ЛОКАЦИЯ.md','series':'01_Сценарий/СЮЖЕТ.md','episode':'01_Сценарий/СЦЕНА.md','frame':'КАДР.md'}
+# Вложенные папки мира: место → место/вариант, герой → образ. Номер в имени не нужен.
+CHILD_DIRS={'episode':'02_Эпизоды','frame':'03_Кадры','location':'','look':'05_Образы'}
+NOTE_FILES={'character':'ПЕРСОНАЖ.md','location':'ЛОКАЦИЯ.md','series':'01_Сценарий/СЮЖЕТ.md','episode':'01_Сценарий/СЦЕНА.md','frame':'КАДР.md','look':'ОБРАЗ.md'}
 EXTENSIONS={'.png','.jpg','.jpeg','.webp','.mp4','.mov','.webm','.mp3','.wav','.m4a','.txt','.md','.json','.pdf','.srt'}
 
 
@@ -95,7 +98,7 @@ def copy_asset(studio,pid,nid,asset_id,category=None):
     if not asset or not allowed:raise HTTPException(404,'Файл не принадлежит этому общему проекту')
     metadata=json.loads(asset['metadata']);kind=metadata.get('kind','image')
     if category is None:
-        category=({'character':'02_Референсы','location':'03_Видео' if kind=='video' else '01_Референсы',
+        category=({'character':'02_Референсы','location':'03_Видео' if kind=='video' else '01_Референсы','look':'02_Изображения' if kind=='image' else None,
                    'frame':'04_Звук' if kind=='audio' else ('03_Видео' if kind=='video' else ('01_Исходники' if metadata.get('provider')=='local_import' else '02_Изображения'))}).get(target['kind'])
     if category not in GROUPS[target['kind']]:raise HTTPException(400,'Выбери раздел внутри папки')
     source=(studio.LIBRARY_ROOT/asset['filename']).resolve()
@@ -180,8 +183,10 @@ def sync_project(studio,project_id):
 def create_node(studio,pid,body):
     common=production(studio,pid)
     parent=node(studio,pid,body.parent_id) if body.parent_id else None
-    valid=(body.kind in ROOT_GROUPS and parent is None) or (body.kind=='episode' and parent and parent['kind']=='series') or (body.kind=='frame' and parent and parent['kind']=='episode')
-    if not valid:raise HTTPException(400,'Порядок папок: общий проект → серия → эпизод/сцена → кадр')
+    above=parent['kind'] if parent else None
+    valid=(body.kind in ROOT_GROUPS and parent is None) or (body.kind=='episode' and above=='series') or (body.kind=='frame' and above=='episode')         or (body.kind=='location' and above=='location' and not parent['variant']) or (body.kind=='look' and above=='character')
+    if not valid:raise HTTPException(400,'Порядок папок: общий проект → серия → сцена → кадр; место → место или вариант; герой → образ')
+    if body.variant and not (body.kind=='location' and above=='location'):raise HTTPException(400,'Вариант создаётся внутри места')
     title=safe_name(body.title);guest=safe_name(body.guest) if body.guest.strip() else ''
     if guest and body.kind!='series':raise HTTPException(400,'Гость указывается в папке серии')
     if body.kind=='character' and body.character_id:
@@ -193,8 +198,8 @@ def create_node(studio,pid,body):
         number=body.number
         if number is None:number=db.execute('SELECT COALESCE(MAX(number),0)+1 FROM production_nodes WHERE production_id=? AND parent_id IS ? AND kind=?',(pid,body.parent_id,body.kind)).fetchone()[0]
         if db.execute('SELECT 1 FROM production_nodes WHERE production_id=? AND parent_id IS ? AND kind=? AND (number=? OR title=?)',(pid,body.parent_id,body.kind,number,body.title.strip())).fetchone():raise HTTPException(409,'Папка с таким номером или названием уже есть')
-        base=Path(common['folder'])/ROOT_GROUPS[body.kind] if parent is None else Path(parent['relative_dir'])/('02_Эпизоды' if body.kind=='episode' else '03_Кадры')
-        name=title if body.kind in {'character','location'} else f'{number:03d}_{title}'+(' — '+guest if guest else '')
+        base=Path(common['folder'])/ROOT_GROUPS[body.kind] if parent is None else Path(parent['relative_dir'])/CHILD_DIRS[body.kind]
+        name=title if body.kind in {'character','location','look'} else f'{number:03d}_{title}'+(' — '+guest if guest else '')
         relative=str(base/name);directory=checked_path(studio,relative)
         if directory.exists():raise HTTPException(409,'Папка на диске уже существует; выбери другое название')
         directory.mkdir(parents=True)
@@ -205,7 +210,8 @@ def create_node(studio,pid,body):
             row=db.execute('SELECT state FROM projects WHERE id=?',(common['source_project_id'],)).fetchone();state=json.loads(row['state'])
             state.setdefault('characters',[]).append({'id':character_id,'name':body.title.strip(),'identity':{'species':'','face':'','hair':'','eyes':'','costume':'','negative':''},'profiles':{}})
             db.execute('UPDATE projects SET state=?,updated_at=? WHERE id=?',(json.dumps(state,ensure_ascii=False),studio.now(),common['source_project_id']))
-        db.execute('INSERT INTO production_nodes VALUES(?,?,?,?,?,?,?,?,?,?,?)',(nid,pid,body.parent_id,body.kind,body.title.strip(),number,body.guest.strip(),relative,body.notes,character_id,studio.now()))
+        db.execute('INSERT INTO production_nodes(id,production_id,parent_id,kind,title,number,guest,relative_dir,notes,character_id,created_at,variant) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)',
+                   (nid,pid,body.parent_id,body.kind,body.title.strip(),number,body.guest.strip(),relative,body.notes,character_id,studio.now(),int(body.variant)))
     write_text(studio,str(Path(relative)/NOTE_FILES[body.kind]),f'# {body.title.strip()}\n\n'+(f'Гость: {body.guest.strip()}\n\n' if guest else '')+body.notes+'\n')
     return node(studio,pid,nid)
 
@@ -223,6 +229,7 @@ class NewNode(BaseModel):
     number:int|None=Field(default=None,ge=0,le=9999)
     notes:str=Field(default='',max_length=30000)
     character_id:str|None=None
+    variant:bool=False
 
 
 class AssetAssignment(BaseModel):
@@ -262,6 +269,8 @@ def register(app,studio):
             db.execute('CREATE TABLE IF NOT EXISTS production_nodes(id TEXT PRIMARY KEY,production_id TEXT NOT NULL,parent_id TEXT,kind TEXT NOT NULL,title TEXT NOT NULL,number INTEGER NOT NULL,guest TEXT NOT NULL,relative_dir TEXT NOT NULL UNIQUE,notes TEXT NOT NULL,character_id TEXT,created_at TEXT NOT NULL)')
             db.execute('CREATE TABLE IF NOT EXISTS production_files(id TEXT PRIMARY KEY,production_id TEXT NOT NULL,node_id TEXT NOT NULL,asset_id TEXT,filename TEXT NOT NULL,relative_path TEXT NOT NULL,kind TEXT NOT NULL,created_at TEXT NOT NULL)')
             db.execute('CREATE TABLE IF NOT EXISTS production_links(project_id TEXT PRIMARY KEY,production_id TEXT NOT NULL,node_id TEXT UNIQUE)')
+            if 'variant' not in {r['name'] for r in db.execute('PRAGMA table_info(production_nodes)')}:
+                db.execute('ALTER TABLE production_nodes ADD COLUMN variant INTEGER NOT NULL DEFAULT 0')
 
     @app.get('/api/productions')
     def listing():
