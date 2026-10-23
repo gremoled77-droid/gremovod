@@ -117,6 +117,9 @@ export type ModelSpecLite = {
   launch_enabled?: boolean;
   max_refs?: number;
   api_refs?: number;
+  label?: string;
+  ui_order?: number;
+  family?: string;
   options?: Record<string, {values?: (string | number)[]; default?: string | number}>;
 };
 /** Сколько референсов-картинок принимает модель; null — лимит неизвестен. */

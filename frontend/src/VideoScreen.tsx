@@ -1,6 +1,7 @@
 import {useEffect, useMemo, useState} from 'react';
 import {X} from 'lucide-react';
 import {apiFetch} from './api';
+import {modelLabel, videoModelIds} from './modelCatalog';
 import {useSharedActivity} from './ActivityContext';
 import FrameActions from './FrameActions';
 import CameraFramePanel from './CameraFramePanel';
@@ -13,6 +14,8 @@ type OptionSpec = {values?: (string | number)[]; default?: string | number; min?
 type Spec = {
   kind: string;
   launch_enabled?: boolean;
+  label?: string;
+  ui_order?: number;
   prompt_only?: boolean;
   options?: Record<string, OptionSpec>;
   resolution?: string[];
@@ -33,12 +36,6 @@ type LibAsset = {
   metadata: {kind?: string; favorite?: boolean};
 };
 
-const LABELS: Record<string, string> = {
-  'seedance-2.5': 'Seedance 2.5',
-  'minimax-h3': 'MiniMax H3',
-  'hunyuan-i2v': 'Hunyuan I2V',
-};
-const ORDER = Object.keys(LABELS);
 const PROVIDERS: Record<string, string> = {piapi: 'PiAPI'};
 const MOVE_ONLY = ['move' as const];
 const draftKey = (projectId: string) => `studio:video-draft:v1:${projectId}`;
@@ -137,7 +134,7 @@ function VideoScreenBody({projectId, world = ''}: {projectId: string; world?: st
 
   const byId = useMemo(() => Object.fromEntries(library.map(a => [a.id, a])), [library]);
   const frames = library.filter(a => (a.metadata.kind || 'image') === 'image');
-  const models = ORDER.filter(id => specs[id]?.launch_enabled && specs[id]?.kind === 'video');
+  const models = videoModelIds(specs).filter(id => specs[id]?.launch_enabled);
   const spec = specs[model];
   const schema = optionsOf(spec);
   const value = (key: string) => values[key] ?? schema[key]?.default;
@@ -484,7 +481,7 @@ function VideoScreenBody({projectId, world = ''}: {projectId: string; world?: st
             <select value={model} onChange={e => setModel(e.target.value)}>
               {models.map(id => (
                 <option key={id} value={id}>
-                  {LABELS[id]}
+                  {specs[id].label || id}
                 </option>
               ))}
             </select>
@@ -566,7 +563,7 @@ function VideoScreenBody({projectId, world = ''}: {projectId: string; world?: st
         {pending.map(i => (
           <div key={i.id} className="cs-card cs-spin">
             <div className="cs-spinner" />
-            <small>{LABELS[i.model] || i.model} · в работе…</small>
+            <small>{modelLabel(specs, i.model)} · в работе…</small>
           </div>
         ))}
         {results.flatMap(item =>
@@ -586,7 +583,7 @@ function VideoScreenBody({projectId, world = ''}: {projectId: string; world?: st
                 />
                 <div className="cs-cap">
                   <div>
-                    <b>{LABELS[item.model] || item.model}</b>
+                    <b>{modelLabel(specs, item.model)}</b>
                     <small>{item.status}</small>
                   </div>
                   <div className="cs-row">

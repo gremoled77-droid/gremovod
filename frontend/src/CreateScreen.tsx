@@ -1,5 +1,6 @@
 import {useEffect, useMemo, useRef, useState} from 'react';
 import {apiFetch} from './api';
+import {imageLabels, modelLabel, modelLayout} from './modelCatalog';
 import {loadCreateDraft, saveCreateDraft} from './createDraft';
 import GenerationReview, {type GenerationRequest} from './GenerationReview';
 import {type ActivityItem} from './useActivity';
@@ -30,6 +31,10 @@ type Spec = {
   options?: Record<string, OptionSpec>;
   variants?: Record<string, unknown>;
   api_refs?: number;
+  label?: string;
+  ui_order?: number;
+  family?: string;
+  variant_label?: string;
   provider?: string;
   page_urls?: Record<string, string>;
 };
@@ -43,30 +48,6 @@ type LibAsset = {
 };
 type Hero = {id: string; name: string; assetId?: string};
 
-const LABELS: Record<string, string> = {
-  'seedream-5-pro': 'Seedream 5 Pro',
-  'seedream-5-lite': 'Seedream 5 Lite',
-  'seedream-5-lite-less-restriction': 'Seedream 5 Lite · less restriction',
-  'seedream-5-pro-less-restriction': 'Seedream 5 Pro · less restriction',
-  'gpt-image-2': 'GPT Image 2.0',
-  'gpt-image-2.5': 'GPT Image 2.5',
-  'gpt-image-2.5-ref': 'GPT Image 2.5 + референс',
-  'nano-banana-2.1': 'Nano Banana 2.1',
-  'qwen-image-2.1': 'Qwen Image 2.1',
-};
-/** Модели, у которых в карточке можно выбрать вариант; остальные id из LABELS показываются отдельными боксами. */
-const FAMILIES: Record<string, string[]> = {
-  'seedream-5-pro': ['seedream-5-pro', 'seedream-5-pro-less-restriction'],
-  'seedream-5-lite': ['seedream-5-lite', 'seedream-5-lite-less-restriction'],
-};
-const MEMBERS = new Set(Object.values(FAMILIES).flat());
-const ORDER = Object.keys(LABELS).filter(id => !MEMBERS.has(id) || id in FAMILIES);
-const VARIANT_NAMES: Record<string, string> = {
-  'seedream-5-pro': 'Pro',
-  'seedream-5-pro-less-restriction': 'Pro · less restriction',
-  'seedream-5-lite': 'Lite',
-  'seedream-5-lite-less-restriction': 'Lite · less restriction',
-};
 /** Названия API-сервисов; новый сервис добавляется сюда и в каталог бэкенда (provider, page_urls). */
 const PROVIDERS: Record<string, string> = {piapi: 'PiAPI'};
 
@@ -278,7 +259,9 @@ function CreateScreenBody({
     }
   };
 
-  const models = ORDER.filter(id => specs[id]);
+  const layout = useMemo(() => modelLayout(specs), [specs]);
+  const models = layout.order;
+  const labelMap = useMemo(() => imageLabels(specs), [specs]);
   const optionValue = (model: string, key: string, spec: OptionSpec) =>
     options[model]?.[key] ?? (spec.default as string | number);
   const byId = useMemo(() => Object.fromEntries(library.map(a => [a.id, a])), [library]);
@@ -656,9 +639,7 @@ function CreateScreenBody({
 
   const openResult = (aid: string) => {
     const list = results.flatMap(it =>
-      it.asset_ids
-        .filter(x => byId[x])
-        .map(x => ({id: x, kind: it.kind, title: LABELS[it.model] || it.model}))
+      it.asset_ids.filter(x => byId[x]).map(x => ({id: x, kind: it.kind, title: modelLabel(specs, it.model)}))
     );
     setView({
       entries: list,
@@ -670,7 +651,7 @@ function CreateScreenBody({
   };
 
   const modelCard = (base: string) => {
-    const family = FAMILIES[base];
+    const family = layout.families[base];
     const id = family ? (family.find(m => selected.includes(m)) ?? pick[base] ?? base) : base;
     const on = selected.includes(id);
     const o = specs[id]?.options;
@@ -695,7 +676,7 @@ function CreateScreenBody({
         >
           <span>
             <b>
-              {LABELS[id]}
+              {specs[id].label || id}
               <ModelInfo spec={specs[id]} />
             </b>
             <small>
@@ -714,7 +695,7 @@ function CreateScreenBody({
                 .filter(m => specs[m])
                 .map(m => (
                   <option key={m} value={m}>
-                    {VARIANT_NAMES[m] || m}
+                    {specs[m].variant_label || m}
                     {specs[m].launch_enabled === false ? ' · не проверена' : ''}
                   </option>
                 ))}
@@ -912,7 +893,7 @@ function CreateScreenBody({
           {pending.map(i => (
             <div key={i.id} className="cs-card cs-spin">
               <div className="cs-spinner" />
-              <small>{LABELS[i.model] || i.model} · в работе…</small>
+              <small>{modelLabel(specs, i.model)} · в работе…</small>
             </div>
           ))}
           {results.flatMap(item =>
@@ -935,7 +916,7 @@ function CreateScreenBody({
                   <FrameActions className="cs-result-actions" {...actionsFor(aid, item.kind)} />
                   <div className="cs-cap">
                     <div>
-                      <b>{LABELS[item.model] || item.model}</b>
+                      <b>{modelLabel(specs, item.model)}</b>
                       <small>{item.status}</small>
                     </div>
                     <div className="cs-row">
@@ -1090,7 +1071,7 @@ function CreateScreenBody({
           <b>Модели</b>
         </div>
         {models.map(modelCard)}
-        <PriceTable specs={specs} labels={LABELS} models={Object.keys(LABELS)} />
+        <PriceTable specs={specs} labels={labelMap} models={Object.keys(labelMap)} />
         <div className="cs-note">
           Перед отправкой покажу точную цену и попрошу подтверждение. Ручная попытка в ChatGPT стоит $0 по
           API.

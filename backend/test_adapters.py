@@ -294,3 +294,67 @@ class GptImageEditTests(unittest.TestCase):
             preview('gpt-image-2.5', reference_urls=[REF])
         payload, cost = preview('gpt-image-2.5')
         self.assertEqual((payload['task_type'], cost), ('gpt-image-generation', 0.010))
+
+
+class CatalogLabelsTests(unittest.TestCase):
+    """Названия и порядок карточек моделей приходят из каталога: во фронтенде своих словарей нет."""
+    SHOWN = ('seedream-5-pro', 'seedream-5-lite', 'seedream-5-lite-less-restriction',
+             'seedream-5-pro-less-restriction', 'gpt-image-2', 'gpt-image-2.5', 'gpt-image-2.5-ref',
+             'nano-banana-2.1', 'nano-banana-2', 'qwen-image-2.1', 'seedance-2.5', 'minimax-h3', 'hunyuan-i2v')
+
+    def test_every_model_the_screens_show_has_a_label_and_a_unique_order(self):
+        orders = []
+        for model in self.SHOWN:
+            spec = main.MODEL_SPECS[model]
+            self.assertTrue(spec.get('label'), model)
+            orders.append(spec['ui_order'])
+        self.assertEqual(orders, sorted(set(orders)))
+
+    def test_family_members_name_their_base_and_carry_a_variant_label(self):
+        for member, base in (('seedream-5-lite-less-restriction', 'seedream-5-lite'),
+                             ('seedream-5-pro-less-restriction', 'seedream-5-pro')):
+            self.assertEqual(main.MODEL_SPECS[member]['family'], base)
+            self.assertTrue(main.MODEL_SPECS[member]['variant_label'])
+            self.assertTrue(main.MODEL_SPECS[base]['variant_label'])
+            self.assertNotIn('family', main.MODEL_SPECS[base])
+
+    def test_the_model_specs_endpoint_exposes_labels(self):
+        specs = main.model_specs()
+        self.assertEqual(specs['gpt-image-2.5-ref']['label'], 'GPT Image 2.5 + референс')
+
+
+class NanoBananaParametersTests(unittest.TestCase):
+    """Параметры Nano Banana по странице PiAPI (docs/gemini-api/nano-banana-2, прочитана 23.10.2026)."""
+    RATIOS = ['1:1', '16:9', '9:16', '4:3', '3:4', '21:9', '3:2', '2:3', '5:4', '4:5', '1:4', '1:8', '4:1', '8:1']
+
+    def test_every_aspect_ratio_of_the_provider_is_offered(self):
+        schema = main.MODEL_SPECS['nano-banana-2.1']['options']['aspect_ratio']
+        self.assertEqual(sorted(schema['values']), sorted(self.RATIOS))
+        for ratio in self.RATIOS:
+            payload, _ = preview('nano-banana-2.1', options={'aspect_ratio': ratio})
+            self.assertEqual(payload['input']['aspect_ratio'], ratio)
+        with self.assertRaises(HTTPException):
+            preview('nano-banana-2.1', options={'aspect_ratio': '7:5'})
+
+    def test_up_to_fourteen_references_are_accepted(self):
+        payload, _ = preview('nano-banana-2.1', reference_urls=[REF] * 14)
+        self.assertEqual(len(payload['input']['image_urls']), 14)
+        with self.assertRaises(HTTPException):
+            preview('nano-banana-2.1', reference_urls=[REF] * 15)
+
+    def test_the_price_depends_on_resolution_and_not_on_aspect_ratio(self):
+        for resolution, price in (('1K', 0.03), ('2K', 0.04), ('4K', 0.09)):
+            _, cost = preview('nano-banana-2.1', options={'resolution': resolution, 'aspect_ratio': '21:9'})
+            self.assertEqual(cost, price)
+
+    def test_nano_banana_2_is_an_unverified_variant_with_its_own_prices(self):
+        spec = main.MODEL_SPECS['nano-banana-2']
+        self.assertEqual((spec['family'], spec['task_type'], spec['label']),
+                         ('nano-banana-2.1', 'nano-banana-2', 'Nano Banana 2'))
+        self.assertFalse(spec['launch_enabled'])
+        self.assertNotIn('verified_at', spec)
+        for resolution, price in (('1K', 0.06), ('2K', 0.08), ('4K', 0.12)):
+            _, cost = preview('nano-banana-2', options={'resolution': resolution})
+            self.assertEqual(cost, price)
+        with self.assertRaises(HTTPException):
+            main.image_payload(job('nano-banana-2'))  # запуск выключен до живой проверки

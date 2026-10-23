@@ -2,22 +2,12 @@ import {useEffect, useRef, useState} from 'react';
 import {apiFetch} from './api';
 import {type ActivityItem} from './useActivity';
 import {useSharedActivity} from './ActivityContext';
+import {modelLabel, useModelCatalog} from './modelCatalog';
 
 /** Интервалы опроса провайдера, мс. Потом подберём под конкретные модели через MODEL_POLL_MS. */
 export const POLL_MS = {image: 5000, video: 15000};
 export const MODEL_POLL_MS: Record<string, number> = {};
 
-const LABELS: Record<string, string> = {
-  'seedream-5-pro': 'Seedream 5 Pro',
-  'seedream-5-lite': 'Seedream 5 Lite',
-  'gpt-image-2': 'GPT Image 2.0',
-  'gpt-image-2.5': 'GPT Image 2.5',
-  'gpt-image-2.5-ref': 'GPT Image 2.5 + референс',
-  'nano-banana-2.1': 'Nano Banana 2.1',
-  'qwen-image-2.1': 'Qwen Image 2.1',
-  'seedance-2.5': 'Seedance 2.5',
-  'minimax-h3': 'MiniMax H3',
-};
 const ACTIVE = new Set(['queued', 'running', 'saving']);
 const pollEvery = (item: ActivityItem) =>
   MODEL_POLL_MS[item.model] ?? (item.kind === 'video' ? POLL_MS.video : POLL_MS.image);
@@ -27,6 +17,9 @@ type Toast = {key: string; kind: 'ok' | 'bad'; title: string; text: string};
 /** Невидимый наблюдатель: опрашивает API по активным заданиям и показывает пузырьки о готовности. */
 export default function GenerationWatcher({projectId, onOpen}: {projectId: string; onOpen: () => void}) {
   const {items, reset} = useSharedActivity();
+  const catalog = useModelCatalog();
+  const catalogRef = useRef(catalog);
+  catalogRef.current = catalog;
   const [toasts, setToasts] = useState<Toast[]>([]);
   const previous = useRef<Record<string, string> | null>(null);
   const lastPoll = useRef<Record<string, number>>({});
@@ -61,7 +54,7 @@ export default function GenerationWatcher({projectId, onOpen}: {projectId: strin
       for (const item of items) {
         const before = previous.current[item.id];
         if (!before || !ACTIVE.has(before) || ACTIVE.has(item.status)) continue;
-        const name = LABELS[item.model] || item.model;
+        const name = modelLabel(catalogRef.current, item.model);
         if (item.status === 'done')
           fresh.push({key: item.id, kind: 'ok', title: `${name}: готово`, text: item.prompt.slice(0, 60)});
         else if (item.status === 'failed' || item.status === 'attention')
