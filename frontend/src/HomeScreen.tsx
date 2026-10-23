@@ -1,8 +1,9 @@
 import {useEffect, useState} from 'react';
 import {apiFetch} from './api';
 import {useSharedActivity} from './ActivityContext';
-import type {Mode} from './StageNav';
+import {STAGES, type Mode} from './StageNav';
 import Lightbox from './Lightbox';
+import {KIND_LABELS, modelLabel} from './modelLabels';
 import {loadCreateDraft, saveCreateDraft} from './createDraft';
 
 type Budget = {
@@ -25,17 +26,6 @@ const REELS: {id: Reel; label: string}[] = [
   {id: 'video', label: 'Видео'},
   {id: 'image', label: 'Кадры'},
   {id: 'audio', label: 'Звук'},
-];
-
-const STEPS: {mode: Mode; n: string; title: string; text: string}[] = [
-  {mode: 'studio', n: '1', title: 'Идея', text: 'Задание ролика, шутка, сюжет'},
-  {mode: 'styles', n: '2', title: 'Мир', text: 'Стиль, герои, локации'},
-  {mode: 'storyboard', n: '3', title: 'Раскадровка', text: 'Сцены и кадры эпизода'},
-  {mode: 'create', n: '4', title: 'Кадры', text: 'Картинки от нескольких моделей'},
-  {mode: 'video', n: '5', title: 'Видео', text: 'Оживить кадры'},
-  {mode: 'audio', n: '6', title: 'Звук', text: 'Голос и музыка'},
-  {mode: 'files', n: '7', title: 'Монтаж', text: 'Выгрузка в CapCut по порядку кадров'},
-  {mode: 'economics', n: '8', title: 'Выпуск', text: 'Бюджет серии и итоги'},
 ];
 
 const money = (v: number | undefined) => '$' + (v ?? 0).toFixed(2);
@@ -167,10 +157,9 @@ export default function HomeScreen({
 
   const videos = items.filter(i => i.kind === 'video' && i.asset_ids.length).length;
   const stageMeta: Record<string, string> = {
-    '4': images.length ? `${images.length}+ картинок` : '',
-    '5': videos ? `${videos} клипов` : '',
+    frames: images.length ? `${images.length}+ картинок` : '',
+    video: videos ? `${videos} клипов` : '',
   };
-  const nextN = next.mode === 'create' ? '4' : '1';
   const Gauge = ({label, used, limit}: {label: string; used?: number; limit?: number}) => {
     const p = limit ? Math.min(1, (used ?? 0) / limit) : 0;
     const R = 34;
@@ -212,7 +201,8 @@ export default function HomeScreen({
             <h1>{projectName || 'Новый проект'}</h1>
             <div className="home-meta">
               <span>
-                <small>ЭТАПОВ</small>8
+                <small>ЭТАПОВ</small>
+                {STAGES.length}
               </span>
               <span>
                 <small>КАДРОВ</small>
@@ -239,7 +229,7 @@ export default function HomeScreen({
           </div>
         </div>
         <button className="home-cta" onClick={() => onMode(next.mode)}>
-          <span className="home-cta-k">NEXT TAKE</span>
+          <span className="home-cta-k">СЛЕДУЮЩИЙ ШАГ</span>
           <span className="home-cta-t">{next.text}</span>
           <span className="home-cta-a" aria-hidden="true">
             →
@@ -332,14 +322,14 @@ export default function HomeScreen({
             <i /> Конвейер ролика
           </h2>
           <ol className="home-track">
-            {STEPS.map(s => (
-              <li key={s.n + s.title} className={s.n === nextN ? 'now' : ''}>
+            {STAGES.map(s => (
+              <li key={s.key} className={s.mode === next.mode ? 'now' : ''}>
                 <button onClick={() => onMode(s.mode)}>
-                  <span className="home-n">{s.n}</span>
+                  <span className="home-n">{s.icon}</span>
                   <span className="home-st">
-                    <b>{s.title}</b>
+                    <b>{s.label}</b>
                     <small>{s.text}</small>
-                    {stageMeta[s.n] && <em>{stageMeta[s.n]}</em>}
+                    {stageMeta[s.key] && <em>{stageMeta[s.key]}</em>}
                   </span>
                 </button>
               </li>
@@ -360,8 +350,8 @@ export default function HomeScreen({
                     className={'dot ' + (i.status === 'failed' ? 'bad' : waiting.includes(i) ? 'warn' : '')}
                   />
                   <span className="home-job-text">
-                    <b>{i.model || i.provider}</b>
-                    <small>{i.prompt.slice(0, 48)}</small>
+                    <b>{modelLabel(i.model) || i.provider}</b>
+                    <small title={i.prompt}>{KIND_LABELS[i.kind] || i.kind}</small>
                   </span>
                   <em>{STATUS[i.status] || i.status}</em>
                 </div>

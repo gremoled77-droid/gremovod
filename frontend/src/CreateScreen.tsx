@@ -15,6 +15,7 @@ import {
 } from './replaceCharacterPrompt';
 import {AddReferenceModal, LocationModal} from './FrameSources';
 import CameraFramePanel from './CameraFramePanel';
+import {LABELS} from './modelLabels';
 import PriceTable, {cents, useModelRange, useOptionPrices} from './PriceTable';
 
 type OptionSpec = {
@@ -43,16 +44,6 @@ type LibAsset = {
 };
 type Hero = {id: string; name: string; assetId?: string};
 
-const LABELS: Record<string, string> = {
-  'seedream-5-pro': 'Seedream 5 Pro',
-  'seedream-5-lite': 'Seedream 5 Lite',
-  'seedream-5-lite-less-restriction': 'Seedream 5 Lite · less restriction',
-  'seedream-5-pro-less-restriction': 'Seedream 5 Pro · less restriction',
-  'gpt-image-2': 'GPT Image 2.0',
-  'gpt-image-2.5': 'GPT Image 2.5',
-  'nano-banana-2.1': 'Nano Banana 2.1',
-  'qwen-image-2.1': 'Qwen Image 2.1',
-};
 /** Модели, у которых в карточке можно выбрать вариант; остальные id из LABELS показываются отдельными боксами. */
 const FAMILIES: Record<string, string[]> = {
   'seedream-5-pro': ['seedream-5-pro', 'seedream-5-pro-less-restriction'],
@@ -225,6 +216,22 @@ function CreateScreenBody({
     draftTaskId: '',
   });
   const [tab, setTab] = useState<'results' | 'favorites' | 'temp'>('results');
+  const [manualOpen, setManualOpen] = useState(false);
+  const manualRef = useRef<HTMLDivElement>(null);
+  // Меню «Через ChatGPT» закрывается кликом вне его и по Esc.
+  useEffect(() => {
+    if (!manualOpen) return;
+    const close = (e: Event) => {
+      if (e instanceof KeyboardEvent ? e.key === 'Escape' : !manualRef.current?.contains(e.target as Node))
+        setManualOpen(false);
+    };
+    document.addEventListener('mousedown', close);
+    document.addEventListener('keydown', close);
+    return () => {
+      document.removeEventListener('mousedown', close);
+      document.removeEventListener('keydown', close);
+    };
+  }, [manualOpen]);
   const [temp, setTemp] = useState<TempItem[]>([]);
   const [wouldRemove, setWouldRemove] = useState<string[] | null>(null);
 
@@ -950,37 +957,45 @@ function CreateScreenBody({
                       <button onClick={() => regenerate(item)} title="Подставить промпт и модель">
                         ↻
                       </button>
-                      {item.kind === 'image' && (
-                        <select
-                          value=""
-                          title="Подставить героя вместо персонажа в этом кадре (кадр и герой станут референсами)"
-                          onChange={e => e.target.value && replaceHero(aid, e.target.value)}
-                        >
-                          <option value="">Заменить героя ▾</option>
-                          {heroes.map(h => (
-                            <option key={h.id} value={h.id} disabled={!h.assetId}>
-                              {h.name}
-                              {h.assetId ? '' : ' (нет образа)'}
-                            </option>
-                          ))}
-                        </select>
-                      )}
-                      {item.kind === 'video' && (
-                        <button
-                          title="Скопировать промпт замены героя в видео (Kling 3.0 Omni: исходное видео и картинка героя)"
-                          onClick={() => void copyPrompt(buildReplaceInVideoPrompt())}
-                        >
-                          Промпт замены героя
-                        </button>
-                      )}
-                      <select value="" onChange={e => e.target.value && toHero(aid, e.target.value)}>
-                        <option value="">В героя ▾</option>
-                        {heroes.map(h => (
-                          <option key={h.id} value={h.id}>
-                            {h.name}
-                          </option>
-                        ))}
-                      </select>
+                      <details className="cs-more">
+                        <summary aria-label="Ещё действия" title="Ещё действия">
+                          ⋯
+                        </summary>
+                        <div className="cs-row">
+                          {item.kind === 'image' && heroes.some(h => h.assetId) && (
+                            <select
+                              value=""
+                              title="Подставить героя вместо персонажа в этом кадре (кадр и герой станут референсами)"
+                              onChange={e => e.target.value && replaceHero(aid, e.target.value)}
+                            >
+                              <option value="">Заменить героя ▾</option>
+                              {heroes
+                                .filter(h => h.assetId)
+                                .map(h => (
+                                  <option key={h.id} value={h.id}>
+                                    {h.name}
+                                  </option>
+                                ))}
+                            </select>
+                          )}
+                          {item.kind === 'video' && (
+                            <button
+                              title="Скопировать промпт замены героя в видео (Kling 3.0 Omni: исходное видео и картинка героя)"
+                              onClick={() => void copyPrompt(buildReplaceInVideoPrompt())}
+                            >
+                              Промпт замены героя
+                            </button>
+                          )}
+                          <select value="" onChange={e => e.target.value && toHero(aid, e.target.value)}>
+                            <option value="">В героя ▾</option>
+                            {heroes.map(h => (
+                              <option key={h.id} value={h.id}>
+                                {h.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </details>
                     </div>
                   </div>
                 </div>
@@ -1068,15 +1083,27 @@ function CreateScreenBody({
               {refs.length} реф. · {total} {total === 1 ? 'модель' : 'моделей'}
             </span>
             <span className="cs-spacer" />
-            <button disabled={!projectId} onClick={() => void external()}>
-              Скопировать для ChatGPT
-            </button>
-            <button className="cs-send-codex" disabled={!projectId} onClick={() => void toCodex()}>
-              Отправить в Codex
-            </button>
-            <button className="cs-send-chat" disabled={!projectId} onClick={() => void external(true)}>
-              Отправить в ChatGPT
-            </button>
+            <div className={'cs-manual' + (manualOpen ? ' open' : '')} ref={manualRef}>
+              <button
+                type="button"
+                className="cs-manual-toggle"
+                aria-expanded={manualOpen}
+                onClick={() => setManualOpen(v => !v)}
+              >
+                Через ChatGPT ▾
+              </button>
+              <div className="cs-manual-menu" onClick={() => setManualOpen(false)}>
+                <button disabled={!projectId} onClick={() => void external()}>
+                  Скопировать для ChatGPT
+                </button>
+                <button className="cs-send-codex" disabled={!projectId} onClick={() => void toCodex()}>
+                  Отправить в Codex
+                </button>
+                <button className="cs-send-chat" disabled={!projectId} onClick={() => void external(true)}>
+                  Отправить в ChatGPT
+                </button>
+              </div>
+            </div>
             <button className="primary" disabled={busy || !projectId} onClick={start}>
               {busy ? 'Готовлю…' : 'Сгенерировать'}
             </button>

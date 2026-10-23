@@ -142,6 +142,7 @@
   grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
   gap: 12px;
   align-content: start;
+  grid-auto-rows: max-content;
 }
 .cs-card {
   position: relative;
@@ -155,6 +156,7 @@
 }
 .cs-result img,
 .cs-result video {
+  flex: none;
   width: 100%;
   display: block;
   object-fit: cover;
@@ -995,4 +997,56 @@ a.cs-info:hover {
 .fs-modal textarea {
   width: 100%;
   box-sizing: border-box;
+}
+
+/* Ручной маршрут одним меню: на десктопе выпадает вверх, на телефоне кнопки остаются на виду */
+.cs-manual {
+  position: relative;
+}
+.cs-manual-menu {
+  display: none;
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 6px);
+  z-index: 5;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 220px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface-2);
+  box-shadow: 0 14px 30px -12px #000;
+}
+.cs-manual.open .cs-manual-menu {
+  display: flex;
+}
+@media (max-width: 700px) {
+  .cs-manual,
+  .cs-manual-menu {
+    display: contents;
+  }
+  .cs-manual-toggle {
+    display: none;
+  }
+}
+
+/* «⋯» на карточке результата: вторичные действия раскрываются внутри карточки */
+.cs-more > summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 5px 10px;
+  font-size: 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  color: var(--muted);
+}
+.cs-more > summary::-webkit-details-marker {
+  display: none;
+}
+.cs-more[open] {
+  flex-basis: 100%;
+}
+.cs-more[open] > .cs-row {
+  margin-top: 6px;
 }

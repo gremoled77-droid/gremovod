@@ -2225,7 +2225,6 @@ function App() {
                 </Suspense>
               )}
               <StageFooter mode={mode} onMode={setMode} />
-              <footer>Workflow Studio · ChatGPT · сцены · экономика ролика</footer>
             </div>
           </main>
         )}
