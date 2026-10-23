@@ -103,7 +103,6 @@ export default function CharactersScreen({
     <section className="chars">
       {tabs}
       <div className="panel">
-        <h2>Персонажи</h2>
         <p className="muted">
           Герои проекта. Описание, референсы, голос и версии правятся справа, в Character Vault.
         </p>

@@ -1008,7 +1008,6 @@ export default function WorkflowPanel({
       <section className="wf">
         <aside className="wf-console">
           <div className="wf-console-head">
-            <h2>Воркфлоу</h2>
             <p>Собери цепочку: текст и картинки подаются в узлы «Изображение» и «Видео».</p>
           </div>
           <input

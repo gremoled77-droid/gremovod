@@ -39,9 +39,6 @@ export default function SoundScreen({projectId, audioLab}: {projectId: string; a
   };
   return (
     <section className="panel snd">
-      <div className="panel-title">
-        <h2>Звук</h2>
-      </div>
       <div className="chips" role="tablist" aria-label="Разделы звука">
         {TABS.map(t => (
           <button
