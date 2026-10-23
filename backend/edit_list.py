@@ -71,11 +71,16 @@ def build(studio, pid, sid):
                 files = {k: db.execute("SELECT * FROM production_files WHERE node_id=? AND kind=? ORDER BY created_at DESC,id DESC", (frame['id'], k)).fetchall() for k in ('image', 'video')}
 
                 def pick(kind, chosen):
+                    # main = выбран владельцем; candidate = выбора нет (или он устарел), взят последний дубль.
                     items = files[kind]
-                    return next((dict(f) for f in items if f['id'] == chosen), dict(items[0]) if items else None)
+                    main = next((dict(f) for f in items if f['id'] == chosen), None)
+                    if main:
+                        return main, 'main'
+                    return (dict(items[0]), 'candidate') if items else (None, 'none')
                 plan = visual_plan.clean(visual_plan.stored(db, 'visual_plans', frame['id']))
-                rows.append({'scene': scene, 'frame': frame, 'image': pick('image', selection['selected_image_file_id']),
-                             'video': pick('video', selection['selected_video_file_id']), 'plan': plan})
+                (image, image_choice), (video, video_choice) = pick('image', selection['selected_image_file_id']), pick('video', selection['selected_video_file_id'])
+                rows.append({'scene': scene, 'frame': frame, 'image': image, 'video': video, 'image_choice': image_choice,
+                             'video_choice': video_choice, 'plan': plan})
     analyses = []
     for row in rows:
         result = None
@@ -109,6 +114,7 @@ def build(studio, pid, sid):
             'video': video['relative_path'] if video else '', 'image': row['image']['relative_path'] if row['image'] else '',
             'duration': seconds, 'sector_start': plan['sector_start'], 'sector_end': plan['sector_end'], 'sector_cut': jump,
             'image_cut': cut, 'space': plan['space'], 'line': plan['line'], 'story': plan['story'], 'visual': plan['visual'], 'note': plan['note'],
+            'image_choice': row['image_choice'], 'video_choice': row['video_choice'],
         })
     timed = [r['duration'] for r in out if r['duration']]
     warnings = []
@@ -117,18 +123,23 @@ def build(studio, pid, sid):
             warnings.append(f"Кадр {r['scene']}.{r['frame']} длится {r['duration']} с: монтажный ритм на таком кадре не ощущается; оставь, если это осознанный длинный план.")
         if not r['video']:
             warnings.append(f"У кадра {r['scene']}.{r['frame']} нет видео: в монтаже будет пропуск.")
+        elif r['video_choice'] == 'candidate':
+            warnings.append(f"У кадра {r['scene']}.{r['frame']} видео не утверждено: взят последний дубль (предварительно). Выбери главное видео на доске.")
     for i in range(len(out) - 2):
         trio = out[i:i + 3]
         if trio[0]['space'] and all(t['space'] == trio[0]['space'] and t['line'] == trio[0]['line'] for t in trio):
             warnings.append(f"Кадры {trio[0]['scene']}.{trio[0]['frame']}–{trio[2]['scene']}.{trio[2]['frame']} повторяют пространство и линию без роста напряжения.")
-    summary = {'shots': len(out), 'with_video': sum(1 for r in out if r['video']), 'cuts': max(0, len(out) - 1),
+    approved = sum(1 for r in out if r['video_choice'] == 'main')
+    summary = {'shots': len(out), 'with_video': sum(1 for r in out if r['video']), 'approved_videos': approved,
+               'ready': bool(out) and approved == len(out), 'cuts': max(0, len(out) - 1),
                'total_seconds': round(sum(timed), 2) if timed else None,
                'average_seconds': round(sum(timed) / len(timed), 2) if timed else None,
                'cuts_per_minute': round((len(timed) - 1) / (sum(timed) / 60), 1) if len(timed) > 1 and sum(timed) else None}
     return {'summary': summary, 'warnings': warnings, 'rows': out}
 
 
-HEADER = ['№', 'Сцена', 'Кадр', 'Название', 'Видео', 'Картинка', 'Длительность, с', 'Сектор начало', 'Сектор конец', 'Склейка по сектору',
+CHOICE = {'main': 'главное', 'candidate': 'предварительно', 'none': ''}
+HEADER = ['№', 'Сцена', 'Кадр', 'Название', 'Видео', 'Выбор видео', 'Картинка', 'Длительность, с', 'Сектор начало', 'Сектор конец', 'Склейка по сектору',
           'Склейка по картинке', 'Пространство', 'Линия', 'Сюжет 0-10', 'Картинка 0-10', 'Заметка']
 
 
@@ -137,7 +148,7 @@ def to_csv(data):
     writer = csv.writer(stream, delimiter=';')
     writer.writerow(HEADER)
     for r in data['rows']:
-        writer.writerow([r['order'], r['scene'], r['frame'], r['title'], r['video'], r['image'], r['duration'] if r['duration'] is not None else '',
+        writer.writerow([r['order'], r['scene'], r['frame'], r['title'], r['video'], CHOICE[r['video_choice']], r['image'], r['duration'] if r['duration'] is not None else '',
                          r['sector_start'] or '', r['sector_end'] or '', r['sector_cut'] or '', r['image_cut']['label'] if r['image_cut'] else '',
                          r['space'], r['line'], '' if r['story'] is None else r['story'], '' if r['visual'] is None else r['visual'], r['note']])
     return '﻿' + stream.getvalue()

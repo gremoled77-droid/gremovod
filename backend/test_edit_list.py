@@ -62,6 +62,34 @@ class EditListTests(unittest.TestCase):
         self.assertEqual(self.client.get(url, params={'format': 'xml'}).status_code, 400)
         self.assertEqual(self.client.get(f'/api/productions/{self.pid}/series/{scene["id"]}/edit-list').status_code, 404)
 
+    def test_new_candidate_does_not_replace_main_video(self):
+        series, scene, frames = self.build()
+        url = f'/api/productions/{self.pid}/series/{series["id"]}/edit-list'
+        upload = lambda name: self.client.post(f'/api/productions/{self.pid}/nodes/{frames[0]["id"]}/upload', data={'category': '03_Видео'},
+                                               files={'file': (name, b'not-a-real-video', 'video/mp4')})
+        data = self.client.get(url).json()
+        self.assertEqual(data['rows'][0]['video_choice'], 'candidate')
+        self.assertEqual(data['rows'][1]['video_choice'], 'none')
+        self.assertTrue(any('1.1' in w and 'предварительно' in w for w in data['warnings']))
+        self.assertEqual((data['summary']['approved_videos'], data['summary']['ready']), (0, False))
+        self.assertIn('предварительно', self.client.get(url, params={'format': 'csv'}).text)
+        # Без выбора новый файл подменяет прежний, но лист честно помечает его как предварительный.
+        upload('second.mp4')
+        data = self.client.get(url).json()
+        self.assertTrue(data['rows'][0]['video'].endswith('second.mp4'))
+        self.assertEqual(data['rows'][0]['video_choice'], 'candidate')
+        editor = self.client.get(f'/api/productions/{self.pid}/nodes/{frames[0]["id"]}/editor').json()
+        clip = next(f for f in editor['files'] if f['filename'] == 'clip.mp4')
+        saved = self.client.put(f'/api/productions/{self.pid}/nodes/{frames[0]["id"]}/editor',
+                                json={**editor['data'], 'base_revision': editor['revision'], 'notes': editor['node']['notes'], 'selected_video_file_id': clip['id']})
+        self.assertEqual(saved.status_code, 200, saved.text)
+        upload('new-unapproved.mp4')
+        data = self.client.get(url).json()
+        self.assertTrue(data['rows'][0]['video'].endswith('clip.mp4'))
+        self.assertEqual(data['rows'][0]['video_choice'], 'main')
+        self.assertEqual(data['summary']['approved_videos'], 1)
+        self.assertFalse(any('1.1' in w and 'предварительно' in w for w in data['warnings']))
+
     def test_vertical_prompt_and_project_rules(self):
         series, scene, frames = self.build()
         self.client.put(f'/api/productions/{self.pid}/nodes/{series["id"]}/visual-rules', json={'palette': 'ochre and teal'})

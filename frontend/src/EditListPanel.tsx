@@ -18,6 +18,8 @@ type EditList = {
   summary: {
     shots: number;
     with_video: number;
+    approved_videos: number;
+    ready: boolean;
     cuts: number;
     total_seconds: number | null;
     average_seconds: number | null;
@@ -93,6 +95,11 @@ export default function EditListPanel({pid, sid}: {pid: string; sid: string}) {
             {data.summary.total_seconds !== null && `, хронометраж ${data.summary.total_seconds} с`}
             {data.summary.average_seconds !== null && `, средний кадр ${data.summary.average_seconds} с`}
             {data.summary.cuts_per_minute !== null && `, ${data.summary.cuts_per_minute} склеек в минуту`}
+          </p>
+          <p className={data.summary.ready ? 'vp-legend' : 'vp-warn'} role="status">
+            {data.summary.ready
+              ? `Готово к выгрузке: у всех ${data.summary.shots} кадров выбрано главное видео.`
+              : `Готово к выгрузке: ${data.summary.approved_videos} из ${data.summary.shots}. Остальные кадры пойдут без видео или с предварительным дублем.`}
           </p>
           {data.warnings.map(w => (
             <p key={w} className="vp-warn" role="status">
