@@ -742,3 +742,7 @@ main.storyboard-main {
   font-size: 12px;
   line-height: 1;
 }
+
+.snd-filter {
+  justify-content: flex-end;
+}

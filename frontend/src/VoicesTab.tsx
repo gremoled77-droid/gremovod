@@ -13,6 +13,13 @@ import {
 } from './soundApi';
 import {voiceIdOk} from './soundCues';
 
+const MODEL_LABEL: Record<string, string> = {
+  eleven_v4: 'Eleven v4',
+  eleven_v3: 'Eleven v3',
+  eleven_multilingual_v2: 'Eleven v2',
+  's2.1-pro': 'Fish s2.1',
+  's2.1-pro-free': 'Fish free',
+};
 const PLACEHOLDER: Record<Provider, string> = {
   elevenlabs: 'Например: Xb7hH8MSUJpSbSDYk0k2',
   fish: 'Например: 8c2a1f0b3e4d4b8a9c7d6e5f4a3b2c1d',
@@ -177,18 +184,14 @@ export default function VoicesTab({
     }
   };
   const [adding, setAdding] = useState(false),
-    [filter, setFilter] = useState<Provider | ''>('');
-  const shown = voices.filter(v => !filter || v.provider === filter);
+    [filter, setFilter] = useState('');
+  const order = (['elevenlabs', 'fish'] as const).flatMap(p => MODELS[p]);
+  const present = order.filter(m => voices.some(v => v.model === m));
+  const shown = voices.filter(v => !filter || v.model === filter);
   return (
     <div className="snd-voices">
-      <div className="chips" aria-label="Сервис голоса">
-        {(
-          [
-            ['', 'Все'],
-            ['elevenlabs', 'ElevenLabs'],
-            ['fish', 'Fish Audio'],
-          ] as const
-        ).map(([id, label]) => (
+      <div className="chips snd-filter" aria-label="Фильтр по модели">
+        {[['', 'Все'], ...present.map(m => [m, MODEL_LABEL[m] || m])].map(([id, label]) => (
           <button
             key={id}
             className={filter === id ? 'primary' : ''}
