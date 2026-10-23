@@ -78,12 +78,15 @@ export default function ProductionStoryboard({
   focus = '',
   onFocus,
   onOpenSound,
+  onOpenStudio,
 }: {
   location?: WorkspaceLocation | null;
   /** Кадр в фокусе (из адреса) и смена фокуса. */
   focus?: string;
   onFocus: (frameId: string) => void;
   onOpenSound?: () => void;
+  /** «В студию» из инспектора: открыть «Кадры» для кадра в фокусе, не переключая проект приложения. */
+  onOpenStudio?: () => void;
   outlineContext?: OutlineContext;
   onInspect: (productionId: string, nodeId: string) => void;
   onOpenProject: (id: string) => void;
@@ -135,6 +138,15 @@ export default function ProductionStoryboard({
     }
     return null;
   })();
+  // Кадр из адреса открывает свою серию один раз; дальше серию можно переключать вручную.
+  const shownFocus = useRef('');
+  useEffect(() => {
+    if (!focus || shownFocus.current === focus) return;
+    const scene = nodes.find(n => n.id === nodes.find(n => n.id === focus && n.kind === 'frame')?.parent_id);
+    if (!scene?.parent_id) return;
+    shownFocus.current = focus;
+    setSid(scene.parent_id);
+  }, [focus, nodes]);
   const [estimating, setEstimating] = useState(false);
   const estimateEmpty = async () => {
     if (!board) return;
@@ -928,7 +940,7 @@ export default function ProductionStoryboard({
                 busy={busy}
                 onPatch={(patch, message) => savePatch(focused.frame.id, patch, message)}
                 onAnimate={() => animateFrame(focused.frame, focused.scene)}
-                onStudio={() => openFrame(focused.frame)}
+                onStudio={onOpenStudio || (() => openFrame(focused.frame))}
                 onFiles={() => inspect(focused.frame.id)}
                 onSound={onOpenSound}
                 onClose={() => onFocus('')}

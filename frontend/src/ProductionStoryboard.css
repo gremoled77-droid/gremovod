@@ -702,3 +702,31 @@ main.storyboard-main {
     border-radius: 16px 16px 0 0;
   }
 }
+
+/* Полоса «Кадр в работе» над «Кадрами», «Видео» и «Звуком». */
+.frame-context {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 12px;
+  padding: 8px 12px;
+  border: 1px solid var(--accent);
+  border-radius: 12px;
+  background: var(--surface);
+  font-size: 13px;
+}
+.frame-context > span:first-child {
+  margin-right: auto;
+}
+.frame-context small {
+  color: var(--muted);
+}
+.frame-context button {
+  padding: 4px 10px;
+  font-size: 12px;
+}
+.snd-frame.focused {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}

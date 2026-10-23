@@ -31,14 +31,17 @@ const json = (method: string, body: unknown) => ({
 });
 
 /** Общий проект, герои, библиотека голосов и звук по кадрам первой (или запомненной) серии. */
-export async function loadSound(projectId: string): Promise<SoundContext | null> {
+export async function loadSound(projectId: string, seriesId = ''): Promise<SoundContext | null> {
   const pid = await findProduction(projectId);
   if (!pid) return null;
   const tree = await responseJson(await apiFetch('/api/productions/' + pid));
   const stored = readLocal<{pid: string; sid: string}>('studio:board-location', {pid: '', sid: ''});
   const series = tree.nodes.filter((n: {kind: string}) => n.kind === 'series');
   const sid: string =
-    series.find((n: {id: string}) => stored.pid === pid && n.id === stored.sid)?.id || series[0]?.id || '';
+    series.find((n: {id: string}) => n.id === seriesId)?.id ||
+    series.find((n: {id: string}) => stored.pid === pid && n.id === stored.sid)?.id ||
+    series[0]?.id ||
+    '';
   const [voices, frames] = await Promise.all([
     responseJson(await apiFetch(`/api/productions/${pid}/voices`)),
     sid ? responseJson(await apiFetch(`/api/productions/${pid}/series/${sid}/sound`)) : Promise.resolve([]),

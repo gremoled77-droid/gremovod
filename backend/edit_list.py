@@ -57,6 +57,15 @@ def label(value):
     return 'гладкая' if value < 0.25 else ('заметная' if value < 0.5 else 'резкая')
 
 
+def choose(items, chosen):
+    """main = выбран владельцем; candidate = выбора нет (или он устарел), взят последний дубль; none = файлов нет.
+    items упорядочены от новых к старым."""
+    main = next((dict(f) for f in items if f['id'] == chosen), None)
+    if main:
+        return main, 'main'
+    return (dict(items[0]), 'candidate') if items else (None, 'none')
+
+
 def build(studio, pid, sid):
     from backend.production_entities import state
     with studio.connect() as db:
@@ -70,15 +79,8 @@ def build(studio, pid, sid):
                 _, selection, _ = state(db, pid, frame['id'])
                 files = {k: db.execute("SELECT * FROM production_files WHERE node_id=? AND kind=? ORDER BY created_at DESC,id DESC", (frame['id'], k)).fetchall() for k in ('image', 'video')}
 
-                def pick(kind, chosen):
-                    # main = выбран владельцем; candidate = выбора нет (или он устарел), взят последний дубль.
-                    items = files[kind]
-                    main = next((dict(f) for f in items if f['id'] == chosen), None)
-                    if main:
-                        return main, 'main'
-                    return (dict(items[0]), 'candidate') if items else (None, 'none')
                 plan = visual_plan.clean(visual_plan.stored(db, 'visual_plans', frame['id']))
-                (image, image_choice), (video, video_choice) = pick('image', selection['selected_image_file_id']), pick('video', selection['selected_video_file_id'])
+                (image, image_choice), (video, video_choice) = choose(files['image'], selection['selected_image_file_id']), choose(files['video'], selection['selected_video_file_id'])
                 rows.append({'scene': scene, 'frame': frame, 'image': image, 'video': video, 'image_choice': image_choice,
                              'video_choice': video_choice, 'plan': plan})
     analyses = []

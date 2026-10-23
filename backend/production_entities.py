@@ -134,6 +134,25 @@ def register(app,studio):
         deliver(studio,row,row['asset_id'])
         return {'saved':True}
 
+    @app.get('/api/productions/{pid}/nodes/{nid}/workspace')
+    def workspace(pid:str,nid:str):
+        """Рабочее место кадра одним ответом: где он, что выбрано, файлы, звук, задания и проект кадра (если уже открыт)."""
+        from backend import activity,edit_list
+        with studio.connect() as db:
+            node,data,revision=state(db,pid,nid)
+            if node['kind']!='frame':raise HTTPException(400,'Рабочее место открывается для кадра')
+            scene=dict(db.execute('SELECT id,title,number,parent_id FROM production_nodes WHERE id=?',(node['parent_id'],)).fetchone())
+            series=dict(db.execute('SELECT id,title,number FROM production_nodes WHERE id=?',(scene.pop('parent_id'),)).fetchone())
+            files=[{**dict(r),'url':'/api/production-files/'+r['id']} for r in db.execute('SELECT * FROM production_files WHERE node_id=? ORDER BY created_at DESC,id DESC',(nid,))]
+            bound=db.execute('SELECT project_id FROM production_links WHERE node_id=?',(nid,)).fetchone()
+            cues=[dict(r) for r in db.execute('SELECT id,kind,text,level_db,start_s,file_id FROM frame_sound_cues WHERE frame_id=? AND archived=0 ORDER BY start_s,created_at',(nid,))]
+        pick=lambda kind,chosen:edit_list.choose([f for f in files if f['kind']==kind],chosen)
+        (image,image_choice),(video,video_choice)=pick('image',data['selected_image_file_id']),pick('video',data['selected_video_file_id'])
+        return {'production_id':pid,'project_id':bound['project_id'] if bound else None,'revision':revision,
+                'frame':{'id':node['id'],'title':node['title'],'number':node['number'],'notes':node['notes']},'scene':scene,'series':series,
+                'selection':data,'files':files,'image':image,'image_choice':image_choice,'video':video,'video_choice':video_choice,
+                'cues':cues,'jobs':[j for j in activity.production_items(studio,pid) if j['node_id']==nid]}
+
     @app.get('/api/productions/{pid}/nodes/{nid}/editor')
     def editor(pid:str,nid:str):
         with studio.connect() as db:

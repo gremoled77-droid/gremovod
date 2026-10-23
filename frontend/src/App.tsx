@@ -54,6 +54,7 @@ import {readWorkspaceRoute, workspaceHash} from './workspaceRoute';
 import {readLocal, writeLocal, clearLocal} from './localDrafts';
 import Dock, {countActive} from './Dock';
 import useActivity from './useActivity';
+import FrameContextBar, {openFrameWorkspace, type FrameWorkspace} from './FrameContextBar';
 import AgentPanel from './AgentPanel';
 import IdeaBrief from './IdeaBrief';
 import IdeaRefs from './IdeaRefs';
@@ -74,6 +75,8 @@ import {
 const StoryboardDemo = lazy(() => import('./StoryboardDemo'));
 const GraphPanel = lazy(() => import('./WorkflowPanel'));
 
+/** Инструменты, которые при кадре в фокусе работают в проекте этого кадра. */
+const FRAME_TOOLS: Mode[] = ['create', 'video', 'audio'];
 type ModelSpec = {
   kind: string;
   model: string;
@@ -240,8 +243,39 @@ function App() {
   const [projectId, setProjectId] = useState('');
   const currentProjectId = useRef(projectId);
   currentProjectId.current = projectId;
-  const activity = useActivity(projectId);
+  // Кадр в фокусе: инструменты работают в его проекте, открытом на сервере; приложение остаётся в своём проекте.
+  const frameTool = !!focusFrame && FRAME_TOOLS.includes(mode);
+  const framePid = workspaceLocation?.production_id || '';
+  const frameKey = framePid + '/' + focusFrame;
+  const [frameWork, setFrameWork] = useState<{key: string; data?: FrameWorkspace; error?: string} | null>(
+    null
+  );
+  const frameReady = frameTool && frameWork?.key === frameKey ? frameWork : null;
+  const toolProjectId = frameTool ? frameReady?.data?.project_id || '' : projectId;
+  const activity = useActivity(toolProjectId || projectId);
+  useEffect(() => {
+    if (!frameTool || !framePid) return;
+    let live = true;
+    openFrameWorkspace(framePid, focusFrame)
+      .then(data => {
+        if (live) setFrameWork({key: frameKey, data});
+      })
+      .catch(e => {
+        if (live) setFrameWork({key: frameKey, error: e instanceof Error ? e.message : String(e)});
+      });
+    return () => {
+      live = false;
+    };
+    // Состояние кадра перечитывается при смене инструмента и при изменениях в ленте заданий.
+  }, [frameTool, framePid, focusFrame, frameKey, mode, activity.items]);
   const activeCount = countActive(activity.items);
+  const frameBar = frameReady?.data ? (
+    <FrameContextBar
+      work={frameReady.data}
+      onBoard={() => setMode('storyboard')}
+      onClear={() => setFocusFrame('')}
+    />
+  ) : null;
   const [projectName, setProjectName] = useState('Новый клип');
   const [projects, setProjects] = useState<{id: string; title: string}[]>([]);
   const [titleEditing, setTitleEditing] = useState(true);
@@ -1383,7 +1417,7 @@ function App() {
             </div>
           </div>
         </header>
-        {dockOpen && <Dock projectId={projectId} onClose={() => setDockOpen(false)} />}
+        {dockOpen && <Dock projectId={toolProjectId || projectId} onClose={() => setDockOpen(false)} />}
         {startup !== 'ready' ? (
           <section className="panel startup-panel" aria-live="polite">
             {startup === 'loading' ? (
@@ -1784,6 +1818,7 @@ function App() {
                     focus={focusFrame}
                     onFocus={setFocusFrame}
                     onOpenSound={() => setMode('audio')}
+                    onOpenStudio={() => setMode('create')}
                     outlineContext={{
                       projectId,
                       brief: state.brief,
@@ -1974,37 +2009,61 @@ function App() {
                 />
               ) : mode === 'reels' ? (
                 <ReelsScreen onUse={useReelRecipe} />
+              ) : frameTool && !frameReady?.data ? (
+                <section className="panel" aria-live="polite">
+                  <p>{frameReady?.error ? 'Кадр не открыт: ' + frameReady.error : 'Открываю кадр…'}</p>
+                  <button onClick={() => setFocusFrame('')}>Без кадра</button>
+                </section>
               ) : mode === 'create' ? (
-                <CreateScreen
-                  projectId={projectId}
-                  heroes={state.characters.map(c => ({
-                    id: c.id,
-                    name: c.name,
-                    assetId: c.working_asset_id,
-                  }))}
-                  world={[
-                    state.style?.look,
-                    state.style?.palette,
-                    state.style?.lighting,
-                    state.style?.environment,
-                  ]
-                    .filter(Boolean)
-                    .join('. ')}
-                />
+                <>
+                  {frameBar}
+                  <CreateScreen
+                    key={toolProjectId}
+                    projectId={toolProjectId}
+                    heroes={state.characters.map(c => ({
+                      id: c.id,
+                      name: c.name,
+                      assetId: c.working_asset_id,
+                    }))}
+                    world={[
+                      state.style?.look,
+                      state.style?.palette,
+                      state.style?.lighting,
+                      state.style?.environment,
+                    ]
+                      .filter(Boolean)
+                      .join('. ')}
+                  />
+                </>
               ) : mode === 'video' ? (
-                <VideoScreen
-                  projectId={projectId}
-                  world={[
-                    state.style?.look,
-                    state.style?.palette,
-                    state.style?.lighting,
-                    state.style?.environment,
-                  ]
-                    .filter(Boolean)
-                    .join('. ')}
-                />
+                <>
+                  {frameBar}
+                  <VideoScreen
+                    projectId={toolProjectId}
+                    world={[
+                      state.style?.look,
+                      state.style?.palette,
+                      state.style?.lighting,
+                      state.style?.environment,
+                    ]
+                      .filter(Boolean)
+                      .join('. ')}
+                  />
+                </>
               ) : mode === 'audio' ? (
-                <SoundScreen projectId={projectId} audioLab={audioPanel()} />
+                <>
+                  {frameBar}
+                  <SoundScreen
+                    key={toolProjectId}
+                    projectId={toolProjectId}
+                    focus={
+                      frameReady?.data
+                        ? {frameId: focusFrame, seriesId: frameReady.data.series.id}
+                        : undefined
+                    }
+                    audioLab={audioPanel()}
+                  />
+                </>
               ) : mode === 'archive' ? (
                 <AssetLibrary
                   {...replacementControls}
