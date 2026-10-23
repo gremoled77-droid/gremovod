@@ -48,7 +48,7 @@ import HomeScreen from './HomeScreen';
 import ReelsScreen, {type ReelUse} from './ReelsScreen';
 import GenerationWatcher from './GenerationWatcher';
 import {ActivityProvider} from './ActivityContext';
-import StageNav, {STAGES, type Mode} from './StageNav';
+import StageNav, {type Mode} from './StageNav';
 import WorkspaceTrail, {type WorkspaceLocation} from './WorkspaceTrail';
 import {readWorkspaceRoute, workspaceHash} from './workspaceRoute';
 import {readLocal, writeLocal, clearLocal} from './localDrafts';
@@ -1634,15 +1634,13 @@ function App() {
               )}
             </aside>
             <div className="content">
-              {mode !== 'studio' && (
-                <WorkspaceTrail
-                  projectId={projectId}
-                  mode={mode}
-                  onMode={setMode}
-                  onLocation={setWorkspaceLocation}
-                  onOpenProject={id => void load(id, 'home')}
-                />
-              )}
+              <WorkspaceTrail
+                projectId={projectId}
+                mode={mode}
+                onMode={setMode}
+                onLocation={setWorkspaceLocation}
+                onOpenProject={id => void load(id, 'home')}
+              />
               {!projectDraftSaved && (
                 <p className="alert" role="alert">
                   Черновик проекта не сохранён браузером. Сохрани проект перед перезагрузкой.
@@ -1723,6 +1721,109 @@ function App() {
                     void work('diagnose', async () =>
                       setDiagnostics(await json(await apiFetch('/api/diagnostics')))
                     )
+                  }
+                  service={
+                    <>
+                      <NativeGallery {...replacementControls} projectId={projectId} onRefine={refineAsset} />
+                      <button className="secondary" onClick={refresh}>
+                        <RefreshCw size={14} /> Обновить список
+                      </button>
+                      <div className="jobs">
+                        {jobs.length === 0 ? (
+                          <p className="muted">Задач через API пока нет.</p>
+                        ) : (
+                          jobs.map(j => (
+                            <div className="job" key={j.id}>
+                              <div className="jobtop">
+                                <b>
+                                  {j.kind} · {j.provider}
+                                </b>
+                                <span>{j.status}</span>
+                                <button onClick={() => poll(j.id)} disabled={!!busy}>
+                                  Проверить
+                                </button>
+                              </div>
+                              <small>Task ID: {j.task_id || '—'}</small>
+                              {j.delivery && (
+                                <div>
+                                  <p>
+                                    {j.delivery.state === 'saved'
+                                      ? `Сохранено в библиотеке: ${j.delivery.saved}/${j.delivery.total}`
+                                      : j.delivery.state === 'retry'
+                                        ? 'Скачивание будет повторено автоматически'
+                                        : 'Требуется проверить скачивание'}
+                                  </p>
+                                  {j.delivery.error && <p role="alert">{j.delivery.error}</p>}
+                                  {j.delivery.state !== 'saved' && (
+                                    <button
+                                      disabled={!!busy}
+                                      onClick={() =>
+                                        work('retry-download', async () => {
+                                          await json(
+                                            await apiFetch(`/api/jobs/${j.id}/retry-download`, {
+                                              method: 'POST',
+                                            })
+                                          );
+                                          setLibraryRevision(x => x + 1);
+                                          await refresh();
+                                        })
+                                      }
+                                    >
+                                      Повторить скачивание без генерации
+                                    </button>
+                                  )}
+                                </div>
+                              )}
+                              {j.provider === 'piapi' &&
+                                ['submission_unknown', 'submitting'].includes(j.status) &&
+                                !j.task_id && (
+                                  <RecoverJob jobId={j.id} onRecovered={() => void refresh()} />
+                                )}{' '}
+                              {j.kind === 'audio' && j.response?.asset_id && (
+                                <div>
+                                  <audio src={'/api/library/' + j.response.asset_id + '/file'} controls />
+                                  <a href={'/api/library/' + j.response.asset_id + '/file'} download>
+                                    Скачать реплику
+                                  </a>
+                                </div>
+                              )}
+                              <div className="results">
+                                {extract(j).map((link, i) => (
+                                  <div key={i} className="result">
+                                    {j.kind === 'video' ? (
+                                      <video src={link} controls />
+                                    ) : (
+                                      <img src={link} alt="Результат генерации" />
+                                    )}
+                                    <a href={link} target="_blank" rel="noreferrer">
+                                      <Download size={13} /> Открыть
+                                    </a>
+                                    {j.status === 'completed' && (
+                                      <button disabled={!!busy} onClick={() => saveImage(j.id, i)}>
+                                        Сохранить в библиотеку
+                                      </button>
+                                    )}
+                                    {j.kind === 'image' && (
+                                      <button
+                                        className="primary"
+                                        onClick={() => {
+                                          change({videoReference: link});
+                                          setSelectedJob(j.id);
+                                          setNotice('Кадр передан в Video Lab');
+                                        }}
+                                      >
+                                        Использовать для видео
+                                      </button>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                              {selectedJob === j.id && <small>Выбран для видео ✓</small>}
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </>
                   }
                 >
                   <>
@@ -2013,204 +2114,50 @@ function App() {
                 />
               ) : mode === 'studio' ? (
                 <>
-                  <StoryPlanBoard location={workspaceLocation} brief={state.brief} />
-                  <div className="idea-layout">
-                    <div className="idea-col">
-                      <IdeaBrief
-                        projectId={projectId}
-                        brief={state.brief}
-                        onBrief={v => change({brief: v})}
-                        result={state.ideaResult || ''}
-                        onResult={v => change({ideaResult: v})}
-                        model={state.ideaModel || 'gpt-5.6-luna'}
-                        onModel={v => change({ideaModel: v})}
-                        refs={state.ideaRefs || []}
-                        onRefs={ids => change({ideaRefs: ids})}
-                        world={[state.style.look, state.style.rules].filter(Boolean).join('. ')}
-                        onNext={() => setMode('styles')}
-                        onScene={() => setMode('scene')}
-                      />
-                      <section className="panel photo-setup" aria-label="Фото">
-                        <h2>Фото · постановка и промпт</h2>
-                        <FrameSelector
-                          catalogue={frameCatalogue}
-                          value={state.composition}
-                          onChange={chooseComposition}
-                          onCatalogue={() => setCatalogue('frame')}
-                        />
-                        {frameError && <p role="alert">{frameError}</p>}
-                        <ChatGPTPanel
-                          {...replacementControls}
-                          projectId={projectId}
-                          ensureProject={ensureProject}
-                          onPrompt={(prompt, target, _movement, frame) =>
-                            setState(s => ({
-                              ...s,
-                              prompts: {...s.prompts, [target]: prompt},
-                              compositionPromptBasis: {
-                                ...s.compositionPromptBasis,
-                                [target]: frameBasis(frame),
-                              },
-                            }))
-                          }
-                          onAsset={() => setLibraryRevision(x => x + 1)}
-                        />
-                      </section>
-                      <section className="panel idea-world" aria-label="Мир по заданию">
-                        <AttachmentMenu
-                          projectId={projectId}
-                          ensureProject={ensureProject}
-                          heroes={state.characters}
-                          items={(state.scene || EMPTY_SCENE).assets}
-                          revision={libraryRevision}
-                          onChange={assets =>
-                            setState(s => ({...s, scene: {...(s.scene || EMPTY_SCENE), assets}}))
-                          }
-                          onAsset={() => setLibraryRevision(x => x + 1)}
-                        />
-                        <WorldFromBrief
-                          projectId={projectId}
-                          brief={state.brief}
-                          style={state.style}
-                          conflicts={state.worldDraft || {}}
-                          onConflicts={worldDraft => setState(s => ({...s, worldDraft}))}
-                          ensureProject={ensureProject}
-                          onApply={fields => setState(s => ({...s, style: {...s.style, ...fields}}))}
-                          onDone={() => setMode('styles')}
-                        />
-                      </section>
-                    </div>
-                    <aside className="idea-path" aria-label="Путь ролика">
-                      <h3>Путь ролика</h3>
-                      <ol>
-                        {STAGES.map(stage => (
-                          <li key={stage.key} className={stage.mode === 'studio' ? 'current' : ''}>
-                            <button onClick={() => setMode(stage.mode)}>
-                              <span className="idea-path-n">{stage.icon}</span>
-                              <span>
-                                <b>{stage.label}</b>
-                                <small>{stage.hint}</small>
-                              </span>
-                            </button>
-                          </li>
-                        ))}
-                      </ol>
-                      <p className="muted">
-                        Начни с задания, затем иди вниз по списку: каждый этап готовит следующий.
-                      </p>
-                    </aside>
-                  </div>
-
-                  <Collapsible title="Очередь и галерея" hint="задачи проекта и результаты из ChatGPT">
-                    <NativeGallery {...replacementControls} projectId={projectId} onRefine={refineAsset} />
-                    <button className="secondary" onClick={refresh}>
-                      <RefreshCw size={14} /> Обновить список
-                    </button>
-                    <div className="jobs">
-                      {jobs.length === 0 ? (
-                        <p className="muted">Задач через API пока нет.</p>
-                      ) : (
-                        jobs.map(j => (
-                          <div className="job" key={j.id}>
-                            <div className="jobtop">
-                              <b>
-                                {j.kind} · {j.provider}
-                              </b>
-                              <span>{j.status}</span>
-                              <button onClick={() => poll(j.id)} disabled={!!busy}>
-                                Проверить
-                              </button>
-                            </div>
-                            <small>Task ID: {j.task_id || '—'}</small>
-                            {j.delivery && (
-                              <div>
-                                <p>
-                                  {j.delivery.state === 'saved'
-                                    ? `Сохранено в библиотеке: ${j.delivery.saved}/${j.delivery.total}`
-                                    : j.delivery.state === 'retry'
-                                      ? 'Скачивание будет повторено автоматически'
-                                      : 'Требуется проверить скачивание'}
-                                </p>
-                                {j.delivery.error && <p role="alert">{j.delivery.error}</p>}
-                                {j.delivery.state !== 'saved' && (
-                                  <button
-                                    disabled={!!busy}
-                                    onClick={() =>
-                                      work('retry-download', async () => {
-                                        await json(
-                                          await apiFetch(`/api/jobs/${j.id}/retry-download`, {method: 'POST'})
-                                        );
-                                        setLibraryRevision(x => x + 1);
-                                        await refresh();
-                                      })
-                                    }
-                                  >
-                                    Повторить скачивание без генерации
-                                  </button>
-                                )}
-                              </div>
-                            )}
-                            {j.provider === 'piapi' &&
-                              ['submission_unknown', 'submitting'].includes(j.status) &&
-                              !j.task_id && (
-                                <RecoverJob jobId={j.id} onRecovered={() => void refresh()} />
-                              )}{' '}
-                            {j.kind === 'audio' && j.response?.asset_id && (
-                              <div>
-                                <audio src={'/api/library/' + j.response.asset_id + '/file'} controls />
-                                <a href={'/api/library/' + j.response.asset_id + '/file'} download>
-                                  Скачать реплику
-                                </a>
-                              </div>
-                            )}
-                            <div className="results">
-                              {extract(j).map((link, i) => (
-                                <div key={i} className="result">
-                                  {j.kind === 'video' ? (
-                                    <video src={link} controls />
-                                  ) : (
-                                    <img src={link} alt="Результат генерации" />
-                                  )}
-                                  <a href={link} target="_blank" rel="noreferrer">
-                                    <Download size={13} /> Открыть
-                                  </a>
-                                  {j.status === 'completed' && (
-                                    <button disabled={!!busy} onClick={() => saveImage(j.id, i)}>
-                                      Сохранить в библиотеку
-                                    </button>
-                                  )}
-                                  {j.kind === 'image' && (
-                                    <button
-                                      className="primary"
-                                      onClick={() => {
-                                        change({videoReference: link});
-                                        setSelectedJob(j.id);
-                                        setNotice('Кадр передан в Video Lab');
-                                      }}
-                                    >
-                                      Использовать для видео
-                                    </button>
-                                  )}
-                                </div>
-                              ))}
-                            </div>
-                            {selectedJob === j.id && <small>Выбран для видео ✓</small>}
-                          </div>
-                        ))
-                      )}
-                    </div>
+                  <IdeaBrief
+                    projectId={projectId}
+                    brief={state.brief}
+                    onBrief={v => change({brief: v})}
+                    result={state.ideaResult || ''}
+                    onResult={v => change({ideaResult: v})}
+                    model={state.ideaModel || 'gpt-5.6-luna'}
+                    onModel={v => change({ideaModel: v})}
+                    refs={state.ideaRefs || []}
+                    onRefs={ids => change({ideaRefs: ids})}
+                    world={[state.style.look, state.style.rules].filter(Boolean).join('. ')}
+                    onScene={() => setMode('scene')}
+                  />
+                  <Collapsible title="Сюжет серии" hint="замысел серии → сцены → раскадровка">
+                    <StoryPlanBoard
+                      key={workspaceLocation?.production_id}
+                      location={workspaceLocation}
+                      brief={state.brief}
+                    />
                   </Collapsible>
-                  <Collapsible title="Библиотека проекта" hint="все картинки и видео проекта">
-                    <AssetLibrary
-                      {...replacementControls}
-                      onRefine={refineAsset}
-                      onScene={addToScene}
+                  <Collapsible
+                    title="Вложения и мир по заданию"
+                    hint="файлы к заданию и черновик мира от GPT"
+                  >
+                    <AttachmentMenu
                       projectId={projectId}
+                      ensureProject={ensureProject}
+                      heroes={state.characters}
+                      items={(state.scene || EMPTY_SCENE).assets}
                       revision={libraryRevision}
-                      onUse={(link, id) => {
-                        change({videoReference: link, videoAssetId: id});
-                        setNotice('Изображение из библиотеки выбрано для Video Lab');
-                      }}
+                      onChange={assets =>
+                        setState(s => ({...s, scene: {...(s.scene || EMPTY_SCENE), assets}}))
+                      }
+                      onAsset={() => setLibraryRevision(x => x + 1)}
+                    />
+                    <WorldFromBrief
+                      projectId={projectId}
+                      brief={state.brief}
+                      style={state.style}
+                      conflicts={state.worldDraft || {}}
+                      onConflicts={worldDraft => setState(s => ({...s, worldDraft}))}
+                      ensureProject={ensureProject}
+                      onApply={fields => setState(s => ({...s, style: {...s.style, ...fields}}))}
+                      onDone={() => setMode('styles')}
                     />
                   </Collapsible>
                 </>

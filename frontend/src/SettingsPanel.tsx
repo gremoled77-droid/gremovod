@@ -5,6 +5,7 @@ import ChatLinkSetting from './ChatLinkSetting';
 
 type Props = {
   children?: ReactNode;
+  service?: ReactNode;
   projectHeader?: ReactNode;
   provider: 'openai' | 'piapi';
   model: string;
@@ -29,6 +30,7 @@ export default function SettingsPanel({
   onDiagnose,
   onProjectsChanged,
   children,
+  service,
 }: Props) {
   const card = (icon: string, title: string, hint: string) => (
     <div className="rf-head">
@@ -105,6 +107,12 @@ export default function SettingsPanel({
           <pre className="settings-diagnostics">{JSON.stringify(diagnostics, null, 2)}</pre>
         )}
       </article>
+      {service && (
+        <details className="sc-step reserve-tools">
+          <summary>Служебное: задания API · повторить скачивание, восстановить задание</summary>
+          <div>{service}</div>
+        </details>
+      )}
       {children && (
         <details className="sc-step reserve-tools">
           <summary>Резервные инструменты · промпты и фото</summary>

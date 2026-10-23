@@ -127,24 +127,32 @@ export default function StoryPlanBoard({
       <p>Одна карточка — одна сцена. Порядок плана переносится в раскадровку после просмотра изменений.</p>
       {error && <p role="alert">{error}</p>}
       <div className="story-plan-toolbar">
-        <label>
-          Проект
-          <select
-            aria-label="Проект сюжета"
-            value={pid}
-            onChange={e => {
-              setPid(e.target.value);
-              setSid('');
-            }}
-          >
-            {!productions.length && <option value="">Нет проектов постановки</option>}
-            {productions.map(p => (
-              <option key={p.id} value={p.id}>
-                {p.title}
-              </option>
-            ))}
-          </select>
-        </label>
+        {/* Проект выбирается в шапке; свой список нужен, только если проект студии не связан с постановкой. */}
+        {location?.production_id ? (
+          <label>
+            Проект
+            <b>{location.production_title}</b>
+          </label>
+        ) : (
+          <label>
+            Проект
+            <select
+              aria-label="Проект сюжета"
+              value={pid}
+              onChange={e => {
+                setPid(e.target.value);
+                setSid('');
+              }}
+            >
+              {!productions.length && <option value="">Нет проектов постановки</option>}
+              {productions.map(p => (
+                <option key={p.id} value={p.id}>
+                  {p.title}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         <label>
           Серия
           <select aria-label="Серия сюжета" value={sid} onChange={e => setSid(e.target.value)}>

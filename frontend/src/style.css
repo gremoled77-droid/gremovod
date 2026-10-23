@@ -959,9 +959,6 @@ footer {
   margin: 0;
   border: 0;
 }
-.photo-setup > .chatgpt-panel {
-  margin: 18px 0 0;
-}
 .catalogue-dialog .camera-grid {
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
 }

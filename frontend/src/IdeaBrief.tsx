@@ -47,7 +47,6 @@ export default function IdeaBrief({
   refs,
   onRefs,
   world,
-  onNext,
   onScene,
 }: {
   projectId: string;
@@ -60,7 +59,6 @@ export default function IdeaBrief({
   refs: string[];
   onRefs: (ids: string[]) => void;
   world: string;
-  onNext: () => void;
   onScene: () => void;
 }) {
   const [busy, setBusy] = useState(false);
@@ -218,9 +216,6 @@ export default function IdeaBrief({
           <RotateCw size={14} /> Обновить
         </button>
       )}
-      <button className="primary" onClick={onNext}>
-        Дальше: мир и герои →
-      </button>
       <button onClick={onScene}>Собрать сцену из исходников</button>
     </div>
   );
@@ -286,7 +281,7 @@ export default function IdeaBrief({
         >
           {listening ? <Square size={16} /> : <Mic size={18} />}
         </button>
-        <button className="primary idea-go" onClick={() => void send()} disabled={busy}>
+        <button className="idea-go" onClick={() => void send()} disabled={busy}>
           <Send size={15} /> {busy ? 'Думаю…' : 'Отправить в LLM'}
         </button>
       </div>
