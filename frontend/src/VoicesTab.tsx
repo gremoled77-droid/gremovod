@@ -1,4 +1,5 @@
 import {useEffect, useRef, useState} from 'react';
+import {Plus, Square, Trash2, Play} from 'lucide-react';
 import {
   addVoice,
   archiveVoice,
@@ -154,7 +155,8 @@ export default function VoicesTab({
   const audio = useRef<HTMLAudioElement | null>(null),
     [playing, setPlaying] = useState(''),
     [previewError, setPreviewError] = useState(''),
-    [noteOpen, setNoteOpen] = useState('');
+    [noteOpen, setNoteOpen] = useState(''),
+    [menuFor, setMenuFor] = useState('');
   useEffect(() => () => audio.current?.pause(), []);
   const preview = async (v: Voice) => {
     setPreviewError('');
@@ -204,77 +206,114 @@ export default function VoicesTab({
           <b>Добавить голос</b>
         </button>
         {shown.map(v => (
-          <article key={v.id} className="chars-tile snd-card">
-            <span className="chars-empty">{v.name.slice(0, 1).toUpperCase()}</span>
-            <b>{v.name}</b>
-            <small>
-              {PROVIDER_LABEL[v.provider]} · {v.model}
-            </small>
-            <small>ID {v.voice_id}</small>
-            {v.note && (
-              <button
-                type="button"
-                className="snd-info"
-                aria-label="Заметка к голосу"
-                aria-expanded={noteOpen === v.id}
-                onClick={() => setNoteOpen(noteOpen === v.id ? '' : v.id)}
-              >
-                И
-              </button>
-            )}
-            {noteOpen === v.id && <small role="note">{v.note}</small>}
-            {v.provider === 'elevenlabs' && (
-              <button aria-pressed={playing === v.id} onClick={() => void preview(v)}>
-                {playing === v.id ? '■ Стоп' : '▶ Прослушать'}
-              </button>
-            )}
-            <div className="chips">
-              {v.assigned.map(a => (
+          <article key={v.id} className="snd-card">
+            <div className="snd-cover">
+              <span>{v.name.slice(0, 1).toUpperCase()}</span>
+              {v.provider === 'elevenlabs' && (
                 <button
-                  key={a.node_id}
-                  title="Снять голос с героя"
-                  onClick={() =>
-                    run(async () => {
-                      await assignVoice(pid, v.id, a.node_id, true);
-                      onChanged();
-                    })
-                  }
+                  className="snd-play"
+                  aria-label={playing === v.id ? 'Стоп' : 'Прослушать'}
+                  aria-pressed={playing === v.id}
+                  data-tip={playing === v.id ? 'Стоп' : 'Прослушать'}
+                  onClick={() => void preview(v)}
                 >
-                  {a.title} ×
+                  {playing === v.id ? <Square size={14} /> : <Play size={14} />}
                 </button>
-              ))}
+              )}
             </div>
-            <select
-              aria-label={`Привязать голос ${v.name} к герою`}
-              value=""
-              onChange={e => {
-                const hero = e.target.value;
-                if (hero)
+            <div className="snd-body">
+              <b>{v.name}</b>
+              <small>
+                {PROVIDER_LABEL[v.provider]} · {v.model}
+              </small>
+              <small>ID {v.voice_id}</small>
+              {(v.assigned.length > 0 || v.note) && (
+                <div className="snd-tags">
+                  {v.assigned.map(a => (
+                    <button
+                      key={a.node_id}
+                      title="Снять голос с героя"
+                      onClick={() =>
+                        run(async () => {
+                          await assignVoice(pid, v.id, a.node_id, true);
+                          onChanged();
+                        })
+                      }
+                    >
+                      {a.title} ×
+                    </button>
+                  ))}
+                  {v.note && (
+                    <button
+                      type="button"
+                      className="snd-info"
+                      aria-label="Заметка к голосу"
+                      aria-expanded={noteOpen === v.id}
+                      onClick={() => setNoteOpen(noteOpen === v.id ? '' : v.id)}
+                    >
+                      И
+                    </button>
+                  )}
+                </div>
+              )}
+              {noteOpen === v.id && <small role="note">{v.note}</small>}
+            </div>
+            <div className="snd-actions">
+              <div className="snd-menu-wrap">
+                <button
+                  className="snd-btn"
+                  aria-label="Добавить персонажа"
+                  aria-expanded={menuFor === v.id}
+                  data-tip="Добавить персонажа"
+                  onClick={() => setMenuFor(menuFor === v.id ? '' : v.id)}
+                >
+                  <Plus size={16} />
+                </button>
+                {menuFor === v.id && (
+                  <div className="snd-menu" role="menu">
+                    {heroes.filter(h => !v.assigned.some(a => a.node_id === h.id)).length === 0 && (
+                      <small>Нет свободных персонажей</small>
+                    )}
+                    {heroes
+                      .filter(h => !v.assigned.some(a => a.node_id === h.id))
+                      .map(h => (
+                        <button
+                          key={h.id}
+                          role="menuitem"
+                          onClick={() => {
+                            setMenuFor('');
+                            run(async () => {
+                              await assignVoice(pid, v.id, h.id);
+                              onChanged();
+                            });
+                          }}
+                        >
+                          {h.title}
+                        </button>
+                      ))}
+                  </div>
+                )}
+              </div>
+              <button
+                className="snd-btn"
+                aria-label="Удалить"
+                data-tip="Удалить"
+                onClick={() => {
+                  if (
+                    !window.confirm(
+                      `Удалить голос «${v.name}»? Он исчезнет из списка, привязки к героям останутся.`
+                    )
+                  )
+                    return;
                   run(async () => {
-                    await assignVoice(pid, v.id, hero);
+                    await archiveVoice(pid, v.id);
                     onChanged();
                   });
-              }}
-            >
-              <option value="">Привязать к герою…</option>
-              {heroes
-                .filter(h => !v.assigned.some(a => a.node_id === h.id))
-                .map(h => (
-                  <option key={h.id} value={h.id}>
-                    {h.title}
-                  </option>
-                ))}
-            </select>
-            <button
-              onClick={() =>
-                run(async () => {
-                  await archiveVoice(pid, v.id);
-                  onChanged();
-                })
-              }
-            >
-              Убрать из списка
-            </button>
+                }}
+              >
+                <Trash2 size={16} />
+              </button>
+            </div>
           </article>
         ))}
       </div>

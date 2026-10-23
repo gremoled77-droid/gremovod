@@ -617,16 +617,119 @@ main.storyboard-main {
   padding: 7px 10px;
 }
 .snd-card {
-  cursor: default;
+  display: grid;
+  align-content: start;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  overflow: visible;
 }
-.snd-card .chars-empty {
-  aspect-ratio: 2 / 1;
-  font-size: 28px;
+.snd-cover {
+  position: relative;
+  display: grid;
+  place-items: center;
+  aspect-ratio: 4 / 3;
+  border-radius: 12px 12px 0 0;
+  background:
+    linear-gradient(to bottom, transparent 45%, var(--surface) 100%),
+    radial-gradient(circle at 30% 20%, rgba(242, 177, 52, 0.35), transparent 60%),
+    linear-gradient(135deg, #3a2f12, #1e2128);
+}
+.snd-cover > span {
+  font-size: 44px;
+  font-weight: 700;
+  color: var(--accent);
+  opacity: 0.85;
+}
+.snd-play {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: rgba(14, 15, 18, 0.7);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.snd-body {
+  display: grid;
+  gap: 2px;
+  padding: 0 10px 8px;
+}
+.snd-body small {
+  color: var(--muted);
+}
+.snd-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+.snd-tags button {
+  padding: 2px 8px;
+  font-size: 12px;
+}
+.snd-actions {
+  display: flex;
+  gap: 8px;
+  padding: 0 10px 10px;
+}
+.snd-btn {
+  position: relative;
+  flex: 1;
+  display: grid;
+  place-items: center;
+  padding: 7px;
+  background: transparent;
+  line-height: 0;
+}
+.snd-menu-wrap {
+  position: relative;
+  flex: 1;
+  display: grid;
+}
+.snd-menu {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 0;
+  z-index: 5;
+  display: grid;
+  gap: 4px;
+  min-width: 160px;
+  padding: 6px;
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  background: var(--surface-2);
+}
+.snd-menu button {
+  text-align: left;
+  padding: 6px 10px;
+}
+[data-tip]:hover::after,
+[data-tip]:focus-visible::after {
+  content: attr(data-tip);
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  line-height: 1.2;
+  background: var(--surface-2);
+  border: 1px solid var(--border-strong);
+  color: var(--text);
+  pointer-events: none;
+  z-index: 6;
 }
 .snd-info {
-  justify-self: start;
-  width: 24px;
-  height: 24px;
+  width: 22px;
+  height: 22px;
   padding: 0;
   border-radius: 999px;
   font-size: 12px;
