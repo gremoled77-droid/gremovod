@@ -55,19 +55,23 @@ function AddVoiceDialog({
           </select>
         </label>
         <label>
-          Сервис
+          Сервис и модель
           <select
-            value={provider}
+            value={`${provider}|${model}`}
             onChange={e => {
-              const next = e.target.value as Provider;
-              setProvider(next);
-              setModel(MODELS[next][0]);
+              const [p, m] = e.target.value.split('|');
+              setProvider(p as Provider);
+              setModel(m);
             }}
           >
             {(['elevenlabs', 'fish'] as const).map(p => (
-              <option key={p} value={p}>
-                {PROVIDER_LABEL[p]}
-              </option>
+              <optgroup key={p} label={PROVIDER_LABEL[p]}>
+                {MODELS[p].map(m => (
+                  <option key={m} value={`${p}|${m}`}>
+                    {m}
+                  </option>
+                ))}
+              </optgroup>
             ))}
           </select>
         </label>
@@ -89,14 +93,6 @@ function AddVoiceDialog({
           />
         </label>
         {idBad && <small role="alert">Только латиница, цифры, «_» и «-»</small>}
-        <label>
-          Модель озвучки
-          <select value={model} onChange={e => setModel(e.target.value)}>
-            {MODELS[provider].map(m => (
-              <option key={m}>{m}</option>
-            ))}
-          </select>
-        </label>
         {withNote ? (
           <label>
             Заметка

@@ -12,7 +12,7 @@ type Voice = {
 };
 type Quote = {estimated_usd: number; quote_token: string; source: string; note: string};
 const MODELS: Record<string, string[]> = {
-  elevenlabs: ['eleven_v4', 'eleven_multilingual_v2', 'eleven_v3'],
+  elevenlabs: ['eleven_v4', 'eleven_v3', 'eleven_multilingual_v2'],
   fish: ['s2.1-pro', 's2.1-pro-free'],
 };
 export default function CharacterVoicePanel({

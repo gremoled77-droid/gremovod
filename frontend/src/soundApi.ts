@@ -6,7 +6,7 @@ import type {Cue, CueKind, FrameSound} from './soundCues';
 
 export type Provider = 'elevenlabs' | 'fish';
 export const MODELS: Record<Provider, string[]> = {
-  elevenlabs: ['eleven_v4', 'eleven_multilingual_v2', 'eleven_v3'],
+  elevenlabs: ['eleven_v4', 'eleven_v3', 'eleven_multilingual_v2'],
   fish: ['s2.1-pro', 's2.1-pro-free'],
 };
 export const PROVIDER_LABEL: Record<Provider, string> = {elevenlabs: 'ElevenLabs', fish: 'Fish Audio'};
