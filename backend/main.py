@@ -487,16 +487,12 @@ def waiting_duplicate(db,project_id,request_data):
 
 @app.post('/api/jobs/{job_id}/stop-waiting')
 def stop_waiting(job_id:str):
-    """Владелец проверил историю провайдера и снимает зависшее задание: оно становится ошибкой, резерв бюджета
-    освобождается, такой же запрос снова можно отправить. Провайдера не вызывает и ничего не перезапускает."""
+    """Ручное снятие ожидания не доказывает отсутствие списания."""
     with connect() as db:
-        db.execute('BEGIN IMMEDIATE')
-        job=db.execute('SELECT status,response FROM jobs WHERE id=?',(job_id,)).fetchone()
+        job=db.execute('SELECT status FROM jobs WHERE id=?',(job_id,)).fetchone()
         if not job: raise HTTPException(404,'Задание не найдено')
         if str(job['status']).lower() in FINAL_JOB_STATUSES: raise HTTPException(409,'Задание уже завершено')
-        response={'detail':'Ожидание снято владельцем после проверки истории провайдера','stopped_at':now(),'previous_status':job['status'],'previous':json.loads(job['response'] or '{}')}
-        db.execute("UPDATE jobs SET status='failed',response=? WHERE id=?",(json.dumps(response,ensure_ascii=False),job_id))
-    return {'job_id':job_id,'status':'failed'}
+    raise HTTPException(409,'Нельзя снять ожидание без доказанной сверки списания. Резерв и блокировка повтора сохранены. Можно выбрать другую модель.')
 
 @app.post('/api/model-jobs')
 async def model_job(body:ModelJobRequest,x_api_key:str|None=Header(default=None)):
@@ -520,7 +516,7 @@ async def model_job(body:ModelJobRequest,x_api_key:str|None=Header(default=None)
     with connect() as db:
         db.execute('BEGIN IMMEDIATE')
         waiting=waiting_duplicate(db,body.project_id,request_data)
-        if waiting: raise HTTPException(409,f'Такой запрос уже ждёт ответа (задание {waiting}). Дождись результата или ошибки; если в истории PiAPI задачи нет, нажми «Снять ожидание» у задания в очереди.')
+        if waiting: raise HTTPException(409,f'Такой запрос уже ждёт ответа (задание {waiting}). При неизвестном списании резерв и блокировка повтора сохраняются до доказанной сверки. Можно выбрать другую модель.')
         security.check_budget(db,body.project_id,cost)
         try:
             db.execute('INSERT INTO jobs VALUES(?,?,?,?,?,?,?,?,?)',(jid,body.project_id,spec['kind'],spec['provider'],None,'submitting',request_data,'{}',now()))
