@@ -2,6 +2,7 @@ import {useEffect, useRef, useState, type ReactNode} from 'react';
 import {Plus, MoreHorizontal} from 'lucide-react';
 import {apiFetch} from './api';
 import {responseJson} from './ChatGPTPanel';
+import Lightbox from './Lightbox';
 
 export type CharacterIdentity = {
   species: string;
@@ -62,7 +63,8 @@ export default function CharacterReferences({
   const [references, setReferences] = useState<Reference[]>([]),
     [expanded, setExpanded] = useState(false),
     [uploading, setUploading] = useState(false),
-    [error, setError] = useState('');
+    [error, setError] = useState(''),
+    [view, setView] = useState(-1);
   const [job, setJob] = useState<DescriptionJob | null>(null),
     [worker, setWorker] = useState<{worker_online: boolean; chat_url: string} | null>(null);
   const input = useRef<HTMLInputElement>(null),
@@ -170,6 +172,14 @@ export default function CharacterReferences({
       setUploading(false);
     }
   };
+  const gallery = [
+    ...(workingImage ? [{url: workingImage, title: 'Основной образ'}] : []),
+    ...references.map(r => ({
+      url: r.url,
+      title: r.original_name || 'Фото-референс',
+      downloadName: r.original_name,
+    })),
+  ];
   const running = !!job && ['queued', 'preparing'].includes(job.status);
   return (
     <div className="character-references">
@@ -209,23 +219,11 @@ export default function CharacterReferences({
         onChange={e => void upload(e.target.files)}
       />
       <div className="character-reference-thumbnails">
-        {workingImage && (
-          <a href={workingImage} target="_blank" rel="noreferrer" title="Основной образ">
-            <img src={workingImage} alt="Основной образ персонажа" loading="lazy" />
-            <small>Основной образ</small>
-          </a>
-        )}
-        {references.map(reference => (
-          <a
-            key={reference.id}
-            href={reference.url}
-            target="_blank"
-            rel="noreferrer"
-            title={reference.original_name}
-          >
-            <img src={reference.url} alt={reference.original_name || 'Фото-референс'} loading="lazy" />
-            <small>{reference.original_name}</small>
-          </a>
+        {gallery.map((item, i) => (
+          <button key={item.url} type="button" title={item.title} onClick={() => setView(i)}>
+            <img src={item.url} alt={item.title} loading="lazy" />
+            <small>{item.title}</small>
+          </button>
         ))}
       </div>
       {!workingImage && !references.length && (
@@ -266,6 +264,7 @@ export default function CharacterReferences({
           Распознать описание по фото
         </button>
       )}
+      {view >= 0 && <Lightbox items={gallery} index={view} onIndex={setView} onClose={() => setView(-1)} />}
       {expanded && (
         <div id="character-description" className="character-full-description">
           <h4>Полное описание</h4>

@@ -1,3 +1,4 @@
+import {bumpUses} from './TileOrder';
 import {useEffect, useMemo, useRef, useState} from 'react';
 import {apiFetch} from './api';
 import {responseJson} from './ChatGPTPanel';
@@ -367,6 +368,8 @@ function SendDialog({
         },
         requestId.current
       );
+      bumpUses(projectId + ':heroes', heroNodeIds, assets.length);
+      if (location) bumpUses(projectId + ':locations', [location], assets.length);
       onSent();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));

@@ -11,7 +11,7 @@ from fastapi import HTTPException
 from pydantic import BaseModel, Field
 from backend import production_folders as folders, security
 
-MODELS={'elevenlabs':{'eleven_multilingual_v2':0.00008,'eleven_v3':0.00008},'fish':{'s2.1-pro':0.000015,'s2.1-pro-free':0}}
+MODELS={'elevenlabs':{'eleven_multilingual_v2':0.00008,'eleven_v3':0.00008,'eleven_v4':0.00008},'fish':{'s2.1-pro':0.000015,'s2.1-pro-free':0}}
 SOURCES={'elevenlabs':'https://elevenlabs.io/pricing/api','fish':'https://docs.fish.audio/developer-guide/models-pricing/pricing-and-rate-limits'}
 
 class Voice(BaseModel):
@@ -25,6 +25,7 @@ class Voice(BaseModel):
 class Phrase(BaseModel):
     text:str=Field(min_length=1,max_length=3000)
     project_id:str
+    voice_library_id:str=Field(default='',max_length=100)
 
 class Generate(Phrase):
     request_id:str=Field(pattern=r'^[a-zA-Z0-9_-]{16,100}$')
@@ -117,6 +118,11 @@ def register(app,studio):
         target(studio,pid,nid);membership=folders.link(studio,body.project_id)
         if not membership or membership['production_id']!=pid:raise HTTPException(400,'Выбери кадр этого общего проекта для учёта расходов')
         voice=read_voice(studio,nid)
+        if body.voice_library_id:
+            with studio.connect() as db:
+                row=db.execute('SELECT v.* FROM voice_library v JOIN hero_voices h ON h.voice_lib_id=v.id WHERE v.id=? AND v.production_id=? AND v.archived=0 AND h.node_id=?',(body.voice_library_id,pid,nid)).fetchone()
+            if not row:raise HTTPException(400,'Этот голос не привязан к герою')
+            voice={'provider':row['provider'],'name':row['name'],'voice_id':row['voice_id'],'url':row['url'],'model':row['model'],'cost_multiplier':voice.get('cost_multiplier',1)}
         if not voice['voice_id'] or not voice['name']:raise HTTPException(400,'Сначала сохрани название голоса и Voice ID')
         if not body.text.strip():raise HTTPException(400,'Напиши фразу')
         units=len(body.text.encode('utf-8')) if voice['provider']=='fish' else len(body.text)

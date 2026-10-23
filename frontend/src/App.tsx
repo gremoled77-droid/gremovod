@@ -863,11 +863,11 @@ function App() {
       characters: state.characters.map(c => (c.id === character.id ? {...c, ...patch} : c)),
     });
   };
-  const mkChar = () => {
+  const mkChar = (name = 'Новый персонаж') => {
     const id = crypto.randomUUID();
     const c: Character = {
       id,
-      name: 'Новый персонаж',
+      name,
       identity: {
         species: '',
         face: '',
@@ -1449,7 +1449,7 @@ function App() {
               <h3>
                 <ShieldCheck size={16} /> Character Vault
               </h3>
-              <button className="secondary" onClick={mkChar}>
+              <button className="secondary" onClick={() => mkChar()}>
                 <Plus size={14} /> Новый персонаж
               </button>
               <select

@@ -297,3 +297,30 @@
   background: var(--accent, #f2b134);
   color: #1a1306;
 }
+.chars-cell {
+  position: relative;
+}
+.chars-cell > .chars-tile {
+  width: 100%;
+}
+.tile-fav {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  padding: 5px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.55);
+  line-height: 0;
+}
+.tile-fav.on {
+  color: var(--accent, #f2b134);
+  border-color: var(--accent, #f2b134);
+}
+.create-dialog {
+  display: grid;
+  gap: 12px;
+  width: min(560px, 92vw);
+  max-height: 90vh;
+  overflow: auto;
+  cursor: default;
+}

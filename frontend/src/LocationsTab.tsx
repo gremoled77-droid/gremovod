@@ -10,6 +10,9 @@ import {
   type LocationCard,
 } from './locations';
 import SheetPanel from './SheetPanel';
+import CreateEntityDialog from './CreateEntityDialog';
+import {usePortraits} from './usePortraits';
+import {FavButton, TileToolbar, useTileOrder} from './TileOrder';
 import {LOCATION_DEFAULT, LOCATION_SHOTS, locationShotPrompt} from './sheetShots';
 
 const DEFAULT_MODEL = 'seedream-5-pro';
@@ -31,7 +34,7 @@ export default function LocationsTab({
   const [pid, setPid] = useState<string | null>(null),
     [items, setItems] = useState<LocationCard[]>([]),
     [selected, setSelected] = useState(''),
-    [title, setTitle] = useState(''),
+    [creating, setCreating] = useState(false),
     [notes, setNotes] = useState(''),
     [error, setError] = useState(''),
     [note, setNote] = useState(''),
@@ -56,6 +59,13 @@ export default function LocationsTab({
       active = false;
     };
   }, [projectId, reload]);
+  const portraits = usePortraits(
+    projectId,
+    revision,
+    'location',
+    items.map(l => l.title)
+  );
+  const order = useTileOrder(projectId + ':locations', items, l => l.title);
   const current = items.find(i => i.id === selected) || null;
   useEffect(() => {
     setNotes(current?.notes || '');
@@ -91,43 +101,40 @@ export default function LocationsTab({
         <p className="muted">
           Места действия проекта. Основа и вариации ракурсов используются в составе кадра.
         </p>
+        <TileToolbar
+          sort={order.sort}
+          onSort={order.setSort}
+          onlyFav={order.onlyFav}
+          onOnlyFav={order.setOnlyFav}
+        />
         <div className="chars-grid">
-          {items.map(l => (
-            <button
-              key={l.id}
-              className={'chars-tile' + (l.id === selected ? ' on' : '')}
-              aria-pressed={l.id === selected}
-              onClick={() => setSelected(l.id)}
-            >
-              {l.files[0] ? (
-                <img src={`/api/production-files/${l.files[0].id}`} alt="" loading="lazy" />
-              ) : (
-                <span className="chars-empty">нет картинки</span>
-              )}
-              <b>{l.title}</b>
-              <small>ракурсов: {l.files.length}</small>
-            </button>
-          ))}
-        </div>
-        <div className="sheet-row">
-          <label>
-            Новая локация
-            <input value={title} placeholder="Например: Двор" onChange={e => setTitle(e.target.value)} />
-          </label>
-          <button
-            className="primary"
-            disabled={busy || !title.trim()}
-            onClick={() =>
-              void run(async () => {
-                const node = await createLocation(pid, title.trim());
-                setTitle('');
-                await reload(pid);
-                setSelected(node.id);
-              })
-            }
-          >
-            Создать локацию
+          <button className="chars-tile chars-new" onClick={() => setCreating(true)}>
+            <span>＋</span>
+            <b>Создать локацию</b>
           </button>
+          {order.sorted.map(l => (
+            <div key={l.id} className="chars-cell">
+              <button
+                className={'chars-tile' + (l.id === selected ? ' on' : '')}
+                aria-pressed={l.id === selected}
+                onClick={() => setSelected(l.id)}
+              >
+                {l.files[0] ? (
+                  <img src={`/api/production-files/${l.files[0].id}`} alt="" loading="lazy" />
+                ) : portraits[l.title] ? (
+                  <img src={`/api/library/${portraits[l.title]}/thumbnail`} alt="" loading="lazy" />
+                ) : (
+                  <span className="chars-empty">нет картинки</span>
+                )}
+                <b>{l.title}</b>
+                <small>
+                  ракурсов: {l.files.length}
+                  {order.uses[l.id] ? ` · выбрана: ${order.uses[l.id]}` : ''}
+                </small>
+              </button>
+              <FavButton on={order.favs.includes(l.id)} onToggle={() => order.toggleFav(l.id)} />
+            </div>
+          ))}
         </div>
         {error && <p role="alert">{error}</p>}
         {note && <p className="muted">{note}</p>}
@@ -215,6 +222,26 @@ export default function LocationsTab({
             )}
           />
         </>
+      )}
+      {creating && (
+        <CreateEntityDialog
+          title="Создать локацию"
+          namePlaceholder="Например: Двор на Немиге"
+          aspect="16:9"
+          projectId={projectId}
+          ensureProject={ensureProject}
+          buildPrompt={name => locationShotPrompt(name, '', world, LOCATION_SHOTS[0])}
+          create={async name => {
+            const node = await createLocation(pid, name);
+            await reload(pid);
+            setSelected(node.id);
+          }}
+          onClose={() => setCreating(false)}
+          onStarted={() => {
+            setCreating(false);
+            setNote('Задание запущено. Результат появится в очереди и в библиотеке.');
+          }}
+        />
       )}
     </section>
   );

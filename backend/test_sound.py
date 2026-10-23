@@ -2,8 +2,10 @@
 import io
 import unittest
 import uuid
+from unittest.mock import AsyncMock, patch
 
 from backend import main
+from backend import sound
 from backend import test_production as production_tests
 from backend import test_storyboard as board_tests
 
@@ -65,6 +67,32 @@ class SoundTests(unittest.TestCase):
         card = self.client.get(f'/api/productions/{self.pid}/nodes/{self.char["id"]}/voice').json()
         self.assertEqual(card['voice_id'], '')
         self.assertEqual(self.voices()[0]['assigned'], [])
+
+    def test_hero_can_have_several_voices_and_eleven_v4(self):
+        self.setup_production()
+        first = self.add_voice(model='eleven_v4').json()['id']
+        second = self.add_voice(voice_id='voice_456', name='Грэм тихо').json()['id']
+        for vid in (first, second):
+            self.assertEqual(self.client.post(f'/api/productions/{self.pid}/voices/{vid}/assign', json={'character_node_id': self.char['id']}).status_code, 200)
+        self.assertEqual([[a['title'] for a in v['assigned']] for v in self.voices()], [['Грэм'], ['Грэм']])
+        card = f'/api/productions/{self.pid}/nodes/{self.char["id"]}/voice'
+        self.assertEqual(self.client.get(card).json()['voice_id'], 'voice_456')  # последний привязанный — по умолчанию
+        self.client.post(f'/api/productions/{self.pid}/voices/{second}/unassign', json={'character_node_id': self.char['id']})
+        shown = self.client.get(card).json()
+        self.assertEqual((shown['voice_id'], shown['model']), ('voice_123', 'eleven_v4'))  # по умолчанию вернулся первый голос
+        self.assertEqual(self.voices()[1]['assigned'], [])
+
+    def test_voice_preview_uses_free_voice_lookup_and_only_elevenlabs(self):
+        self.setup_production()
+        eleven = self.add_voice().json()['id']
+        fish = self.add_voice(provider='fish').json()['id']
+        url = f'/api/productions/{self.pid}/voices/'
+        with patch.object(sound, 'fetch_preview', AsyncMock(return_value='https://cdn.example.test/p.mp3')) as fetch,                 patch.object(main, 'provider_key', return_value='k'):
+            ok = self.client.get(url + eleven + '/preview')
+            self.assertEqual((ok.status_code, ok.json()), (200, {'preview_url': 'https://cdn.example.test/p.mp3'}))
+            fetch.assert_awaited_once_with('voice_123', 'k')
+            self.assertEqual(self.client.get(url + fish + '/preview').status_code, 400)
+            self.assertEqual(self.client.get(url + 'nope/preview').status_code, 404)
 
     def cue(self, frame, **extra):
         body = {'kind': 'sfx', 'text': 'хлопок двери', **extra}

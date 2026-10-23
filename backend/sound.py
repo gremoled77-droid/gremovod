@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Literal
 from urllib.parse import urlparse
 
+import httpx
 from fastapi import File, HTTPException, UploadFile
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
@@ -130,6 +131,23 @@ def to_csv(frames, heroes):
     return '﻿' + stream.getvalue()
 
 
+async def fetch_preview(voice_id, key):
+    """Готовый пример звучания голоса ElevenLabs (preview_url из описания голоса): озвучка не запускается."""
+    try:
+        async with httpx.AsyncClient(timeout=20, follow_redirects=False) as client:
+            r = await client.get('https://api.elevenlabs.io/v1/voices/' + voice_id, headers={'xi-api-key': key})
+    except httpx.RequestError:
+        raise HTTPException(502, 'ElevenLabs не ответил. Попробуй позже.')
+    if r.status_code == 404:
+        raise HTTPException(404, 'Голос не найден в аккаунте ElevenLabs. Добавь его в «Мои голоса» на сайте сервиса.')
+    if r.status_code != 200:
+        raise HTTPException(502, f'ElevenLabs отклонил запрос (HTTP {r.status_code}). Проверь ключ и права.')
+    url = r.json().get('preview_url') or ''
+    if not url.startswith('https://'):
+        raise HTTPException(404, 'У голоса нет готового примера.')
+    return url
+
+
 def register(app, studio):
     @app.on_event('startup')
     def setup():
@@ -137,6 +155,7 @@ def register(app, studio):
             db.execute('''CREATE TABLE IF NOT EXISTS voice_library(id TEXT PRIMARY KEY, production_id TEXT NOT NULL, provider TEXT NOT NULL,
                 name TEXT NOT NULL, voice_id TEXT NOT NULL, model TEXT NOT NULL, url TEXT NOT NULL DEFAULT '', note TEXT NOT NULL DEFAULT '',
                 archived INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL)''')
+            db.execute('CREATE TABLE IF NOT EXISTS hero_voices(node_id TEXT NOT NULL, voice_lib_id TEXT NOT NULL, created_at TEXT NOT NULL, PRIMARY KEY(node_id, voice_lib_id))')
             db.execute('''CREATE TABLE IF NOT EXISTS frame_sound_cues(id TEXT PRIMARY KEY, production_id TEXT NOT NULL, frame_id TEXT NOT NULL,
                 kind TEXT NOT NULL, text TEXT NOT NULL DEFAULT '', hero_node_id TEXT, level_db REAL NOT NULL, start_s REAL NOT NULL DEFAULT 0,
                 duration_s REAL, file_id TEXT, archived INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL, updated_at TEXT NOT NULL)''')
@@ -151,9 +170,14 @@ def register(app, studio):
             voices = [dict(r) for r in db.execute('SELECT * FROM voice_library WHERE production_id=? AND archived=0 ORDER BY provider, created_at, id', (pid,))]
             heroes = db.execute('''SELECT n.id, n.title, v.profile FROM production_nodes n JOIN character_voices v ON v.node_id=n.id
                 WHERE n.production_id=? AND n.kind='character' ''', (pid,)).fetchall()
+            links = db.execute('''SELECT h.voice_lib_id, n.id, n.title FROM hero_voices h JOIN production_nodes n ON n.id=h.node_id
+                WHERE n.production_id=? AND n.kind='character' ORDER BY h.created_at''', (pid,)).fetchall()
         cards = [(h['id'], h['title'], json.loads(h['profile'])) for h in heroes]
         for v in voices:
-            v['assigned'] = [{'node_id': nid, 'title': title} for nid, title, p in cards if p.get('provider') == v['provider'] and p.get('voice_id') == v['voice_id']]
+            assigned = {nid: title for lid, nid, title in links if lid == v['id']}
+            # Старые привязки, сделанные до списка «несколько голосов», видны по активному голосу героя.
+            assigned.update({nid: title for nid, title, p in cards if p.get('provider') == v['provider'] and p.get('voice_id') == v['voice_id']})
+            v['assigned'] = [{'node_id': nid, 'title': title} for nid, title in assigned.items()]
         return voices
 
     @app.post(base + '/voices')
@@ -169,6 +193,17 @@ def register(app, studio):
             db.execute('INSERT INTO voice_library(id,production_id,provider,name,voice_id,model,url,note,archived,created_at) VALUES(?,?,?,?,?,?,?,?,0,?)',
                        (vid, pid, body.provider, body.name.strip(), body.voice_id, model, body.url, body.note.strip(), studio.now()))
         return {'id': vid}
+
+    @app.get(base + '/voices/{vid}/preview')
+    async def voice_preview(pid: str, vid: str):
+        folders.production(studio, pid)
+        with studio.connect() as db:
+            voice = db.execute('SELECT * FROM voice_library WHERE id=? AND production_id=? AND archived=0', (vid, pid)).fetchone()
+        if not voice:
+            raise HTTPException(404, 'Голос не найден')
+        if voice['provider'] != 'elevenlabs':
+            raise HTTPException(400, 'Предпрослушивание пока только для ElevenLabs')
+        return {'preview_url': await fetch_preview(voice['voice_id'], studio.provider_key('elevenlabs'))}
 
     @app.delete(base + '/voices/{vid}')
     def archive_voice(pid: str, vid: str):
@@ -191,6 +226,8 @@ def register(app, studio):
         profile = {'provider': voice['provider'], 'name': voice['name'], 'voice_id': voice['voice_id'], 'url': voice['url'],
                    'model': voice['model'], 'cost_multiplier': old.get('cost_multiplier', 1)}
         with studio.connect() as db:
+            # Герой может иметь несколько голосов; последний привязанный становится голосом по умолчанию.
+            db.execute('INSERT OR IGNORE INTO hero_voices VALUES(?,?,?)', (info['id'], vid, studio.now()))
             db.execute('INSERT INTO character_voices VALUES(?,?,?) ON CONFLICT(node_id) DO UPDATE SET profile=excluded.profile,updated_at=excluded.updated_at',
                        (info['id'], json.dumps(profile, ensure_ascii=False), studio.now()))
         character_voice.document(studio, info)
@@ -204,14 +241,23 @@ def register(app, studio):
             raise HTTPException(404, 'Голос не найден')
         info = character_voice.target(studio, pid, body.character_node_id)
         current = character_voice.read_voice(studio, info['id'])
-        if current.get('voice_id') != voice['voice_id'] or current.get('provider') != voice['provider']:
-            raise HTTPException(409, 'У героя сейчас другой голос')
-        empty = character_voice.Voice().model_dump()
+        is_default = current.get('voice_id') == voice['voice_id'] and current.get('provider') == voice['provider']
         with studio.connect() as db:
+            linked = db.execute('SELECT 1 FROM hero_voices WHERE node_id=? AND voice_lib_id=?', (info['id'], vid)).fetchone()
+            if not linked and not is_default:
+                raise HTTPException(409, 'Этот голос не привязан к герою')
+            db.execute('DELETE FROM hero_voices WHERE node_id=? AND voice_lib_id=?', (info['id'], vid))
+            if not is_default:
+                return current
+            rest = db.execute('''SELECT v.* FROM hero_voices h JOIN voice_library v ON v.id=h.voice_lib_id
+                WHERE h.node_id=? AND v.archived=0 ORDER BY h.created_at DESC LIMIT 1''', (info['id'],)).fetchone()
+            profile = ({'provider': rest['provider'], 'name': rest['name'], 'voice_id': rest['voice_id'], 'url': rest['url'],
+                        'model': rest['model'], 'cost_multiplier': current.get('cost_multiplier', 1)}
+                       if rest else character_voice.Voice().model_dump())
             db.execute('INSERT INTO character_voices VALUES(?,?,?) ON CONFLICT(node_id) DO UPDATE SET profile=excluded.profile,updated_at=excluded.updated_at',
-                       (info['id'], json.dumps(empty, ensure_ascii=False), studio.now()))
+                       (info['id'], json.dumps(profile, ensure_ascii=False), studio.now()))
         character_voice.document(studio, info)
-        return empty
+        return profile
 
     # ---------- звуковые заметки кадров ----------
     @app.get(base + '/series/{sid}/sound')

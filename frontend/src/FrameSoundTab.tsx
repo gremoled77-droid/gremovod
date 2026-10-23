@@ -219,6 +219,7 @@ export default function FrameSoundTab({
           pid={ctx.pid}
           cue={voiceCue}
           hero={ctx.heroes.find(h => h.id === voiceCue.hero_node_id)?.title || ''}
+          voices={ctx.voices.filter(v => v.assigned.some(a => a.node_id === voiceCue.hero_node_id))}
           onClose={() => setVoiceCue(null)}
           onDone={() => {
             setVoiceCue(null);

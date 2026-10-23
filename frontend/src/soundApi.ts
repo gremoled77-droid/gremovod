@@ -6,7 +6,7 @@ import type {Cue, CueKind, FrameSound} from './soundCues';
 
 export type Provider = 'elevenlabs' | 'fish';
 export const MODELS: Record<Provider, string[]> = {
-  elevenlabs: ['eleven_multilingual_v2', 'eleven_v3'],
+  elevenlabs: ['eleven_v4', 'eleven_multilingual_v2', 'eleven_v3'],
   fish: ['s2.1-pro', 's2.1-pro-free'],
 };
 export const PROVIDER_LABEL: Record<Provider, string> = {elevenlabs: 'ElevenLabs', fish: 'Fish Audio'};
@@ -58,6 +58,8 @@ export const addVoice = async (
   pid: string,
   body: Pick<Voice, 'provider' | 'name' | 'voice_id' | 'model' | 'url' | 'note'>
 ) => responseJson(await apiFetch(`/api/productions/${pid}/voices`, json('POST', body)));
+export const voicePreview = async (pid: string, vid: string): Promise<string> =>
+  (await responseJson(await apiFetch(`/api/productions/${pid}/voices/${vid}/preview`))).preview_url;
 export const archiveVoice = async (pid: string, vid: string) =>
   responseJson(await apiFetch(`/api/productions/${pid}/voices/${vid}`, {method: 'DELETE'}));
 export const assignVoice = async (pid: string, vid: string, character_node_id: string, undo = false) =>
@@ -118,10 +120,14 @@ export const estimateVoice = async (
   pid: string,
   hero: string,
   text: string,
-  project_id: string
+  project_id: string,
+  voice_library_id = ''
 ): Promise<Quote> =>
   responseJson(
-    await apiFetch(`/api/productions/${pid}/nodes/${hero}/voice/estimate`, json('POST', {text, project_id}))
+    await apiFetch(
+      `/api/productions/${pid}/nodes/${hero}/voice/estimate`,
+      json('POST', {text, project_id, voice_library_id})
+    )
   );
 export const generateVoice = async (
   pid: string,
@@ -129,7 +135,8 @@ export const generateVoice = async (
   text: string,
   project_id: string,
   quote: Quote,
-  request_id: string
+  request_id: string,
+  voice_library_id = ''
 ): Promise<{asset_id: string}> =>
   responseJson(
     await apiFetch(
@@ -141,6 +148,7 @@ export const generateVoice = async (
         quote_token: quote.quote_token,
         max_cost_usd: quote.estimated_usd,
         approved: true,
+        voice_library_id,
       })
     )
   );

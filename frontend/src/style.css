@@ -1120,7 +1120,8 @@ footer {
   gap: 8px;
   margin: 12px 0;
 }
-.character-reference-thumbnails > a {
+.character-reference-thumbnails > a,
+.character-reference-thumbnails > button {
   display: block;
   min-width: 0;
   border: 1px solid var(--border);
@@ -1128,6 +1129,8 @@ footer {
   overflow: hidden;
   background: var(--surface);
   color: var(--text);
+  padding: 0;
+  cursor: pointer;
 }
 .character-reference-thumbnails img {
   display: block;
