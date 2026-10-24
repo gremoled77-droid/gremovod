@@ -51,6 +51,19 @@ table{border-collapse:collapse;width:100%}td,th{border-bottom:1px solid var(--bo
 .drawer{position:fixed;top:52px;right:0;bottom:0;width:340px;background:var(--surface);border-left:1px solid var(--border);padding:14px;overflow:auto;transform:translateX(100%);transition:.2s;z-index:5}
 .drawer.open{transform:none}
 .drawer details{border-bottom:1px solid var(--border);padding:6px 0}.drawer summary{cursor:pointer}
+.pe{display:grid;grid-template-columns:170px 1fr;gap:14px;align-items:start}
+.pe .side{display:flex;flex-direction:column;gap:6px}.pe .side h4{margin:8px 0 2px}
+.pe .pick{display:flex;align-items:center;gap:8px;padding:5px;border:1px solid var(--border);border-radius:8px;cursor:pointer;background:var(--surface)}
+.pe .pick.on{border-color:var(--accent)}.pe .pick i{width:34px;aspect-ratio:1;border-radius:6px;background:linear-gradient(135deg,#4a4130,#222633);flex:none}
+.pe .pick.plus{justify-content:center;color:var(--muted);border-style:dashed}
+.stage{height:42vh;aspect-ratio:16/9;max-width:100%;border-radius:var(--r);position:relative;overflow:hidden;background:linear-gradient(135deg,#3a3326,#1d2230 60%,#141820);user-select:none;touch-action:none}
+.stage .col{position:absolute;top:0;bottom:0;width:33.333%;border-right:1px dashed rgba(255,255,255,.12)}
+.stage .col span{position:absolute;top:6px;left:8px;font-size:11px;color:var(--muted)}
+.stage .loc{position:absolute;left:10px;bottom:8px;font-size:12px;color:var(--muted)}
+.mk{position:absolute;display:flex;flex-direction:column;align-items:center;cursor:grab;font-size:11px}
+.mk i{display:block;border-radius:50% 50% 8px 8px;background:linear-gradient(160deg,#f2b134,#7a5a1c);border:2px solid #fff3}
+.plusbar{display:flex;justify-content:flex-end;margin-top:6px}
+.bar{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:8px 0}
 .opts{display:flex;flex-wrap:wrap;gap:4px;margin:6px 0}
 .opts button{padding:3px 9px;font-size:12px}
 .toast{position:fixed;left:50%;bottom:70px;transform:translateX(-50%);background:var(--surface-2);border:1px solid var(--accent);padding:8px 14px;border-radius:999px;opacity:0;transition:.2s;z-index:9;pointer-events:none}
@@ -113,12 +126,10 @@ const DR={
   <p class="muted">Реальные фото места в запрос не уходят (скрыты).</p>`,
  refine:()=>`<div class="opts"><button class="on" onclick="toast('Правка этого варианта')">Исправить этот</button><button onclick="toast('Результат станет фото нового шота сразу после текущего')">Новый шот из этого</button></div>
   <b>Что не так?</b>
-  <details><summary>Свет</summary>${opts(['окно','фонарь','солнце','лампа салона','фары','слева','справа','сверху','контровой','мягче','жёстче'])}</details>
-  <details open><summary>Камера</summary>${opts(['ближе','дальше','только глаза','только руки','выше','ниже','на уровне глаз','с места водителя','с места пассажира','через лобовое'])}</details>
-  <details><summary>Глубина</summary>${opts(['+ передний план','размыть фон','убрать лишнее сзади'])}</details>
-  <details><summary>Атмосфера</summary>${opts(['дымка','пар','пыль','снежинки','проще и чище'])}</details>
-  <details><summary>Стиль и лицо</summary>${opts(['ближе к эталону стиля','вернуть лицо героя','меньше пластика'])}</details>
-  <details><summary>Очистить</summary>${opts(['простой','универсальный','подробный'])}<input placeholder="где: земля, деревья, фон" style="width:100%"></details>
+  <details open><summary>Источник света</summary>${opts(['окно','фонарь','солнце','лампа салона','фары','слева','справа','сверху','контровой','мягче','жёстче'])}</details>
+  <details><summary>3 плана</summary>${opts(['чётче передний план','чётче средний','чётче задний','размыть задний','+ предмет на переднем'])}</details>
+  <details><summary>Воздух: пространство и туман</summary>${opts(['больше воздуха','дымка','туман','пар','пыль','снежинки','проще и чище'])}</details>
+  <details><summary>Фактура кожи</summary>${opts(['живая кожа','мягче','больше деталей','меньше пластика','вернуть лицо героя'])}</details>
   <p><input placeholder="Хочу увидеть: щурится" style="width:100%"></p>
   <p class="muted" id="rsum">Ничего не выбрано</p>
   <button class="main" onclick="S.variants++;S.sel=S.variants;render();toast('Готово: новый вариант — доработка (макет)')">Допилить · $0.04</button>
@@ -196,17 +207,24 @@ function photoEditor(inShot){
  const chips=(l,o)=>`<div class="row"><span class="muted" style="width:80px">${l}</span>${o.map(x=>`<button onclick="this.classList.toggle('on')">${x}</button>`).join('')}</div>`;
  let h=`<h1>${inShot?'Шот 3 · Крупно лицо — хитрый прищур':'Фото · пробы'}</h1>
  ${inShot?`<div class="row"><label><input type="checkbox"> говорит в шоте</label><span class="muted">→ фото и видео под липсинк</span></div><div class="tabs"><button class="${tab==='photo'?'on':''}" onclick="S.shotTab='photo';render()">Фото</button><button class="${tab==='video'?'on':''}" onclick="S.shotTab='video';render()">Видео</button></div>`:''}`;
- if(tab==='photo'){h+=`
- <div class="row" style="margin-bottom:8px"><span class="chip">Грэм <select><option>Основной</option><option>Зима</option><option>Карнавал</option></select></span><span class="chip">Комаровка <select><option>день</option><option>вечер</option><option>ночь (нет варианта)</option></select></span><button class="ghost" onclick="drawer('refs')">Что уйдёт в запрос · 4</button></div>
- <div class="big">вариант ${S.sel}${S.sel===S.approved?' · <span class="ok">&nbsp;утверждён ✓</span>':''}<button class="refine" onclick="drawer('refine')">✎ Допилить</button></div>
- <div class="row" style="margin:8px 0">${Array.from({length:S.variants},(_,i)=>`<div class="thumb ${i+1===S.sel?'sel':''}" style="width:96px" onclick="S.sel=${i+1};render()">${i+1===S.approved?'<span class="tick">✓</span>':''}${i+1}</div>`).join('')}</div>
- <div class="row"><button onclick="S.approved=S.sel;render();toast('Утверждено — опора для видео шота')">Утвердить для шота</button><span class="muted">Направления:</span>${['Ближе','Глубже','Свет','Масштаб'].map(a=>`<button onclick="S.variants++;S.sel=S.variants;render();toast('Новый вариант: ось «${a}», остальное держится (макет)')">${a}</button>`).join('')}<span class="info" title="Ось «Реализм» появляется в режиме «реалистичное кино»">И</span></div>
- <h2>Промпт</h2><textarea placeholder="Смысл: Грэм задумал схитрить. Что делает и чувствует…">Грэм щурится и прячет улыбку — задумал схитрить</textarea>
- ${chips('Крупность',['общий','средний','крупный','только глаза'])}${chips('Ракурс',['на уровне глаз','сверху','снизу','с места пассажира'])}${chips('Свет',['из сцены','слева','справа','контровой','мягче'])}
- <details><summary class="muted">Оптика и заполнялка</summary>${chips('Оптика',['широкий угол','нормальный','телевик'])}${chips('Доминанта',['лицо','руки','машина'])}</details>
+ if(tab==='photo'){const C=S.cast,pl=['слева','в центре','справа'],y={'задний':[50,34],'средний':[30,50],'передний':[10,70]};
+ const req=C.map(c=>`${c.h} (${c.look}): ${pl[c.col]}, ${c.plan} план`).join('; ')+(C.length?'. ':'')+`Место: ${S.loc.n}${S.loc.v!=='Основной'?' · '+S.loc.v:''}, ${S.time}, ${S.weather}.`;
+ h+=`<div class="pe"><div class="side"><h4>Герои</h4>${HEROES.map(n=>`<div class="pick ${C.some(c=>c.h===n)?'on':''}" onclick="castToggle('${n}')"><i></i>${n}</div>`).join('')}<div class="pick plus" onclick="toast('Новый герой: имя + референс, довести в «Мир» (макет)')">＋ герой</div>
+ <h4>Локации</h4>${PLACES.map(n=>`<div class="pick ${S.loc.n===n?'on':''}" onclick="S.loc={n:'${n}',v:'Основной'};render()"><i></i>${n}</div>`).join('')}<div class="pick plus" onclick="toast('Новая локация: название + фото, довести в «Мир» (макет)')">＋ локация</div></div>
+ <div><div class="stage" id="stage"><div class="col" style="left:0"><span>слева</span></div><div class="col" style="left:33.333%"><span>в центре</span></div><div class="col" style="left:66.666%;border:0"><span>справа</span></div>
+ ${C.map((c,k)=>{const [b,w]=y[c.plan];const off=C.slice(0,k).filter(o=>o.col===c.col&&o.plan===c.plan).length*14;return `<div class="mk" data-k="${k}" style="left:calc(${c.col*33.333+16.666}% - ${w/2}px + ${off}px);bottom:${b}%;width:${w}px"><i style="width:${w}px;height:${w*1.1}px"></i>${c.h}</div>`}).join('')}
+ <div class="loc">${S.loc.n} · ${S.loc.v}</div><div class="muted" style="position:absolute;right:10px;top:6px;font-size:11px">вариант ${S.sel}${S.sel===S.approved?' · утверждён ✓':''}</div></div>
+ <div class="plusbar" style="max-width:calc(42vh*16/9)"><button class="ghost" title="Допилить фото" onclick="drawer('refine')">＋ Допилить</button></div>
+ <div class="row" style="margin:6px 0">${Array.from({length:S.variants},(_,i)=>`<div class="thumb ${i+1===S.sel?'sel':''}" style="width:80px" onclick="S.sel=${i+1};render()">${i+1===S.approved?'<span class="tick">✓</span>':''}${i+1}</div>`).join('')}<button onclick="S.approved=S.sel;render();toast('Утверждено — опора для видео шота')">Утвердить для шота</button></div>
+ <div class="bar"><span class="muted">Выбрано:</span>${C.map((c,k)=>`<span class="chip">${c.h} <select onchange="S.cast[${k}].look=this.value">${['Основной','Зима','Карнавал'].map(l=>`<option ${l===c.look?'selected':''}>${l}</option>`).join('')}</select> <select onchange="S.cast[${k}].plan=this.value;render()">${['задний','средний','передний'].map(l=>`<option ${l===c.plan?'selected':''}>${l}</option>`).join('')}</select> <b onclick="S.cast.splice(${k},1);render()">×</b></span>`).join('')||'<span class="muted">герой не выбран</span>'}
+ <span class="chip">${S.loc.n} <select onchange="S.loc.v=this.value;render()">${['Основной','Ночь','Зима'].map(l=>`<option ${l===S.loc.v?'selected':''}>${l}</option>`).join('')}</select> <select onchange="S.time=this.value;render()">${['день','утро','вечер','пасмурно'].map(l=>`<option ${l===S.time?'selected':''}>${l}</option>`).join('')}</select> <select onchange="S.weather=this.value;render()">${['ясно','дождь','снег'].map(l=>`<option ${l===S.weather?'selected':''}>${l}</option>`).join('')}</select></span>
+ <button class="ghost" onclick="drawer('refs')">Что уйдёт в запрос</button></div>
+ <p class="muted" style="margin:4px 0">Расстановка → в запрос: ${req}</p>
+ <textarea placeholder="Что они делают: Грэм слушает, Прохор жестикулирует…">Грэм слушает пассажира и прячет улыбку</textarea>
+ <details><summary class="muted">Камера и оптика</summary>${chips('Крупность',['общий','средний','крупный','только глаза'])}${chips('Ракурс',['на уровне глаз','сверху','снизу','с места пассажира'])}${chips('Оптика',['широкий угол','нормальный','телевик'])}</details>
  <div class="row" style="margin-top:10px"><select><option>Nano Banana 2.1</option><option>GPT Image 2.5</option><option>Seedream 5 Lite</option><option>Seedream 5 Pro</option></select>
- <button class="main" onclick="gen(this)">Сгенерировать · $0.04</button><span class="muted">Сохранится в: ${where}</span><button class="ghost" onclick="toast('Английский промпт после переписывания LLM — по нажатию')">EN ▸</button><span class="info" title="5 вопросов: доминанта, смысл без слов, чей взгляд, желание/препятствие, ритм">5?</span></div>
- ${inShot?'':`<div class="row" style="margin-top:8px"><button onclick="toast('Перенести в шот… (выбор)')">Перенести в шот…</button><button onclick="toast('В Мир… (герой, место, реквизит)')">В Мир…</button><button onclick="toast('Сделать эталоном стиля')">Сделать эталоном стиля</button></div>`}`}
+ <button class="main" onclick="gen(this)">Сгенерировать · $0.04</button><span class="muted">Сохранится в: ${where}</span><button class="ghost" onclick="toast('Английский промпт после переписывания LLM — по нажатию')">EN ▸</button></div>
+ <div class="row" style="margin-top:8px"><span class="muted">Направления:</span>${['Ближе','Глубже','Свет','Масштаб'].map(a=>`<button onclick="S.variants++;S.sel=S.variants;render();toast('Новый вариант: ось «${a}» (макет)')">${a}</button>`).join('')}${inShot?'':`<button onclick="toast('Перенести в шот… (выбор)')">В шот…</button><button onclick="toast('В Мир… (герой, место, реквизит)')">В Мир…</button>`}</div></div></div>`;setTimeout(initDrag,0)}
  else{const dear=S.videoModel==='Seedance 2.5';h+=`
  <div class="split" style="grid-template-columns:200px 1fr"><div><div class="thumb sel"><span class="tick">✓</span>утверждённое фото</div><p class="muted">Видео делается только от утверждённого фото.</p></div>
  <div><textarea>0–2 с: слушает пассажира. 2–4 с: смотрит в зеркало, медленно щурится. 4–5 с: держит взгляд, молчит.</textarea>
@@ -215,6 +233,12 @@ function photoEditor(inShot){
  ${dear?'<label class="warn"><input type="checkbox" id="ok"> подтверждаю $0.75</label>':''}<button class="main" onclick="if(${dear}&&!$('ok').checked){toast('Дороже $0.50 — поставьте галочку');return}toast('Шот отправлен (макет)')">Сделать шот · ${dear?'$0.75':'$0.15'}</button></div>
  <h2>Дубли</h2><div class="row">${[1,2].map(i=>`<div class="card" style="width:200px"><div class="thumb">дубль ${i}</div><div class="row" style="margin-top:6px"><button onclick="toast('Выбран')">Выбрать</button><button onclick="toast('Принят после просмотра')">Принять</button></div><div class="opts">${['лицо меняется','машина плывёт','камера дёргается','много движения'].map(x=>`<button onclick="toast('Добавлено ограничение «${x}», повтор (макет)')">${x}</button>`).join('')}</div></div>`).join('')}</div></div></div>`}
  return h}
+const HEROES=['Грэм','Прохор','Звезда','Шестёрка'],PLACES=['Двор на Немиге','Комаровка','Кухня'];
+S.cast=[{h:'Грэм',look:'Основной',col:0,plan:'средний'}];S.loc={n:'Двор на Немиге',v:'Основной'};S.time='день';S.weather='ясно';
+function castToggle(n){const i=S.cast.findIndex(c=>c.h===n);if(i>=0)S.cast.splice(i,1);else S.cast.push({h:n,look:'Основной',col:1,plan:'средний'});render()}
+function initDrag(){const st=document.getElementById('stage');if(!st)return;st.querySelectorAll('.mk').forEach(m=>m.onpointerdown=e=>{e.preventDefault();m.setPointerCapture(e.pointerId);const r=st.getBoundingClientRect();
+ m.onpointermove=ev=>{m.style.left=(ev.clientX-r.left-m.offsetWidth/2)+'px'};
+ m.onpointerup=ev=>{S.cast[+m.dataset.k].col=Math.max(0,Math.min(2,Math.floor((ev.clientX-r.left)/r.width*3)));render()}})}
 function gen(b){if(S.pending){toast('Такой запрос уже ждёт ответа — смените модель или «Снять ожидание»');return}S.pending=true;b.textContent='Ждёт ответа…';setTimeout(()=>{S.pending=false;S.variants++;S.sel=S.variants;render();toast('Готово (макет, без генерации)')},1200)}
 function render(){const r=route();nav(r);const key=r[0]==='world'?'world/'+(r[1]||'heroes'):r[0];const f=V[key]||V.home;$('main').innerHTML=f(r[1]);$('drawer').classList.remove('open')}
 S.videoModel='MiniMax H3 · 480p · 5 с';
