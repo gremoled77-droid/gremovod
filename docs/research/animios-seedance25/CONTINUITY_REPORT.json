@@ -1,0 +1,208 @@
+{
+  "schema_version": "1.0.0",
+  "contract_type": "continuity_report",
+  "status": "BLOCKED",
+  "issues": [
+    {
+      "code": "UNAPPROVED_STAGE",
+      "severity": "WARN",
+      "detail": "Stage geometry requires owner review"
+    },
+    {
+      "code": "UNVERIFIED_GEOGRAPHY",
+      "severity": "WARN",
+      "detail": "ANIMIOS_SH01"
+    },
+    {
+      "code": "UNVERIFIED_GEOGRAPHY",
+      "severity": "WARN",
+      "detail": "ANIMIOS_SH02"
+    },
+    {
+      "code": "GEOGRAPHY_TRANSITION_UNVERIFIED",
+      "severity": "WARN",
+      "detail": "ANIMIOS_SH02"
+    },
+    {
+      "code": "UNVERIFIED_GEOGRAPHY",
+      "severity": "WARN",
+      "detail": "ANIMIOS_SH03"
+    },
+    {
+      "code": "GEOGRAPHY_TRANSITION_UNVERIFIED",
+      "severity": "WARN",
+      "detail": "ANIMIOS_SH03"
+    },
+    {
+      "code": "UNVERIFIED_GEOGRAPHY",
+      "severity": "WARN",
+      "detail": "ANIMIOS_SH04"
+    },
+    {
+      "code": "CHARACTER_EXIT_UNVERIFIED",
+      "severity": "WARN",
+      "detail": "ANIMIOS_SH04:C01"
+    },
+    {
+      "code": "CHARACTER_EXIT_UNVERIFIED",
+      "severity": "WARN",
+      "detail": "ANIMIOS_SH04:C02"
+    },
+    {
+      "code": "CHARACTER_EXIT_UNVERIFIED",
+      "severity": "WARN",
+      "detail": "ANIMIOS_SH04:C03"
+    },
+    {
+      "code": "CHARACTER_EXIT_UNVERIFIED",
+      "severity": "WARN",
+      "detail": "ANIMIOS_SH04:C04"
+    },
+    {
+      "code": "GEOGRAPHY_TRANSITION_UNVERIFIED",
+      "severity": "WARN",
+      "detail": "ANIMIOS_SH04"
+    },
+    {
+      "code": "UNVERIFIED_GEOGRAPHY",
+      "severity": "WARN",
+      "detail": "ANIMIOS_SH05"
+    },
+    {
+      "code": "GEOGRAPHY_TRANSITION_UNVERIFIED",
+      "severity": "WARN",
+      "detail": "ANIMIOS_SH05"
+    },
+    {
+      "code": "UNVERIFIED_GEOGRAPHY",
+      "severity": "WARN",
+      "detail": "ANIMIOS_SH06"
+    },
+    {
+      "code": "CHARACTER_EXIT_UNVERIFIED",
+      "severity": "WARN",
+      "detail": "ANIMIOS_SH06:C05"
+    },
+    {
+      "code": "PROP_EXIT_UNVERIFIED",
+      "severity": "WARN",
+      "detail": "ANIMIOS_SH06:P01"
+    },
+    {
+      "code": "GEOGRAPHY_TRANSITION_UNVERIFIED",
+      "severity": "WARN",
+      "detail": "ANIMIOS_SH06"
+    },
+    {
+      "code": "UNVERIFIED_GEOGRAPHY",
+      "severity": "WARN",
+      "detail": "ANIMIOS_SH07"
+    },
+    {
+      "code": "GEOGRAPHY_TRANSITION_UNVERIFIED",
+      "severity": "WARN",
+      "detail": "ANIMIOS_SH07"
+    },
+    {
+      "code": "UNVERIFIED_GEOGRAPHY",
+      "severity": "WARN",
+      "detail": "ANIMIOS_SH08"
+    },
+    {
+      "code": "CHARACTER_EXIT_UNVERIFIED",
+      "severity": "WARN",
+      "detail": "ANIMIOS_SH08:C01"
+    },
+    {
+      "code": "CHARACTER_EXIT_UNVERIFIED",
+      "severity": "WARN",
+      "detail": "ANIMIOS_SH08:C02"
+    },
+    {
+      "code": "CHARACTER_EXIT_UNVERIFIED",
+      "severity": "WARN",
+      "detail": "ANIMIOS_SH08:C03"
+    },
+    {
+      "code": "GEOGRAPHY_TRANSITION_UNVERIFIED",
+      "severity": "WARN",
+      "detail": "ANIMIOS_SH08"
+    },
+    {
+      "code": "UNVERIFIED_GEOGRAPHY",
+      "severity": "WARN",
+      "detail": "ANIMIOS_SH09"
+    },
+    {
+      "code": "CHARACTER_EXIT_UNVERIFIED",
+      "severity": "WARN",
+      "detail": "ANIMIOS_SH09:C04"
+    },
+    {
+      "code": "PROP_EXIT_UNVERIFIED",
+      "severity": "WARN",
+      "detail": "ANIMIOS_SH09:P02"
+    },
+    {
+      "code": "GEOGRAPHY_TRANSITION_UNVERIFIED",
+      "severity": "WARN",
+      "detail": "ANIMIOS_SH09"
+    },
+    {
+      "code": "UNVERIFIED_GEOGRAPHY",
+      "severity": "WARN",
+      "detail": "ANIMIOS_SH10"
+    },
+    {
+      "code": "UNVERIFIED_GEOGRAPHY",
+      "severity": "WARN",
+      "detail": "ANIMIOS_SH11"
+    },
+    {
+      "code": "CHARACTER_EXIT_UNVERIFIED",
+      "severity": "WARN",
+      "detail": "ANIMIOS_SH11:C03"
+    },
+    {
+      "code": "GEOGRAPHY_TRANSITION_UNVERIFIED",
+      "severity": "WARN",
+      "detail": "ANIMIOS_SH11"
+    },
+    {
+      "code": "BLOCKED_UNVERIFIED_ASSET",
+      "severity": "BLOCKED",
+      "detail": "C05_CHEF_SHEET_UNAVAILABLE"
+    },
+    {
+      "code": "BLOCKED_UNVERIFIED_ASSET",
+      "severity": "BLOCKED",
+      "detail": "GALLEY_DOOR_REF_UNAVAILABLE"
+    },
+    {
+      "code": "BLOCKED_UNVERIFIED_ASSET",
+      "severity": "BLOCKED",
+      "detail": "PIZZA_PROP_REF_UNAVAILABLE"
+    },
+    {
+      "code": "BLOCKED_UNVERIFIED_ASSET",
+      "severity": "BLOCKED",
+      "detail": "KF_BEFORE_IMPACT_UNAVAILABLE"
+    },
+    {
+      "code": "BLOCKED_UNVERIFIED_ASSET",
+      "severity": "BLOCKED",
+      "detail": "KF_AFTER_IMPACT_UNAVAILABLE"
+    }
+  ],
+  "visual_acceptance": "NOT_PERFORMED",
+  "execution_allowed": false,
+  "input_digest": "7fc0644f62f4a32e000bbd6a54a0fbe8c33bbaefb4945b009386ca1d4b90da51",
+  "stage_note": "Axes are a proposed convention; source world geography is unverified.",
+  "timing_summary": {
+    "shots": 11,
+    "hard_cuts": 10,
+    "frames": 760,
+    "impact_candidate_frame": 672,
+    "impact_is_cut": false
+  }
+}

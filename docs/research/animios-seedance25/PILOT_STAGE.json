@@ -1,0 +1,28 @@
+{
+  "schema_version": "1.0.0",
+  "project_id": "gremovod",
+  "scene_id": "EP01_SECRET_LIMO_REVEAL",
+  "status": "ILLUSTRATIVE_PENDING_OWNER_APPROVAL",
+  "reconstructed": false,
+  "not_approved_3d_asset": true,
+  "units": "meters",
+  "fps": {"num":24,"den":1},
+  "duration_frames": 240,
+  "duration_seconds": 10,
+  "frame_interval": "[0,240)",
+  "required_aspect_ratios": ["16:9","9:16"],
+  "world_axes": {"up":"+Z","forward":"+Y","right":"+X","physical_vehicle_left":"-X","physical_vehicle_right":"+X","screen_left_right":"camera/composition dependent; never substitute for physical vehicle side"},
+  "graybox_reference": {"status":"ILLUSTRATIVE_PROXY_DIMENSIONS_NOT_APPROVED_ASSET","origin":"vehicle geometry bounding-box center at [0,0,0] meters; front face points toward +Y","dimensions_m":{"length_y":6.5,"width_x":1.8,"height_z":1.5},"dimensions_note":"placeholder dimensions for camera blocking only; not measured or approved vehicle geometry; rigid length_y is constant across the timeline"},
+  "assets": {"vehicle_id":"LIMO_2106","character_id":"GREM","approved_vehicle_geometry_id":"REQUIRES_OWNER_APPROVAL","master_asset_sha256":null,"grem_character_sheet":"REQUIRES_OWNER_APPROVAL"},
+  "vehicle_canon": {"color":"yellow","front":"classic VAZ-2106 grille and headlamp arrangement; no BMW fascia","body":"single rigid immutable geometry for all 240 frames; fixed length; reveal only by camera framing/movement, never morph/stretch","left_side":"standard front door, fixed short insert with narrow window, elongated rear suicide door hinged at rearmost pillar","right_side":"elongated rear door, exposed hinges and narrow center window","wheel_style":"BBS mesh (canon target; not verified asset)","interior":"brown diamond quilted leather, wood, black steering wheel, red rose shift knob (not shown in pilot unless separately approved)"},
+  "pilot_phase_0": {"character_presence":"GREM absent","vehicle_transform":"immutable across all keys","background_geometry":"simple graybox only; no factual claim about approved assets"},
+  "camera_proxy_keys": [
+    {"key_id":"CAM01","frame":0,"time_seconds":0,"camera_position_xyz_m":[0.0,-7.0,1.35],"target_xyz_m":[0.0,1.2,0.9],"lens_mm":70,"framing":"tight front detail; show classic grille/headlamps and suppress view of full body by crop","vehicle_geometry_id":"LIMO_2106","vehicle_transform_id":"VEHICLE_FIXED_01"},
+    {"key_id":"CAM02","frame":72,"time_seconds":3,"camera_position_xyz_m":[-3.4,-4.6,1.5],"target_xyz_m":[0.0,0.5,1.0],"lens_mm":55,"framing":"front three-quarter; show standard front door and original fascia","vehicle_geometry_id":"LIMO_2106","vehicle_transform_id":"VEHICLE_FIXED_01"},
+    {"key_id":"CAM03","frame":144,"time_seconds":6,"camera_position_xyz_m":[-5.8,0.4,1.65],"target_xyz_m":[0.0,0.7,0.95],"lens_mm":45,"framing":"camera tracks along physical left (-X) side; reveal fixed insert and rear door progressively","vehicle_geometry_id":"LIMO_2106","vehicle_transform_id":"VEHICLE_FIXED_01"},
+    {"key_id":"CAM04","frame":239,"time_seconds":9.958333333,"camera_position_xyz_m":[-8.0,-2.5,2.4],"target_xyz_m":[0.0,1.5,0.8],"lens_mm":35,"framing":"wide three-quarter view reveals complete rigid elongated body","vehicle_geometry_id":"LIMO_2106","vehicle_transform_id":"VEHICLE_FIXED_01"}
+  ],
+  "validation_invariants": ["vehicle geometry identity/hash constant through timeline","vehicle length unchanged","no scale or mesh morph animation","camera alone reveals hidden body extent","physical left=-X and right=+X under forward=+Y convention","render both 16:9 and 9:16 camera crops"],
+  "approval_status": "PENDING_OWNER_APPROVAL",
+  "asset_status": "BLOCKED_MISSING_APPROVED_VEHICLE_AND_CHARACTER_ASSETS"
+}
