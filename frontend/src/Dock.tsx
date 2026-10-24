@@ -1,5 +1,5 @@
 import {useEffect, useState} from 'react';
-import {Check, RefreshCw, Trash2} from 'lucide-react';
+import {Check, RefreshCw, TimerOff, Trash2} from 'lucide-react';
 import {apiFetch} from './api';
 import {useSharedActivity} from './ActivityContext';
 import {KIND_LABELS, modelLabel} from './modelLabels';
@@ -43,6 +43,15 @@ export default function Dock({projectId, onClose}: {projectId: string; onClose: 
     setError('');
     const r = await apiFetch(`/api/activity/${id}/hide`, {method: 'POST'});
     if (!r.ok) setError('Не удалось убрать задание');
+  };
+  const stopWaiting = async (id: string) => {
+    const ok = window.confirm(
+      'Снять ожидание? Только если в истории PiAPI задачи нет или она с ошибкой. Такой же запрос можно будет отправить снова; резерв бюджета останется до сверки.'
+    );
+    if (!ok) return;
+    setError('');
+    const r = await apiFetch(`/api/jobs/${id}/stop-waiting`, {method: 'POST'});
+    if (!r.ok) setError('Не удалось снять ожидание');
   };
   useEffect(() => {
     if (!projectId) return;
@@ -92,10 +101,14 @@ export default function Dock({projectId, onClose}: {projectId: string; onClose: 
           const thumb = i.status === 'done' && i.kind === 'image' ? i.asset_ids[0] : '';
           const saved = FAILED.has(i.status) ? recallRequest(i.id) : null;
           const stuck = i.source === 'api' && !FINAL_RAW.has(i.raw_status.toLowerCase());
-          const hold = (
-            <span title="Ожидание нельзя снять вручную. При неизвестном списании нужна сверка. Можно выбрать другую модель.">
-              Резерв сохранён
-            </span>
+          const stop = (
+            <button
+              title="Снять ожидание (после проверки истории PiAPI)"
+              aria-label="Снять ожидание"
+              onClick={() => void stopWaiting(i.id)}
+            >
+              <TimerOff size={15} />
+            </button>
           );
           return (
             <div key={i.id} className={'dock-item st-' + i.status}>
@@ -126,7 +139,7 @@ export default function Dock({projectId, onClose}: {projectId: string; onClose: 
                     <RefreshCw size={15} />
                   </button>
                   {stuck ? (
-                    hold
+                    stop
                   ) : (
                     <button title="Убрать из очереди" aria-label="Убрать" onClick={() => void hide(i.id)}>
                       <Trash2 size={15} />
@@ -134,7 +147,7 @@ export default function Dock({projectId, onClose}: {projectId: string; onClose: 
                   )}
                 </span>
               ) : stuck ? (
-                <span className="dock-actions">{hold}</span>
+                <span className="dock-actions">{stop}</span>
               ) : (
                 <span>{STATUS[i.status] || i.status}</span>
               )}

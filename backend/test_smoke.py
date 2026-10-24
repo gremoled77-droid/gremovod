@@ -121,7 +121,7 @@ class StudioSmokeTests(unittest.TestCase):
         with main.connect() as db:
             self.assertEqual(db.execute('SELECT COUNT(*) FROM generation_approvals').fetchone()[0],1)
 
-    def test_same_request_waits_for_provider_answer(self):
+    def test_same_request_waits_for_answer_and_owner_can_stop_waiting(self):
         first=self.image_request()
         again=lambda request_id,**changes:self.requote(first,request_id=request_id,**changes)
         main.request_piapi.side_effect=None
@@ -137,7 +137,7 @@ class StudioSmokeTests(unittest.TestCase):
         self.assertEqual(self.client.post('/api/model-jobs',json=again('request-id-other-model',model_id='nano-banana-2.1')).status_code,200)
         self.assertEqual(self.client.post('/api/model-jobs',json=again('request-id-other-prompt',prompt='Дневной Минск')).status_code,200)
         with main.connect() as db: reserved=main.security.budget_state(db,first['project_id'])['project_reserved_usd']
-        self.assertEqual(self.client.post('/api/jobs/'+first['request_id']+'/stop-waiting').status_code,409)
+        self.assertEqual(self.client.post('/api/jobs/'+first['request_id']+'/stop-waiting').status_code,200)
         with main.connect() as db:
             self.assertAlmostEqual(main.security.budget_state(db,first['project_id'])['project_reserved_usd'],reserved)
         main.request_piapi.return_value={'data':{'task_id':'hung-task','status':'completed','output':{}}}
@@ -154,7 +154,7 @@ class StudioSmokeTests(unittest.TestCase):
         self.assertEqual(self.client.post('/api/model-jobs',json=again('request-id-fourth-0001')).status_code,502)
         self.assertEqual(self.client.post('/api/model-jobs',json=again('request-id-fifth-00001')).status_code,409)
 
-    def test_stop_waiting_cannot_clear_an_unresolved_submission(self):
+    def test_stop_waiting_unblocks_repeat_but_keeps_budget_hold(self):
         for status in ('submitting','pending','submission_unknown'):
             with self.subTest(status=status):
                 first=self.image_request(request_id=f'stop-waiting-{status}-0001')
@@ -163,21 +163,21 @@ class StudioSmokeTests(unittest.TestCase):
                 self.assertEqual(self.client.post('/api/model-jobs',json=first).status_code,502 if status=='submission_unknown' else 200)
                 with main.connect() as db:
                     if status=='submitting':db.execute("UPDATE jobs SET status='submitting',task_id=NULL,response='{}' WHERE id=?",(first['request_id'],))
-                    before=dict(db.execute('SELECT * FROM jobs WHERE id=?',(first['request_id'],)).fetchone())
                     budget=main.security.budget_state(db,first['project_id'])
                 calls=main.request_piapi.await_count
-                stopped=self.client.post('/api/jobs/'+first['request_id']+'/stop-waiting',json={'approved':True})
-                self.assertEqual(stopped.status_code,409,stopped.text)
-                with main.connect() as db:
-                    self.assertEqual(dict(db.execute('SELECT * FROM jobs WHERE id=?',(first['request_id'],)).fetchone()),before)
-                    self.assertEqual(main.security.budget_state(db,first['project_id']),budget)
-                repeat=self.requote(first,request_id=f'stop-repeat-{status}-0001')
-                self.assertEqual(self.client.post('/api/model-jobs',json=repeat).status_code,409)
+                stopped=self.client.post('/api/jobs/'+first['request_id']+'/stop-waiting')
+                self.assertEqual(stopped.status_code,200,stopped.text)
+                self.assertTrue(stopped.json()['budget_hold'])
                 self.assertEqual(main.request_piapi.await_count,calls)
+                with main.connect() as db:
+                    self.assertEqual(db.execute('SELECT status FROM jobs WHERE id=?',(first['request_id'],)).fetchone()[0],'failed')
+                    self.assertEqual(main.security.budget_state(db,first['project_id']),budget)
+                self.assertEqual(self.client.post('/api/jobs/'+first['request_id']+'/stop-waiting').status_code,409)
                 main.request_piapi.side_effect=None
-                other=self.requote(first,request_id=f'stop-other-{status}-0001',model_id='nano-banana-2.1')
-                self.assertEqual(self.client.post('/api/model-jobs',json=other).status_code,200)
+                repeat=self.requote(first,request_id=f'stop-repeat-{status}-0001')
+                self.assertEqual(self.client.post('/api/model-jobs',json=repeat).status_code,200)
                 self.assertEqual(main.request_piapi.await_count,calls+1)
+                with main.connect() as db: db.execute("UPDATE jobs SET status='completed' WHERE id=?",(repeat['request_id'],))
         self.assertEqual(self.client.post('/api/jobs/missing-job/stop-waiting').status_code,404)
 
     def test_recovery_rejects_unrelated_provider_task(self):
