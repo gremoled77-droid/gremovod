@@ -1,0 +1,268 @@
+{
+  "schema_version": "1.0.0",
+  "previews": [
+    {
+      "schema_version": "1.0.0",
+      "contract_type": "generation_manifest",
+      "variant": "A",
+      "provider": "piapi",
+      "model_id": "seedance-2.5",
+      "status": "SYNTHETIC_PREVIEW_ONLY",
+      "execution_allowed": false,
+      "launch_enabled": false,
+      "approval_id": null,
+      "estimated_cost_usd": 1.5,
+      "actual_cost_usd": null,
+      "cost_basis": "LOCAL_CATALOG_UNVERIFIED_LIVE",
+      "hold_status": "NOT_RESERVED",
+      "attempts": [],
+      "wire_payload": {
+        "model": "seedance",
+        "task_type": "seedance-2.5",
+        "input": {
+          "prompt": "A camera reveals the full length of a rigid yellow VAZ-2106 limousine; fixed geometry.",
+          "resolution": "480p",
+          "duration": 10,
+          "aspect_ratio": "16:9",
+          "mode": "text_to_video"
+        }
+      },
+      "payload_sha256": "d4eba697df39987d1b642e758243c1666c9ea763055d4f2c5b8239bfb21ff139"
+    },
+    {
+      "schema_version": "1.0.0",
+      "contract_type": "generation_manifest",
+      "variant": "B",
+      "provider": "piapi",
+      "model_id": "seedance-2.5",
+      "status": "SYNTHETIC_PREVIEW_ONLY",
+      "execution_allowed": false,
+      "launch_enabled": false,
+      "approval_id": null,
+      "estimated_cost_usd": 1.5,
+      "actual_cost_usd": null,
+      "cost_basis": "LOCAL_CATALOG_UNVERIFIED_LIVE",
+      "hold_status": "NOT_RESERVED",
+      "attempts": [],
+      "wire_payload": {
+        "model": "seedance",
+        "task_type": "seedance-2.5",
+        "input": {
+          "prompt": "A camera reveals the full length of a rigid yellow VAZ-2106 limousine; fixed geometry. Identity and reveal keys: @image1 @image2 @image3 @image4.",
+          "resolution": "480p",
+          "duration": 10,
+          "aspect_ratio": "16:9",
+          "mode": "omni_reference",
+          "omni_reference_task_type": "reference",
+          "image_urls": [
+            "https://preview.invalid/key1.png",
+            "https://preview.invalid/key2.png",
+            "https://preview.invalid/key3.png",
+            "https://preview.invalid/key4.png"
+          ]
+        }
+      },
+      "payload_sha256": "2d0cc35c45b7156bd2bc862354804251e059601667ed9d243d495508307b2d4f"
+    },
+    {
+      "schema_version": "1.0.0",
+      "contract_type": "generation_manifest",
+      "variant": "C",
+      "provider": "piapi",
+      "model_id": "seedance-2.5",
+      "status": "SYNTHETIC_PREVIEW_ONLY",
+      "execution_allowed": false,
+      "launch_enabled": false,
+      "approval_id": null,
+      "estimated_cost_usd": 2.25,
+      "actual_cost_usd": null,
+      "cost_basis": "LOCAL_CATALOG_UNVERIFIED_LIVE",
+      "hold_status": "NOT_RESERVED",
+      "attempts": [],
+      "wire_payload": {
+        "model": "seedance",
+        "task_type": "seedance-2.5",
+        "input": {
+          "prompt": "A camera reveals the full length of a rigid yellow VAZ-2106 limousine; fixed geometry. Identity and reveal keys: @image1 @image2 @image3 @image4. Camera motion reference: @video1.",
+          "resolution": "480p",
+          "duration": 10,
+          "aspect_ratio": "16:9",
+          "mode": "omni_reference",
+          "omni_reference_task_type": "reference",
+          "image_urls": [
+            "https://preview.invalid/key1.png",
+            "https://preview.invalid/key2.png",
+            "https://preview.invalid/key3.png",
+            "https://preview.invalid/key4.png"
+          ],
+          "video_urls": [
+            "https://preview.invalid/clay.mp4"
+          ]
+        }
+      },
+      "payload_sha256": "664ca79f984462698a0090545c58d96ae79f319b7e1bf38c674b63e884eec0c3"
+    },
+    {
+      "schema_version": "1.0.0",
+      "contract_type": "generation_manifest",
+      "variant": "A",
+      "provider": "piapi",
+      "model_id": "seedance-2.5",
+      "status": "SYNTHETIC_PREVIEW_ONLY",
+      "execution_allowed": false,
+      "launch_enabled": false,
+      "approval_id": null,
+      "estimated_cost_usd": 1.5,
+      "actual_cost_usd": null,
+      "cost_basis": "LOCAL_CATALOG_UNVERIFIED_LIVE",
+      "hold_status": "NOT_RESERVED",
+      "attempts": [],
+      "wire_payload": {
+        "model": "seedance",
+        "task_type": "seedance-2.5",
+        "input": {
+          "prompt": "A camera reveals the full length of a rigid yellow VAZ-2106 limousine; fixed geometry.",
+          "resolution": "480p",
+          "duration": 10,
+          "aspect_ratio": "9:16",
+          "mode": "text_to_video"
+        }
+      },
+      "payload_sha256": "7aa343177e04f526d86625e72f2bae486703a5058277854a12d230f0bb76b1f0"
+    },
+    {
+      "schema_version": "1.0.0",
+      "contract_type": "generation_manifest",
+      "variant": "B",
+      "provider": "piapi",
+      "model_id": "seedance-2.5",
+      "status": "SYNTHETIC_PREVIEW_ONLY",
+      "execution_allowed": false,
+      "launch_enabled": false,
+      "approval_id": null,
+      "estimated_cost_usd": 1.5,
+      "actual_cost_usd": null,
+      "cost_basis": "LOCAL_CATALOG_UNVERIFIED_LIVE",
+      "hold_status": "NOT_RESERVED",
+      "attempts": [],
+      "wire_payload": {
+        "model": "seedance",
+        "task_type": "seedance-2.5",
+        "input": {
+          "prompt": "A camera reveals the full length of a rigid yellow VAZ-2106 limousine; fixed geometry. Identity and reveal keys: @image1 @image2 @image3 @image4.",
+          "resolution": "480p",
+          "duration": 10,
+          "aspect_ratio": "9:16",
+          "mode": "omni_reference",
+          "omni_reference_task_type": "reference",
+          "image_urls": [
+            "https://preview.invalid/key1.png",
+            "https://preview.invalid/key2.png",
+            "https://preview.invalid/key3.png",
+            "https://preview.invalid/key4.png"
+          ]
+        }
+      },
+      "payload_sha256": "1d2cc80b756423c90656348000014424b3f232cf8df80d439ee8f0ae59a2f210"
+    },
+    {
+      "schema_version": "1.0.0",
+      "contract_type": "generation_manifest",
+      "variant": "C",
+      "provider": "piapi",
+      "model_id": "seedance-2.5",
+      "status": "SYNTHETIC_PREVIEW_ONLY",
+      "execution_allowed": false,
+      "launch_enabled": false,
+      "approval_id": null,
+      "estimated_cost_usd": 2.25,
+      "actual_cost_usd": null,
+      "cost_basis": "LOCAL_CATALOG_UNVERIFIED_LIVE",
+      "hold_status": "NOT_RESERVED",
+      "attempts": [],
+      "wire_payload": {
+        "model": "seedance",
+        "task_type": "seedance-2.5",
+        "input": {
+          "prompt": "A camera reveals the full length of a rigid yellow VAZ-2106 limousine; fixed geometry. Identity and reveal keys: @image1 @image2 @image3 @image4. Camera motion reference: @video1.",
+          "resolution": "480p",
+          "duration": 10,
+          "aspect_ratio": "9:16",
+          "mode": "omni_reference",
+          "omni_reference_task_type": "reference",
+          "image_urls": [
+            "https://preview.invalid/key1.png",
+            "https://preview.invalid/key2.png",
+            "https://preview.invalid/key3.png",
+            "https://preview.invalid/key4.png"
+          ],
+          "video_urls": [
+            "https://preview.invalid/clay.mp4"
+          ]
+        }
+      },
+      "payload_sha256": "d3aa69b88fe6f6e57a47b0fa81f5fe00a74f9807e992f0b776dda4a4e0238c4b"
+    }
+  ],
+  "source_generation": {
+    "schema_version": "1.0.0",
+    "contract_type": "generation_manifest",
+    "shot_id": "ANIMIOS_SH11",
+    "provider": "piapi",
+    "model_id": "seedance-2.5",
+    "status": "BLOCKED",
+    "execution_allowed": false,
+    "source_digest": "7fc0644f62f4a32e000bbd6a54a0fbe8c33bbaefb4945b009386ca1d4b90da51",
+    "approval_id": null,
+    "reference_mapping": [
+      {
+        "source_role": "character_identity",
+        "asset_id": "C05_CHEF_SHEET_UNAVAILABLE",
+        "asset_version": "UNVERIFIED",
+        "sha256": null,
+        "provider_slot": "@image1",
+        "source_type": "image"
+      },
+      {
+        "source_role": "location_layout",
+        "asset_id": "GALLEY_DOOR_REF_UNAVAILABLE",
+        "asset_version": "UNVERIFIED",
+        "sha256": null,
+        "provider_slot": "@image2",
+        "source_type": "image"
+      },
+      {
+        "source_role": "style",
+        "asset_id": "PIZZA_PROP_REF_UNAVAILABLE",
+        "asset_version": "UNVERIFIED",
+        "sha256": null,
+        "provider_slot": "@image3",
+        "source_type": "image"
+      },
+      {
+        "source_role": "keyframe_start",
+        "asset_id": "KF_BEFORE_IMPACT_UNAVAILABLE",
+        "asset_version": "UNVERIFIED",
+        "sha256": null,
+        "provider_slot": "@image4",
+        "source_type": "image"
+      },
+      {
+        "source_role": "keyframe_end",
+        "asset_id": "KF_AFTER_IMPACT_UNAVAILABLE",
+        "asset_version": "UNVERIFIED",
+        "sha256": null,
+        "provider_slot": "@image5",
+        "source_type": "image"
+      }
+    ],
+    "attempts": [],
+    "estimated_cost_usd": null,
+    "actual_cost_usd": null,
+    "hold_status": "NOT_RESERVED",
+    "wire_payload": null,
+    "cost_basis": "LOCAL_CATALOG_UNVERIFIED_LIVE"
+  },
+  "source_preflight_status": "BLOCKED",
+  "execution_allowed": false
+}

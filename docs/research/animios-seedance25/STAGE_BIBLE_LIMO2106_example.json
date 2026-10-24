@@ -1,0 +1,51 @@
+{
+  "schema_version": "1.0.0",
+  "project_id": "gremovod",
+  "scene_id": "EP01_SECRET_LIMO_REVEAL",
+  "illustrative_contract": true,
+  "not_approved_3d_asset": true,
+  "units": "meters",
+  "world_axes": {
+    "up": "+Z",
+    "forward": "+Y",
+    "right": "+X",
+    "physical_vehicle_left": "side of vehicle relative to forward +Y, NOT screen left"
+  },
+  "assets": {
+    "vehicle_id": "LIMO_2106",
+    "character_id": "GREM",
+    "approved_vehicle_geometry_id": "REQUIRES_OWNER_APPROVAL",
+    "master_asset_sha256": null
+  },
+  "vehicle_canon": {
+    "color": "yellow",
+    "front": "original VAZ-2106 classic headlamps and grille, no BMW fascia",
+    "body": "fixed length: reveal exclusively through camera framing, NEVER change geometry",
+    "left_side": "standard front door then fixed short insert with narrow window then elongated rear suicide door hinged at rearmost pillar",
+    "right_side": "elongated rear door, exposed hinges and narrow center window",
+    "wheel_style": "BBS mesh",
+    "interior": "brown diamond quilted leather, wood, black steering wheel, red rose shift knob"
+  },
+  "characters": {
+    "GREM": {
+      "character_sheet": "APPROVED_CANON_REQUIRED",
+      "cap": "red corduroy",
+      "eyes": "looking straight, no cross-eye",
+      "pilot_phase_0": "not present"
+    }
+  },
+  "camera_reveal": {
+    "duration_seconds_target": [
+      8,
+      12
+    ],
+    "master_geometry_fixed": true,
+    "beats": [
+      "classic VAZ-2106 close details",
+      "regular front fascia and door",
+      "camera moves to reveal narrow insert",
+      "wide reveal of entire rigid limousine"
+    ]
+  },
+  "approval_status": "PENDING_OWNER_APPROVAL"
+}

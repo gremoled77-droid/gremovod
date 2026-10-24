@@ -1,0 +1,58 @@
+{
+  "schema_version": "1.0.0",
+  "source_status": "RECONSTRUCTED_FROM_LOCAL_FINAL_VIDEO_AND_SUPPLIED_FIXTURES",
+  "reconstructed": true,
+  "not_original_author_project": true,
+  "fps": {"num": 24, "den": 1},
+  "video_frames": 760,
+  "video_duration_seconds": 31.6666667,
+  "container_duration_seconds_reported": 31.718,
+  "frame_interval": "[start_frame,end_frame)",
+  "shots": [
+    {"shot_id":"ANIMIOS_SH01","start_frame":0,"end_frame":93,"duration_frames":93,"location_id":"SEA_SHIP","characters":["C01"],"props":[],"observed":"boat sees ship"},
+    {"shot_id":"ANIMIOS_SH02","start_frame":93,"end_frame":143,"duration_frames":50,"location_id":"OUTER_HULL","characters":["C01","C02","C03","C04"],"props":[],"observed":"penguins climb ship hull"},
+    {"shot_id":"ANIMIOS_SH03","start_frame":143,"end_frame":184,"duration_frames":41,"location_id":"DECK","characters":["C01","C02","C03","C04"],"props":[],"observed":"penguins hide on deck"},
+    {"shot_id":"ANIMIOS_SH04","start_frame":184,"end_frame":242,"duration_frames":58,"location_id":"GALLEY_ENTRANCE","characters":["C05"],"props":["P01"],"observed":"chef exits galley with bin"},
+    {"shot_id":"ANIMIOS_SH05","start_frame":242,"end_frame":286,"duration_frames":44,"location_id":"WET_DECK","characters":["C05"],"props":["P01"],"observed":"chef walks away; bin remains in shot description"},
+    {"shot_id":"ANIMIOS_SH06","start_frame":286,"end_frame":335,"duration_frames":49,"location_id":"GALLEY_ENTRANCE","characters":["C01","C02","C03","C04"],"props":[],"observed":"penguins enter galley"},
+    {"shot_id":"ANIMIOS_SH07","start_frame":335,"end_frame":448,"duration_frames":113,"location_id":"GALLEY_MAIN","characters":["C01","C02","C03","C04"],"props":["P02","P03"],"observed":"open pizza box"},
+    {"shot_id":"ANIMIOS_SH08","start_frame":448,"end_frame":491,"duration_frames":43,"location_id":"GALLEY_SIDE","characters":["C04"],"props":["P02","P03"],"observed":"chick carries box then drops it"},
+    {"shot_id":"ANIMIOS_SH09","start_frame":491,"end_frame":570,"duration_frames":79,"location_id":"GALLEY_MAIN","characters":["C03"],"props":["P03"],"observed":"tall penguin chases flying pizza"},
+    {"shot_id":"ANIMIOS_SH10","start_frame":570,"end_frame":630,"duration_frames":60,"location_id":"GALLEY_MAIN","characters":["C03"],"props":["P03"],"observed":"pizza hot contact/reaction"},
+    {"shot_id":"ANIMIOS_SH11","start_frame":630,"end_frame":760,"duration_frames":130,"location_id":"GALLEY_ENTRANCE","characters":["C05"],"props":["P03"],"observed":"pizza strikes chef; continuous in-shot action"}
+  ],
+  "cuts": [
+    {"from":"ANIMIOS_SH01","to":"ANIMIOS_SH02","at_frame":93},
+    {"from":"ANIMIOS_SH02","to":"ANIMIOS_SH03","at_frame":143},
+    {"from":"ANIMIOS_SH03","to":"ANIMIOS_SH04","at_frame":184},
+    {"from":"ANIMIOS_SH04","to":"ANIMIOS_SH05","at_frame":242,"continuity_note":"P01 moves with chef in observations; exact screen visibility/placement is uncertain."},
+    {"from":"ANIMIOS_SH05","to":"ANIMIOS_SH06","at_frame":286},
+    {"from":"ANIMIOS_SH06","to":"ANIMIOS_SH07","at_frame":335},
+    {"from":"ANIMIOS_SH07","to":"ANIMIOS_SH08","at_frame":448,"continuity_note":"P02/P03 transition from table to chick-held box; intermediate motion is hidden by cut."},
+    {"from":"ANIMIOS_SH08","to":"ANIMIOS_SH09","at_frame":491,"continuity_note":"Box/pizza separation is inferred across cut; exact release trajectory is unverified."},
+    {"from":"ANIMIOS_SH09","to":"ANIMIOS_SH10","at_frame":570},
+    {"from":"ANIMIOS_SH10","to":"ANIMIOS_SH11","at_frame":630,"continuity_note":"Transfer toward chef is across cut; path is not continuously observed."}
+  ],
+  "prop_ledger": [
+    {"prop_id":"P01","name":"trash_bin","states":[{"shots":["ANIMIOS_SH04","ANIMIOS_SH05"],"state":"carried/associated with chef; placement at shot end is uncertain"},{"shots":["ANIMIOS_SH06","ANIMIOS_SH11"],"state":"not listed/visible in supplied shot manifest; may be out of frame or omitted"}],"continuity":"WARNING_UNRESOLVED_VISIBILITY","notes":"Do not assert disappearance: the supplied description does not prove whether the bin was set down or simply out of frame."},
+    {"prop_id":"P02","name":"pizza_box","states":[{"shot":"ANIMIOS_SH07","state":"opened on/near table"},{"shot":"ANIMIOS_SH08","state":"carried by C04 then dropped"},{"shots":["ANIMIOS_SH09","ANIMIOS_SH11"],"state":"not listed after transition; likely out of active action"}],"continuity":"WARNING_CUT_HIDES_TRANSITION","notes":"Whether the box remains in the same location after the drop is not established."},
+    {"prop_id":"P03","name":"pizza","states":[{"shot":"ANIMIOS_SH07","state":"inside/opened box"},{"shot":"ANIMIOS_SH08","state":"separates from dropped box; exact beat uncertain"},{"shots":["ANIMIOS_SH09","ANIMIOS_SH10"],"state":"airborne/handled by C03; exact contacts are reconstructed"},{"shot":"ANIMIOS_SH11","state":"flies to chef, impacts around frame 672 (~28s), then reaction"}],"continuity":"WARNING_RECONSTRUCTED_PHYSICS","notes":"Impact near frame 672 is inside SH11 [630,760), not a cut. The supplied analysis explicitly rejects the detector's ~28s false cut."}
+  ],
+  "keyframe_candidates": [
+    {"keyframe_id":"KF01","frame_approx":93,"shot_id":"ANIMIOS_SH02","purpose":"climb/hull transition pose","confidence":"candidate"},
+    {"keyframe_id":"KF02","frame_approx":184,"shot_id":"ANIMIOS_SH04","purpose":"chef exits doorway while penguins hide","confidence":"candidate"},
+    {"keyframe_id":"KF03","frame_approx":390,"shot_id":"ANIMIOS_SH07","purpose":"four characters around opened pizza box","confidence":"candidate"},
+    {"keyframe_id":"KF04","frame_approx":470,"shot_id":"ANIMIOS_SH08","purpose":"C04 carrying/dropping box","confidence":"candidate"},
+    {"keyframe_id":"KF05","frame_approx":491,"shot_id":"ANIMIOS_SH09","purpose":"pizza flight/chase handoff","confidence":"candidate"},
+    {"keyframe_id":"KF06","frame_approx":570,"shot_id":"ANIMIOS_SH10","purpose":"hot pizza contact and reaction","confidence":"candidate"},
+    {"keyframe_id":"KF07","frame_approx":630,"shot_id":"ANIMIOS_SH11","purpose":"pre-impact setup after editorial cut","confidence":"candidate"},
+    {"keyframe_id":"KF08","frame_approx":672,"shot_id":"ANIMIOS_SH11","purpose":"pizza impact on chef; key action within continuous shot","confidence":"candidate_not_verified_frame_exact"},
+    {"keyframe_id":"KF09","frame_approx":710,"shot_id":"ANIMIOS_SH11","purpose":"post-impact reaction/slide","confidence":"candidate"}
+  ],
+  "dependency_graph": {
+    "nodes": ["ANIMIOS_SH01","ANIMIOS_SH02","ANIMIOS_SH03","ANIMIOS_SH04","ANIMIOS_SH05","ANIMIOS_SH06","ANIMIOS_SH07","ANIMIOS_SH08","ANIMIOS_SH09","ANIMIOS_SH10","ANIMIOS_SH11"],
+    "edges": [{"from":"ANIMIOS_SH01","to":"ANIMIOS_SH02","cut_frame":93},{"from":"ANIMIOS_SH02","to":"ANIMIOS_SH03","cut_frame":143},{"from":"ANIMIOS_SH03","to":"ANIMIOS_SH04","cut_frame":184},{"from":"ANIMIOS_SH04","to":"ANIMIOS_SH05","cut_frame":242},{"from":"ANIMIOS_SH05","to":"ANIMIOS_SH06","cut_frame":286},{"from":"ANIMIOS_SH06","to":"ANIMIOS_SH07","cut_frame":335},{"from":"ANIMIOS_SH07","to":"ANIMIOS_SH08","cut_frame":448},{"from":"ANIMIOS_SH08","to":"ANIMIOS_SH09","cut_frame":491},{"from":"ANIMIOS_SH09","to":"ANIMIOS_SH10","cut_frame":570},{"from":"ANIMIOS_SH10","to":"ANIMIOS_SH11","cut_frame":630}],
+    "cut_count": 10,
+    "interpretation": "Edges denote observed editorial adjacency, not proof of source generation dependencies."
+  }
+}

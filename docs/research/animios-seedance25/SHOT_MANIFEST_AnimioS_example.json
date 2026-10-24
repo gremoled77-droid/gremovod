@@ -1,0 +1,279 @@
+{
+  "schema_version": "1.0.0",
+  "reconstructed": true,
+  "not_original_author_project": true,
+  "source": "AnimioS_2106689861562323210.mp4",
+  "source_url": "https://x.com/AnimioS/status/2106689872014852375",
+  "video_stream": {
+    "width": 1280,
+    "height": 720,
+    "fps_num": 24,
+    "fps_den": 1,
+    "frame_count": 760,
+    "frame_interval": "[start_frame,end_frame)",
+    "container_duration_seconds": 31.718
+  },
+  "assets": {
+    "character_ids": [
+      "C01",
+      "C02",
+      "C03",
+      "C04",
+      "C05"
+    ],
+    "location_ids": [
+      "DECK",
+      "GALLEY_ENTRANCE",
+      "GALLEY_MAIN",
+      "GALLEY_SIDE",
+      "OUTER_HULL",
+      "SEA_SHIP",
+      "WET_DECK"
+    ],
+    "prop_ids": [
+      "P01",
+      "P02",
+      "P03"
+    ]
+  },
+  "shots": [
+    {
+      "shot_id": "ANIMIOS_SH01",
+      "scene_id": "ANIMIOS_RECONSTRUCTION",
+      "start_frame": 0,
+      "end_frame": 93,
+      "location_id": "SEA_SHIP",
+      "character_ids": [
+        "C01"
+      ],
+      "prop_ids": [],
+      "camera": {
+        "composition": "reconstructed_from_final_video",
+        "movement": "UNVERIFIED"
+      },
+      "observed_action": "boat sees ship",
+      "cut_after": true,
+      "reference_contract": "UNVERIFIED",
+      "source_status": "OBSERVATION"
+    },
+    {
+      "shot_id": "ANIMIOS_SH02",
+      "scene_id": "ANIMIOS_RECONSTRUCTION",
+      "start_frame": 93,
+      "end_frame": 143,
+      "location_id": "OUTER_HULL",
+      "character_ids": [
+        "C01",
+        "C02",
+        "C03",
+        "C04"
+      ],
+      "prop_ids": [],
+      "camera": {
+        "composition": "reconstructed_from_final_video",
+        "movement": "UNVERIFIED"
+      },
+      "observed_action": "climb ship hull",
+      "cut_after": true,
+      "reference_contract": "UNVERIFIED",
+      "source_status": "OBSERVATION"
+    },
+    {
+      "shot_id": "ANIMIOS_SH03",
+      "scene_id": "ANIMIOS_RECONSTRUCTION",
+      "start_frame": 143,
+      "end_frame": 184,
+      "location_id": "DECK",
+      "character_ids": [
+        "C01",
+        "C02",
+        "C03",
+        "C04"
+      ],
+      "prop_ids": [],
+      "camera": {
+        "composition": "reconstructed_from_final_video",
+        "movement": "UNVERIFIED"
+      },
+      "observed_action": "penguins hide on deck",
+      "cut_after": true,
+      "reference_contract": "UNVERIFIED",
+      "source_status": "OBSERVATION"
+    },
+    {
+      "shot_id": "ANIMIOS_SH04",
+      "scene_id": "ANIMIOS_RECONSTRUCTION",
+      "start_frame": 184,
+      "end_frame": 242,
+      "location_id": "GALLEY_ENTRANCE",
+      "character_ids": [
+        "C05"
+      ],
+      "prop_ids": [
+        "P01"
+      ],
+      "camera": {
+        "composition": "reconstructed_from_final_video",
+        "movement": "UNVERIFIED"
+      },
+      "observed_action": "chef exits galley with bin",
+      "cut_after": true,
+      "reference_contract": "UNVERIFIED",
+      "source_status": "OBSERVATION"
+    },
+    {
+      "shot_id": "ANIMIOS_SH05",
+      "scene_id": "ANIMIOS_RECONSTRUCTION",
+      "start_frame": 242,
+      "end_frame": 286,
+      "location_id": "WET_DECK",
+      "character_ids": [
+        "C05"
+      ],
+      "prop_ids": [
+        "P01"
+      ],
+      "camera": {
+        "composition": "reconstructed_from_final_video",
+        "movement": "UNVERIFIED"
+      },
+      "observed_action": "chef walks away",
+      "cut_after": true,
+      "reference_contract": "UNVERIFIED",
+      "source_status": "OBSERVATION"
+    },
+    {
+      "shot_id": "ANIMIOS_SH06",
+      "scene_id": "ANIMIOS_RECONSTRUCTION",
+      "start_frame": 286,
+      "end_frame": 335,
+      "location_id": "GALLEY_ENTRANCE",
+      "character_ids": [
+        "C01",
+        "C02",
+        "C03",
+        "C04"
+      ],
+      "prop_ids": [],
+      "camera": {
+        "composition": "reconstructed_from_final_video",
+        "movement": "UNVERIFIED"
+      },
+      "observed_action": "penguins enter galley",
+      "cut_after": true,
+      "reference_contract": "UNVERIFIED",
+      "source_status": "OBSERVATION"
+    },
+    {
+      "shot_id": "ANIMIOS_SH07",
+      "scene_id": "ANIMIOS_RECONSTRUCTION",
+      "start_frame": 335,
+      "end_frame": 448,
+      "location_id": "GALLEY_MAIN",
+      "character_ids": [
+        "C01",
+        "C02",
+        "C03",
+        "C04"
+      ],
+      "prop_ids": [
+        "P02",
+        "P03"
+      ],
+      "camera": {
+        "composition": "reconstructed_from_final_video",
+        "movement": "UNVERIFIED"
+      },
+      "observed_action": "open pizza box",
+      "cut_after": true,
+      "reference_contract": "UNVERIFIED",
+      "source_status": "OBSERVATION"
+    },
+    {
+      "shot_id": "ANIMIOS_SH08",
+      "scene_id": "ANIMIOS_RECONSTRUCTION",
+      "start_frame": 448,
+      "end_frame": 491,
+      "location_id": "GALLEY_SIDE",
+      "character_ids": [
+        "C04"
+      ],
+      "prop_ids": [
+        "P02",
+        "P03"
+      ],
+      "camera": {
+        "composition": "reconstructed_from_final_video",
+        "movement": "UNVERIFIED"
+      },
+      "observed_action": "chick drops pizza box",
+      "cut_after": true,
+      "reference_contract": "UNVERIFIED",
+      "source_status": "OBSERVATION"
+    },
+    {
+      "shot_id": "ANIMIOS_SH09",
+      "scene_id": "ANIMIOS_RECONSTRUCTION",
+      "start_frame": 491,
+      "end_frame": 570,
+      "location_id": "GALLEY_MAIN",
+      "character_ids": [
+        "C03"
+      ],
+      "prop_ids": [
+        "P03"
+      ],
+      "camera": {
+        "composition": "reconstructed_from_final_video",
+        "movement": "UNVERIFIED"
+      },
+      "observed_action": "tall penguin chases pizza",
+      "cut_after": true,
+      "reference_contract": "UNVERIFIED",
+      "source_status": "OBSERVATION"
+    },
+    {
+      "shot_id": "ANIMIOS_SH10",
+      "scene_id": "ANIMIOS_RECONSTRUCTION",
+      "start_frame": 570,
+      "end_frame": 630,
+      "location_id": "GALLEY_MAIN",
+      "character_ids": [
+        "C03"
+      ],
+      "prop_ids": [
+        "P03"
+      ],
+      "camera": {
+        "composition": "reconstructed_from_final_video",
+        "movement": "UNVERIFIED"
+      },
+      "observed_action": "pizza contact/hot reaction",
+      "cut_after": true,
+      "reference_contract": "UNVERIFIED",
+      "source_status": "OBSERVATION"
+    },
+    {
+      "shot_id": "ANIMIOS_SH11",
+      "scene_id": "ANIMIOS_RECONSTRUCTION",
+      "start_frame": 630,
+      "end_frame": 760,
+      "location_id": "GALLEY_ENTRANCE",
+      "character_ids": [
+        "C05"
+      ],
+      "prop_ids": [
+        "P03"
+      ],
+      "camera": {
+        "composition": "reconstructed_from_final_video",
+        "movement": "UNVERIFIED"
+      },
+      "observed_action": "pizza strikes chef without in-shot edit",
+      "cut_after": false,
+      "reference_contract": "UNVERIFIED",
+      "source_status": "OBSERVATION"
+    }
+  ],
+  "editorial_note": "11 real shots / 10 cuts; impact around 28 seconds inside shot 11 is NOT a hard cut."
+}

@@ -1,0 +1,56 @@
+{
+  "schema_version": "1.0.0",
+  "shot_id": "ANIMIOS_SH11",
+  "reconstructed": true,
+  "provider": "piapi",
+  "model_id": "seedance-2.5",
+  "task_type": "reference",
+  "submit_authorized": false,
+  "source_status": "ILLUSTRATIVE_NOT_AUTHOR_ASSETS",
+  "reference_mapping": [
+    {
+      "source_role": "character_identity",
+      "asset_id": "C05_CHEF_SHEET_UNAVAILABLE",
+      "asset_version": "UNVERIFIED",
+      "sha256": null,
+      "provider_slot": "@image1",
+      "source_type": "image"
+    },
+    {
+      "source_role": "location_layout",
+      "asset_id": "GALLEY_DOOR_REF_UNAVAILABLE",
+      "asset_version": "UNVERIFIED",
+      "sha256": null,
+      "provider_slot": "@image2",
+      "source_type": "image"
+    },
+    {
+      "source_role": "style",
+      "asset_id": "PIZZA_PROP_REF_UNAVAILABLE",
+      "asset_version": "UNVERIFIED",
+      "sha256": null,
+      "provider_slot": "@image3",
+      "source_type": "image"
+    },
+    {
+      "source_role": "keyframe_start",
+      "asset_id": "KF_BEFORE_IMPACT_UNAVAILABLE",
+      "asset_version": "UNVERIFIED",
+      "sha256": null,
+      "provider_slot": "@image4",
+      "source_type": "image"
+    },
+    {
+      "source_role": "keyframe_end",
+      "asset_id": "KF_AFTER_IMPACT_UNAVAILABLE",
+      "asset_version": "UNVERIFIED",
+      "sha256": null,
+      "provider_slot": "@image5",
+      "source_type": "image"
+    }
+  ],
+  "prompt_template": "Chef identity @image1; galley layout @image2; pizza prop @image3; before @image4; impact/reaction @image5. Continuous action and no cuts.",
+  "estimated_cost_usd": null,
+  "approval_id": null,
+  "validation_expected": "BLOCKED_UNVERIFIED_ASSET: examples intentionally refer to missing assets and do not authorize generation."
+}
