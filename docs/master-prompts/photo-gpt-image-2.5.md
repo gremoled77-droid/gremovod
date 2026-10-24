@@ -18,6 +18,7 @@ style: <строка стиля проекта из паспорта; пусто
 refs: [{n: 1, role: character, name: "Грэм", look: "Основной"},
        {n: 2, role: character, name: "Прохор"},
        {n: 3, role: location, name: "Двор на Немиге", variant: "Ночь"}]
+focal_point: <герой с ★ на холсте или «лицо / руки / предмет / машина»>
 cast: [{n: 1, column: left|center|right, plan: foreground|midground|background, facing: ...}]
 time / season / weather: <слова из кнопок, уже на английском>
 light: <положение, характер, тип, источник — фразы из кнопок>
@@ -29,6 +30,14 @@ edit_target: <для mode=edit: что менять, и что оставить>
 ```
 
 Положение героя из трёх колонок переводится в слова: left → «on the left third of the frame», center → «in the center», right → «on the right third»; план: foreground / midground / background.
+
+## 1а. Хранение и загрузка (решение 24.10.2026)
+
+- **Один файл на уровень и модель** в `docs/master-prompts/` (позже в каталог рядом с бэкендом): `photo-gpt-image-2.5.md`, дальше `photo-qwen-image-2.1.md` и т.д. Версия записана в шапке файла (сейчас v0.1).
+- **Выбор модели чипом на экране «Фото» подгружает её файл.** Для моделей без файла режим LLM недоступен (в макете: «мастер-промпт ещё не написан»), остаётся txt.
+- **Что уходит в `gpt-5.6-luna`:** системное сообщение = раздел 2 этого файла **без изменений**; к нему код добавляет одну строку «MASTER PROMPT photo-gpt-image-2.5 v0.1. Use it unchanged.»; пользовательское сообщение = блок параметров из раздела 1. Версия мастер-промпта записывается в журнал вызова (`llm_calls`) и показывается в окне «Готовый промпт».
+- **Кто расставляет параметры (гибрид):** кнопки (свет, ракурс, крупность, объектив, место, время, сезон, погода, расстановка) переводит в английские фразы и раскладывает по разделам Scene / Subject / Action / Camera and light / Constraints **код**, по словарю из TODO.md п.5: это надёжно, бесплатно и повторяемо. LLM получает уже разложенный блок и делает только то, что код не умеет: переводит и склеивает «Action» из текста владельца, вычитывает язык, отсекает лишнее. Режим txt отправляет тот же разложенный блок без LLM. Если словарь ещё не готов, LLM расставляет сама по правилам раздела 2.
+- **Доминанта:** в блок параметров добавлено `focal_point` (герой, помеченный ★ на холсте, или «лицо / руки / предмет / машина»); правило 13 ниже.
 
 ## 2. Системная инструкция (текст для отправки LLM)
 
@@ -52,6 +61,7 @@ RULES FOR PROMPT_EN
 10. Exclusions are plain sentences in Constraints: "No extra text, no watermarks, no unrelated logos. Do not add new elements. No extra people." There is no negative-prompt parameter.
 11. Never mention image size, quality or background parameters.
 12. Keep it compact. One thought per sentence.
+13. Focal point: name one dominant element in "Subject:" ("X is the clear focal point, everything else is secondary"). Do not add background clutter or decorative details that compete with it. Every light source must have a physical cause.
 
 EDIT MODE (mode=edit)
 Write one change per prompt. Format:
