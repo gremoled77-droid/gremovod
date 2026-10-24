@@ -69,7 +69,7 @@ class LlmGuardTests(unittest.TestCase):
         self.assertEqual(self.client.post('/api/llm/estimate', json={**base, 'project_id': 'absent'}).status_code, 404)
         self.assertEqual(self.client.post('/api/llm/estimate', json={**base, 'messages': [{'role': 'user', 'content': '  '}]}).status_code, 400)
 
-    def test_budget_reserved_before_call_and_failed_call_frees_it(self):
+    def test_budget_reserved_before_call_and_unknown_failure_keeps_it(self):
         self.prepare()
         self.client.put('/api/budgets/limits', json={'project_usd': 0.00001, 'daily_usd': 0.00001})
         body, quote = self.estimate()
@@ -80,12 +80,22 @@ class LlmGuardTests(unittest.TestCase):
             self.assertEqual(call.await_count, 0)
         self.client.put('/api/budgets/limits', json={'project_usd': 1, 'daily_usd': 2})
         failing = AsyncMock(side_effect=main.HTTPException(502, 'PiAPI вернул ошибку'))
+        request = self.chat_body(body, quote, request_id='llm-test-request-2')
         with patch.object(main, 'request_piapi', failing):
-            r = self.client.post('/api/llm/chat', json=self.chat_body(body, quote, request_id='llm-test-request-2'))
+            r = self.client.post('/api/llm/chat', json=request)
             self.assertEqual(r.status_code, 502)
+            self.assertEqual(self.client.post('/api/llm/chat', json=request).status_code, 409)
+            self.assertEqual(failing.await_count, 1)
         with main.connect() as db:
-            self.assertEqual(db.execute("SELECT status,usd FROM llm_calls WHERE request_id='llm-test-request-2'").fetchone()['usd'], 0)
-            self.assertEqual(llm_guard.spent(db, self.pid), (0.0, 0.0))
+            row = db.execute("SELECT status,usd FROM llm_calls WHERE request_id='llm-test-request-2'").fetchone()
+            self.assertEqual((row['status'], row['usd']), ('submission_unknown', quote['estimated_usd']))
+            self.assertEqual(llm_guard.spent(db, self.pid), (quote['estimated_usd'], quote['estimated_usd']))
+        self.client.put('/api/budgets/limits', json={'project_usd': quote['estimated_usd'], 'daily_usd': 2})
+        with patch.object(main, 'request_piapi', AsyncMock(return_value=REPLY)) as call:
+            blocked = self.client.post('/api/llm/chat', json={**request, 'request_id': 'llm-after-unknown'})
+            self.assertEqual(blocked.status_code, 400)
+            self.assertIn('бюджет', blocked.text.lower())
+            call.assert_not_awaited()
 
     def test_other_paid_llm_routes_stay_closed(self):
         for endpoint in ('/api/chat', '/api/compose', '/api/agents/run'):
@@ -186,7 +196,7 @@ class PaidLlmRouteGuardTests(unittest.TestCase):
             self.assertEqual(second.status_code, 409)
             self.assertEqual(call.await_count, 3)
 
-    def test_provider_error_frees_the_reservation(self):
+    def test_provider_error_without_charge_evidence_keeps_the_reservation(self):
         self.prepare()
         quote = self.client.post('/api/compose/estimate', json=self.compose_body()).json()
         failing = AsyncMock(side_effect=main.HTTPException(502, 'PiAPI вернул ошибку'))
@@ -196,8 +206,8 @@ class PaidLlmRouteGuardTests(unittest.TestCase):
             self.assertEqual(r.status_code, 502)
         with main.connect() as db:
             row = db.execute('SELECT status,usd FROM llm_calls').fetchone()
-            self.assertEqual((row['status'], row['usd']), ('failed', 0))
-            self.assertEqual(llm_guard.spent(db, self.pid), (0.0, 0.0))
+            self.assertEqual((row['status'], row['usd']), ('submission_unknown', quote['estimated_usd']))
+            self.assertEqual(llm_guard.spent(db, self.pid), (quote['estimated_usd'], quote['estimated_usd']))
 
     def test_partial_agent_failure_keeps_paid_work_accounted(self):
         self.prepare()
@@ -223,11 +233,14 @@ class PaidLlmRouteGuardTests(unittest.TestCase):
             self.assertEqual(db.execute('SELECT count(*) FROM llm_calls').fetchone()[0], 2)
             done = db.execute("SELECT usd FROM llm_calls WHERE request_id=? AND status='done'",
                               ('paid-partial-agents#director',)).fetchone()
-            failed = db.execute("SELECT usd FROM llm_calls WHERE request_id=? AND status='failed'",
-                                ('paid-partial-agents#continuity',)).fetchone()
+            unknown = db.execute("SELECT usd,estimated_usd FROM llm_calls WHERE request_id=? AND status='submission_unknown'",
+                                 ('paid-partial-agents#continuity',)).fetchone()
             self.assertGreater(done['usd'], 0)
-            self.assertEqual(failed['usd'], 0)
-            self.assertGreater(llm_guard.spent(db, self.pid)[0], 0)
+            self.assertIsNotNone(unknown)
+            self.assertGreater(unknown['usd'], 0)
+            self.assertEqual(unknown['usd'], unknown['estimated_usd'])
+            expected = done['usd'] + unknown['usd']
+            self.assertEqual(llm_guard.spent(db, self.pid), (expected, expected))
 
     def test_agent_sequence_checks_the_aggregate_forecast_before_any_call(self):
         self.prepare()
