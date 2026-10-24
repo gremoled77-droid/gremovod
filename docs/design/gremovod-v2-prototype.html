@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ГремоВОД v2 — макет</title>
+<style>
+:root{--bg:#0e0f12;--surface:#16181d;--surface-2:#1e2128;--border:#2a2e37;--border-strong:#3a3f4a;--text:#ece8df;--muted:#8b8f99;--accent:#f2b134;--accent-ink:#17130a;--ok:#5ec27a;--bad:#e27b7b;--info:#7ea8e8;--r:12px}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:13px/1.45 'Onest',system-ui,-apple-system,'Segoe UI',sans-serif}
+button,select,input,textarea{font:inherit;color:inherit}
+button{background:var(--surface-2);border:1px solid var(--border);border-radius:999px;padding:6px 12px;cursor:pointer}
+button:hover{border-color:var(--border-strong)}
+button.main{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600}
+button.ghost{background:transparent}
+button.on{border-color:var(--accent);color:var(--accent)}
+input,select,textarea{background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:6px 8px}
+textarea{width:100%;min-height:54px;resize:vertical}
+.app{display:grid;grid-template-columns:232px 1fr;grid-template-rows:52px 1fr;height:100vh}
+header{grid-column:1/3;display:flex;align-items:center;gap:14px;padding:0 16px;border-bottom:1px solid var(--border);background:var(--surface)}
+.logo{font-weight:700;cursor:pointer}.logo i{color:var(--accent);font-style:normal}
+.crumbs{display:flex;gap:6px;color:var(--muted);flex:1;flex-wrap:wrap}
+.crumbs a{color:var(--text);cursor:pointer;text-decoration:none}.crumbs a:hover{color:var(--accent)}
+.chip{border:1px solid var(--border);border-radius:999px;padding:4px 10px;cursor:pointer;white-space:nowrap}
+nav{border-right:1px solid var(--border);padding:12px 8px;overflow:auto;background:var(--surface)}
+nav h4{margin:14px 8px 4px;font-size:11px;letter-spacing:.06em;color:var(--muted);text-transform:uppercase}
+nav a{display:block;padding:6px 10px;border-radius:8px;cursor:pointer;color:var(--text)}
+nav a:hover{background:var(--surface-2)}nav a.act{background:var(--surface-2);color:var(--accent)}
+nav a.sub{padding-left:24px;color:var(--muted)}nav a.sub.act{color:var(--accent)}
+.badge{float:right;color:var(--muted);font-size:11px}
+main{overflow:auto;padding:18px 22px 120px;position:relative}
+h1{font-size:20px;margin:0 0 4px}h2{font-size:15px;margin:18px 0 8px}
+.muted{color:var(--muted)}.ok{color:var(--ok)}.warn{color:var(--accent)}.bad{color:var(--bad)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:12px}
+.grid{display:grid;gap:10px;grid-template-columns:repeat(auto-fill,minmax(170px,1fr))}
+.thumb{aspect-ratio:16/9;border-radius:8px;background:linear-gradient(135deg,#2c3140,#1b1d24);position:relative;display:flex;align-items:flex-end;padding:6px;font-size:11px;color:var(--muted);cursor:pointer;border:1px solid var(--border)}
+.thumb.sel{outline:2px solid var(--accent)}
+.thumb .tick{position:absolute;top:6px;left:6px;color:var(--ok);font-weight:700}
+.big{height:44vh;max-width:100%;aspect-ratio:16/9;border-radius:var(--r);background:linear-gradient(135deg,#3a3326,#1d2230 60%,#141820);position:relative;display:flex;align-items:center;justify-content:center;color:var(--muted);border:1px solid var(--border)}
+.big .refine{position:absolute;right:10px;bottom:10px;opacity:0;transition:.15s}
+.big:hover .refine{opacity:1}
+.continue{background:linear-gradient(90deg,#2a2416,var(--surface));border:1px solid #4a3c1c;border-radius:var(--r);padding:16px;display:flex;align-items:center;gap:16px}
+.tabs{display:flex;gap:6px;margin:10px 0}
+.tabs button.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+table{border-collapse:collapse;width:100%}td,th{border-bottom:1px solid var(--border);padding:6px;text-align:left;vertical-align:top}
+.track{position:fixed;left:232px;right:0;bottom:0;background:var(--surface);border-top:1px solid var(--border);padding:8px 16px;display:flex;gap:6px;align-items:center;overflow:auto;z-index:2}
+.track .seg{min-width:70px;padding:6px 8px;border:1px solid var(--border);border-radius:8px;background:var(--surface-2);cursor:pointer;font-size:11px}
+.track .seg.cur{border-color:var(--accent)}
+.track .joint{color:var(--muted);font-size:10px;cursor:pointer}
+.drawer{position:fixed;top:52px;right:0;bottom:0;width:340px;background:var(--surface);border-left:1px solid var(--border);padding:14px;overflow:auto;transform:translateX(100%);transition:.2s;z-index:5}
+.drawer.open{transform:none}
+.drawer details{border-bottom:1px solid var(--border);padding:6px 0}.drawer summary{cursor:pointer}
+.opts{display:flex;flex-wrap:wrap;gap:4px;margin:6px 0}
+.opts button{padding:3px 9px;font-size:12px}
+.toast{position:fixed;left:50%;bottom:70px;transform:translateX(-50%);background:var(--surface-2);border:1px solid var(--accent);padding:8px 14px;border-radius:999px;opacity:0;transition:.2s;z-index:9;pointer-events:none}
+.toast.show{opacity:1}
+.tree a{display:block;padding:3px 6px;border-radius:6px;cursor:pointer}.tree a:hover{background:var(--surface-2)}.tree a.act{color:var(--accent)}
+.split{display:grid;grid-template-columns:240px 1fr;gap:16px}
+.info{display:inline-block;width:16px;height:16px;border-radius:50%;border:1px solid var(--border-strong);text-align:center;font-size:10px;line-height:14px;color:var(--muted);cursor:help}
+.note{font-size:11px;color:var(--muted);border:1px dashed var(--border);border-radius:8px;padding:6px 8px;margin-top:10px}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <span class="logo" onclick="go('home')"><i>◆</i> ГремоВОД</span>
+    <div class="crumbs" id="crumbs"></div>
+    <span class="chip" id="cost" onclick="drawer('costs')"></span>
+    <span class="chip" onclick="drawer('queue')">очередь 2</span>
+  </header>
+  <nav id="nav"></nav>
+  <main id="main"></main>
+</div>
+<div class="track" id="track" hidden></div>
+<div class="drawer" id="drawer"></div>
+<div class="toast" id="toast"></div>
+<script>
+// Макет ГремоВОД v2: данные выдуманы, сервер не вызывается, генерации не настоящие.
+const S={
+ heroes:[{id:'grem',name:'Грэм',pack:6,voice:'',looks:['Основной','Зима','Карнавал']},{id:'prokhor',name:'Прохор',pack:8,voice:'ElevenLabs · «Прохор»',looks:['Основной']},{id:'car',name:'Шестёрка',pack:4,voice:'—',looks:['Основной'],group:'Транспорт'}],
+ places:[{id:'minsk',name:'Минск',d:0},{id:'nemiga',name:'Немига',d:1},{id:'yard',name:'Двор на Немиге',d:2,ok:true},{id:'night',name:'Ночь',d:3,variant:true},{id:'winter',name:'Зима',d:3,variant:true,ok:true},{id:'komar',name:'Комаровка',d:1,ok:true},{id:'airport',name:'Аэропорт',d:1}],
+ scenes:[{n:1,t:'Встреча в аэропорту',place:'Аэропорт',heroes:'Грэм, Прохор',want:'Прохор хочет уехать незаметно — фанаты у выхода',change:'чужак → пассажир',kadry:4,done:3},
+  {n:2,t:'За салом на Комаровку',place:'Комаровка',heroes:'Грэм, Прохор',want:'Прохор хочет сала, рынок закрывается',change:'скепсис → азарт',kadry:5,done:1},
+  {n:3,t:'Фантазия: карнавал',place:'Двор на Немиге › Ночь',heroes:'Грэм (Карнавал)',want:'Грэм хочет произвести впечатление',change:'мечта → реальность',kadry:3,done:0,layer:'фантазия'}],
+ kadr:{n:3,sense:'Грэм решает подвезти звезду',shots:[{n:1,t:'Грэм подходит к машине слева',photo:true,take:'принят'},{n:2,t:'Общий план: город',photo:true,take:'выбран'},{n:3,t:'Крупно лицо — хитрый прищур',photo:true,take:''},{n:4,t:'Машина сзади, дым из трубы',photo:false,take:''}]},
+ variants:4,sel:3,approved:2,trys:0,mode:'shot',shotTab:'photo',seriesTab:'scenes',worldTab:'heroes',hero:'grem',place:'yard',cur:{scene:2,kadr:3,shot:3}
+};
+const $=id=>document.getElementById(id);
+function toast(t){const e=$('toast');e.textContent=t;e.classList.add('show');clearTimeout(e._t);e._t=setTimeout(()=>e.classList.remove('show'),1800)}
+function go(r){location.hash='#/'+r}
+function route(){return (location.hash.replace(/^#\//,'')||'home').split('/')}
+function crumbs(parts){$('crumbs').innerHTML=parts.map(([t,r])=>r?`<a onclick="go('${r}')">${t}</a>`:`<span>${t}</span>`).join(' › ')}
+function nav(r){
+ const a=(k,t,cls='',b='')=>`<a class="${cls}${r.join('/').startsWith(k)?' act':''}" onclick="go('${k}')">${t}${b?`<span class="badge">${b}</span>`:''}</a>`;
+ $('nav').innerHTML=`<h4>Мир</h4>${a('world/heroes','Герои')}${a('world/places','Места')}${a('world/props','Реквизит')}${a('world/passport','Паспорт','', 'стиль не утв.')}
+ <h4>Серии</h4>${a('series','01 · Пилот')}${S.scenes.map(s=>a('scene/'+s.n,`Сцена ${String(s.n).padStart(2,'0')}`,'sub')).join('')}<a class="sub" onclick="toast('Новая серия — в макете не создаётся')">+ серия</a>
+ <h4>Фото</h4>${a('photo','Пробы','', '7')}
+ <h4>Библиотека</h4>${a('world/unassigned','Без привязки','', '26')}
+ <h4>Ещё</h4><a onclick="toast('Инструменты: узлы, рилсы, агенты — свёрнуты')">Инструменты</a><a onclick="toast('Настройки')">Настройки</a>`}
+function cost(scope,sum){$('cost').textContent=`${scope} · $${sum}`}
+function track(items,cur,joints){const t=$('track');if(!items){t.hidden=true;return}t.hidden=false;
+ t.innerHTML=items.map((it,i)=>(i&&joints?`<span class="joint" title="Тип стыка" onclick="toast('Тип стыка: обычный / по движению / по форме / по звуку / трансформация')">⟷</span>`:'')+`<div class="seg${i===cur?' cur':''}" onclick="${it.go}">${it.t}<br><span class="muted">${it.d}</span></div>`).join('')+`<span class="muted" style="margin-left:auto">⚠ <span title="Сверка соседних">Грэм уходит вправо, в шоте 3 входит справа — так задумано?</span></span>`}
+function drawer(kind){const d=$('drawer');if(d.dataset.k===kind&&d.classList.contains('open')){d.classList.remove('open');return}d.dataset.k=kind;d.classList.add('open');d.innerHTML=`<div class="row" style="justify-content:space-between"><b>${{refs:'Что уйдёт в запрос',refine:'Допилить вариант '+S.sel,queue:'Очередь',costs:'Расходы'}[kind]}</b><button class="ghost" onclick="$('drawer').classList.remove('open')">✕</button></div>`+DR[kind]()}
+const opts=(list)=>`<div class="opts">${list.map(o=>`<button onclick="this.classList.toggle('on');sum()">${o}</button>`).join('')}</div>`;
+function sum(){const on=[...document.querySelectorAll('#drawer .opts .on')].map(b=>b.textContent);const e=$('rsum');if(e)e.textContent=on.length?'Изменится: '+on.join(', '):'Ничего не выбрано'}
+const DR={
+ refs:()=>`<p class="muted">Студия выбрала 2–4 вида под план. Можно поменять.</p>
+  <div class="grid" style="grid-template-columns:1fr 1fr">
+  <div class="thumb"><span class="tick">✓</span>Image 1 · лицо Грэма 3/4</div><div class="thumb"><span class="tick">✓</span>Image 2 · Грэм, полный рост</div>
+  <div class="thumb"><span class="tick">✓</span>Image 3 · Комаровка · день</div><div class="thumb"><span class="tick">✓</span>Image 4 · эталон стиля</div></div>
+  <p class="bad">Не хватает: голос Грэма; эталон стиля не утверждён</p>
+  <p class="muted">Реальные фото места в запрос не уходят (скрыты).</p>`,
+ refine:()=>`<div class="opts"><button class="on" onclick="toast('Правка этого варианта')">Исправить этот</button><button onclick="toast('Результат станет фото нового шота сразу после текущего')">Новый шот из этого</button></div>
+  <b>Что не так?</b>
+  <details><summary>Свет</summary>${opts(['окно','фонарь','солнце','лампа салона','фары','слева','справа','сверху','контровой','мягче','жёстче'])}</details>
+  <details open><summary>Камера</summary>${opts(['ближе','дальше','только глаза','только руки','выше','ниже','на уровне глаз','с места водителя','с места пассажира','через лобовое'])}</details>
+  <details><summary>Глубина</summary>${opts(['+ передний план','размыть фон','убрать лишнее сзади'])}</details>
+  <details><summary>Атмосфера</summary>${opts(['дымка','пар','пыль','снежинки','проще и чище'])}</details>
+  <details><summary>Стиль и лицо</summary>${opts(['ближе к эталону стиля','вернуть лицо героя','меньше пластика'])}</details>
+  <details><summary>Очистить</summary>${opts(['простой','универсальный','подробный'])}<input placeholder="где: земля, деревья, фон" style="width:100%"></details>
+  <p><input placeholder="Хочу увидеть: щурится" style="width:100%"></p>
+  <p class="muted" id="rsum">Ничего не выбрано</p>
+  <button class="main" onclick="S.variants++;S.sel=S.variants;render();toast('Готово: новый вариант — доработка (макет)')">Допилить · $0.04</button>
+  <p class="note">После 2–3 доработок подряд: «качество может поплыть — вернитесь к исходнику».</p>`,
+ queue:()=>`<table><tr><td>GPT Image · «Грэм у машины»</td><td class="warn">ждёт ответа 6 мин</td><td><button onclick="toast('Отмечено неудачным после проверки в PiAPI — блок снят')">Снять ожидание</button></td></tr>
+  <tr><td>Nano Banana · то же</td><td class="ok">готово</td><td></td></tr></table>
+  <p class="note">Такой же запрос той же модели не уйдёт, пока первый не ответит. Другую модель — можно сразу.</p>`,
+ costs:()=>`<table><tr><th>Масштаб</th><th>Факт</th><th>Резерв</th></tr><tr><td>Шот 3</td><td>$0.12</td><td>$0.04</td></tr><tr><td>Кадр 03</td><td>$0.86</td><td>$0.04</td></tr><tr><td>Сцена 02</td><td>$3.10</td><td>$0.19</td></tr><tr><td>Пилот</td><td>$40.80</td><td>$1.20</td></tr><tr><td>ГремоВОД</td><td>$58.80</td><td>$1.20</td></tr></table>
+  <p class="muted">День: $4.20 из $10. Одно задание считается один раз на любом уровне. Суммы выдуманы.</p>`
+};
+const V={
+ home:()=>{crumbs([['ГремоВОД']]);cost('ГремоВОД','58.80');track();return `
+  <div class="continue"><div style="flex:1"><div class="muted">Продолжить работу</div><h1>Пилот › Сцена 02 › Кадр 03 › Шот 3 · Фото</h1><span class="muted">вчера, 23:10 · есть несохранённый черновик</span></div><button class="main" onclick="go('shot')">▶ Продолжить</button></div>
+  <h2>Серии <button class="ghost" onclick="toast('+ серия')">+ серия</button></h2>
+  <div class="card row" style="justify-content:space-between;cursor:pointer" onclick="go('series')"><b>01 · Пилот</b><span class="muted">3 сцены · план 4:00 · факт 0:46 · кадров готово 4 из 12 · $40.80</span></div>
+  <h2>Фото</h2><div class="card row" style="justify-content:space-between;cursor:pointer" onclick="go('photo')"><span>Пробы — 7 фото без привязки</span><span class="muted">открыть</span></div>
+  <p class="warn" style="margin-top:16px">Не хватает: у Грэма нет голоса · пакет Грэма 6/8 · эталон стиля не выбран</p>`},
+ 'world/heroes':()=>{const h=S.heroes.find(x=>x.id===S.hero);crumbs([['ГремоВОД','home'],['Мир'],['Герои']]);cost('ГремоВОД','58.80');track();return `
+  <div class="split"><div class="tree card"><b>Герои</b>${S.heroes.filter(x=>!x.group).map(x=>`<a class="${x.id===S.hero?'act':''}" onclick="S.hero='${x.id}';render()">${x.name}</a>`).join('')}<a onclick="toast('Массовка: люди на фоне')">Массовка</a><b style="display:block;margin-top:8px">Транспорт</b><a class="${S.hero==='car'?'act':''}" onclick="S.hero='car';render()">Шестёрка</a><a onclick="toast('+ герой')">+ герой</a></div>
+  <div><h1>${h.name}</h1><span class="muted">${h.group?'Транспорт · рендеры из Blender':'Герой'} · голос: ${h.voice||'<span class=bad>не назначен</span>'}</span>
+  <h2>Пакет ракурсов · ${h.pack}/8 ${h.pack<8?'<span class="warn">— герой не готов</span>':'<span class="ok">✓</span>'}</h2>
+  <div class="grid" style="grid-template-columns:repeat(4,1fr)">${(h.group?['спереди','сзади','слева','справа','3/4 слева','3/4 справа','салон: водитель','салон: пассажир']:['лицо анфас','лицо 3/4 л','лицо 3/4 п','профиль','рост спереди','рост сзади','рост слева','рост справа']).map((v,i)=>`<div class="thumb">${i<h.pack?'<span class="tick">✓</span>':''}${v}</div>`).join('')}</div>
+  <div class="row" style="margin-top:8px"><button onclick="toast('Догенерировать недостающие ракурсы · $0.08')">Догенерировать пакет · $0.08</button><button class="ghost" onclick="toast('⋯ → Исходные фото (видит только владелец)')">⋯</button></div>
+  <h2>Образы</h2><div class="row">${h.looks.map((l,i)=>`<span class="chip">${l}${i?' · только одежда':''}</span>`).join('')}<button onclick="let d=prompt('Свой образ: опишите','бразильский карнавал');if(d){S.heroes.find(x=>x.id===S.hero).looks.push(d[0].toUpperCase()+d.slice(1,12));render();toast('Пакет 8 ракурсов из основного · $0.08 (макет)')}">+ Свой образ</button></div>
+  <p class="note">Образ делается из основного пакета. «Меняет внешность» (молодой, старый) — лицо из образа; «только одежда» — лицо из основного.</p></div></div>`},
+ 'world/places':()=>{const p=S.places.find(x=>x.id===S.place);crumbs([['ГремоВОД','home'],['Мир'],['Места'],[p.name]]);cost('ГремоВОД','58.80');track();return `
+  <div class="split"><div class="tree card"><b>Места</b>${S.places.map(x=>`<a style="padding-left:${6+x.d*12}px" class="${x.id===S.place?'act':''}" onclick="S.place='${x.id}';render()">${x.variant?'· ':''}${x.name}${x.ok?' <span class=ok>✓</span>':''}</a>`).join('')}<a onclick="toast('+ место')">+ место</a></div>
+  <div><h1>${p.name}</h1><span class="muted">${p.variant?'вариант места «Двор на Немиге» · геометрия: фон двора ✓':'место'} · где используется: Пилот › Сцена 03</span>
+  <div class="tabs"><button class="on">Референсы</button><button>Все изображения</button></div>
+  <div class="grid">${[1,2,3].map(i=>`<div class="thumb ${p.ok&&i===1?'sel':''}">${p.ok&&i===1?'<span class="tick">✓ утверждён</span>':''}фон ${i}</div>`).join('')}<div class="thumb" onclick="toast('Загрузить: с компьютера или перетащить')">+ загрузить</div></div>
+  <div class="row" style="margin-top:8px"><button onclick="S.places.find(x=>x.id===S.place).ok=true;render();toast('Сделано утверждённым')">Сделать утверждённым</button>${p.variant?'':`<button onclick="toast('+ вариант: ночь, зима…')">+ вариант</button>`}<button onclick="toast('Перерисовать реальное фото в наш стиль · $0.04')">Перерисовать в наш стиль</button><button class="ghost" onclick="toast('⋯ → Исходные фото (Real Reference, видит только владелец)')">⋯</button></div>
+  ${!p.ok?'<p class="warn">Нет утверждённого фона — сцены с этим местом покажут пропуск, похожий фон не подставится.</p>':''}</div></div>`},
+ 'world/props':()=>{crumbs([['ГремоВОД','home'],['Мир'],['Реквизит']]);track();return `<h1>Реквизит</h1><p class="muted">Предметы, одинаковые во всех сценах. Символ серии берётся отсюда.</p><div class="grid"><div class="thumb sel"><span class="tick">✓</span>Массажная накидка (символ Пилота)</div><div class="thumb">Ключи Грэма</div><div class="thumb">+ предмет</div></div>`},
+ 'world/passport':()=>{crumbs([['ГремоВОД','home'],['Мир'],['Паспорт']]);track();const f=(l,v,ph='')=>`<tr><td style="width:180px">${l}</td><td><input style="width:100%" value="${v}" placeholder="${ph}"></td></tr>`;return `
+  <h1>Паспорт проекта</h1><div class="row"><span>Режим</span><select><option>3D-мульт</option><option>реалистичное кино</option><option>2D-анимация</option></select><span class="warn">стиль не утверждён</span></div>
+  <h2>Эталон стиля</h2><div class="row"><div class="thumb" style="width:220px">нет эталона</div><button onclick="go('photo')">Сделать пробы стиля</button></div>
+  <table style="margin-top:12px">${f('Место и время','Минск, наши дни')}${f('Главная идея','Гаражная смекалка Грэма встречается с миром звёзд')}${f('Правило мира','В каждой серии новая сомнительная функция «шестёрки»')}${f('Стилизация','Простой объёмный мульт, мало мелких деталей')}${f('Архитектура','Реальный Минск по фото, узнаваемо')}${f('Палитра','','не задана — выберем по пробам')}${f('Свет','У света всегда понятная причина')}${f('Пластика','Ясные позы, читаемые лица, микро-игра в разговорах')}${f('Запрещено','Менять лицо и кепку Грэма; кузов и фары машины; толпы; хаотичный фон')}${f('Слои','Воспоминание 2014 — фильтр в монтаже; Фантазия')}</table>
+  <p class="note">Паспорт подставляется в каждый запрос и не копируется в шот.</p>`},
+ 'world/unassigned':()=>{crumbs([['ГремоВОД','home'],['Библиотека'],['Без привязки']]);track();return `<h1>Без привязки · 26</h1><p class="muted">Старые файлы. Автоматически ничего не раскладывается.</p><div class="grid">${Array.from({length:12},(_,i)=>`<div class="thumb">16.10 · piapi · seedream<br><button style="margin-top:4px;font-size:11px" onclick="event.stopPropagation();toast('Перенести в… (выбор узла)')">Перенести в…</button></div>`).join('')}</div>`},
+ series:()=>{crumbs([['ГремоВОД','home'],['Пилот']]);cost('Пилот','40.80');const tab=S.seriesTab;track(tab==='build'?S.scenes.flatMap(s=>Array.from({length:s.kadry},(_,i)=>({t:`${s.n}.${i+1}`,d:i<s.done?'8 с ✓':'—',go:`go('scene/${s.n}')`}))):null,-1,true);return `
+  <h1>01 · Пилот</h1><span class="muted">план 4:00 · факт 0:46</span>
+  <div class="tabs">${[['story','История'],['scenes','Сцены'],['build','Сборка']].map(([k,t])=>`<button class="${tab===k?'on':''}" onclick="S.seriesTab='${k}';render()">${t}</button>`).join('')}</div>
+  ${tab==='story'?`<div class="row"><button onclick="toast('Разбить сценарий на сцены — LLM, без подтверждения (макет)')">Разбить сценарий на сцены</button><button class="main" onclick="toast('Применить к сценам после просмотра изменений')">Применить к сценам</button></div>
+   <p class="muted">Символ серии: Массажная накидка · Сквозные детали: мигающая лампочка, камера Очумельца</p>
+   <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(260px,1fr))">${S.scenes.map(s=>`<div class="card"><b>${s.n}. ${s.t}</b><div class="muted">${s.place} · ${s.heroes}</div><div>Чего хочет / что мешает: ${s.want}</div><div>Что меняется: ${s.change}</div></div>`).join('')}</div>`:''}
+  ${tab==='scenes'?`<div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(240px,1fr))">${S.scenes.map(s=>`<div class="card" style="cursor:pointer" onclick="go('scene/${s.n}')"><div class="thumb">${s.layer?'слой: '+s.layer:''}</div><b>Сцена ${String(s.n).padStart(2,'0')} · ${s.t}</b><div class="muted">${s.place} · кадров готово ${s.done}/${s.kadry}</div></div>`).join('')}</div>`:''}
+  ${tab==='build'?`<p class="bad">Не хватает: 8 кадров не собраны · музыка серии не загружена</p><div class="row"><button class="main" onclick="toast('Комплект для CapCut: кадры по порядку + дорожки + монтажный лист')">Собрать комплект для CapCut</button><label><input type="checkbox"> проверено в CapCut</label></div><p class="muted">Дорожки: реплики · шумы · атмосфера · музыка — отдельно. Звук видеомоделей не берём.</p>`:''}`},
+ scene:(n)=>{const s=S.scenes.find(x=>x.n==n)||S.scenes[1];crumbs([['ГремоВОД','home'],['Пилот','series'],['Сцена '+String(s.n).padStart(2,'0')]]);cost('Сцена '+String(s.n).padStart(2,'0'),'3.10');
+  track(Array.from({length:s.kadry},(_,i)=>({t:'Кадр '+String(i+1).padStart(2,'0'),d:i<s.done?'9 с ✓':'—',go:"go('kadr')"})),-1,true);
+  const sel=(l,o)=>`<label class="muted">${l} <select>${o.map(x=>`<option>${x}</option>`).join('')}</select></label>`;return `
+  <h1>Сцена ${String(s.n).padStart(2,'0')} · ${s.t}</h1>
+  <div class="row"><span class="chip">${s.place}</span><span class="chip">${s.heroes}</span><button class="ghost" onclick="toast('Изменить место и героев; у героя — выбор образа')">Изменить</button></div>
+  <p>Чего хочет / что мешает: <b>${s.want}</b><br>Что меняется: <b>${s.change}</b></p>
+  <div class="row">${sel('Время',['день','утро','вечер','ночь (вариант)'])}${sel('Погода',['ясно','пасмурно','дождь','снег (вариант)'])}${sel('Слой',[s.layer||'основной','воспоминание','фантазия'])}</div>
+  <h2>Кадры <button class="ghost" onclick="toast('+ кадр')">+ кадр</button> <button class="main" style="float:right" onclick="go('kadr')">Дальше: кадр 03 — выбрать дубль шота 2</button></h2>
+  <div class="grid">${Array.from({length:s.kadry},(_,i)=>`<div style="cursor:pointer" onclick="go('kadr')"><div class="thumb ${i<s.done?'':''}">${i<s.done?'<span class="tick">✓</span>':''}</div>Кадр ${String(i+1).padStart(2,'0')} <span class="muted">· шоты ${i<s.done?'4/4':'2/4'} · ${i<s.done?'собран':'не собран'}</span></div>`).join('')}</div>
+  <h2>Оценка сцены · 7 фильтров</h2><div class="row">${['Смысл','Взгляд','Ритм','Крупности','Пластика','Консистентность','Пересмотр'].map(x=>`<label class="chip">${x} <select><option>—</option><option>0</option><option>1</option><option>2</option></select></label>`).join('')}</div>`},
+ kadr:()=>{const k=S.kadr;crumbs([['ГремоВОД','home'],['Пилот','series'],['Сцена 02','scene/2'],['Кадр 03']]);cost('Кадр 03','0.86');
+  track(k.shots.map(s=>({t:'Шот '+s.n,d:s.take?'5 с':'—',go:"go('shot')"})),-1,true);return `
+  <h1>Кадр 03</h1><input style="width:100%" value="${k.sense}" title="Смысл кадра одним предложением">
+  <h2>Шоты <button class="ghost" onclick="toast('+ шот')">+ шот</button></h2>
+  <div class="grid">${k.shots.map(s=>`<div style="cursor:pointer" onclick="go('shot')"><div class="thumb">${s.photo?'<span class="tick">✓</span>':''}</div><b>Шот ${s.n}</b> <span class="muted">${s.t}</span><br><span class="${s.take==='принят'?'ok':s.take?'warn':'muted'}">фото ${s.photo?'✓':'—'} · дубль ${s.take||'—'}</span></div>`).join('')}</div>
+  <h2>Черновая сборка</h2><table>${k.shots.map(s=>`<tr><td>Шот ${s.n}</td><td>начало <input size="3" value="0.0"> конец <input size="3" value="4.5"></td><td><button class="ghost">↑</button><button class="ghost">↓</button></td></tr>`).join('')}</table>
+  <div class="row" style="margin-top:8px"><button class="main" onclick="toast('Собрано локально (ffmpeg), бесплатно — макет')">Собрать кадр</button><span class="muted">≈ 9.5 с</span></div>
+  <h2>Звук кадра</h2><table><tr><td>Прохор (за кадром)</td><td>«А автоматический режим где?»</td><td><button onclick="toast('Озвучено · $0.01 (макет)')">Озвучить · $0.01</button></td></tr><tr><td>Грэм (в шоте 3)</td><td>«Вы сели — я автоматически закрыл»</td><td><span class="bad">голос не назначен</span></td></tr></table>`},
+ shot:()=>photoEditor(true),
+ photo:()=>photoEditor(false)
+};
+function photoEditor(inShot){
+ const where=inShot?'Пилот › Сцена 02 › Кадр 03 › Шот 3':'Пробы проекта';
+ crumbs(inShot?[['ГремоВОД','home'],['Пилот','series'],['Сцена 02','scene/2'],['Кадр 03','kadr'],['Шот 3']]:[['ГремоВОД','home'],['Фото'],['Пробы']]);
+ cost(inShot?'Шот 3':'Пробы',inShot?'0.12':'0.31');
+ if(inShot)track(S.kadr.shots.map(s=>({t:'Шот '+s.n,d:s.t.slice(0,18),go:"go('shot')"})),2,true);else track();
+ const tab=inShot?S.shotTab:'photo';
+ const chips=(l,o)=>`<div class="row"><span class="muted" style="width:80px">${l}</span>${o.map(x=>`<button onclick="this.classList.toggle('on')">${x}</button>`).join('')}</div>`;
+ let h=`<h1>${inShot?'Шот 3 · Крупно лицо — хитрый прищур':'Фото · пробы'}</h1>
+ ${inShot?`<div class="row"><label><input type="checkbox"> говорит в шоте</label><span class="muted">→ фото и видео под липсинк</span></div><div class="tabs"><button class="${tab==='photo'?'on':''}" onclick="S.shotTab='photo';render()">Фото</button><button class="${tab==='video'?'on':''}" onclick="S.shotTab='video';render()">Видео</button></div>`:''}`;
+ if(tab==='photo'){h+=`
+ <div class="row" style="margin-bottom:8px"><span class="chip">Грэм <select><option>Основной</option><option>Зима</option><option>Карнавал</option></select></span><span class="chip">Комаровка <select><option>день</option><option>вечер</option><option>ночь (нет варианта)</option></select></span><button class="ghost" onclick="drawer('refs')">Что уйдёт в запрос · 4</button></div>
+ <div class="big">вариант ${S.sel}${S.sel===S.approved?' · <span class="ok">&nbsp;утверждён ✓</span>':''}<button class="refine" onclick="drawer('refine')">✎ Допилить</button></div>
+ <div class="row" style="margin:8px 0">${Array.from({length:S.variants},(_,i)=>`<div class="thumb ${i+1===S.sel?'sel':''}" style="width:96px" onclick="S.sel=${i+1};render()">${i+1===S.approved?'<span class="tick">✓</span>':''}${i+1}</div>`).join('')}</div>
+ <div class="row"><button onclick="S.approved=S.sel;render();toast('Утверждено — опора для видео шота')">Утвердить для шота</button><span class="muted">Направления:</span>${['Ближе','Глубже','Свет','Масштаб'].map(a=>`<button onclick="S.variants++;S.sel=S.variants;render();toast('Новый вариант: ось «${a}», остальное держится (макет)')">${a}</button>`).join('')}<span class="info" title="Ось «Реализм» появляется в режиме «реалистичное кино»">И</span></div>
+ <h2>Промпт</h2><textarea placeholder="Смысл: Грэм задумал схитрить. Что делает и чувствует…">Грэм щурится и прячет улыбку — задумал схитрить</textarea>
+ ${chips('Крупность',['общий','средний','крупный','только глаза'])}${chips('Ракурс',['на уровне глаз','сверху','снизу','с места пассажира'])}${chips('Свет',['из сцены','слева','справа','контровой','мягче'])}
+ <details><summary class="muted">Оптика и заполнялка</summary>${chips('Оптика',['широкий угол','нормальный','телевик'])}${chips('Доминанта',['лицо','руки','машина'])}</details>
+ <div class="row" style="margin-top:10px"><select><option>Nano Banana 2.1</option><option>GPT Image 2.5</option><option>Seedream 5 Lite</option><option>Seedream 5 Pro</option></select>
+ <button class="main" onclick="gen(this)">Сгенерировать · $0.04</button><span class="muted">Сохранится в: ${where}</span><button class="ghost" onclick="toast('Английский промпт после переписывания LLM — по нажатию')">EN ▸</button><span class="info" title="5 вопросов: доминанта, смысл без слов, чей взгляд, желание/препятствие, ритм">5?</span></div>
+ ${inShot?'':`<div class="row" style="margin-top:8px"><button onclick="toast('Перенести в шот… (выбор)')">Перенести в шот…</button><button onclick="toast('В Мир… (герой, место, реквизит)')">В Мир…</button><button onclick="toast('Сделать эталоном стиля')">Сделать эталоном стиля</button></div>`}`}
+ else{const dear=S.videoModel==='Seedance 2.5';h+=`
+ <div class="split" style="grid-template-columns:200px 1fr"><div><div class="thumb sel"><span class="tick">✓</span>утверждённое фото</div><p class="muted">Видео делается только от утверждённого фото.</p></div>
+ <div><textarea>0–2 с: слушает пассажира. 2–4 с: смотрит в зеркало, медленно щурится. 4–5 с: держит взгляд, молчит.</textarea>
+ ${chips('Камера',['неподвижная','наезд','отъезд','сопровождение','дуга','боковой проезд'])}${chips('Среда',['фары на фоне','снежинки','пар'])}
+ <div class="row" style="margin-top:8px"><select onchange="S.videoModel=this.value;render()">${['MiniMax H3 · 480p · 5 с','Seedance 2.5'].map(m=>`<option ${S.videoModel===m?'selected':''}>${m}</option>`).join('')}</select>
+ ${dear?'<label class="warn"><input type="checkbox" id="ok"> подтверждаю $0.75</label>':''}<button class="main" onclick="if(${dear}&&!$('ok').checked){toast('Дороже $0.50 — поставьте галочку');return}toast('Шот отправлен (макет)')">Сделать шот · ${dear?'$0.75':'$0.15'}</button></div>
+ <h2>Дубли</h2><div class="row">${[1,2].map(i=>`<div class="card" style="width:200px"><div class="thumb">дубль ${i}</div><div class="row" style="margin-top:6px"><button onclick="toast('Выбран')">Выбрать</button><button onclick="toast('Принят после просмотра')">Принять</button></div><div class="opts">${['лицо меняется','машина плывёт','камера дёргается','много движения'].map(x=>`<button onclick="toast('Добавлено ограничение «${x}», повтор (макет)')">${x}</button>`).join('')}</div></div>`).join('')}</div></div></div>`}
+ return h}
+function gen(b){if(S.pending){toast('Такой запрос уже ждёт ответа — смените модель или «Снять ожидание»');return}S.pending=true;b.textContent='Ждёт ответа…';setTimeout(()=>{S.pending=false;S.variants++;S.sel=S.variants;render();toast('Готово (макет, без генерации)')},1200)}
+function render(){const r=route();nav(r);const key=r[0]==='world'?'world/'+(r[1]||'heroes'):r[0];const f=V[key]||V.home;$('main').innerHTML=f(r[1]);$('drawer').classList.remove('open')}
+S.videoModel='MiniMax H3 · 480p · 5 с';
+window.addEventListener('hashchange',render);render();
+</script>
+</body>
+</html>
