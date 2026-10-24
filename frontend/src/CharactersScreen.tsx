@@ -164,7 +164,7 @@ export default function CharactersScreen({
           defaultModel={DEFAULT_MODEL}
           projectId={projectId}
           ensureProject={ensureProject}
-          referenceAssetId={hero.working_asset_id}
+          referenceAssetIds={hero.working_asset_id ? [hero.working_asset_id] : []}
           buildPrompt={shot => heroShotPrompt(hero.name, hero.identity, world, shot)}
           revision={revision}
           actions={(selected, done) => (

@@ -82,7 +82,7 @@ export default function LocationsTab({
       setBusy(false);
     }
   };
-  const baseAsset = current?.files.find(f => f.asset_id)?.asset_id || undefined;
+  const baseAssets = (current?.files || []).flatMap(f => (f.asset_id ? [f.asset_id] : []));
   if (pid === null) return <section className="panel">Загружаю локации…</section>;
   if (!pid)
     return (
@@ -202,7 +202,7 @@ export default function LocationsTab({
             defaultModel={DEFAULT_MODEL}
             projectId={projectId}
             ensureProject={ensureProject}
-            referenceAssetId={baseAsset}
+            referenceAssetIds={baseAssets}
             buildPrompt={shot => locationShotPrompt(current.title, current.notes, world, shot)}
             revision={revision}
             actions={(selectedIds, done) => (

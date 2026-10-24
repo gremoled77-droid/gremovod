@@ -45,7 +45,7 @@ export function locationShotPrompt(
     clean(world?.palette) ? `Палитра: ${clean(world?.palette)}.` : '',
     clean(world?.lighting) ? `Освещение: ${clean(world?.lighting)}.` : '',
     `Ракурс: ${shot.label}. ${shot.prompt}`,
-    'Архитектура и предметы как на референсе.',
+    'Архитектура и предметы как на референсах (фото этого места с разных сторон).',
   ];
   return lines.filter(Boolean).join('\n');
 }

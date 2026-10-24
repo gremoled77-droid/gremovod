@@ -15,6 +15,7 @@ type Asset = {
   provider_reference_url?: string | null;
   metadata: {kind?: string; request?: {payload?: {input?: {prompt?: string}}}};
 };
+const MAX_REFS = 4;
 const thumb = (id: string) => `/api/library/${id}/thumbnail`;
 const promptOf = (a: Asset) => a.metadata.request?.payload?.input?.prompt;
 
@@ -29,7 +30,7 @@ export default function SheetPanel({
   defaultModel,
   projectId,
   ensureProject,
-  referenceAssetId,
+  referenceAssetIds = [],
   buildPrompt,
   revision,
   actions,
@@ -43,7 +44,7 @@ export default function SheetPanel({
   defaultModel: string;
   projectId: string;
   ensureProject: () => Promise<string>;
-  referenceAssetId?: string;
+  referenceAssetIds?: string[];
   buildPrompt: (shot: Shot) => string;
   revision: number;
   actions: (selected: string[], done: () => void) => ReactNode;
@@ -103,21 +104,23 @@ export default function SheetPanel({
     try {
       const pid = projectId || (await ensureProject());
       const spec = specs[model];
-      let urls: string[] = [];
-      if (referenceAssetId && (spec?.api_refs ?? 0) > 0) {
-        const known = library.find(a => a.id === referenceAssetId)?.provider_reference_url;
-        urls = [
+      const urls: string[] = [];
+      // Несколько фото места или героя уходят вместе (до MAX_REFS), чтобы модель видела все стороны.
+      const take = referenceAssetIds.slice(0, Math.min(spec?.api_refs ?? 0, MAX_REFS));
+      for (const id of take) {
+        const known = library.find(a => a.id === id)?.provider_reference_url;
+        urls.push(
           known ||
             (
               await responseJson(
-                await apiFetch(`/api/library/${referenceAssetId}/upload-reference`, {
+                await apiFetch(`/api/library/${id}/upload-reference`, {
                   method: 'POST',
                   headers: {'Content-Type': 'application/json'},
                   body: JSON.stringify({approved: true, provider: 'tempfile'}),
                 })
               )
-            ).url,
-        ];
+            ).url
+        );
       }
       const options = Object.fromEntries(
         Object.entries(spec?.options || {})
@@ -182,7 +185,7 @@ export default function SheetPanel({
           {busy ? 'Готовлю…' : `Собрать пакет (${chosen.length}): оценка и подтверждение`}
         </button>
       </div>
-      {!referenceAssetId && (
+      {!referenceAssetIds.length && (
         <p className="muted">
           Образа-референса пока нет: картинки получатся без привязки к внешности. Сначала сделай или загрузи
           образ.
