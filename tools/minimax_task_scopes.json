@@ -1,0 +1,79 @@
+{
+  "version": 1,
+  "note": "Explicit scope allowlist for MiniMax/owner task branches. The scope check reads THIS FILE FROM THE BASE COMMIT (origin/<base>), never from the pull request head, so a task branch cannot widen its own scope in the same pull request. Extending a scope therefore needs a reviewed change that lands before the next task PR.",
+  "branch_prefixes": ["minimax/", "mavis/"],
+  "task_key_pattern": "^[a-z]+-[0-9]+$",
+  "common_allow": [
+    "docs/"
+  ],
+  "common_deny": [
+    "canon/",
+    "skills/",
+    "docs/specs/",
+    "AGENTS.md",
+    "CLAUDE.md",
+    "AGENT_BUILD_MANUAL.md"
+  ],
+  "common_allow_note": "Every task branch may write its own documentation under docs/. The shared denylist above always wins over both common_allow and a task scope: it encodes the general prohibitions of the GA backlog (no canon, no changes to the existing AGENTS/CLAUDE/SKILL, no edits to the Codex contract specs).",
+  "tasks": {
+    "ga-01": {
+      "summary": "Достоверный settlement всех LLM: llm_guard + счётчики вызовов.",
+      "allow": [
+        "backend/llm_guard.py",
+        "backend/main.py",
+        "backend/test_llm_settlement.py",
+        "backend/test_llm_guard.py",
+        "backend/test_money_boundary.py"
+      ]
+    },
+    "ga-02": {
+      "summary": "Восстановить prepare/permit/execute lifecycle в llm_guard.",
+      "allow": [
+        "backend/llm_guard.py",
+        "backend/test_llm_guard.py"
+      ]
+    },
+    "ga-03": {
+      "summary": "Связать импорт master с приёмкой выпуска (release artifacts + QC read model).",
+      "allow": [
+        "backend/release_gate.py",
+        "backend/release_artifacts.py",
+        "backend/media_qc.py",
+        "backend/qa_reviews.py",
+        "backend/test_release_gate.py",
+        "backend/test_release_artifacts.py",
+        "backend/test_media_qc.py",
+        "backend/test_qa_reviews.py",
+        "frontend/src/StageSummary.tsx",
+        "frontend/src/releaseGate.test.mjs"
+      ]
+    },
+    "ga-04": {
+      "summary": "Полноценный offline CI кандидата: workflow, контракты, scope guard, скан секретов.",
+      "allow": [
+        ".github/workflows/studio-offline-ci.yml",
+        ".github/workflows/studio-ci-contract.yml",
+        ".github/workflows/agent-scope-guard.yml",
+        ".github/workflows/agent-coordination.yml",
+        ".gitignore",
+        "backend/CI.md",
+        "tools/check_agent_scope.py",
+        "tools/test_agent_scope.py",
+        "tools/check_ci_contracts.py",
+        "tools/test_ci_contracts.py",
+        "tools/check_no_secrets.py",
+        "tools/test_no_secrets.py",
+        "tools/minimax_task_scopes.json"
+      ]
+    },
+    "ga-05": {
+      "summary": "Доверенные proxy для login throttle: backend/remote_access.py.",
+      "allow": [
+        "backend/remote_access.py",
+        "backend/test_remote_access.py",
+        ".env.cloud.example",
+        "docs/CLOUD_DEPLOY.md"
+      ]
+    }
+  }
+}

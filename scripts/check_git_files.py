@@ -4,6 +4,13 @@ import sys
 from pathlib import PurePosixPath
 
 
+# Project Claude Code configuration is tracked on purpose: the rules, the skills and
+# the hooks are part of the repository contract and have to be reviewable. Only the
+# local, machine specific parts of .claude/ stay out of Git.
+ALLOWED_CLAUDE_PATHS = ('.claude/rules/', '.claude/skills/', '.claude/hooks/',
+                        '.claude/settings.json')
+
+
 def blocked(path):
     parts = PurePosixPath(path.replace('\\', '/')).parts
     if not parts:
@@ -11,7 +18,9 @@ def blocked(path):
     name = parts[-1].lower()
     lower = '/'.join(parts).lower()
     prefixes = ('projects/', 'runtime/', '.worktrees/', '.venv/', 'backend/library/',
-                'backend/media/', 'backend/character_library/', '.claude/')
+                'backend/media/', 'backend/character_library/')
+    if lower.startswith('.claude/'):
+        return not lower.startswith(ALLOWED_CLAUDE_PATHS)
     return (lower.startswith(prefixes) or 'node_modules' in parts
             or name.endswith('_api_key.txt')
             or (name.startswith('.env') and not name.endswith('.example'))
