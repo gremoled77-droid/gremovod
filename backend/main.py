@@ -741,14 +741,37 @@ def agent_context(body:AgentRunRequest):
             'model_profiles':body.character.get('profiles',{}),'project_style_bible':body.style,
             'target_models':{m:MODEL_SPECS[m] for m in body.target_models}}
 
-def agent_estimate_usd(body:AgentRunRequest, context_chars:int):
-    """Оценка всех ролей: каждая роль — отдельный платный вызов."""
+def agent_role_estimates(body:AgentRunRequest, context_chars:int):
+    """Оценка по каждой роли: сумма этих оценок — резерв всего прогона.
+
+    Отдельная оценка на роль нужна, чтобы при неопределённом исходе удержать резерв
+    именно той роли, чей usage не подтверждён, а не весь прогон целиком.
+    """
     from backend import llm_guard
-    total=0.0
+    estimates=[]
     for index in range(len(AGENT_ROLES)):
         messages=[{'role':'system','content':''},{'role':'user','content':'x'*(context_chars+index*AGENT_PREVIOUS_CHARS)}]
-        total+=llm_guard.estimate_usd(body.model, messages, AGENT_MAX_TOKENS)
-    return round(total,6)
+        estimates.append(llm_guard.estimate_usd(body.model, messages, AGENT_MAX_TOKENS))
+    return estimates
+
+def agent_estimate_usd(body:AgentRunRequest, context_chars:int):
+    """Оценка всех ролей: каждая роль — отдельный платный вызов."""
+    return round(sum(agent_role_estimates(body, context_chars)),6)
+
+def agent_spend(role_tokens, role_estimates):
+    """Деньги прогона агентов: подтверждённые токены и удерживаемая часть.
+
+    Роль без достоверного usage не подтверждена фактом, но её резерв остаётся в руках.
+    Роль, до которой прогон не дошёл, тоже стоит резерва. Ни одна часть не пишется
+    как $0: подтверждённое считается фактом, неопределённое удерживается до сверки.
+    Цена считается по сумме подтверждённых токенов одной формулой — так округление
+    не накапливается по ролям.
+    """
+    tokens_in=sum(pair[0] for pair in role_tokens if pair[0] is not None)
+    tokens_out=sum(pair[1] for pair in role_tokens if pair[1] is not None)
+    unknown=sum(role_estimates[index] for index,pair in enumerate(role_tokens) if pair[0] is None)
+    unknown+=sum(role_estimates[len(role_tokens):])
+    return (tokens_in, tokens_out), unknown
 
 def agent_quote_payload(body:AgentRunRequest, context_chars:int):
     """Что подписывается оценкой: вход прогона и его цена."""
@@ -818,7 +841,9 @@ async def run_agents(body:AgentRunRequest,x_api_key:str|None=Header(default=None
     request_id=body.request_id or uuid.uuid4().hex
     call_id=llm_guard.reserve_call(sys.modules[__name__], body.project_id, body.model, request_id, cost)
     output={}
-    tokens_in=tokens_out=0
+    role_estimates=agent_role_estimates(body, context_chars)
+    price_in,price_out=llm_guard.price_of(body.model)
+    role_tokens=[]  # токены каждой роли; (None, None) — достоверного usage нет
     try:
         for role,instructions in AGENT_ROLES.items():
             previous=json.dumps(output,ensure_ascii=False)
@@ -826,16 +851,28 @@ async def run_agents(body:AgentRunRequest,x_api_key:str|None=Header(default=None
             if role=='prompt': instructions=instructions+' Respond with labelled sections for each target model, then a short list of required references and parameters.'
             content,usage=await agent_completion(provider,body.model,key,instructions,prompt,spend=('llm',request_id,body.model),max_tokens=AGENT_MAX_TOKENS)
             output[role]={'content':content,'usage':usage}
-            tokens_in+=usage.get('prompt_tokens') or 0
-            tokens_out+=usage.get('completion_tokens') or 0
+            role_tokens.append(llm_guard.valid_tokens(usage) or (None, None))
     except Exception as exc:
-        llm_guard.settle_call(sys.modules[__name__], call_id, 'submission_unknown', cost, f'прервано после ролей: {len(output)}: {exc}')
+        # Часть ролей уже оплачена, часть — нет: подтверждённое не теряем, остальное
+        # удерживаем в резерве. Ложный $0 не пишем.
+        (tokens_in,tokens_out),unknown=agent_spend(role_tokens,role_estimates)
+        confirmed=round((tokens_in*price_in+tokens_out*price_out)/1_000_000,6)
+        llm_guard.settle_call(sys.modules[__name__], call_id, 'submission_unknown', round(confirmed+unknown,6),
+                              f'прервано после ролей: {len(role_tokens)}: {exc}', tokens=(tokens_in,tokens_out),
+                              confirmed_usd=confirmed)
         raise
-    price_in,price_out=llm_guard.price_of(body.model)
-    actual=round((tokens_in*price_in+tokens_out*price_out)/1_000_000,6)
-    llm_guard.settle_call(sys.modules[__name__], call_id, 'done', actual, f'ролей: {len(output)}', tokens=(tokens_in,tokens_out))
+    (tokens_in,tokens_out),unknown=agent_spend(role_tokens,role_estimates)
+    confirmed=round((tokens_in*price_in+tokens_out*price_out)/1_000_000,6)
+    if unknown>0:
+        # Роль без достоверного usage: её резерв удерживается, сумма не подтверждена.
+        # Подтверждённая часть пишется отдельно: её нельзя обнулить сверкой резерва.
+        llm_guard.settle_call(sys.modules[__name__], call_id, 'submission_unknown', round(confirmed+unknown,6),
+                              f'ролей: {len(role_tokens)}, без достоверного usage: {sum(1 for pair in role_tokens if pair[0] is None)}',
+                              tokens=(tokens_in,tokens_out), confirmed_usd=confirmed)
+    else:
+        llm_guard.settle_call(sys.modules[__name__], call_id, 'done', round(confirmed,6), f'ролей: {len(role_tokens)}', tokens=(tokens_in,tokens_out))
     run_id=uuid.uuid4().hex
-    record={'id':run_id,'created_at':now(),'provider':provider,'model':body.model,'brief':body.brief,'target_models':body.target_models,'output':output,'status':'awaiting_user_approval','generation_started':False,'cost_usd':actual,'estimated_usd':cost}
+    record={'id':run_id,'created_at':now(),'provider':provider,'model':body.model,'brief':body.brief,'target_models':body.target_models,'output':output,'status':'awaiting_user_approval','generation_started':False,'cost_usd':round(confirmed+unknown,6),'confirmed_usd':round(confirmed,6),'unconfirmed_usd':round(unknown,6),'cost_confirmed':unknown==0,'estimated_usd':cost}
     with connect() as db:
         db.execute('CREATE TABLE IF NOT EXISTS agent_runs(id TEXT PRIMARY KEY,project_id TEXT,created_at TEXT,data TEXT)')
         db.execute('INSERT INTO agent_runs VALUES(?,?,?,?)',(run_id,body.project_id,record['created_at'],json.dumps(record,ensure_ascii=False)))
