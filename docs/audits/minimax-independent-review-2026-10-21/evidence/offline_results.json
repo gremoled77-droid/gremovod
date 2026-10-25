@@ -1,0 +1,428 @@
+{
+  "generated_at_utc": "2026-10-21T13:45:39.275100+00:00",
+  "publication_observation": {
+    "timestamp_moscow": "2026-10-21 16:44:38",
+    "ga01_current_head": "c634c0c915a1afbf3d75df5bc897f75ef5b723ea",
+    "ga01_current_head_review": "NOT_REVIEWED",
+    "note": "GA-01 advanced during publication. Verdicts and runner defaults below still refer to the reviewed 5c47ace head. No MiniMax branch was updated by publication. Other reviewed heads, main and mavis/work were unchanged at observation."
+  },
+  "original_results": {
+    "ga01_profile_pass": 82,
+    "ga01_new_file_included_tests": 30,
+    "ga04_tools_pass": 63,
+    "ga04_subtests_pass": 7,
+    "ga05_profile_pass": 20,
+    "combined_backend_pass": 530,
+    "combined_subtests_pass": 26,
+    "combined_seconds": 219.78
+  },
+  "independent_observations": {
+    "pr58-independent.log": [
+      {
+        "case": "unpatched_task_prepare",
+        "error": "NameError",
+        "message": "name 'task_identity' is not defined",
+        "submits": 0
+      },
+      {
+        "case": "contradictory_usage_parse_failure",
+        "http": 502,
+        "ledger": {
+          "status": "failed",
+          "usd": 0.0,
+          "estimated_usd": 6.1e-05,
+          "input_tokens": null,
+          "output_tokens": null,
+          "note": "провайдер сообщил нулевое потребление"
+        },
+        "submits": 1
+      },
+      {
+        "case": "manual_reconcile_confirmed_report",
+        "before": {
+          "id": "fa3abfb8603a4b73a0ac5d7de1b1dfef",
+          "status": "submission_unknown",
+          "usd": 0.000295,
+          "confirmed_usd": 1.4e-05,
+          "input_tokens": 240,
+          "output_tokens": 80,
+          "note": "ролей: 3, без достоверного usage: 1"
+        },
+        "response": {
+          "id": "fa3abfb8603a4b73a0ac5d7de1b1dfef",
+          "status": "done",
+          "usd": 0.001014,
+          "confirmed_usd": 1.4e-05,
+          "unknown_usd": 0.001,
+          "released_usd": 0.0,
+          "note": "review manual fact",
+          "estimated_usd": 0.000843
+        },
+        "summary": {
+          "calls": 1,
+          "usd": 0.001014,
+          "estimated_usd": 0.000843,
+          "today_usd": 0.001014,
+          "by_model": {
+            "gpt-5.6-luna": {
+              "calls": 1,
+              "usd": 0.001014
+            }
+          },
+          "unknown_calls": 0,
+          "unknown_usd": 0.0,
+          "confirmed_usd": 1.4e-05,
+          "over_estimate_calls": 1,
+          "over_estimate_usd": 0.000171
+        }
+      },
+      {
+        "case": "legacy_migration_normal",
+        "first_error": null,
+        "after_second_startup": [
+          {
+            "id": "done",
+            "status": "done",
+            "usd": 0.03,
+            "confirmed_usd": 0.03
+          },
+          {
+            "id": "unknown",
+            "status": "submission_unknown",
+            "usd": 0.1,
+            "confirmed_usd": 1.4e-05
+          },
+          {
+            "id": "reserved",
+            "status": "reserved",
+            "usd": 0.1,
+            "confirmed_usd": 0.0
+          },
+          {
+            "id": "failed",
+            "status": "failed",
+            "usd": 0.0,
+            "confirmed_usd": 0.0
+          },
+          {
+            "id": "legacy-negative",
+            "status": "done",
+            "usd": -0.14,
+            "confirmed_usd": -0.14
+          }
+        ]
+      },
+      {
+        "case": "legacy_negative_budget_after_upgrade",
+        "spent": [
+          0.09,
+          0.09
+        ]
+      },
+      {
+        "case": "legacy_migration_invalid",
+        "first_error": "TypeError",
+        "after_second_startup": [
+          {
+            "id": "done",
+            "status": "done",
+            "usd": 0.03,
+            "confirmed_usd": null
+          },
+          {
+            "id": "unknown",
+            "status": "submission_unknown",
+            "usd": 0.1,
+            "confirmed_usd": null
+          },
+          {
+            "id": "reserved",
+            "status": "reserved",
+            "usd": 0.1,
+            "confirmed_usd": null
+          },
+          {
+            "id": "failed",
+            "status": "failed",
+            "usd": 0.0,
+            "confirmed_usd": null
+          },
+          {
+            "id": "legacy-negative",
+            "status": "done",
+            "usd": -0.14,
+            "confirmed_usd": null
+          }
+        ]
+      },
+      {
+        "case": "legacy_migration_fault",
+        "first_error": "OperationalError",
+        "after_second_startup": [
+          {
+            "id": "done",
+            "status": "done",
+            "usd": 0.03,
+            "confirmed_usd": null
+          },
+          {
+            "id": "unknown",
+            "status": "submission_unknown",
+            "usd": 0.1,
+            "confirmed_usd": null
+          },
+          {
+            "id": "reserved",
+            "status": "reserved",
+            "usd": 0.1,
+            "confirmed_usd": null
+          },
+          {
+            "id": "failed",
+            "status": "failed",
+            "usd": 0.0,
+            "confirmed_usd": null
+          },
+          {
+            "id": "legacy-negative",
+            "status": "done",
+            "usd": -0.14,
+            "confirmed_usd": null
+          }
+        ]
+      },
+      {
+        "case": "nonfinite_price",
+        "error": "TypeError",
+        "message": "can only concatenate str (not \"NoneType\") to str"
+      }
+    ],
+    "pr62-independent.log": [
+      {
+        "case": "normal_scope_allow_deny",
+        "passed": true
+      },
+      {
+        "case": "head_checker_bypass_with_base_manifest",
+        "exit": 0,
+        "output": "AGENT_SCOPE: role=task:ga-05, changed=2, forbidden=0"
+      },
+      {
+        "case": "path_filter",
+        "path": "backend/main.py",
+        "runs_heavy": true
+      },
+      {
+        "case": "path_filter",
+        "path": "backend/llm_guard.py",
+        "runs_heavy": true
+      },
+      {
+        "case": "path_filter",
+        "path": "backend/character_voice.py",
+        "runs_heavy": true
+      },
+      {
+        "case": "path_filter",
+        "path": "backend/spend_ledger.py",
+        "runs_heavy": true
+      },
+      {
+        "case": "path_filter",
+        "path": "frontend/src/StageSummary.tsx",
+        "runs_heavy": true
+      },
+      {
+        "case": "path_filter",
+        "path": "docs/only.md",
+        "runs_heavy": false
+      },
+      {
+        "case": "path_filter",
+        "path": ".github/workflows/studio-offline-ci.yml",
+        "runs_heavy": false
+      },
+      {
+        "case": "path_filter",
+        "path": "tools/check_agent_scope.py",
+        "runs_heavy": false
+      },
+      {
+        "case": "future_ga03_scope",
+        "path": "frontend/src/releaseGate.test.mjs",
+        "allowed": true
+      },
+      {
+        "case": "future_ga03_scope",
+        "path": "frontend/releaseGate.test.mjs",
+        "allowed": false
+      },
+      {
+        "case": "future_ga03_scope",
+        "path": "backend/test_release_gate.py",
+        "allowed": true
+      },
+      {
+        "case": "legacy_google_key_patterns",
+        "file": "banana-prompting.html",
+        "occurrences": 9
+      },
+      {
+        "case": "legacy_google_key_patterns",
+        "file": "banana21-model.html",
+        "occurrences": 9
+      },
+      {
+        "case": "legacy_google_key_patterns",
+        "file": "banana-framework.html",
+        "occurrences": 2
+      },
+      {
+        "case": "legacy_google_key_patterns_total",
+        "occurrences": 20,
+        "distinct_strings": 10,
+        "validity_tested": false
+      }
+    ],
+    "pr63-independent.log": [
+      {
+        "case": "bare_asgi",
+        "statuses": [
+          401,
+          401,
+          401,
+          401,
+          401,
+          429,
+          429
+        ]
+      },
+      {
+        "case": "bare_loopback_spoof",
+        "session_status": 401,
+        "projects_status": 401
+      },
+      {
+        "case": "uvicorn_wildcard",
+        "statuses": [
+          401,
+          401,
+          401,
+          401,
+          401,
+          401,
+          401
+        ]
+      },
+      {
+        "case": "uvicorn_loopback_spoof",
+        "session_status": 200,
+        "projects_status": 200
+      },
+      {
+        "case": "proxy_chain_hops2",
+        "header": "203.0.113.7, invalid, 198.51.100.20",
+        "identity": "203.0.113.7"
+      },
+      {
+        "case": "proxy_chain_hops2",
+        "header": "203.0.113.7, 198.51.100.20",
+        "identity": "203.0.113.7"
+      },
+      {
+        "case": "invalid_bracket_port",
+        "input": "[2001:db8::7]:bad",
+        "parsed": "2001:db8::7"
+      },
+      {
+        "case": "invalid_bracket_port",
+        "input": "[2001:db8::7]:999999",
+        "parsed": "2001:db8::7"
+      },
+      {
+        "case": "invalid_bracket_port",
+        "input": "[2001:db8::7]trailing",
+        "parsed": "2001:db8::7"
+      }
+    ]
+  },
+  "package_validation": [
+    {
+      "target": "ga01",
+      "mode": "reproduce",
+      "exit_code": 0,
+      "summary": [],
+      "log_file": "package-ga01-reproduce.log",
+      "log_sha256": "d23adb4dd9d8ebc0cdf9d71e72215090f51e64a6cddcee816706cccf19b32a99"
+    },
+    {
+      "target": "ga04",
+      "mode": "reproduce",
+      "exit_code": 0,
+      "summary": [],
+      "log_file": "package-ga04-reproduce.log",
+      "log_sha256": "9daca705f8efef7ff16a4e07a64665b62662f2c330f34e99298cb23daed65e92"
+    },
+    {
+      "target": "ga05",
+      "mode": "reproduce",
+      "exit_code": 0,
+      "summary": [],
+      "log_file": "package-ga05-reproduce.log",
+      "log_sha256": "70b6a7d00c0ebe57b56acdc5010a37bc36086b5f80c9396cded1de350a6081b2"
+    },
+    {
+      "target": "ga01",
+      "mode": "regression",
+      "exit_code": 1,
+      "summary": [
+        "Ran 8 tests in 6.907s",
+        "FAILED (failures=4, errors=3)"
+      ],
+      "log_file": "package-ga01-regression.log",
+      "log_sha256": "73b9e1ea9f74138ca236af3d202b8cc571461cb1f3568f6e22c55f1559bfcfd1"
+    },
+    {
+      "target": "ga04",
+      "mode": "regression",
+      "exit_code": 1,
+      "summary": [
+        "Ran 4 tests in 0.711s",
+        "FAILED (failures=3)"
+      ],
+      "log_file": "package-ga04-regression.log",
+      "log_sha256": "7df6372f2a2b9cccf89bcb8a90d2fac82325ae01868fcf8da8f3120cc6606854"
+    },
+    {
+      "target": "ga05",
+      "mode": "regression",
+      "exit_code": 1,
+      "summary": [
+        "Ran 5 tests in 6.606s",
+        "FAILED (failures=7)"
+      ],
+      "log_file": "package-ga05-regression.log",
+      "log_sha256": "e5b0a370bab07d97fbeaebf39fc9204851c7e724afb60706dd557945b13a6a97"
+    }
+  ],
+  "packaged_existing_ga01": {
+    "pass": 82,
+    "seconds": 40.08,
+    "exit_code": 0,
+    "log": {
+      "file": "package-existing-ga01.log",
+      "bytes": 638,
+      "sha256": "7ed5db7bb3856ba093b6f2c20b5cdf2d6c4ee0574574583f5359851aa0f4358b"
+    }
+  },
+  "fixture_normalization": "Only synthetic test literals adjusted for publication: use the already-whitelisted correct-horse-battery password; construct the fake secret assignment from a named synthetic value. Reproductions otherwise preserve the original scenarios. No runtime edits.",
+  "unverified": [
+    "browser_mobile_e2e",
+    "live_caddy",
+    "real_capcut_master",
+    "production_migration_restore",
+    "live_n8n",
+    "provider_billing",
+    "effective_branch_protection"
+  ]
+}
