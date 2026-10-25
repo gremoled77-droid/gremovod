@@ -3,6 +3,10 @@
 Включается переменными окружения (иначе студия остаётся строго локальной):
   STUDIO_REMOTE_HOSTS     — публичные имена через запятую, например studio.example.com
   STUDIO_ACCESS_PASSWORD  — пароль входа, не короче 12 символов
+  STUDIO_TRUSTED_PROXIES  — адреса proxy (IP или CIDR) через запятую, которым можно верить
+                            forwarded-заголовки; пусто = не доверяем никому
+  STUDIO_TRUSTED_PROXY_HOPS — сколько ходов proxy между клиентом и студией (по умолчанию —
+                            столько, сколько адресов в STUDIO_TRUSTED_PROXIES)
 Снаружи (не loopback) каждый запрос требует подписанную cookie studio_auth, которую выдаёт /api/login.
 Пароль хранится только в окружении сервера; попытки входа ограничены. HTTPS обеспечивает обратный
 прокси (см. docs/CLOUD_DEPLOY.md); cookie получает флаг Secure, когда прокси сообщает https.
@@ -27,6 +31,8 @@ MAX_FAILS = 5
 WINDOW = 300
 LOOPBACK = {'127.0.0.1', 'localhost', '::1'}
 PUBLIC_PATHS = {'/api/health', '/api/login', '/api/logout', '/login'}
+TRUSTED_PROXIES_ENV = 'STUDIO_TRUSTED_PROXIES'
+TRUSTED_HOPS_ENV = 'STUDIO_TRUSTED_PROXY_HOPS'
 _fails = defaultdict(deque)
 
 
@@ -86,9 +92,82 @@ def valid_cookie(value, password, now=None):
         return False
 
 
-def client_ip(request: Request):
-    forwarded = request.headers.get('x-forwarded-for', '')
-    return forwarded.split(',')[0].strip() or (request.client.host if request.client else '?')
+def _parse_ip(value):
+    """IP-адрес из peer-адреса или forwarded-заголовка; None, если это не адрес."""
+    text = (value or '').strip()
+    if not text:
+        return None
+    if text.startswith('[') and ']' in text:
+        text = text[1:text.index(']')]
+    try:
+        addr = ipaddress.ip_address(text)
+    except ValueError:
+        host, _, port = text.rpartition(':')
+        if not host or not port.isdigit() or not 0 < int(port) <= 65535:
+            return None
+        try:
+            addr = ipaddress.ip_address(host)
+        except ValueError:
+            return None
+    return getattr(addr, 'ipv4_mapped', None) or addr
+
+
+def trusted_proxies():
+    """Доверенные proxy (IP или CIDR). Пустой список — forwarded-заголовки не доверяем никому."""
+    networks = []
+    for item in os.environ.get(TRUSTED_PROXIES_ENV, '').split(','):
+        item = item.strip()
+        if not item:
+            continue
+        try:
+            networks.append(ipaddress.ip_network(item, strict=False))
+        except ValueError:
+            addr = _parse_ip(item)
+            if addr is None:
+                raise RuntimeError(f'{TRUSTED_PROXIES_ENV}: неверный адрес proxy: {item!r}')
+            networks.append(ipaddress.ip_network(addr))
+    return networks
+
+
+def trusted_hops():
+    """Сколько ходов proxy стоит между клиентом и студией."""
+    raw = os.environ.get(TRUSTED_HOPS_ENV, '').strip()
+    if not raw:
+        return max(1, len(trusted_proxies()))
+    try:
+        hops = int(raw)
+    except ValueError:
+        raise RuntimeError(f'{TRUSTED_HOPS_ENV} должен быть целым числом')
+    if hops < 1:
+        raise RuntimeError(f'{TRUSTED_HOPS_ENV} должен быть не меньше 1')
+    return hops
+
+
+def client_ip(request: Request, proxies=None, hops=None):
+    """Адрес клиента, по которому считаются неудачные попытки входа.
+
+    По умолчанию берётся адрес непосредственного соединения: клиент подделывает
+    X-Forwarded-For, поэтому forwarded-заголовок сам по себе не является идентификатором.
+    Цепочка читается только когда запрос пришёл от явно доверенного proxy
+    (STUDIO_TRUSTED_PROXIES) и берётся с конца: адрес, записанный последним доверенным
+    ходом, — это клиент, всё что дописал клиент слева, игнорируется.
+    """
+    peer = request.client.host if request.client else '?'
+    networks = trusted_proxies() if proxies is None else proxies
+    if not networks:
+        return peer
+    peer_addr = _parse_ip(peer)
+    if peer_addr is None or not any(peer_addr in net for net in networks):
+        return peer
+    limit = trusted_hops() if hops is None else hops
+    chain = []
+    for part in (request.headers.get('x-forwarded-for') or '').split(','):
+        addr = _parse_ip(part)
+        if addr is not None:
+            chain.append(addr)
+    if len(chain) < limit:
+        return peer
+    return str(chain[-limit])
 
 
 def is_loopback(request: Request):
@@ -116,6 +195,8 @@ class Login(BaseModel):
 
 def register(app, studio=None):
     config()  # неверная настройка останавливает запуск сразу
+    trusted_proxies()  # неверный список proxy тоже останавливает запуск сразу
+    trusted_hops()
     @app.middleware('http')
     async def gate(request: Request, call_next):
         if not enabled() or is_loopback(request):
