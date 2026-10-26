@@ -71,3 +71,5 @@ Screenshots/
 *.log
 # NOTE: .aiderignore and .aider.model.settings.yml are tracked on purpose.
 # Ignore Aider's local caches precisely instead of the broad ".aider*" glob.
+# Local temporary evidence for targeted Blender offline tests.
+.pytest-*/

@@ -1,0 +1,4 @@
+-r requirements-blender.txt
+pytest==9.1.1
+fastapi==0.151.0
+pydantic==2.14.1
