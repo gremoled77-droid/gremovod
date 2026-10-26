@@ -1,0 +1,653 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:gremovod:previz:v1",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/stage"
+    },
+    {
+      "$ref": "#/$defs/shot"
+    },
+    {
+      "$ref": "#/$defs/references"
+    },
+    {
+      "$ref": "#/$defs/generation"
+    },
+    {
+      "$ref": "#/$defs/qc"
+    }
+  ],
+  "$defs": {
+    "hash": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "vec3": {
+      "type": "array",
+      "items": {
+        "type": "number"
+      },
+      "minItems": 3,
+      "maxItems": 3
+    },
+    "ids": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
+    },
+    "asset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "entity_id",
+        "file_id",
+        "version",
+        "sha256"
+      ],
+      "properties": {
+        "entity_id": {
+          "type": "string"
+        },
+        "file_id": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        },
+        "sha256": {
+          "$ref": "#/$defs/hash"
+        }
+      }
+    },
+    "stage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "schema_version",
+        "stage_id",
+        "units",
+        "axes",
+        "physical_left",
+        "north",
+        "assets",
+        "landmarks",
+        "invariants",
+        "production_id",
+        "node_id",
+        "asset_policy",
+        "approval_id",
+        "protected_bounds_m"
+      ],
+      "properties": {
+        "kind": {
+          "const": "stage_bible"
+        },
+        "schema_version": {
+          "const": "1.0"
+        },
+        "stage_id": {
+          "type": "string"
+        },
+        "units": {
+          "const": "m"
+        },
+        "axes": {
+          "const": "X_forward_Y_left_Z_up"
+        },
+        "physical_left": {
+          "const": "+Y"
+        },
+        "north": {
+          "$ref": "#/$defs/vec3"
+        },
+        "assets": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/asset"
+          }
+        },
+        "landmarks": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/vec3"
+          }
+        },
+        "invariants": {
+          "$ref": "#/$defs/ids"
+        },
+        "production_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,95}$"
+        },
+        "node_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,95}$"
+        },
+        "asset_policy": {
+          "enum": [
+            "NON_CANONICAL_PROXY",
+            "APPROVED_MASTER"
+          ]
+        },
+        "approval_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "protected_bounds_m": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "$ref": "#/$defs/vec3"
+          }
+        }
+      }
+    },
+    "key": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "frame",
+        "position_m",
+        "look_at_m"
+      ],
+      "properties": {
+        "frame": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "position_m": {
+          "$ref": "#/$defs/vec3"
+        },
+        "look_at_m": {
+          "$ref": "#/$defs/vec3"
+        }
+      }
+    },
+    "shot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "schema_version",
+        "episode_id",
+        "scene_id",
+        "shot_id",
+        "stage_id",
+        "stage_sha256",
+        "aspect",
+        "fps",
+        "start_frame",
+        "end_frame_exclusive",
+        "camera",
+        "beats",
+        "continuity",
+        "production_id",
+        "node_id",
+        "resolution"
+      ],
+      "properties": {
+        "kind": {
+          "const": "shot_manifest"
+        },
+        "schema_version": {
+          "const": "1.0"
+        },
+        "episode_id": {
+          "type": "string"
+        },
+        "scene_id": {
+          "type": "string"
+        },
+        "shot_id": {
+          "type": "string"
+        },
+        "stage_id": {
+          "type": "string"
+        },
+        "stage_sha256": {
+          "$ref": "#/$defs/hash"
+        },
+        "aspect": {
+          "enum": [
+            "16:9",
+            "9:16"
+          ]
+        },
+        "fps": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 60
+        },
+        "start_frame": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "end_frame_exclusive": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "camera": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "lens_mm",
+            "sensor_width_mm",
+            "interpolation",
+            "keys",
+            "clip_start_m",
+            "clip_end_m"
+          ],
+          "properties": {
+            "lens_mm": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "sensor_width_mm": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "interpolation": {
+              "const": "linear"
+            },
+            "keys": {
+              "type": "array",
+              "minItems": 2,
+              "items": {
+                "$ref": "#/$defs/key"
+              }
+            },
+            "clip_start_m": {
+              "type": "number",
+              "minimum": 0.01,
+              "maximum": 1
+            },
+            "clip_end_m": {
+              "type": "number",
+              "minimum": 2,
+              "maximum": 1000
+            }
+          }
+        },
+        "beats": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "frame",
+              "entity_id",
+              "action",
+              "visible_ids"
+            ],
+            "properties": {
+              "frame": {
+                "type": "integer"
+              },
+              "entity_id": {
+                "type": "string"
+              },
+              "action": {
+                "type": "string"
+              },
+              "visible_ids": {
+                "$ref": "#/$defs/ids"
+              }
+            }
+          }
+        },
+        "continuity": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "previous_shot_id",
+            "required_last_visible_ids"
+          ],
+          "properties": {
+            "previous_shot_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "required_last_visible_ids": {
+              "$ref": "#/$defs/ids"
+            }
+          }
+        },
+        "production_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,95}$"
+        },
+        "node_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,95}$"
+        },
+        "resolution": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "type": "integer",
+            "minimum": 64,
+            "maximum": 1920
+          }
+        }
+      }
+    },
+    "reference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "role",
+        "source",
+        "provider_slot",
+        "tag",
+        "duration_s",
+        "restrictions"
+      ],
+      "properties": {
+        "role": {
+          "enum": [
+            "motion_only",
+            "character_identity",
+            "vehicle_identity",
+            "location_layout",
+            "style",
+            "audio"
+          ]
+        },
+        "source": {
+          "$ref": "#/$defs/asset"
+        },
+        "provider_slot": {
+          "type": "string"
+        },
+        "tag": {
+          "type": "string"
+        },
+        "duration_s": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "restrictions": {
+          "$ref": "#/$defs/ids"
+        }
+      }
+    },
+    "references": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "schema_version",
+        "shot_id",
+        "provider",
+        "model",
+        "ordered_refs"
+      ],
+      "properties": {
+        "kind": {
+          "const": "reference_manifest"
+        },
+        "schema_version": {
+          "const": "1.0"
+        },
+        "shot_id": {
+          "type": "string"
+        },
+        "provider": {
+          "type": "string"
+        },
+        "model": {
+          "type": "string"
+        },
+        "ordered_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/reference"
+          }
+        }
+      }
+    },
+    "generation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "schema_version",
+        "shot_id",
+        "attempt_id",
+        "parent_attempt_id",
+        "provider",
+        "model",
+        "payload_sha256",
+        "references_sha256",
+        "quote",
+        "approval",
+        "cost_state",
+        "actual_usd"
+      ],
+      "properties": {
+        "kind": {
+          "const": "generation_manifest"
+        },
+        "schema_version": {
+          "const": "1.0"
+        },
+        "shot_id": {
+          "type": "string"
+        },
+        "attempt_id": {
+          "type": "string"
+        },
+        "parent_attempt_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "provider": {
+          "type": "string"
+        },
+        "model": {
+          "type": "string"
+        },
+        "payload_sha256": {
+          "$ref": "#/$defs/hash"
+        },
+        "references_sha256": {
+          "$ref": "#/$defs/hash"
+        },
+        "quote": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "usd",
+            "source",
+            "as_of"
+          ],
+          "properties": {
+            "id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "usd": {
+              "type": "number",
+              "minimum": 0
+            },
+            "source": {
+              "type": "string"
+            },
+            "as_of": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        },
+        "approval": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "approved",
+            "evidence_id"
+          ],
+          "properties": {
+            "approved": {
+              "type": "boolean"
+            },
+            "evidence_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        },
+        "cost_state": {
+          "enum": [
+            "NOT_SUBMITTED",
+            "RESERVED",
+            "SETTLED",
+            "UNKNOWN"
+          ]
+        },
+        "actual_usd": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        }
+      }
+    },
+    "qc": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "schema_version",
+        "shot_id",
+        "artifact_sha256",
+        "technical",
+        "human",
+        "findings"
+      ],
+      "properties": {
+        "kind": {
+          "const": "qc_report"
+        },
+        "schema_version": {
+          "const": "1.0"
+        },
+        "shot_id": {
+          "type": "string"
+        },
+        "artifact_sha256": {
+          "$ref": "#/$defs/hash"
+        },
+        "technical": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "fps",
+            "frame_count",
+            "width",
+            "height",
+            "duration_s"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "NOT_RUN",
+                "PASS_TECHNICAL",
+                "FAIL"
+              ]
+            },
+            "fps": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "frame_count": {
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "width": {
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "height": {
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "duration_s": {
+              "type": [
+                "number",
+                "null"
+              ]
+            }
+          }
+        },
+        "human": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "reviewer_id",
+            "approval_id"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "PENDING",
+                "APPROVED",
+                "REJECTED"
+              ]
+            },
+            "reviewer_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "approval_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        },
+        "findings": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

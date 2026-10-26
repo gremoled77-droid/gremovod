@@ -1,0 +1,388 @@
+{
+  "dry_run": true,
+  "writes_performed": false,
+  "skills": [
+    {
+      "name": "blender-addon-development",
+      "action": "SKIP_EXISTING",
+      "source_available": true,
+      "files": {
+        "assets/addon_template/__init__.py": "93e6b738cdc7916f70db24065e0cd5368f5d5c9cdeb3cab1939f500cd6af667d",
+        "assets/addon_template/blender_manifest.toml": "18ad0365a8239ace1924bf81073111db4b42caecc70b968c0aa127776707e155",
+        "assets/addon_template/operators.py": "b8ff4aa706c666a814451bf016a6c533e89540bc7168d953b1f9d84d6468eb3f",
+        "assets/addon_template/ui.py": "50e3083d3c94f69d065ee8b8cf05fa9e8b1e86675285d0d6c144307473f19a0f",
+        "SKILL.md": "072a74e87d433437ec14895312f23bb0f1bf78f9533028297f89d41bdc1df269"
+      },
+      "source_repository": "EL4CTEO/blender-skills",
+      "source_commit": "71d031dab8bc6729504d11a78cbe91945401045f",
+      "license": "MIT",
+      "claude_matches_agents": true
+    },
+    {
+      "name": "blender-animation",
+      "action": "SKIP_EXISTING",
+      "source_available": true,
+      "files": {
+        "scripts/_bpyx.py": "a3339ba8a678469e8ed29510e32a7331e0235202191ca4edb977af4720819b4b",
+        "scripts/bake_action.py": "ff0e602c9f432872ebe4f34f368d92e36988abf4159c525981708caa962f349c",
+        "SKILL.md": "a1fa25b8175f055899a3566c377d14b1287022baa154da9fab1c0c320809bdb0"
+      },
+      "source_repository": "EL4CTEO/blender-skills",
+      "source_commit": "71d031dab8bc6729504d11a78cbe91945401045f",
+      "license": "MIT",
+      "claude_matches_agents": true
+    },
+    {
+      "name": "blender-asset-qa",
+      "action": "SKIP_EXISTING",
+      "source_available": true,
+      "files": {
+        "scripts/_bpyx.py": "a3339ba8a678469e8ed29510e32a7331e0235202191ca4edb977af4720819b4b",
+        "scripts/qa_check.py": "11b4fa11244bfa6719689a06eec58c050a3ad5b6d17ac0f75113f332f97b274b",
+        "scripts/review_shots.py": "ffd4361f313592b67c124cdf0ec54b8d9866c9b29eefdac5c47731ce133d3f01",
+        "SKILL.md": "345c5f16c7ae9cfd31b3b58ee0642e31ce9fd406265305c03c0fdffd0fb551eb"
+      },
+      "source_repository": "EL4CTEO/blender-skills",
+      "source_commit": "71d031dab8bc6729504d11a78cbe91945401045f",
+      "license": "MIT",
+      "claude_matches_agents": true
+    },
+    {
+      "name": "blender-character-rigging",
+      "action": "SKIP_EXISTING",
+      "source_available": true,
+      "files": {
+        "scripts/_bpyx.py": "a3339ba8a678469e8ed29510e32a7331e0235202191ca4edb977af4720819b4b",
+        "scripts/bind_mesh.py": "1da27ab64d659ee624ca4682ecba508b85fc9b3be32726279c74a689520b12b5",
+        "scripts/rig_check.py": "af8bff2edf6364a61cb55637e295529f8b98b35ffa2864e78046c101e8d4382a",
+        "scripts/rigify_build.py": "66c242c512da7b10222feb859e11deb10a3c6273652eceb275357ccd7c8a6efc",
+        "scripts/stress_poses.py": "71998a915aa95e20c20ab64bd6faff97e2bb95f8a7e7d7a832fa7973567b6bb8",
+        "SKILL.md": "137a8f7aa339b5e785f6a2fe42834ee429788030d37277b256dec520382827a3"
+      },
+      "source_repository": "EL4CTEO/blender-skills",
+      "source_commit": "71d031dab8bc6729504d11a78cbe91945401045f",
+      "license": "MIT",
+      "claude_matches_agents": true
+    },
+    {
+      "name": "blender-core",
+      "action": "SKIP_EXISTING",
+      "source_available": true,
+      "files": {
+        "references/api-changes-5x.md": "ccf0b52a1d9fd836eb689abcec6a878b0ac57fb32ac600476b5070b9c8d22307",
+        "references/bpy-patterns.md": "ba7bbc708bf198bdcdfa59d9d41d830a4ae119c24ae9457830b73d9e818e2af8",
+        "scripts/_bpyx.py": "a3339ba8a678469e8ed29510e32a7331e0235202191ca4edb977af4720819b4b",
+        "scripts/env_report.py": "e628feed806dd265e0c1ce803d92591aac208a9f463d8c47cbb939476d3b347a",
+        "scripts/run_in_blender.py": "e97e078c1b52475d386af2b8f9d27c7578a55c250ccd43ff50bed9c33d380355",
+        "SKILL.md": "92ab591e713d8b4cdd3ed591c813ad29df9f7ce3f90f6e84971719a6b1bdc51d"
+      },
+      "source_repository": "EL4CTEO/blender-skills",
+      "source_commit": "71d031dab8bc6729504d11a78cbe91945401045f",
+      "license": "MIT",
+      "claude_matches_agents": true
+    },
+    {
+      "name": "blender-expert",
+      "action": "SKIP_EXISTING",
+      "source_available": true,
+      "files": {
+        "references/blender-5.2-deltas.md": "34e464a01a397083b4e18468320a827e7353691469b4933201bd2ffbd22f097c",
+        "references/bpy-reliability.md": "e3cee2b1b973305e561e8b8644a457bec778d2760f13c1e5026e4177bde66adb",
+        "scripts/bx_audit.py": "0ff01ffdc6f9413c42be15016c84fbf8f0696434e1b30cc5ad952813d748a0f8",
+        "scripts/bx_gui.py": "7fe6e2dcbb726433233928f3fb052b449e66109683d40f625a1cb04655cf7eea",
+        "scripts/bx_review.py": "3862dc1452960f01219206bbc0f24d487810d0f4cda6ab41b97108e522e53986",
+        "SKILL.md": "1ef96827ec1821905d891e6a77e0f694bb97abb46a05a711ccc96c455649116e"
+      },
+      "source_repository": "edemaistre/blender-expert-skills",
+      "source_commit": "UNKNOWN",
+      "license": "UNKNOWN",
+      "claude_matches_agents": true
+    },
+    {
+      "name": "blender-export-pipelines",
+      "action": "SKIP_EXISTING",
+      "source_available": true,
+      "files": {
+        "references/godot-web.md": "a1de232e3abb1622968f7d531dc6d62aa5a5a7b6d4b97e0b18dd16dc52d6ff30",
+        "references/roblox.md": "9079cd534349ce5ea0034abd983cf849a19c0a08676b88486393fe8caab7e263",
+        "references/unity.md": "6ed7fbaa57f6d8d0bdf87438bfc442bb536465b05459ffebf72b75dfa238d080",
+        "references/unreal.md": "377e784aa26bf0f634039f31d33b8d47800708f5d280cc518030db4e0d7005bc",
+        "scripts/_bpyx.py": "a3339ba8a678469e8ed29510e32a7331e0235202191ca4edb977af4720819b4b",
+        "scripts/export_asset.py": "d30989025a2b06ed7f2241fd64b17aa1e554a92bf9178f601285ce78cc9d9760",
+        "SKILL.md": "b118b488f99bd5a2c45572bc78d76cb14cb6884d6fc00f8a7112a7b18f35896e"
+      },
+      "source_repository": "EL4CTEO/blender-skills",
+      "source_commit": "71d031dab8bc6729504d11a78cbe91945401045f",
+      "license": "MIT",
+      "claude_matches_agents": true
+    },
+    {
+      "name": "blender-facial-shapekeys",
+      "action": "SKIP_EXISTING",
+      "source_available": true,
+      "files": {
+        "scripts/_bpyx.py": "a3339ba8a678469e8ed29510e32a7331e0235202191ca4edb977af4720819b4b",
+        "scripts/shapekeys.py": "ae309ebf193346df73628789529563a43269a4b629674f17c0dfc237e4bcc661",
+        "SKILL.md": "ab5dc046c892833ea51e9cf773c0e0496f2da14b0e20bdaf25664c02d562b244"
+      },
+      "source_repository": "EL4CTEO/blender-skills",
+      "source_commit": "71d031dab8bc6729504d11a78cbe91945401045f",
+      "license": "MIT",
+      "claude_matches_agents": true
+    },
+    {
+      "name": "blender-game-optimization",
+      "action": "SKIP_EXISTING",
+      "source_available": true,
+      "files": {
+        "scripts/_bpyx.py": "a3339ba8a678469e8ed29510e32a7331e0235202191ca4edb977af4720819b4b",
+        "scripts/make_lods.py": "61076e02df93cfa8126a54466540db5a87d763a9910c9e650d441608678c15de",
+        "scripts/mesh_stats.py": "6f48790b87b90cd15d4c20e6884dcfedf9aa65292f4afcc7fad9fcf7eb8216bc",
+        "SKILL.md": "2c8e6c6cf1676ee300cac12e6c2fda27c973c787375e1b720358d34c78315fd5"
+      },
+      "source_repository": "EL4CTEO/blender-skills",
+      "source_commit": "71d031dab8bc6729504d11a78cbe91945401045f",
+      "license": "MIT",
+      "claude_matches_agents": true
+    },
+    {
+      "name": "blender-geometry-nodes",
+      "action": "SKIP_EXISTING",
+      "source_available": true,
+      "files": {
+        "references/recipes.md": "9c2438db79ca4bcab6a89b62ef0e65868ccf140b4ffc7a7fb42d3ee0265cf976",
+        "scripts/_bpyx.py": "a3339ba8a678469e8ed29510e32a7331e0235202191ca4edb977af4720819b4b",
+        "scripts/gn_builder.py": "6dcdd041451d99037b095f1de71356307a02959ab794d01e48a27fbf5aba139a",
+        "SKILL.md": "f0b696e8144504c6563bbf58887a181e647e9c215e309223a806bc5123ca996b"
+      },
+      "source_repository": "EL4CTEO/blender-skills",
+      "source_commit": "71d031dab8bc6729504d11a78cbe91945401045f",
+      "license": "MIT",
+      "claude_matches_agents": true
+    },
+    {
+      "name": "blender-hard-surface",
+      "action": "SKIP_EXISTING",
+      "source_available": true,
+      "files": {
+        "references/critique.md": "6304f46f5b4fdc5327603ec62f817168c5e5db28438ae56f5f510f40bf4a0df9",
+        "references/expert-notes.md": "873478bb159eaf709d8b01ceb2f878fd589cded925394bdf69a37c998568be26",
+        "references/procedures.md": "c6686265711caddd0e1f7eef0ce7ace80137c1859fb935057c43244af402a5b0",
+        "references/sources.md": "46245a6dfcd6c5580ac186cafb5ec055218df5b4f7c655baacd41d46cf1930c9",
+        "scripts/bx_hardsurface.py": "1a9d07a57ba4a907c3926df5b157e0d8ee001a043836f5c619de02fe553469c5",
+        "SKILL.md": "be68fb237365e2b61f4e9fc52f9f529a923722a018d8e1da38f7426412dadc5e"
+      },
+      "source_repository": "edemaistre/blender-expert-skills",
+      "source_commit": "UNKNOWN",
+      "license": "UNKNOWN",
+      "claude_matches_agents": true
+    },
+    {
+      "name": "blender-hardsurface-modeling",
+      "action": "SKIP_EXISTING",
+      "source_available": true,
+      "files": {
+        "scripts/_bpyx.py": "a3339ba8a678469e8ed29510e32a7331e0235202191ca4edb977af4720819b4b",
+        "scripts/apply_stack.py": "95127944b90646b75c73c55cb47d2a4a8e9616b4edd1c0489b94132bcd7f24e9",
+        "SKILL.md": "2bf819ed1e213909955fd70214085c0e07bb65e17f6d479573fabf18cd295c09"
+      },
+      "source_repository": "EL4CTEO/blender-skills",
+      "source_commit": "71d031dab8bc6729504d11a78cbe91945401045f",
+      "license": "MIT",
+      "claude_matches_agents": true
+    },
+    {
+      "name": "blender-lighting-lookdev",
+      "action": "SKIP_EXISTING",
+      "source_available": true,
+      "files": {
+        "scripts/_bpyx.py": "a3339ba8a678469e8ed29510e32a7331e0235202191ca4edb977af4720819b4b",
+        "scripts/turntable.py": "ed3db9b538fda3bd6852ea1ce83aea32e0b3e99c258577b3dd000c50a847cd93",
+        "SKILL.md": "13dac79bcdd6350f7a5cf52fce8951de9c409fd3fcf6beab762782053001a6ba"
+      },
+      "source_repository": "EL4CTEO/blender-skills",
+      "source_commit": "71d031dab8bc6729504d11a78cbe91945401045f",
+      "license": "MIT",
+      "claude_matches_agents": true
+    },
+    {
+      "name": "blender-pbr-materials",
+      "action": "SKIP_EXISTING",
+      "source_available": true,
+      "files": {
+        "references/pbr-values.md": "d92f53568ea1525c84d68fc7077abfa9cc64a517ac9472fdc18b873784b84d40",
+        "scripts/_bpyx.py": "a3339ba8a678469e8ed29510e32a7331e0235202191ca4edb977af4720819b4b",
+        "scripts/build_pbr_material.py": "797b2fba1f384950feeb75e1681ee086abd493566d9a1794e650c0ebe851e296",
+        "SKILL.md": "4ef5b352cca591ce68f9293dd5b805d1f7ded967d770862958a41ab3007c2644"
+      },
+      "source_repository": "EL4CTEO/blender-skills",
+      "source_commit": "71d031dab8bc6729504d11a78cbe91945401045f",
+      "license": "MIT",
+      "claude_matches_agents": true
+    },
+    {
+      "name": "blender-pipeline-automation",
+      "action": "SKIP_EXISTING",
+      "source_available": true,
+      "files": {
+        "scripts/_bpyx.py": "a3339ba8a678469e8ed29510e32a7331e0235202191ca4edb977af4720819b4b",
+        "scripts/batch_process.py": "baedf17711a939981f3796879e1f32be3203c197c41d9dc3fad8a104b82bfe8e",
+        "SKILL.md": "590e1159205c68af5c338425456c3ff86837cdb8202e34f2d40a018e96ec79fa"
+      },
+      "source_repository": "EL4CTEO/blender-skills",
+      "source_commit": "71d031dab8bc6729504d11a78cbe91945401045f",
+      "license": "MIT",
+      "claude_matches_agents": true
+    },
+    {
+      "name": "blender-previs-storyboard",
+      "action": "SKIP_EXISTING",
+      "source_available": true,
+      "files": {
+        "references/critique.md": "b6af218233b63a0fce41d9bb0cedbf5f9ec2b75cca8120533bb5dfd58890f15c",
+        "references/expert-notes.md": "ac573a9c027a6f25dc259316f5ed866cdbbefe8a3f45789e2b0d14ec9b6f3854",
+        "references/procedures.md": "8d6cfa0b0133d5420bacc643f6cb38291724aa602a193289727932df12d9f1d7",
+        "references/sources.md": "5eb5cf8ec3b960c18266061febb4dc6f5741f59684774d655b6d00b22a8f032a",
+        "scripts/bx_previs.py": "d7508026628e2943f9fca71b71c76e1648eb6d4e646c73d48ed7bf2197c78ccd",
+        "SKILL.md": "919442e000ec7759a9a981d3539526570a855e108f806a47c224ef636f268bf5"
+      },
+      "source_repository": "edemaistre/blender-expert-skills",
+      "source_commit": "UNKNOWN",
+      "license": "UNKNOWN",
+      "claude_matches_agents": true
+    },
+    {
+      "name": "blender-rendering",
+      "action": "SKIP_EXISTING",
+      "source_available": true,
+      "files": {
+        "scripts/_bpyx.py": "a3339ba8a678469e8ed29510e32a7331e0235202191ca4edb977af4720819b4b",
+        "scripts/render_batch.py": "2ee9043b297148b9d76b54fc22390e1e6062e2e27c33ab0386dcfa2fdb59c432",
+        "SKILL.md": "ea4c7616fc1559cf8f1838e5e1cd6d49ff3c13fe716af3d8bd7aeca5877eeb45"
+      },
+      "source_repository": "EL4CTEO/blender-skills",
+      "source_commit": "71d031dab8bc6729504d11a78cbe91945401045f",
+      "license": "MIT",
+      "claude_matches_agents": true
+    },
+    {
+      "name": "blender-retopology-uv",
+      "action": "SKIP_EXISTING",
+      "source_available": true,
+      "files": {
+        "scripts/_bpyx.py": "a3339ba8a678469e8ed29510e32a7331e0235202191ca4edb977af4720819b4b",
+        "scripts/auto_retopo.py": "d4e53e2a754f6d6675bc03b04410b7e41e147521cf4e9ba0c87e419deea01662",
+        "scripts/texel_density.py": "9fd15366aa20aa3005163745b12aae216c0b23a5fdafa0bbec98c1786f0c3cd6",
+        "scripts/uv_pack.py": "38746beb008b1f5324a9851b522308933d77bbf4ad660134d2cd7e360a95489f",
+        "SKILL.md": "fc3cbc91a3d2de13b3dbf8ed261b348a9cd05a2576849d83029d93388c34deed"
+      },
+      "source_repository": "EL4CTEO/blender-skills",
+      "source_commit": "71d031dab8bc6729504d11a78cbe91945401045f",
+      "license": "MIT",
+      "claude_matches_agents": true
+    },
+    {
+      "name": "blender-scene-setup",
+      "action": "SKIP_EXISTING",
+      "source_available": true,
+      "files": {
+        "scripts/_bpyx.py": "a3339ba8a678469e8ed29510e32a7331e0235202191ca4edb977af4720819b4b",
+        "scripts/scene_audit.py": "a7baf10fb5a25acaf87d1024e5ec5fb89aee43b7ebff0f8598c4667cef64ae5b",
+        "SKILL.md": "0860bc29f8d7af633bdf475b36884cef8f9acb4a5988a47be6deeecdb56bb0b2"
+      },
+      "source_repository": "EL4CTEO/blender-skills",
+      "source_commit": "71d031dab8bc6729504d11a78cbe91945401045f",
+      "license": "MIT",
+      "claude_matches_agents": true
+    },
+    {
+      "name": "blender-sculpting",
+      "action": "SKIP_EXISTING",
+      "source_available": true,
+      "files": {
+        "scripts/_bpyx.py": "a3339ba8a678469e8ed29510e32a7331e0235202191ca4edb977af4720819b4b",
+        "scripts/sculpt_ops.py": "6adb0bcb4322900dad1b6f00c17c0f14507085e44017a3c162e26f29bcf8c7aa",
+        "SKILL.md": "971c69e249a202069814550dab500dac1520c0d483215d57e3be2745a9c740f9"
+      },
+      "source_repository": "EL4CTEO/blender-skills",
+      "source_commit": "71d031dab8bc6729504d11a78cbe91945401045f",
+      "license": "MIT",
+      "claude_matches_agents": true
+    },
+    {
+      "name": "blender-simulation",
+      "action": "SKIP_EXISTING",
+      "source_available": true,
+      "files": {
+        "scripts/_bpyx.py": "a3339ba8a678469e8ed29510e32a7331e0235202191ca4edb977af4720819b4b",
+        "scripts/sim_setup.py": "8c9f7cf99b4539343873caf707dd1b8eff8d78c55ccd19f9aa2dae26ef7150f2",
+        "SKILL.md": "c7224f4d86921caace516dc9cc436ef0dbda4910be2eb05af3234f6a120dd875"
+      },
+      "source_repository": "EL4CTEO/blender-skills",
+      "source_commit": "71d031dab8bc6729504d11a78cbe91945401045f",
+      "license": "MIT",
+      "claude_matches_agents": true
+    },
+    {
+      "name": "blender-texture-baking",
+      "action": "SKIP_EXISTING",
+      "source_available": true,
+      "files": {
+        "scripts/_bpyx.py": "a3339ba8a678469e8ed29510e32a7331e0235202191ca4edb977af4720819b4b",
+        "scripts/bake_maps.py": "16b27115c8bb19f9d4b2162a67467df9b3f9f720dcc365497a7443be9cab5e0a",
+        "SKILL.md": "b02a766f81399e3a596d450033413df94bc00ce880e96d8d5f5342bf512a3233"
+      },
+      "source_repository": "EL4CTEO/blender-skills",
+      "source_commit": "71d031dab8bc6729504d11a78cbe91945401045f",
+      "license": "MIT",
+      "claude_matches_agents": true
+    },
+    {
+      "name": "blender-time-of-day",
+      "action": "SKIP_EXISTING",
+      "source_available": true,
+      "files": {
+        "references/fog-volumetrics.md": "8371b4b7517363b97e8b023611a5ea8351c913d60205a09805bb47f76d62320c",
+        "references/light-values.md": "21569a5d3c92271f6e219ee77cf3982c9cde59d4d1f3090528086d608030a3a8",
+        "references/night-and-moods.md": "662299d09b341c70488a1e934ce07437610c2ad0dddc92bed93b348e94a76442",
+        "scripts/_bpyx.py": "a3339ba8a678469e8ed29510e32a7331e0235202191ca4edb977af4720819b4b",
+        "scripts/scene_mood.py": "c82cd0a010ac657df727301a89403cc9f5c599bda84349e2e80ed3c2f6d0b134",
+        "SKILL.md": "d32b342df7950c13d4f3838a94be96c7cb6a118a1c53a87dc18149d3bef4acf4"
+      },
+      "source_repository": "EL4CTEO/blender-skills",
+      "source_commit": "71d031dab8bc6729504d11a78cbe91945401045f",
+      "license": "MIT",
+      "claude_matches_agents": true
+    },
+    {
+      "name": "blender-weather-fx",
+      "action": "SKIP_EXISTING",
+      "source_available": true,
+      "files": {
+        "references/realtime-engines.md": "c7584f496ba56c115ab809034cbabee41afa008236553c9436f814c7341d78ec",
+        "references/weather-values.md": "c8be7c985f3d28833b075e71257dd5130d8487ce0b63716a9f237f76592295c3",
+        "scripts/_bpyx.py": "a3339ba8a678469e8ed29510e32a7331e0235202191ca4edb977af4720819b4b",
+        "scripts/lightning.py": "68177d83b754e8140ea8807962c8d3c984667c32332ed6a258c15d271750854e",
+        "scripts/precipitation.py": "063fde91806f683b01172a1478c946a6bf8fd7b7f451f76111017766873f047b",
+        "scripts/surface_weather.py": "498e69a4af740cd2cd341e4fcb33bc3a7d15621bf19cdfbe4dae2ca56619ac20",
+        "SKILL.md": "e3137eb02f4b2c2d7d9a5cc4d0abbf1324c835f7454baf97a963e4aebde2465e"
+      },
+      "source_repository": "EL4CTEO/blender-skills",
+      "source_commit": "71d031dab8bc6729504d11a78cbe91945401045f",
+      "license": "MIT",
+      "claude_matches_agents": true
+    },
+    {
+      "name": "blender-workflow-recipes",
+      "action": "SKIP_EXISTING",
+      "source_available": true,
+      "files": {
+        "SKILL.md": "4994cf41939797e193fef00b6f5eda1a7ba6ae169e6287b5eda3f50a849b576f"
+      },
+      "source_repository": "EL4CTEO/blender-skills",
+      "source_commit": "71d031dab8bc6729504d11a78cbe91945401045f",
+      "license": "MIT",
+      "claude_matches_agents": true
+    }
+  ]
+}

@@ -1,0 +1,2 @@
+# Offline schema validation only; no Blender Python environment modification.
+jsonschema==4.26.0
