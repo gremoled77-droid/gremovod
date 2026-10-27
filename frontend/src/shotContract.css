@@ -1,0 +1,105 @@
+.shot-contract {
+  border: 1px solid var(--border, #3a3d45);
+  border-radius: 12px;
+  padding: 14px;
+  margin: 12px 0;
+  min-width: 0;
+}
+.shot-contract fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.shot-contract label {
+  display: grid;
+  gap: 6px;
+  margin: 8px 0;
+}
+.shot-contract .sc-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.shot-contract .sc-head b {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.shot-contract .sc-head button {
+  flex: 0 0 auto;
+}
+.shot-contract .sc-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 170px), 1fr));
+  gap: 10px;
+}
+.shot-contract .sc-events {
+  display: grid;
+  gap: 4px;
+  margin: 8px 0;
+}
+.shot-contract .sc-events label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+}
+.shot-contract .sc-facts {
+  border-top: 1px solid var(--border, #3a3d45);
+  margin-top: 10px;
+  padding-top: 8px;
+}
+.shot-contract .sc-facts legend {
+  padding: 0 6px;
+  opacity: 0.8;
+}
+.shot-contract .sc-fact {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+.shot-contract .sc-fact input {
+  flex: 1 1 130px;
+  min-width: 0;
+}
+.shot-contract .sc-fact select {
+  flex: 1 1 170px;
+  min-width: 0;
+}
+.shot-contract .sc-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 0;
+}
+.shot-contract .sc-problems {
+  color: #ff9c8a;
+}
+.shot-contract .sc-muted {
+  opacity: 0.7;
+}
+.shot-contract .sc-issues {
+  display: grid;
+  gap: 6px;
+  list-style: none;
+  padding: 0;
+  margin: 8px 0;
+}
+.shot-contract .sc-issue {
+  border-left: 3px solid var(--border, #3a3d45);
+  padding: 6px 10px;
+  background: rgba(255, 255, 255, 0.03);
+}
+.shot-contract .sc-issue.error {
+  border-left-color: #ff6b5e;
+}
+.shot-contract .sc-issue.warning {
+  border-left-color: #f0b429;
+}
+.shot-contract .sc-issue.info {
+  border-left-color: #6aa9ff;
+}

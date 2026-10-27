@@ -11,6 +11,7 @@ import {analyzeAsset, shotPoints, TensionGraph, useVisualPlans, VisualPlanForm} 
 import {emptyPlan, planFromAnalysis} from './visualPlan';
 import VisualRulesForm from './VisualRulesForm';
 import EditListPanel from './EditListPanel';
+import ShotContractInspector from './ShotContractInspector';
 import './ProductionStoryboard.css';
 
 type Node = {
@@ -100,7 +101,8 @@ export default function ProductionStoryboard({
     [error, setError] = useState(''),
     [notice, setNotice] = useState(''),
     [showScript, setShowScript] = useState(false),
-    [importMode, setImportMode] = useState<'append' | 'update'>('append');
+    [importMode, setImportMode] = useState<'append' | 'update'>('append'),
+    [contractShot, setContractShot] = useState<{shotId: string; sceneId: string; title: string} | null>(null);
   const visual = useVisualPlans(pid, sid);
   const [estimating, setEstimating] = useState(false);
   const estimateEmpty = async () => {
@@ -634,6 +636,13 @@ export default function ProductionStoryboard({
                           В студию
                         </button>
                         <button onClick={() => inspect(frame.id)}>Съёмка и файлы ↗</button>
+                        <button
+                          onClick={() =>
+                            setContractShot({shotId: frame.id, sceneId: scene.id, title: frame.title})
+                          }
+                        >
+                          Контракт
+                        </button>
                       </div>
                       <VisualPlanForm
                         kind="frame"
@@ -663,6 +672,16 @@ export default function ProductionStoryboard({
               </details>
             </article>
           ))}
+          {contractShot && (
+            <ShotContractInspector
+              pid={pid}
+              sid={sid}
+              shotId={contractShot.shotId}
+              sceneId={contractShot.sceneId}
+              title={contractShot.title}
+              onClose={() => setContractShot(null)}
+            />
+          )}
           <details>
             <summary>Общие персонажи и локации проекта</summary>
             <p className="muted">

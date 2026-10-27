@@ -8,6 +8,7 @@ from fastapi import Header, HTTPException
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from backend import llm_guard, production_folders as folders, storyboard
+from backend.director_contracts import LOCKED_PREDICATES, PREDICATES, SourceEvent
 
 
 class Card(BaseModel):
@@ -52,6 +53,29 @@ def current(db, pid, sid):
     row = db.execute('SELECT * FROM story_plans WHERE series_id=?', (sid,)).fetchone()
     return {'revision': row['revision'], **json.loads(row['data'])} if row else {
         'revision': 0, 'source': '', 'source_kind': 'idea', 'cards': []}
+
+
+def plan_events(cards, sid):
+    """Карточки плана как реестр событий сценария.
+
+    Порядок карточек — это порядок показа и хронологии. Событие считается
+    обязательным: авторская формулировка не переписывается молча.
+    """
+    events = []
+    for position, card in enumerate(cards):
+        text = (card.get('summary') or card.get('title') or '').strip()
+        if not text:
+            continue
+        events.append(SourceEvent(
+            event_id=str(card.get('id') or f'card-{position}'),
+            episode_id=sid,
+            text=text[:2000],
+            kind='mandatory_action',
+            locked=True,
+            presentation_order=position,
+            timeline_order=position,
+        ))
+    return events
 
 
 def check_revision(plan, revision):
@@ -145,7 +169,9 @@ def register(app, studio):
         with studio.connect() as db:
             plan = current(db, pid, sid)
             suggestions = [dict(r) for r in db.execute('SELECT * FROM story_suggestions WHERE series_id=? ORDER BY created_at DESC LIMIT 10', (sid,))]
-        return {**plan, 'suggestions': [{**r, 'data': json.loads(r['data'])} for r in suggestions]}
+        return {**plan, 'suggestions': [{**r, 'data': json.loads(r['data'])} for r in suggestions],
+                'director': {'events': [event.model_dump(mode='json') for event in plan_events(plan['cards'], sid)],
+                             'predicates': PREDICATES, 'locked_predicates': sorted(LOCKED_PREDICATES)}}
 
     @app.put('/api/productions/{pid}/series/{sid}/story-plan')
     def save(pid: str, sid: str, body: Plan):
