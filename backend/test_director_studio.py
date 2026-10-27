@@ -143,6 +143,25 @@ class DirectorStudioTests(unittest.TestCase):
         self.assertEqual(data['contract']['status'], 'approved')
         self.assertEqual([i['code'] for i in data['issues'] if i['severity'] == 'error'], [])
 
+    def test_capability_registry_is_readable(self):
+        """Реестр возможностей отдаётся интерфейсу без платных вызовов."""
+        self.prepare()
+        r = self.client.get(f'/api/productions/{self.pid}/director/capabilities')
+        self.assertEqual(r.status_code, 200, r.text)
+        profiles = r.json()['profiles']
+        self.assertTrue(profiles)
+        kling = next(p for p in profiles if p['model_id'] == 'kling-3.0')
+        self.assertTrue(kling['supports_start_frame'])
+        self.assertTrue(kling['supports_end_frame'])
+        self.assertIn('start_end_video', kling['available_modes'])
+        h3 = next(p for p in profiles if p['model_id'] == 'minimax-h3')
+        self.assertNotIn('start_end_video', h3['available_modes'])
+
+    def test_capability_registry_reports_unknown_model(self):
+        self.prepare()
+        r = self.client.get(f'/api/productions/{self.pid}/director/capabilities?model=no-such-model')
+        self.assertEqual(r.status_code, 404)
+
     def test_check_endpoint_does_not_store_anything(self):
         self.prepare()
         r = self.client.post(self.url + '/check', json={'contract': self.contract(source_event_ids=['card-404'])})

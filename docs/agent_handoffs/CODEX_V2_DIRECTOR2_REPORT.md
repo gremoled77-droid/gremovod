@@ -18,7 +18,28 @@
 
 ## 2. Что реально добавлено
 
-### Инкремент №1 — контракты без интеграции
+### Инкремент №3 — реестр возможностей моделей
+
+Закрывает требование внешнего аудита (`GremoVOD_FIGMA_COZYCLAY_COURSE_AUDIT_2026-10-27.md`):
+«модель → возможности, цена, лимиты — не хардкод» и «выбор first/last-frame
+недоступен у модели, которая этот способ не поддерживает».
+
+| Файл | Изменение |
+|---|---|
+| `backend/director_contracts/capability.py` | `CAPABILITY_FACTS` (подтверждённые факты со ссылкой на источник), `facts_for`, `profile_for`, `registry`, `available_modes`, `mode_available` |
+| `backend/director_contracts/schemas.py` | `profile_from_catalog(spec, facts=None, model_id=None)`; поле `capability_source`; режим `text_to_video` в `Mode` |
+| `backend/director_contracts/prompt_compiler.py` | Видеомодель без подтверждённого стартового кадра → `text_to_video` (было `text_to_image`) |
+| `backend/storyboard.py` | `GET /api/productions/{pid}/director/capabilities` — реестр для интерфейса, только чтение |
+| `backend/test_director_capability.py` | 10 тестов реестра |
+| `backend/test_director_studio.py` | 2 теста маршрута |
+| `docs/director/V05_AUDIT_AND_DECISIONS.md` | Аудит по документу владельца: матрица реализовано/частично/нет и десять решений Р1–Р10 |
+
+Источники фактов — документация провайдеров, уже разобранная в репозитории:
+`docs/VIDEO_MODELS_PROMPTING_2026-10-17.md`, `skills/video-kling-3-start-end-frame`,
+`skills/video-kling-3-omni`, `skills/video-minimax-h3`. Чего в источниках нет —
+не подтверждено (fail-closed).
+
+### Инкремент №1 — чисто контрактный слой, без интеграции
 
 | Файл | Строк | Назначение |
 |---|---|---|
@@ -88,6 +109,7 @@ author_lock_version, status, locked_paths), `SourceEvent`, `PhysicalFact`,
 | Проверка | Команда | Результат |
 |---|---|---|
 | Полный бэкенд (после merge `origin/main`) | `python -X utf8 -m pytest backend -q` | **326 passed, 16 subtests passed**, 78.45 с, exit 0 (до merge было 260; main добавил 66) |
+| Полный бэкенд (после инкремента №3) | `python -X utf8 -m pytest backend -q` | **338 passed, 16 subtests passed**, 83.25 с, exit 0 |
 | Фронт (после merge) | `npm test` (в `frontend/`) | **113 passed**, 0 failed (до merge было 47) |
 | Сборка фронта (после merge) | `npm run build` (`tsc --noEmit && vite build`) | **exit 0**, 1878 модулей, сборка 4.01 с |
 | Полный бэкенд (до merge) | `python -X utf8 -m pytest backend -q` | 260 passed, 16 subtests passed, exit 0 |

@@ -70,7 +70,7 @@
 | Неизменяемые авторские факты | нет | `LOCKED_PREDICATES` | закрыто | `schemas.py` |
 | Отпечаток состояния | только у доски | `fingerprint`, `is_stale`, `changed_paths` | закрыто | `backend/director_contracts/revisions.py` |
 | Точечный ремонт | нет | `build_patch`, `apply_patch`, `repair`, `diff` | закрыто | `backend/director_contracts/repair.py` |
-| Профиль возможностей модели | плоский `MODEL_SPECS` | `CapabilityProfile` + `profile_from_catalog` | частично: наполнение каталога — P1 | `schemas.py`, `backend/model_catalog.py` |
+| Профиль возможностей модели | плоский `MODEL_SPECS` | `CapabilityProfile` + `profile_from_catalog` | закрыто: реестр возможностей `capability.py` с подтверждёнными фактами | `backend/director_contracts/capability.py`, `backend/model_catalog.py` |
 | Компиляция промпта под профиль | текст вручную | `compile_prompt` | закрыто (не подключён к адаптеру — P1) | `backend/director_contracts/prompt_compiler.py` |
 | Хранение контрактов | нет | таблица `shot_contracts` | закрыто | `backend/storyboard.py` |
 | Инспектор контракта в UI | нет | `ShotContractInspector` | закрыто | `frontend/src/ShotContractInspector.tsx` |
@@ -93,6 +93,7 @@
 | `backend/director_contracts/revisions.py` | `fingerprint`, `Revision`, `is_stale`, `changed_paths` |
 | `backend/director_contracts/repair.py` | `PatchOp`, `RepairError`, `build_patch`, `apply_patch`, `repair`, `diff` |
 | `backend/director_contracts/prompt_compiler.py` | `CompiledPrompt`, `ReferenceBinding`, `compile_prompt` |
+| `backend/director_contracts/capability.py` | `CAPABILITY_FACTS`, `profile_for`, `registry`, `available_modes`, `mode_available` |
 | `backend/test_director_contracts.py` | пилотный канон: Грэм, жёлтый ВАЗ-2106 VIP, раскрытие длины |
 | `backend/test_director_revisions.py` | отпечатки, ревизии, ремонт |
 | `backend/test_director_compiler.py` | компиляция промпта, режимы, привязка референсов |

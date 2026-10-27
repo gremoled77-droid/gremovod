@@ -14,11 +14,14 @@ from backend.director_contracts import (
     LOCKED_PREDICATES,
     PREDICATES,
     ShotContract,
+    available_modes,
     check_asset_references,
     check_chain,
     check_continuity,
     check_coverage,
     check_shots,
+    profile_for,
+    registry,
     sort_issues,
 )
 
@@ -475,6 +478,24 @@ def register(app,studio):
         except OSError:
             warning='Сцены и исходный сценарий сохранены в БД, но копию сценария на диске записать не удалось.'
         return {'node_ids':ids,'replayed':False,'file_warning':warning}
+
+    @app.get('/api/productions/{pid}/director/capabilities')
+    def director_capabilities(pid:str,model:str|None=None):
+        """Реестр возможностей моделей: что подтверждено, что недоступно.
+
+        Только чтение каталога: ни сети, ни оценки цены, ни платных вызовов.
+        """
+        with studio.connect() as db:
+            if not db.execute('SELECT 1 FROM productions WHERE id=?',(pid,)).fetchone():
+                raise HTTPException(404,'Постановка не найдена')
+        if model:
+            try:
+                profile=profile_for(model)
+            except KeyError:
+                raise HTTPException(404,'Модель не найдена в каталоге')
+            return {'profiles':[{**profile.model_dump(mode='json'),'available_modes':available_modes(profile)}]}
+        profiles=registry()
+        return {'profiles':[{**p.model_dump(mode='json'),'available_modes':available_modes(p)} for p in profiles]}
 
     @app.get('/api/productions/{pid}/series/{sid}/director/contracts')
     def director_contracts(pid:str,sid:str):

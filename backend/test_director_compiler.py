@@ -41,11 +41,12 @@ class CompileModeTests(unittest.TestCase):
         compiled = compile_prompt(pilot_shot(), video_profile(), pilot_events())
         self.assertEqual(compiled.mode, 'image_to_video')
 
-    def test_profile_without_start_frame_falls_back_to_text(self):
+    def test_profile_without_start_frame_falls_back_to_text_video(self):
+        """Видеомодель без подтверждённого стартового кадра — текстовый режим видео."""
         compiled = compile_prompt(
             pilot_shot(), video_profile(supports_start_frame=False), pilot_events()
         )
-        self.assertEqual(compiled.mode, 'text_to_image')
+        self.assertEqual(compiled.mode, 'text_to_video')
 
     def test_profile_with_both_frames_uses_start_end_video(self):
         compiled = compile_prompt(

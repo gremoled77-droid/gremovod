@@ -112,7 +112,7 @@ def _mode_for(shot: ShotContract, profile: CapabilityProfile) -> Mode:
             return 'image_to_video'
         # Fail-closed: неподтверждённый флаг не даёт права собирать запрос
         # с картинкой, даже если модель в принципе умеет.
-        return 'text_to_image'
+        return 'text_to_video'
     if profile.modes:
         for mode in ('reference_image_edit', 'text_to_image'):
             if mode in profile.modes:

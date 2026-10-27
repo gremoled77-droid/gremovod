@@ -3,6 +3,14 @@
 Пакет чистый: ни сети, ни БД, ни платных вызовов. Интеграция с существующим
 storyboard — отдельный инкремент.
 """
+from .capability import (
+    CAPABILITY_FACTS,
+    available_modes,
+    facts_for,
+    mode_available,
+    profile_for,
+    registry,
+)
 from .continuity import check_chain, check_continuity, state_after
 from .event_ledger import (
     check_asset_references,
@@ -47,6 +55,7 @@ from .schemas import (
 from .validation import Issue, errors, has_errors, sort_issues, validate_contracts
 
 __all__ = [
+    'CAPABILITY_FACTS',
     'LOCKED_PREDICATES',
     'PREDICATES',
     'CameraPlan',
@@ -69,6 +78,7 @@ __all__ = [
     'SourceEvent',
     'TimeJump',
     'apply_patch',
+    'available_modes',
     'build_patch',
     'changed_paths',
     'check_asset_references',
@@ -82,6 +92,7 @@ __all__ = [
     'current_revision',
     'diff',
     'errors',
+    'facts_for',
     'film_order',
     'fingerprint',
     'fingerprint_events',
@@ -89,8 +100,11 @@ __all__ = [
     'has_errors',
     'index_events',
     'is_stale',
+    'mode_available',
+    'profile_for',
     'profile_from_catalog',
     'propose',
+    'registry',
     'repair',
     'sort_issues',
     'state_after',

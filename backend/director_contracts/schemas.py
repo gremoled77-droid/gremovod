@@ -40,6 +40,7 @@ ShotStatus = Literal['draft', 'proposed', 'approved']
 Mode = Literal[
     'text_to_image',
     'reference_image_edit',
+    'text_to_video',
     'image_to_video',
     'start_end_video',
     'video_extend',
@@ -174,6 +175,7 @@ class CapabilityProfile(BaseModel):
     accepted_fields: list[str] = Field(default_factory=list, max_length=64)
     price_source: str = Field(default='', max_length=200)
     price_verified_at: str = Field(default='', max_length=40)
+    capability_source: str = Field(default='', max_length=400)
     launch_enabled: bool = False
     approval_gate: Literal['required', 'not_required'] = 'required'
     verified: bool = False
@@ -188,19 +190,24 @@ class CapabilityProfile(BaseModel):
         return 'READY'
 
 
-def profile_from_catalog(spec: dict) -> CapabilityProfile:
+def profile_from_catalog(
+    spec: dict, facts: dict | None = None, model_id: str | None = None
+) -> CapabilityProfile:
     """Собирает профиль возможностей из существующего MODEL_SPECS.
 
     Чего в каталоге нет, того профиль не выдумывает: неизвестные поля остаются
-    пустыми, а профиль помечается как неподтверждённый.
+    пустыми, а профиль помечается как неподтверждённый. Подтверждённые факты
+    (first/last frame, звук, лимиты длины) приходят отдельным словарём `facts` —
+    их источник обязателен, иначе профиль остаётся неподтверждённым.
     """
-    model_id = str(spec.get('task_type') or spec.get('model') or 'unknown')
+    facts = facts or {}
+    model_id = model_id or spec.get('task_type') or spec.get('model') or 'unknown'
     kind = 'video' if spec.get('kind') == 'video' else 'image' if spec.get('kind') == 'image' else 'llm'
     modes: list[Mode] = []
     if kind == 'image':
         modes.append('reference_image_edit' if spec.get('api_refs') else 'text_to_image')
     elif kind == 'video':
-        modes.append('image_to_video' if spec.get('max_refs') else 'text_to_image')
+        modes.append('image_to_video' if spec.get('max_refs') else 'text_to_video')
     duration_min = spec.get('duration_min')
     duration_max = spec.get('duration_max')
     if kind == 'video' and duration_max is None:
@@ -208,6 +215,10 @@ def profile_from_catalog(spec: dict) -> CapabilityProfile:
         rule = options.get('duration') or {}
         duration_min = rule.get('min')
         duration_max = rule.get('max')
+    if duration_min is None:
+        duration_min = facts.get('duration_min_sec')
+    if duration_max is None:
+        duration_max = facts.get('duration_max_sec')
     verified_at = str(spec.get('verified_at') or '')
     launch_enabled = bool(spec.get('launch_enabled'))
     return CapabilityProfile(
@@ -222,13 +233,14 @@ def profile_from_catalog(spec: dict) -> CapabilityProfile:
         reference_roles=[],
         max_images=int(spec.get('api_refs', spec.get('max_refs', 0)) or 0),
         max_video_refs=int(spec.get('max_refs', 0) or 0) if kind == 'video' else 0,
-        supports_start_frame=False,
-        supports_end_frame=False,
-        supports_sound=False,
-        supports_negative_prompt=False,
+        supports_start_frame=bool(facts.get('supports_start_frame')),
+        supports_end_frame=bool(facts.get('supports_end_frame')),
+        supports_sound=bool(facts.get('supports_sound')),
+        supports_negative_prompt=bool(facts.get('supports_negative_prompt')),
         accepted_fields=sorted((spec.get('options') or {}).keys()),
         price_source=str(spec.get('docs') or ''),
         price_verified_at=verified_at,
+        capability_source=str(facts.get('source') or ''),
         launch_enabled=launch_enabled,
         approval_gate='required',
         verified=bool(verified_at) and not spec.get('prompt_only', False),
