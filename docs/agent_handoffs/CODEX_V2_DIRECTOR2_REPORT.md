@@ -136,6 +136,25 @@ SMOKE OK
 студия живёт на разрешённых портах. В стенде Origin подменяется на
 разрешённый в конфиге vite, который лежит вне репозитория.
 
+### Проверка после слияния с main
+
+Тот же живой сценарий на слитом коде (стенд 8111, своя БД):
+
+```
+contracts=2 events=1 issues=1
+issue codes: event_missing
+check ok=True issues=
+saved revision=1 downgraded=False status=approved
+conflict status=409
+after save: filled=1 issues=
+plan director events=card-1 predicates=13
+SMOKE OK
+```
+
+Режиссура работает на слитом коде без изменений. Чужую незакоммиченную правку
+`docs/HANDOFF_CLAUDE_CODE.md` вернули ровно в прежнем виде: 8 добавленных
+строк, без воскрешения блоков, которые main переписал.
+
 ### Найденный и исправленный дефект
 
 Первый живой прогон показал ложную ошибку на законном контракте: «дверь
