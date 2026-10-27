@@ -1,0 +1,433 @@
+/* Экран «Идея» по макету Main: задание слева, путь ролика справа */
+.app main.idea-main {
+  display: block;
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 0 22px;
+  box-sizing: border-box;
+}
+.idea-main > .sidebar {
+  display: none;
+}
+.idea-main > .content {
+  max-width: 1240px;
+  margin: 0 auto;
+  padding-left: 0;
+  padding-right: 0;
+}
+.idea-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 16px;
+  align-items: start;
+}
+.idea-col {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+.idea-brief {
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: 16px;
+  background: var(--surface);
+}
+.idea-brief textarea {
+  min-height: 140px;
+  font-size: 16px;
+  line-height: 1.5;
+}
+.idea-brief-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+.idea-path {
+  position: sticky;
+  top: 16px;
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface);
+}
+.idea-path h3 {
+  margin: 0 0 12px;
+  font-size: 15px;
+}
+.idea-path ol {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0 0 12px;
+  padding: 0;
+  list-style: none;
+}
+.idea-path li button {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border-color: transparent;
+  border-radius: 12px;
+  background: transparent;
+  text-align: left;
+}
+.idea-path li button:hover {
+  background: var(--surface-2);
+}
+.idea-path li.current button {
+  border-color: var(--accent);
+  background: var(--surface-2);
+}
+.idea-path li b {
+  display: block;
+  font-size: 14px;
+}
+.idea-path li small {
+  color: var(--muted);
+  font-size: 12px;
+}
+.idea-path-n {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  background: var(--surface-2);
+  color: var(--muted);
+  font-size: 12px;
+}
+.idea-path li.current .idea-path-n {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+@media (max-width: 960px) {
+  .idea-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .idea-path {
+    position: static;
+    order: -1;
+  }
+  .idea-path ol {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+  .idea-path li small {
+    display: none;
+  }
+}
+@media (max-width: 700px) {
+  .app main.idea-main {
+    padding: 0 12px;
+  }
+}
+.world-llm {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line, rgba(255, 255, 255, 0.08));
+  display: grid;
+  gap: 8px;
+}
+.world-llm-quote {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.world-llm-conflicts {
+  display: grid;
+  gap: 8px;
+}
+.world-llm-conflicts p {
+  margin: 2px 0 6px;
+  white-space: pre-wrap;
+}
+
+.att {
+  margin-top: 12px;
+  display: grid;
+  gap: 8px;
+}
+.att-bar {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.att-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 5;
+  display: grid;
+  min-width: 220px;
+  gap: 2px;
+  padding: 6px;
+  border-radius: 10px;
+  background: var(--panel, #1b1b1f);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+.att-menu button {
+  text-align: left;
+}
+.att-pick,
+.att-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.att-tile {
+  display: grid;
+  gap: 4px;
+  width: 92px;
+  padding: 4px;
+}
+.att-tile img {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border-radius: 8px;
+}
+.att-chip {
+  display: grid;
+  grid-template-columns: 56px 1fr auto;
+  align-items: center;
+  gap: 6px;
+  padding: 4px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+.att-chip img {
+  width: 56px;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border-radius: 8px;
+}
+.att-ro .att-chip {
+  grid-template-columns: 56px auto;
+}
+
+/* «Идея»: задание, отправка в LLM, результат */
+.idea-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.idea-head h2 {
+  margin: 0;
+  font-size: 18px;
+}
+.idea-head small {
+  color: var(--muted);
+}
+.idea-n {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 700;
+  font-size: 14px;
+}
+.idea-brief {
+  padding: 16px;
+}
+.idea-brief textarea {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 84px;
+  max-height: 15.5em;
+  resize: vertical;
+  overflow-y: auto;
+}
+.idea-send {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 10px;
+}
+.idea-send small {
+  margin-right: auto;
+}
+.idea-send select {
+  height: 40px;
+  border-radius: 99px;
+  padding: 0 14px;
+}
+.idea-mic {
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+}
+.idea-mic.on {
+  background: var(--bad);
+  border-color: var(--bad);
+  color: #fff;
+  animation: idea-pulse 1.2s ease-in-out infinite;
+}
+@keyframes idea-pulse {
+  50% {
+    box-shadow: 0 0 0 6px color-mix(in srgb, var(--bad) 25%, transparent);
+  }
+}
+.idea-go {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  border-radius: 99px;
+  padding: 0 18px;
+}
+.idea-result {
+  margin-top: 16px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface-2);
+}
+.idea-result-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.idea-result-bar > div {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.idea-result-bar button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  border-radius: 99px;
+  padding: 0 14px;
+  font-size: 13px;
+}
+.idea-refs {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+.idea-refs span {
+  position: relative;
+}
+.idea-refs img {
+  width: 64px;
+  height: 64px;
+  object-fit: cover;
+  border-radius: 10px;
+  border: 1px solid var(--border-strong);
+  display: block;
+}
+.idea-refs span button {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+}
+.idea-refs-strip {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 14px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+}
+.idea-refs-strip small {
+  color: var(--muted);
+}
+.idea-refs-strip > div {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.idea-refs-strip img {
+  width: 56px;
+  height: 56px;
+  object-fit: cover;
+  border-radius: 8px;
+  display: block;
+}
+@media (max-width: 700px) {
+  .idea-send {
+    flex-wrap: wrap;
+  }
+  .idea-go {
+    flex: 1 1 100%;
+    justify-content: center;
+  }
+  .idea-send select {
+    flex: 1;
+  }
+}
+
+/* Карточка задания стоит на уровне пункта «1. Идея» левого меню */
+@media (min-width: 901px) {
+  .idea-main > .content {
+    padding-top: 58px;
+  }
+}
+
+.idea-bg {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 40px;
+  padding: 0 12px;
+  border-radius: 99px;
+  border: 1px solid var(--border);
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.idea-bg.on {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.idea-bg input {
+  accent-color: var(--accent);
+}
+.idea-bg-info {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+}
+.idea-bg-note {
+  margin: 8px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+}

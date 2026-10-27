@@ -19,6 +19,7 @@
 - Windows-first. Запуск: `.\.venv\Scripts\python.exe scripts\start_studio.py` (или `START_WINDOWS.bat`). Если пишет «already running» — заняты порты 8000/5173 старым процессом; остановить его и запустить заново.
 - После правок **бэкенда** нужен перезапуск бэкенда. Фронтенд в dev-режиме обновляется сам.
 - Здоровье: http://127.0.0.1:8000/api/health
+- Порты (решение владельца, 18.10.2026): рабочая студия на 8000/5173 — из корня `C:/AI_Workflow_Studio` (main); запускает и перезапускает её Claude Code, обычным процессом без прав администратора (`Start-Process`, команда как в `start_studio.py`). Codex свой бэкенд на 8000/5173 не запускает — только на отдельных портах (8001/5174) со своим `STUDIO_DATA_DIR`. Если 8000 занят чужим процессом, который нельзя остановить, — сказать владельцу, не обходить. Учти: `ORIGINS` в `backend/security.py` пропускает только 5173/8000, стенду на других портах нужен прокси без заголовка `Origin`.
 
 ## Проверки перед коммитом
 
@@ -69,7 +70,10 @@
 - `TODO.md` — список пожеланий и задач (актуальный). `CHANGES.md` — история версий (сейчас 0.3.0).
 - `docs/` — решения и проверки: `PIAPI_MODELS_2026-10-16.md` (каталог и живые тесты), `CLOUD_DEPLOY.md` (Docker/Caddy, не проверялся на сервере), `TECHNICAL_SPEC.md`, `ARCHITECTURE_PLAN_2026-10-16.md`.
 - `skills/gremovod-screenplay/` — формат сценария для ChatGPT.
-- `skills/cinema-*/` — пять навыков по киноязыку (нарратив и жанр, мизансцена, камера, монтаж, звук) по Lewis «Essential Cinema». Контекст и статус значков «I» в интерфейсе: `docs/CINEMA_KNOWLEDGE_2026-10-16.md`.
+- `skills/cinema-*/` — навыки по киноязыку: пять по Lewis «Essential Cinema» (нарратив и жанр, мизансцена, камера, монтаж, звук), `cinema-visual-structure` (Block) и по Mercado «The Filmmaker's Eye» — `cinema-image-system` (идея, мир), `cinema-character-framing` (персонажи), `cinema-composition`, `cinema-lens-language`, а `cinema-shot-design` сводит их в порядок решений по карточке кадра. Контекст и статус значков «I» в интерфейсе: `docs/CINEMA_KNOWLEDGE_2026-10-16.md`; выжимка Mercado: `docs/MERCADO_FILMMAKERS_EYE_2026-10-16.md`.
+- `skills/cinema-five-pillars/` — пять столпов киноязыка (Practice Ai), чек-лист из 5 вопросов и формула кадра. **Обращаться к нему, когда разбираем написание промптов в ChatGPT для создания кадров**: связан с `backend/prompt_rules.py` (`PILLARS_RULES`) и заготовками «Кадров» (`frontend/src/directorPresets.ts`).
+- `skills/video-*/` — правила промптов по видеомоделям (Seedance 2.0/2.5, FLUX 3, MiniMax H3, Kling 3.0 Omni и Start+Last Frame); не проверены вживую, лимиты референсов в `model_catalog.py` (`ref_limits`, `ref_syntax`).
+- Моушн и монтаж кодом (HyperFrames, Remotion, GSAP, OpenMontage, video-use): скиллы в `~/.claude/skills`, исходники в `~/motion-tools`, что где и что не проверено — `docs/MOTION_TOOLS_2026-10-18.md`; промпт «студии моушна» — `docs/MOTION_STUDIO_PROMPT.md`. В студии: шаблоны заставки и плашки в `motion/`, рендер в папку серии `03_Монтаж` — `backend/motion.py` (`POST /api/productions/{pid}/series/{sid}/motion`), панель `MotionPanel.tsx` на экране «Монтаж».
 - Живой скрипт проверки PiAPI: `scripts/live_piapi_test.py` (платный!).
 
 ## Открытые задачи (кратко, полный список в TODO.md)

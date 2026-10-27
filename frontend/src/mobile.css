@@ -181,6 +181,32 @@
   .topbar .project-global-actions > button {
     display: inline-flex;
   }
+  .topbar {
+    padding: 8px 12px;
+  }
+  .topbar-project-picker {
+    height: 40px;
+    padding: 0 28px 0 12px;
+    font-size: 13px;
+  }
+  .topbar .topbar-status {
+    width: auto;
+    padding: 0;
+    border: 0;
+    background: none;
+    font-size: 0;
+    gap: 0;
+  }
+  .topbar .top-actions button {
+    height: 40px;
+    padding: 0 12px;
+  }
+  .topbar .project-global-actions > button:first-child,
+  .topbar .project-global-actions > .settings-button {
+    width: 40px;
+    padding: 0;
+    justify-content: center;
+  }
 }
 
 /* Телефон: нижняя навигация прячется при прокрутке вниз */

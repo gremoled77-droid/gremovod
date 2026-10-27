@@ -1,6 +1,7 @@
 import {useEffect, useState} from 'react';
 import {apiFetch} from './api';
 import {useSharedActivity} from './ActivityContext';
+import {KIND_LABELS, modelLabel} from './modelLabels';
 
 type Budget = {
   project_limit_usd: number;
@@ -71,9 +72,11 @@ export default function Dock({projectId, onClose}: {projectId: string; onClose: 
       <div className="dock-list">
         {items.slice(0, 30).map(i => (
           <div key={i.id} className={'dock-item st-' + i.status}>
-            <b>{i.model}</b>
+            <b>{modelLabel(i.model)}</b>
             <span>{STATUS[i.status] || i.status}</span>
-            <small>{i.prompt.slice(0, 70)}</small>
+            <small title={i.prompt}>
+              {KIND_LABELS[i.kind] || i.kind} · {i.prompt.slice(0, 50)}
+            </small>
           </div>
         ))}
         {!items.length && <p className="muted">Заданий пока нет. Запусти генерацию на этапе «Кадры».</p>}

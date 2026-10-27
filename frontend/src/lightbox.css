@@ -177,3 +177,84 @@
     transform: none;
   }
 }
+
+.lb-media {
+  position: relative;
+  display: flex;
+  max-width: 100%;
+}
+.lb-top {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px 28px;
+  border-radius: 10px 10px 0 0;
+  background: linear-gradient(to bottom, rgba(6, 7, 9, 0.55), transparent);
+  pointer-events: none;
+}
+.lb-top span {
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  color: rgba(236, 232, 223, 0.78);
+  text-shadow: 0 1px 3px #000;
+}
+
+/* Общий набор действий кадра (FrameActions): просмотр, плитки, карточки результатов. */
+.frame-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  pointer-events: auto;
+}
+.frame-actions button,
+.frame-actions a.fa-link {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(236, 232, 223, 0.25);
+  border-radius: 50%;
+  background: rgba(14, 15, 18, 0.55);
+  color: rgba(236, 232, 223, 0.85);
+  backdrop-filter: blur(6px);
+  cursor: pointer;
+  text-decoration: none;
+}
+.frame-actions.sm {
+  gap: 4px;
+}
+.frame-actions.sm button,
+.frame-actions.sm a.fa-link {
+  width: 26px;
+  height: 26px;
+}
+.frame-actions button:hover,
+.frame-actions a.fa-link:hover,
+.frame-actions button.on {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.frame-actions .fa-trash:hover {
+  border-color: var(--bad);
+  color: var(--bad);
+}
+.frame-actions .fa-fav.on {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.frame-actions :focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+@media (max-width: 640px) {
+  .lb-top {
+    flex-direction: column;
+    align-items: flex-end;
+  }
+}

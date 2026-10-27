@@ -81,17 +81,103 @@ export function hasCycle(nodes: Node[], edges: Edge[]) {
   return nodes.some(n => visit(n.id));
 }
 
-/** Проверка соединения: что во что можно подавать. */
-export function canConnect(source?: Node, target?: Node) {
-  if (!source || !target || source.id === target.id) return false;
-  const s = data(source).kind as NodeKind;
-  const t = data(target).kind as NodeKind;
-  if (t === 'llm') return s === 'text' || s === 'llm' || s === 'file';
-  if (t === 'image') return s === 'text' || s === 'llm' || s === 'reference' || s === 'image';
-  // Аудио можно подключить к видео как референс; сейчас модели студии его не принимают (см. buildSteps).
-  if (t === 'video')
-    return s === 'text' || s === 'llm' || s === 'reference' || s === 'image' || s === 'audio';
+/** Тип данных на портах: цвет связи и совместимость. */
+export type PortType = 'text' | 'image' | 'audio' | 'video';
+export const PORT_COLOR: Record<PortType, string> = {
+  text: '#5ec4b6',
+  image: '#6ea8fe',
+  audio: '#f2b134',
+  video: '#b18cff',
+};
+export const PORT_LABEL: Record<PortType, string> = {
+  text: 'текст',
+  image: 'изображение',
+  audio: 'аудио',
+  video: 'видео',
+};
+
+/** Что узел отдаёт на выход. */
+export function outPort(kind: NodeKind): PortType | null {
+  if (kind === 'text' || kind === 'llm' || kind === 'file') return 'text';
+  if (kind === 'reference' || kind === 'image') return 'image';
+  if (kind === 'audio') return 'audio';
+  if (kind === 'video') return 'video';
+  return null;
+}
+/** Типы, которые узел принимает на вход (по порту на тип). Аудио не принимает никто: модели студии его не получают. */
+export function inPorts(kind: NodeKind): PortType[] {
+  if (kind === 'llm') return ['text'];
+  if (kind === 'image' || kind === 'video') return ['text', 'image'];
+  return [];
+}
+
+/** Часть каталога моделей (/api/model-specs), нужная для проверки входов. */
+export type ModelSpecLite = {
+  kind?: string;
+  launch_enabled?: boolean;
+  max_refs?: number;
+  api_refs?: number;
+  options?: Record<string, {values?: (string | number)[]; default?: string | number}>;
+};
+/** Сколько референсов-картинок принимает модель; null — лимит неизвестен. */
+export function refLimit(model: string, specs?: Record<string, ModelSpecLite>): number | null {
+  if (VIDEO_MODELS[model]) return VIDEO_MODELS[model].maxRefs;
+  const s = specs?.[model];
+  if (!s) return null;
+  return s.api_refs ?? s.max_refs ?? null;
+}
+
+/** Достижим ли узел `to` из `from` по связям. */
+function reaches(from: string, to: string, edges: Edge[]) {
+  const seen = new Set<string>();
+  const stack = [from];
+  while (stack.length) {
+    const id = stack.pop()!;
+    if (id === to) return true;
+    if (seen.has(id)) continue;
+    seen.add(id);
+    for (const e of edges) if (e.source === id) stack.push(e.target);
+  }
   return false;
+}
+
+/** Проверка соединения с причиной отказа: типы портов, повтор, цикл, лимит референсов модели. */
+export function checkConnection(
+  source: Node | undefined,
+  target: Node | undefined,
+  nodes: Node[],
+  edges: Edge[],
+  specs?: Record<string, ModelSpecLite>,
+  targetHandle?: string | null
+): {ok: boolean; reason: string} {
+  const no = (reason: string) => ({ok: false, reason});
+  if (!source || !target) return no('Узел не найден');
+  if (source.id === target.id) return no('Нельзя соединить узел с самим собой');
+  const sk = data(source).kind as NodeKind;
+  const tk = data(target).kind as NodeKind;
+  const out = outPort(sk);
+  if (!out) return no('У этого узла нет выхода');
+  if (!inPorts(tk).length) return no('У этого узла нет входов');
+  if (sk === 'file' && tk !== 'llm') return no('Файл подаётся только в узел LLM');
+  if (!inPorts(tk).includes(out))
+    return no(
+      out === 'audio'
+        ? 'Аудио не принимает ни одна модель студии'
+        : `Узел «${data(target).title || tk}» не принимает ${PORT_LABEL[out]}`
+    );
+  if (targetHandle && targetHandle !== 'in-' + out)
+    return no(`Тип не совпадает: сюда нельзя подать ${PORT_LABEL[out]}`);
+  if (edges.some(e => e.source === source.id && e.target === target.id)) return no('Такая связь уже есть');
+  if (reaches(target.id, source.id, edges)) return no('Связь замкнёт цикл');
+  if (out === 'image') {
+    const limit = refLimit(String(data(target).model || ''), specs);
+    const used = edges.filter(
+      e =>
+        e.target === target.id && outPort(data(nodes.find(n => n.id === e.source) || target).kind) === 'image'
+    ).length;
+    if (limit !== null && used >= limit) return no(`Модель принимает референсов не больше ${limit}`);
+  }
+  return {ok: true, reason: ''};
 }
 
 /** Текст узла-источника: свой текст, ответ LLM или заглушка, если LLM запустится в этом же запуске. */
@@ -212,3 +298,12 @@ export function buildSteps(
   }
   return {steps, problems};
 }
+
+/** Короткая проверка типов без контекста схемы (лимиты моделей и повторы проверяет checkConnection). */
+export const canConnect = (source?: Node, target?: Node) =>
+  checkConnection(
+    source,
+    target,
+    [source, target].filter((n): n is Node => !!n),
+    []
+  ).ok;

@@ -3,6 +3,7 @@ import {apiFetch} from './api';
 import {responseJson} from './ChatGPTPanel';
 import ReplaceCharacterButton, {type CharacterVersion} from './ReplaceCharacterButton';
 import CharacterVoicePanel from './CharacterVoicePanel';
+import MotionPanel from './MotionPanel';
 
 type Folder = {
   id: string;
@@ -412,6 +413,9 @@ export default function ProductionPanel({
                     onGenerated={() => setTick(x => x + 1)}
                   />
                 </>
+              )}
+              {details.kind === 'series' && (
+                <MotionPanel key={selected} pid={pid} sid={selected} onDone={() => setTick(x => x + 1)} />
               )}
               <label>
                 {details.kind === 'series'

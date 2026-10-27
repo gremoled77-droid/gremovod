@@ -90,19 +90,6 @@
   background: var(--bad);
   color: #fff;
 }
-.cs-trash {
-  opacity: 0;
-  font-size: 12px;
-}
-.cs-tile:hover .cs-trash,
-.cs-trash:focus-visible {
-  opacity: 1;
-}
-@media (hover: none) {
-  .cs-trash {
-    opacity: 1;
-  }
-}
 .cs-tabs {
   display: flex;
   gap: 4px;
@@ -155,6 +142,7 @@
   grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
   gap: 12px;
   align-content: start;
+  grid-auto-rows: max-content;
 }
 .cs-card {
   position: relative;
@@ -168,6 +156,7 @@
 }
 .cs-result img,
 .cs-result video {
+  flex: none;
   width: 100%;
   display: block;
   object-fit: cover;
@@ -344,33 +333,6 @@
   .cs-scroll {
     max-height: 200px;
   }
-}
-
-.cs-heart {
-  position: absolute;
-  top: 4px;
-  left: 4px;
-  width: 26px;
-  height: 26px;
-  padding: 0;
-  border-radius: 50%;
-  border: 0;
-  background: #0e0f12dd;
-  color: var(--text);
-  font-size: 15px;
-  line-height: 1;
-  cursor: pointer;
-  z-index: 2;
-}
-.cs-heart.on {
-  color: var(--accent);
-}
-.cs-heart-big {
-  top: 10px;
-  left: 10px;
-  width: 34px;
-  height: 34px;
-  font-size: 19px;
 }
 
 .cs-zoomable {
@@ -596,4 +558,495 @@
     color: var(--accent-ink);
     font-weight: 600;
   }
+}
+
+/* Действия кадра на плитках и карточках результатов. */
+.cs-tile-actions {
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  bottom: 4px;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+.cs-tile:hover .cs-tile-actions,
+.cs-tile:focus-within .cs-tile-actions {
+  opacity: 1;
+}
+/* Плитка всего 50–72 px: четыре кнопки в сетке 2×2 (♡ ✎ ⤓ 🗑); референс — клик по плитке, остальное и сенсорные экраны — в просмотре (⤢). */
+.cs-tile-actions {
+  display: grid;
+  grid-template-columns: repeat(2, 20px);
+  gap: 3px;
+}
+.cs-tile-actions button,
+.cs-tile-actions a.fa-link {
+  width: 20px;
+  height: 20px;
+}
+.cs-tile-actions svg {
+  width: 11px;
+  height: 11px;
+}
+@media (hover: none) {
+  .cs-tile-actions {
+    display: none;
+  }
+}
+.cs-fav-badge {
+  position: absolute;
+  top: 4px;
+  left: 6px;
+  color: var(--accent);
+  font-size: 15px;
+  text-shadow: 0 1px 3px #000;
+  pointer-events: none;
+}
+.cs-zoom {
+  bottom: auto;
+  top: 4px;
+}
+.cs-result {
+  position: relative;
+}
+.cs-result-actions {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  right: 10px;
+  z-index: 2;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+.cs-result:hover .cs-result-actions,
+.cs-result:focus-within .cs-result-actions {
+  opacity: 1;
+}
+@media (hover: none) {
+  .cs-result-actions {
+    opacity: 1;
+  }
+}
+
+/* Карточка «I» на экране «Кадры»: экран обрезает содержимое (overflow hidden), поэтому открываем её вверх */
+.cs .cinema-info-body {
+  top: auto;
+  bottom: 30px;
+  right: auto;
+  left: -120px;
+  width: min(380px, 80vw);
+  max-height: min(220px, 40vh);
+  overflow-y: auto;
+}
+
+/* Таблица цен PiAPI под списком моделей */
+.cs-prices {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  padding: 10px 12px;
+  font-size: 12px;
+}
+.cs-prices summary {
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 13px;
+}
+.cs-price-model {
+  margin-top: 12px;
+}
+.cs-price-model b {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 13px;
+}
+.cs-price-model em {
+  color: var(--muted);
+  font-style: normal;
+  font-weight: 400;
+}
+.cs-price-model table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.cs-price-model th,
+.cs-price-model td {
+  padding: 4px 6px;
+  text-align: left;
+  border-top: 1px solid var(--border);
+  white-space: nowrap;
+}
+.cs-price-model th {
+  color: var(--muted);
+  font-weight: 500;
+}
+.cs-price-model td:first-child {
+  color: var(--muted);
+}
+.cs-prices > small {
+  display: block;
+  margin-top: 10px;
+}
+.cs-price-scroll {
+  overflow-x: auto;
+}
+
+/* Компактные параметры модели: строки плотнее, цены в центах помещаются в список */
+.cs-model-opts {
+  gap: 3px;
+  padding: 0 12px 8px;
+}
+.cs-model-opts label {
+  min-height: 0;
+  gap: 6px;
+}
+.cs-model-opts select,
+.cs-model-opts input {
+  height: 28px;
+  min-height: 0;
+  padding: 0 8px;
+  font-size: 12px;
+  max-width: 150px;
+  border-radius: 8px;
+}
+.cs-model-opts select {
+  padding-right: 24px;
+}
+
+/* Серая «i» в кружке после названия модели */
+.cs-info {
+  display: inline-grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  margin-left: 6px;
+  vertical-align: 1px;
+  border: 1px solid var(--border-strong);
+  border-radius: 50%;
+  color: var(--muted);
+  font-size: 10px;
+  font-style: italic;
+  font-weight: 600;
+  line-height: 1;
+  text-decoration: none;
+}
+a.cs-info:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.cs-info.off {
+  opacity: 0.35;
+  cursor: help;
+}
+
+/* Выбор варианта модели внутри бокса (Seedream Lite / Pro и их less restriction) */
+.cs-variant {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px 3px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.cs-variant select {
+  height: 28px;
+  min-height: 0;
+  padding: 0 24px 0 8px;
+  font-size: 12px;
+  max-width: 170px;
+  border-radius: 8px;
+}
+.cs-flat-price {
+  color: var(--text);
+  font-weight: 600;
+}
+
+/* Панель «Камера и кадр» */
+.cf {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+.cf-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.cf-toggle {
+  height: 32px;
+  padding: 0 14px;
+  border-radius: 99px;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.cf-toggle.on {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.cf-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+  flex: 1;
+}
+.cf-hint {
+  color: var(--muted);
+  font-size: 12px;
+}
+.cf-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 4px 0 10px;
+  border: 1px solid color-mix(in srgb, var(--accent) 55%, var(--border));
+  border-radius: 99px;
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface-2));
+  font-size: 12px;
+}
+.cf-chip small {
+  color: var(--muted);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.cf-chip button {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--muted);
+}
+.cf-chip button:hover {
+  color: var(--bad);
+}
+.cf-extra {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.cf-extra button:not(.cinema-info) {
+  height: 28px;
+  padding: 0 12px;
+  border-radius: 99px;
+  font-size: 12px;
+}
+.cf-drawer {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface-2);
+}
+.cf-tabs {
+  display: flex;
+  gap: 6px;
+}
+.cf-tabs button {
+  height: 30px;
+  padding: 0 14px;
+  border-radius: 99px;
+  font-size: 12px;
+}
+.cf-tabs button.on {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface-2));
+}
+.cf-tabs em {
+  margin-left: 6px;
+  font-style: normal;
+  font-size: 8px;
+  color: var(--accent);
+}
+.cf-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+  gap: 8px;
+}
+.cf-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 12px;
+  text-align: center;
+}
+.cf-card:hover {
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+.cf-card.on {
+  border-color: var(--accent);
+  color: var(--text);
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface));
+}
+.cf-prev {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  border-radius: 8px;
+  background: var(--bg);
+  color: #8b8f99;
+  display: block;
+}
+.cf-chips {
+  order: 3;
+  flex: 1 1 100%;
+}
+.cf-extra {
+  order: 2;
+  margin-left: auto;
+}
+.cf-chip,
+.cf-chip small {
+  white-space: nowrap;
+}
+
+/* Окна «＋» (персонаж, референс) и «Локация» */
+.fs-modal {
+  width: min(560px, calc(100vw - 32px));
+  max-height: calc(100vh - 64px);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.fs-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.fs-head h2 {
+  margin: 0;
+  font-size: 18px;
+}
+.fs-head button {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+}
+.fs-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.fs-entry {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface-2);
+}
+.fs-thumbs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.fs-thumbs button {
+  width: 84px;
+  height: 84px;
+  padding: 0;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid var(--border-strong);
+  background: var(--bg);
+}
+.fs-thumbs button.on {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 35%, transparent);
+}
+.fs-thumbs img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.fs-upload {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+}
+.fs-foot {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.fs-modal textarea {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Ручной маршрут одним меню: на десктопе выпадает вверх, на телефоне кнопки остаются на виду */
+.cs-manual {
+  position: relative;
+}
+.cs-manual-menu {
+  display: none;
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 6px);
+  z-index: 5;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 220px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface-2);
+  box-shadow: 0 14px 30px -12px #000;
+}
+.cs-manual.open .cs-manual-menu {
+  display: flex;
+}
+@media (max-width: 700px) {
+  .cs-manual,
+  .cs-manual-menu {
+    display: contents;
+  }
+  .cs-manual-toggle {
+    display: none;
+  }
+}
+
+/* «⋯» на карточке результата: вторичные действия раскрываются внутри карточки */
+.cs-more > summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 5px 10px;
+  font-size: 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  color: var(--muted);
+}
+.cs-more > summary::-webkit-details-marker {
+  display: none;
+}
+.cs-more[open] {
+  flex-basis: 100%;
+}
+.cs-more[open] > .cs-row {
+  margin-top: 6px;
 }

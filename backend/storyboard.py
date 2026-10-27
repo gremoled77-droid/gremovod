@@ -196,6 +196,105 @@ def director_view(db,pid,sid):
     }
 
 
+class Reorder(BaseModel):
+    base_revision:str=Field(min_length=64,max_length=64)
+    parent_id:str=Field(min_length=1,max_length=100)  # серия (порядок сцен) или сцена серии (порядок кадров)
+    node_ids:list[str]=Field(min_length=1,max_length=500)
+
+
+def reorder(db,pid,sid,body):
+    """Новый порядок детей одного родителя: меняется только number. Папки на диске не переименовываются."""
+    _,nodes,_,revision=snapshot(db,pid,sid)
+    if body.base_revision!=revision:raise HTTPException(409,'Доска изменилась. Обнови её и повтори перестановку.')
+    scenes={n['id'] for n in nodes if n['kind']=='episode' and n['parent_id']==sid}
+    if body.parent_id==sid:kind='episode'
+    elif body.parent_id in scenes:kind='frame'
+    else:raise HTTPException(400,'Порядок меняется внутри серии или сцены этой серии')
+    siblings=[n for n in nodes if n['kind']==kind and n['parent_id']==body.parent_id]
+    known={n['id'] for n in siblings}
+    if len(set(body.node_ids))!=len(body.node_ids) or not set(body.node_ids)<=known:
+        raise HTTPException(400,'Список содержит повтор или карточку другого родителя')
+    # Скрытые с доски кадры (архивные рабочие проекты) остаются после видимых в прежнем порядке.
+    rest=[n['id'] for n in sorted(siblings,key=lambda n:(n['number'],n['id'])) if n['id'] not in body.node_ids]
+    order=list(body.node_ids)+rest
+    current={n['id']:n['number'] for n in siblings}
+    for number,nid in enumerate(order,1):
+        if current[nid]!=number:db.execute('UPDATE production_nodes SET number=? WHERE id=?',(number,nid))
+    return order
+
+
+class SendFrame(BaseModel):
+    asset_id:str=Field(min_length=1,max_length=100)
+    title:str=Field(min_length=1,max_length=75)
+
+
+class SendFrames(BaseModel):
+    base_revision:str=Field(min_length=64,max_length=64)
+    request_id:str=Field(min_length=8,max_length=100,pattern=r'^[a-zA-Z0-9_-]+$')
+    scene_id:str|None=None  # существующая сцена серии; иначе создаётся новая со scene_title
+    scene_title:str|None=Field(default=None,min_length=1,max_length=75)
+    frames:list[SendFrame]=Field(min_length=1,max_length=20)
+    character_node_ids:list[str]=Field(default_factory=list,max_length=100)
+    location_node_id:str|None=None
+
+
+def send_check(db,pid,sid,body):
+    """Всё, что можно проверить до создания папок: ревизия, сцена, названия, доступность картинок, состав."""
+    _,nodes,_,revision=snapshot(db,pid,sid)
+    if body.base_revision!=revision:raise HTTPException(409,'Доска изменилась. Обнови её и повтори отправку.')
+    if bool(body.scene_id)==bool(body.scene_title):raise HTTPException(400,'Выбери существующую сцену или укажи название новой')
+    scenes=[n for n in nodes if n['kind']=='episode' and n['parent_id']==sid]
+    if body.scene_id:
+        if body.scene_id not in {n['id'] for n in scenes}:raise HTTPException(400,'Сцена не относится к этой серии')
+        taken={n['title'].casefold() for n in nodes if n['kind']=='frame' and n['parent_id']==body.scene_id}
+    else:
+        if body.scene_title.strip().casefold() in {n['title'].casefold() for n in scenes}:raise HTTPException(409,'Сцена с таким названием уже есть')
+        folders.safe_name(body.scene_title)
+        taken=set()
+    titles=[f.title.strip().casefold() for f in body.frames]
+    if len(set(titles))!=len(titles) or taken&set(titles):raise HTTPException(409,'Названия кадров должны различаться в пределах сцены')
+    for f in body.frames:
+        folders.safe_name(f.title)
+        row=db.execute('SELECT a.metadata FROM library_assets a WHERE a.id=? AND a.project_id IN (SELECT project_id FROM production_links WHERE production_id=?)',(f.asset_id,pid)).fetchone()
+        if not row:raise HTTPException(404,'Картинка не найдена в проектах этого общего проекта')
+        if json.loads(row['metadata']).get('kind','image')!='image':raise HTTPException(400,'В кадры отправляются только изображения')
+    if len(set(body.character_node_ids))!=len(body.character_node_ids):raise HTTPException(400,'Персонаж выбран дважды')
+    for nid,kind in [(n,'character') for n in body.character_node_ids]+([(body.location_node_id,'location')] if body.location_node_id else []):
+        if not db.execute('SELECT 1 FROM production_nodes WHERE id=? AND production_id=? AND kind=?',(nid,pid,kind)).fetchone():
+            raise HTTPException(400,'Персонаж или локация не принадлежит этому общему проекту')
+
+
+class OutlineFrame(BaseModel):
+    title:str=Field(min_length=1,max_length=75)
+    notes:str=Field(default='',max_length=5000)
+
+
+class OutlineScene(BaseModel):
+    title:str=Field(min_length=1,max_length=75)
+    notes:str=Field(default='',max_length=30000)
+    frames:list[OutlineFrame]=Field(min_length=1,max_length=20)
+
+
+class Outline(BaseModel):
+    base_revision:str=Field(min_length=64,max_length=64)
+    request_id:str=Field(min_length=8,max_length=100,pattern=r'^[a-zA-Z0-9_-]+$')
+    scenes:list[OutlineScene]=Field(min_length=1,max_length=20)
+
+
+def outline_check(db,pid,sid,body):
+    """Проверки до создания папок: ревизия, названия сцен и кадров, допустимость для имён папок."""
+    _,nodes,_,revision=snapshot(db,pid,sid)
+    if body.base_revision!=revision:raise HTTPException(409,'Доска изменилась. Обнови её и повтори добавление.')
+    taken={n['title'].casefold() for n in nodes if n['kind']=='episode' and n['parent_id']==sid}
+    names=[s.title.strip().casefold() for s in body.scenes]
+    if len(set(names))!=len(names) or taken&set(names):raise HTTPException(409,'Названия сцен должны различаться и не совпадать с уже существующими')
+    for scene in body.scenes:
+        folders.safe_name(scene.title)
+        titles=[f.title.strip().casefold() for f in scene.frames]
+        if len(set(titles))!=len(titles):raise HTTPException(409,f'В сцене «{scene.title}» названия кадров должны различаться')
+        for f in scene.frames:folders.safe_name(f.title)
+
+
 def register(app,studio):
     @app.on_event('startup')
     def setup():
@@ -206,6 +305,9 @@ def register(app,studio):
             db.execute('''CREATE TABLE IF NOT EXISTS shot_contracts(
                 series_id TEXT NOT NULL,shot_id TEXT NOT NULL,data TEXT NOT NULL,
                 revision INTEGER NOT NULL,updated_at TEXT NOT NULL,PRIMARY KEY(series_id,shot_id))''')
+            db.execute('''CREATE TABLE IF NOT EXISTS storyboard_sends(
+                request_id TEXT PRIMARY KEY,series_id TEXT NOT NULL,payload_hash TEXT NOT NULL,
+                result TEXT NOT NULL,created_at TEXT NOT NULL)''')
 
     @app.get('/api/productions/{pid}/series/{sid}/storyboard')
     def board(pid:str,sid:str):
@@ -227,6 +329,75 @@ def register(app,studio):
                 _,selection,_=state(db,pid,item['id'])
                 scenes.append({**item,'frames':frames,'selection':selection})
         return {'series':parent,'scenes':scenes,'script':script,'revision':revision}
+
+    @app.post('/api/productions/{pid}/series/{sid}/storyboard/frames')
+    def send_frames(pid:str,sid:str,body:SendFrames):
+        """«Отправить в раскадровку»: кадры из выбранных картинок, главный дубль и состав сцены. Повтор с тем же request_id ничего не дублирует."""
+        from backend.production_entities import state as entity_state
+        digest=hashlib.sha256(body.model_dump_json(exclude={'base_revision'}).encode()).hexdigest()
+        with studio.connect() as db:
+            previous=db.execute('SELECT * FROM storyboard_sends WHERE request_id=?',(body.request_id,)).fetchone()
+            if previous:
+                if previous['series_id']!=sid or previous['payload_hash']!=digest:raise HTTPException(409,'Этот идентификатор отправки уже использован для другого набора кадров')
+                return {**json.loads(previous['result']),'replayed':True}
+            series(db,pid,sid)
+            send_check(db,pid,sid,body)
+        scene_id=body.scene_id
+        if not scene_id:
+            scene_id=folders.create_node(studio,pid,folders.NewNode(kind='episode',parent_id=sid,title=body.scene_title.strip()))['id']
+        frame_ids=[]
+        for item in body.frames:
+            frame=folders.create_node(studio,pid,folders.NewNode(kind='frame',parent_id=scene_id,title=item.title.strip()))
+            file_id=folders.copy_asset(studio,pid,frame['id'],item.asset_id)
+            with studio.connect() as db:
+                db.execute('INSERT INTO production_entity_state(node_id,data,updated_at) VALUES(?,?,?) ON CONFLICT(node_id) DO UPDATE SET data=excluded.data,updated_at=excluded.updated_at',
+                           (frame['id'],json.dumps({'character_node_ids':body.character_node_ids,'location_node_id':body.location_node_id,'location_angle_file_id':None,'selected_image_file_id':file_id,'selected_video_file_id':None}),studio.now()))
+            frame_ids.append(frame['id'])
+        with studio.connect() as db:
+            db.execute('BEGIN IMMEDIATE')
+            _,cast,_=entity_state(db,pid,scene_id)
+            cast['character_node_ids']=cast['character_node_ids']+[n for n in body.character_node_ids if n not in cast['character_node_ids']]
+            if body.location_node_id:cast['location_node_id']=body.location_node_id
+            db.execute('INSERT INTO production_entity_state(node_id,data,updated_at) VALUES(?,?,?) ON CONFLICT(node_id) DO UPDATE SET data=excluded.data,updated_at=excluded.updated_at',
+                       (scene_id,json.dumps(cast),studio.now()))
+            result={'scene_id':scene_id,'frame_ids':frame_ids}
+            db.execute('INSERT INTO storyboard_sends(request_id,series_id,payload_hash,result,created_at) VALUES(?,?,?,?,?)',
+                       (body.request_id,sid,digest,json.dumps(result),studio.now()))
+            revision=snapshot(db,pid,sid)[3]
+        return {**result,'revision':revision,'replayed':False}
+
+    @app.post('/api/productions/{pid}/series/{sid}/storyboard/outline')
+    def add_outline(pid:str,sid:str,body:Outline):
+        """Сцены и пустые кадры по плану (например, от GPT): без картинок, текст кадра в заметке. Повтор с тем же request_id ничего не дублирует."""
+        digest=hashlib.sha256(body.model_dump_json(exclude={'base_revision'}).encode()).hexdigest()
+        with studio.connect() as db:
+            previous=db.execute('SELECT * FROM storyboard_sends WHERE request_id=?',(body.request_id,)).fetchone()
+            if previous:
+                if previous['series_id']!=sid or previous['payload_hash']!=digest:raise HTTPException(409,'Этот идентификатор уже использован для другого плана')
+                return {**json.loads(previous['result']),'replayed':True}
+            series(db,pid,sid)
+            outline_check(db,pid,sid,body)
+        scene_ids=[];frame_ids=[]
+        for scene in body.scenes:
+            node=folders.create_node(studio,pid,folders.NewNode(kind='episode',parent_id=sid,title=scene.title.strip(),notes=scene.notes))
+            scene_ids.append(node['id'])
+            for frame in scene.frames:
+                frame_ids.append(folders.create_node(studio,pid,folders.NewNode(kind='frame',parent_id=node['id'],title=frame.title.strip(),notes=frame.notes))['id'])
+        with studio.connect() as db:
+            db.execute('BEGIN IMMEDIATE')
+            result={'scene_ids':scene_ids,'frame_ids':frame_ids}
+            db.execute('INSERT INTO storyboard_sends(request_id,series_id,payload_hash,result,created_at) VALUES(?,?,?,?,?)',
+                       (body.request_id,sid,digest,json.dumps(result),studio.now()))
+            revision=snapshot(db,pid,sid)[3]
+        return {**result,'revision':revision,'replayed':False}
+
+    @app.put('/api/productions/{pid}/series/{sid}/storyboard/order')
+    def set_order(pid:str,sid:str,body:Reorder):
+        with studio.connect() as db:
+            db.execute('BEGIN IMMEDIATE')
+            order=reorder(db,pid,sid,body)
+            _,_,_,revision=snapshot(db,pid,sid)
+        return {'order':order,'revision':revision}
 
     @app.post('/api/productions/{pid}/series/{sid}/storyboard/preview')
     def preview(pid:str,sid:str,body:ImportScript):

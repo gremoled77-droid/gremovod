@@ -22,10 +22,16 @@ class Approval(BaseModel):
     provider: Literal['tempfile','piapi'] = 'tempfile'
 
 
+def public_https(url):
+    """Публичная ссылка для провайдера: только https с хостом. Метка inline-base64 у результатов GPT Image ссылкой не считается."""
+    parts=urlsplit(url) if isinstance(url,str) else None
+    return url if parts and parts.scheme=='https' and parts.hostname else None
+
+
 def reference_url(studio,row):
     with studio.connect() as db:
         cached=db.execute('SELECT url,expires_at FROM public_references WHERE asset_id=?',(row['id'],)).fetchone()
-    return cached['url'] if cached and cached['expires_at']>time.time() else row['source_url']
+    return public_https(cached['url'] if cached and cached['expires_at']>time.time() else row['source_url'])
 
 
 async def upload(key,filename,content):

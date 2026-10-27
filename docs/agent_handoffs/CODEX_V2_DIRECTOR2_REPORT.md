@@ -10,9 +10,9 @@
 | Репозиторий | `C:\AI_Workflow_Studio` (корень = main + рабочие данные) |
 | Рабочая копия | `.worktrees/codex`, ветка `codex/work` |
 | HEAD на момент начала | `2d4d94e` «Document staged design improvements and Claude Code handoff» |
-| Отношение к `origin/main` | отстаёт на 119 коммитов, опережает на 31 (`git fetch origin` выполнен, exit 0) |
-| Состояние worktree до работы | ` M docs/HANDOFF_CLAUDE_CODE.md` и untracked `standalone/`, `.artifacts/`, `beta-generation-check.png`, два handoff-документа — **чужие правки, не тронуты** |
-| Merge `origin/main` | отложен: worktree не чист, а AGENTS.md допускает отложить синхронизацию при незакоммиченных правках. До P1 merge обязателен |
+| Отношение к `origin/main` на момент начала | отставал на 119 коммитов, опережал на 31 (`git fetch origin` выполнен, exit 0) |
+| Merge `origin/main` | выполнен позже в этой же сессии по решению владельца («сливай только в свою папку»): слито в ветку `codex/work` внутри `.worktrees/codex`, main и чужие worktrees не тронуты |
+| Состояние worktree до работы | ` M docs/HANDOFF_CLAUDE_CODE.md` и untracked `standalone/`, `.artifacts/`, `beta-generation-check.png`, два handoff-документа — **чужие правки, не тронуты**; перед merge чужую правку handoff убрали в stash и вернули после |
 | Отправка в main | не выполнялась |
 | Push | не выполнялся |
 
@@ -87,11 +87,12 @@ author_lock_version, status, locked_paths), `SourceEvent`, `PhysicalFact`,
 
 | Проверка | Команда | Результат |
 |---|---|---|
-| Полный бэкенд | `python -X utf8 -m pytest backend -q` | **260 passed, 16 subtests passed**, 59.90 с, exit 0 (было 248 до работы) |
-| Тот же набор через unittest | `python -X utf8 -m unittest discover -s backend -p "test_*.py"` | **Ran 260 tests — OK** |
+| Полный бэкенд (после merge `origin/main`) | `python -X utf8 -m pytest backend -q` | **326 passed, 16 subtests passed**, 78.45 с, exit 0 (до merge было 260; main добавил 66) |
+| Фронт (после merge) | `npm test` (в `frontend/`) | **113 passed**, 0 failed (до merge было 47) |
+| Сборка фронта (после merge) | `npm run build` (`tsc --noEmit && vite build`) | **exit 0**, 1878 модулей, сборка 4.01 с |
+| Полный бэкенд (до merge) | `python -X utf8 -m pytest backend -q` | 260 passed, 16 subtests passed, exit 0 |
+| Тот же набор через unittest | `python -X utf8 -m unittest discover -s backend -p "test_*.py"` | Ran 260 tests — OK |
 | Тесты режиссуры | `pytest backend/test_director_contracts.py backend/test_director_studio.py backend/test_director_revisions.py backend/test_director_compiler.py -q` | **78 passed** |
-| Фронт | `npm test` (в `frontend/`) | **47 passed**, 0 failed |
-| Сборка фронта | `npm run build` (`tsc --noEmit && vite build`) | **exit 0**, 1828 модулей, сборка 4.20 с |
 | Пробелы в диффе | `git diff --check` | exit 0 |
 | Формат | `npx prettier --write` по новым фронт-файлам | применён |
 
@@ -222,12 +223,25 @@ DELETE FROM shot_contracts;
 
 ## 8. Блокеры и что нужно от владельца
 
-1. **Синхронизация с main.** Ветка отстаёт на 119 коммитов. До P1 merge
-   обязателен. Нужно решение: сливать сейчас или после ревью беты.
-2. **Отсутствующие модули P1.** `spend_ledger.py`, `media_qc.py`,
-   `p0_control.py`, `p0_provider_dispatch.py`, `FrameTakes.tsx`,
-   `CameraFramePanel.tsx` есть в `main` и в другом worktree, но не в
-   `codex/work`. Перенос их в ветку без решения не выполнялся.
+1. **Синхронизация с main — сделано.** `origin/main` слит в `codex/work` внутри
+   `.worktrees/codex`. Конфликты (30 файлов) разрешены так:
+   - навыки и документы — в пользу main (там версии на 2–4 строки новее);
+   - фронт (`App.tsx`, `CreateScreen.tsx`, `HomeScreen.tsx`, `Lightbox.tsx`) — в
+     пользу main: в main появилось новое семейство `Frame*` (`FrameActions`,
+     `FrameTakes`, `FrameCast`, `CameraFramePanel`) вместо моего `mediaAsset`;
+   - `ProductionStoryboard.tsx` — база main, поверх неё наложена интеграция
+     режиссуры (импорт, состояние, кнопка «Контракт», рендер инспектора);
+   - `story_plan.py` — моя версия (main = моя версия минус мои три добавления);
+   - `storyboard.py` — обе стороны: контракты кадра + `outline`/`Reorder`/отправка;
+   - `production_entities.py` — семантическое объединение: правила ракурса и
+     локации из main + проверка постановки съёмки из моей ветки.
+   Осиротевшие после слияния `mediaAsset.ts`, `MediaAssetActions.tsx` и их тест
+   удалены — в main их заменило семейство `Frame*`.
+2. **Модули P1 отсутствуют и в main.** `spend_ledger.py`, `media_qc.py`,
+   `p0_control.py`, `p0_provider_dispatch.py` не найдены ни в `origin/main`, ни
+   в дереве слияния: они лежат только в другом worktree/ветке. Переносить их в
+   `codex/work` без решения владельца не выполнялось. `FrameTakes.tsx` и
+   `CameraFramePanel.tsx` после слияния доступны.
 3. **Commit SHA референсов.** `git clone` во внешний каталог заблокирован
    политикой bash, поэтому SHA не зафиксированы — в документе указаны URL и
    лицензии.

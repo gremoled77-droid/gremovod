@@ -3,6 +3,7 @@ export const MODES: Mode[] = [
   'home',
   'studio',
   'styles',
+  'characters',
   'storyboard',
   'create',
   'video',

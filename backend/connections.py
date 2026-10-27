@@ -12,8 +12,35 @@ PROVIDERS={
     'openai':{'name':'OpenAI','env':'OPENAI_API_KEY','file':'OPENAI_API_KEY.txt','url':'https://api.openai.com/v1/models','header':'Authorization','docs':'https://developers.openai.com/api/reference/resources/models/methods/list'},
     'elevenlabs':{'name':'ElevenLabs','env':'ELEVENLABS_API_KEY','file':'ELEVENLABS_API_KEY.txt','url':'https://api.elevenlabs.io/v1/user/subscription','header':'xi-api-key','docs':'https://elevenlabs.io/docs/api-reference/user/subscription/get'},
     'fish':{'name':'Fish Audio','env':'FISH_AUDIO_API_KEY','file':'FISH_AUDIO_API_KEY.txt','url':'https://api.fish.audio/wallet/self/api-credit','header':'Authorization','docs':'https://docs.fish.audio/api-reference/openapi.json'},
+    'kie':{'name':'KIE','env':'KIE_API_KEY','file':'KIE_API_KEY.txt','url':'https://api.kie.ai/api/v1/chat/credit','header':'Authorization','docs':'https://docs.kie.ai/common-api/get-account-credits'},
 }
 ELEVENLABS_LEGACY_FILE=Path(os.getenv('ELEVENLABS_KEY_FILE') or str(Path.home()/'Documents'/'!GREM TAXI'/'.secrets'/'elevenlabs-api-key.txt'))
+# Ключ KIE, сохранённый kie-access/connect.ps1: DPAPI текущего пользователя Windows (ConvertFrom-SecureString, hex).
+KIE_DPAPI_FILES=[Path(p) for p in (os.getenv('KIE_DPAPI_FILE'),) if p]+[ROOT/'kie-access'/'api-key.dpapi',
+                 Path.home()/'Documents'/'ChatGPT'/'AMOCRM'/'kie-access'/'api-key.dpapi']
+
+def dpapi_decrypt(blob:bytes)->bytes:
+    """CryptUnprotectData для текущего пользователя. Только Windows."""
+    import ctypes
+    from ctypes import wintypes
+    class Blob(ctypes.Structure):
+        _fields_=[('cbData',wintypes.DWORD),('pbData',ctypes.POINTER(ctypes.c_char))]
+    buffer=ctypes.create_string_buffer(blob,len(blob))
+    source=Blob(len(blob),ctypes.cast(buffer,ctypes.POINTER(ctypes.c_char)));result=Blob()
+    if not ctypes.windll.crypt32.CryptUnprotectData(ctypes.byref(source),None,None,None,None,0,ctypes.byref(result)):
+        raise OSError('CryptUnprotectData failed')
+    try: return ctypes.string_at(result.pbData,result.cbData)
+    finally: ctypes.windll.kernel32.LocalFree(result.pbData)
+
+def dpapi_key(paths):
+    for path in paths:
+        try: text=path.read_text(encoding='utf-8-sig').strip()
+        except FileNotFoundError: continue
+        except (OSError,UnicodeError): raise HTTPException(400,'Не удалось прочитать файл ключа')
+        if os.name!='nt': raise HTTPException(400,'Ключ DPAPI расшифровывается только в Windows')
+        try: return dpapi_decrypt(bytes.fromhex(text)).decode('utf-16-le').strip(),path
+        except (OSError,ValueError,UnicodeError): raise HTTPException(400,'Не удалось расшифровать ключ DPAPI: нужен тот же пользователь Windows')
+    return '',None
 CHECKS={}
 router=APIRouter()
 
@@ -32,7 +59,10 @@ def credential(provider, header=None, file_override=None):
             if key:
                 source='файл проекта' if path==paths[0] else 'файл проекта «Гремовод»'
                 break
-    if not key: raise HTTPException(400,'Ключ не настроен: '+spec['file'])
+    if not key and provider=='kie':
+        key,_=dpapi_key(KIE_DPAPI_FILES)
+        source='kie-access (DPAPI)'
+    if not key: raise HTTPException(400,'Ключ не настроен: '+spec['file']+(' или kie-access/api-key.dpapi' if provider=='kie' else ''))
     if not key.isascii() or any(not 32<ord(c)<127 for c in key): raise HTTPException(400,'Ключ должен быть одной строкой ASCII без пробелов')
     return key,source
 

@@ -14,7 +14,7 @@ from backend.image_assets import download_image, inspect_image, output_urls, dow
 from backend.prompt_rules import RULES_VERSION, system_rules, PROFILES, reference_label, validate_prompt
 from backend.llm_response import chat_text, upstream_error
 from backend.model_catalog import MODEL_SPECS, ALLOWED_CHAT, IMAGE_TASKS, VIDEO_MODELS
-from backend import adapters
+from backend import adapters, kie
 from backend import camera_movements
 from backend import frame_composition
 
@@ -182,7 +182,8 @@ async def job_status(job_id:str,x_api_key:str|None=Header(default=None)):
     with connect() as db: job=db.execute('SELECT * FROM jobs WHERE id=?',(job_id,)).fetchone()
     if not job: raise HTTPException(404,'Задание не найдено')
     if job['status'] in {'completed','failed','submission_unknown'} or not job['task_id']: return {'job_id':job_id,'upstream':json.loads(job['response'])}
-    result=await request_piapi('GET','/api/v1/task/'+job['task_id'],get_key(x_api_key))
+    if job['provider']=='kie': result=await kie.fetch(provider_key('kie'),job['task_id'])
+    else: result=await request_piapi('GET','/api/v1/task/'+job['task_id'],get_key(x_api_key))
     status=(result.get('data') or {}).get('status','unknown')
     with connect() as db: db.execute('UPDATE jobs SET status=?,response=? WHERE id=?',(status,json.dumps(result,ensure_ascii=False),job_id))
     return {'job_id':job_id,'upstream':result}
@@ -343,27 +344,44 @@ class ModelJobRequest(BaseModel):
     prompt:str=Field(min_length=1)
     options:dict[str,Any]=Field(default_factory=dict)
     reference_urls:list[str]=Field(default_factory=list)
+    video_urls:list[str]=Field(default_factory=list)
+    audio_urls:list[str]=Field(default_factory=list)
     approved:bool=False
     max_cost_usd:float=Field(default=0,ge=0,le=100,allow_inf_nan=False)
     request_id:str|None=None
     quote_token:str=''
     node_id:str|None=Field(default=None,max_length=100)
 
+def seedance_draft(body:ModelJobRequest):
+    """Расчётные данные черновика Seedance из заданий этого проекта (для финала 1080p по draft_task_id)."""
+    task_id=body.options.get('draft_task_id')
+    if not body.project_id or not isinstance(task_id,str): return None
+    with connect() as db: row=db.execute('SELECT status,request FROM jobs WHERE project_id=? AND task_id=?',(body.project_id,task_id)).fetchone()
+    if not row or str(row['status']).lower() in {'failed','cancelled','canceled','submitting','submission_unknown'}: return None
+    request=json.loads(row['request'])
+    payload=request.get('payload') or {}
+    if request.get('model_id')!=body.model_id or not (payload.get('input') or {}).get('draft'): return None
+    return payload.get('billing')
+
 def image_payload(body:ModelJobRequest,enforce_launch:bool=True):
     spec=MODEL_SPECS.get(body.model_id)
     if not spec: raise HTTPException(400,'Модель отсутствует в каталоге')
     if enforce_launch and not spec.get('launch_enabled'): raise HTTPException(400,'Запуск этой модели отключён до проверки схемы и стоимости.')
     if not body.prompt.strip(): raise HTTPException(400,'Промпт не может быть пустым')
+    if (body.video_urls or body.audio_urls) and spec.get('adapter')!='seedance_25': raise HTTPException(400,'Эта модель не принимает видео и аудио референсы')
     if len(body.reference_urls)>spec['max_refs']: raise HTTPException(400,'Превышено число референсов')
     from urllib.parse import urlsplit
-    for ref in body.reference_urls:
+    for ref in [*body.reference_urls,*body.video_urls,*body.audio_urls]:
         parsed=urlsplit(ref)
         if parsed.scheme!='https' or not parsed.hostname or parsed.username or parsed.password or parsed.hostname in {'localhost','127.0.0.1','::1'}:
             raise HTTPException(400,'Нужен публичный HTTPS URL референса; локальный файл нельзя передать провайдеру напрямую')
     is_video=spec['kind']=='video'
-    if is_video:
+    # Главный кадр обязателен только для генерации с картинкой; правка, продление и финал по черновику идут от видео провайдера.
+    without_anchor=spec.get('adapter')=='seedance_25' and (body.options.get('task') in ('edit','extend') or body.options.get('draft_task_id'))
+    if is_video and not without_anchor:
         from backend import production_entities
         production_entities.video_anchor(sys.modules[__name__],body.project_id,body.reference_urls)
+    if spec.get('adapter')=='seedance_25': return adapters.build(spec,body,draft=seedance_draft(body))
     if adapters.handles(spec): return adapters.build(spec,body)
     if spec.get('adapter')=='hunyuan_i2v':
         if body.options:raise HTTPException(400,'В этом тестовом адаптере Hunyuan используются длительность и разрешение провайдера по умолчанию')
@@ -407,6 +425,7 @@ def estimate_image(body:ModelJobRequest):
     if not body.project_id:raise HTTPException(400,'Сначала сохрани проект')
     project(body.project_id)
     return {'quote_token':security.quote(body.project_id,payload,cost),'expires_in_seconds':600,'model_id':body.model_id,'kind':MODEL_SPECS[body.model_id]['kind'],'estimated_usd':cost,'images':0 if MODEL_SPECS[body.model_id]['kind']=='video' else 1,'payload':payload,
+            'lines':adapters.describe(MODEL_SPECS[body.model_id],payload),
             'source':MODEL_SPECS[body.model_id]['docs'],'verified_at':MODEL_SPECS[body.model_id].get('verified_at','2026-10-15'),
             'note':'Оценка по документации провайдера; фактическое списание определяется PiAPI. Лимит относится к одному запуску.'}
 
@@ -419,7 +438,7 @@ def preview_model_job(body:ModelJobRequest):
     cost=generation_cost(body,payload)
     return {'model_id':body.model_id,'kind':spec['kind'],'launch_enabled':bool(spec.get('launch_enabled')),
             'verified_at':spec.get('verified_at'),'path':adapters.submit_path(spec),
-            'wire_body':adapters.wire_body(spec,payload),'estimated_usd':cost,'external_calls':0,
+            'wire_body':adapters.wire_body(spec,payload),'estimated_usd':cost,'lines':adapters.describe(spec,payload),'external_calls':0,
             'note':'Сухой прогон. Запуск выключен, пока параметры и цена не проверены реальным вызовом.' if not spec.get('launch_enabled') else 'Сухой прогон.'}
 
 @app.post('/api/model-jobs')
@@ -437,23 +456,24 @@ async def model_job(body:ModelJobRequest,x_api_key:str|None=Header(default=None)
     cost=generation_cost(body,payload)
     if not body.approved or body.max_cost_usd<cost: raise HTTPException(400,f'Подтверди платный запуск и лимит не меньше ${cost:.3f}')
     security.verify_quote(body.quote_token,body.project_id,payload,cost)
-    key=get_key(x_api_key)
+    spec=MODEL_SPECS[body.model_id]
+    key=provider_key('kie') if spec['provider']=='kie' else get_key(x_api_key)
     jid=body.request_id
     # Reserve before upstream I/O. Never retry a submission with an uncertain result.
     with connect() as db:
         db.execute('BEGIN IMMEDIATE')
         security.check_budget(db,body.project_id,cost)
         try:
-            db.execute('INSERT INTO jobs VALUES(?,?,?,?,?,?,?,?,?)',(jid,body.project_id,MODEL_SPECS[body.model_id]['kind'],'piapi',None,'submitting',request_data,'{}',now()))
+            db.execute('INSERT INTO jobs VALUES(?,?,?,?,?,?,?,?,?)',(jid,body.project_id,spec['kind'],spec['provider'],None,'submitting',request_data,'{}',now()))
             db.execute('INSERT INTO generation_approvals VALUES(?,?,?,?,?)',(jid,cost,body.max_cost_usd,now(),'documentation_estimate'))
         except sqlite3.IntegrityError: raise HTTPException(409,'Заявка уже отправляется; обнови очередь')
     try:
-        spec=MODEL_SPECS[body.model_id]
-        result=await request_piapi('POST',adapters.submit_path(spec),key,adapters.wire_body(spec,payload))
+        if spec['provider']=='kie': result=await kie.submit(key,adapters.wire_body(spec,payload))
+        else: result=await request_piapi('POST',adapters.submit_path(spec),key,adapters.wire_body(spec,payload))
         if isinstance(result,dict) and not result.get('data') and result.get('task_id'): result={'code':200,'data':result,'message':'success'}  # async GPT-эндпоинт отвечает без обёртки data
         task=result.get('data') or {}
         if not isinstance(task,dict) or not task.get('task_id'):
-            raise HTTPException(502,'Провайдер не вернул task_id. Не повторяй оплату; проверь историю PiAPI.')
+            raise HTTPException(502,'Провайдер не вернул task_id. Не повторяй оплату; проверь историю задач у провайдера.')
         status=str(task.get('status','submitted'))
         with connect() as db:
             db.execute('UPDATE jobs SET task_id=?,status=?,response=? WHERE id=?',(task['task_id'],status,json.dumps(result,ensure_ascii=False),jid))
@@ -786,16 +806,22 @@ from backend import frame_analysis
 frame_analysis.register(app,sys.modules[__name__])
 from backend import edit_list
 edit_list.register(app,sys.modules[__name__])
+from backend import motion
+motion.register(app,sys.modules[__name__])
 from backend import clip_chain
 clip_chain.register(app,sys.modules[__name__])
 from backend import llm_guard
 llm_guard.register(app,sys.modules[__name__])
+from backend import idea_background
+idea_background.register(app,sys.modules[__name__])
 from backend import workflow_import
 workflow_import.register(app,sys.modules[__name__])
 from backend import series_economics
 series_economics.register(app,sys.modules[__name__])
 from backend import character_voice
 character_voice.register(app,sys.modules[__name__])
+from backend import sound
+sound.register(app,sys.modules[__name__])
 camera_movements.register(app)
 frame_composition.register(app)
 from backend import reel_recipes

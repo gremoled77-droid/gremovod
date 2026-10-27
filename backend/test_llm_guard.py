@@ -51,7 +51,7 @@ class LlmGuardTests(unittest.TestCase):
             ok = self.chat_body(body, quote)
             for change in ({'quote_token': ''}, {'quote_token': quote['quote_token'] + 'x'}, {'approved': False}, {'max_tokens': 501},
                            {'messages': [{'role': 'user', 'content': 'другой текст'}]}, {'max_cost_usd': 0}, {'max_cost_usd': None},
-                           {'provider': 'openai'}, {'project_id': None}, {'model': 'gpt-6-astra'}):
+                           {'provider': 'openai'}, {'project_id': None}, {'model': 'gpt-9-unknown'}):
                 r = self.client.post('/api/llm/chat', json={**ok, **change})
                 self.assertEqual(r.status_code, 400, (change, r.text))
             self.assertEqual(self.client.post('/api/llm/chat', json={**ok, 'max_tokens': None}).status_code, 400)
@@ -61,7 +61,8 @@ class LlmGuardTests(unittest.TestCase):
         self.prepare()
         base = {'project_id': self.pid, 'model': 'gpt-5.6-luna', 'messages': self.messages}
         self.assertEqual(self.client.post('/api/llm/estimate', json={**base, 'max_tokens': 4000}).status_code, 422)
-        self.assertEqual(self.client.post('/api/llm/estimate', json={**base, 'model': 'gpt-6-astra'}).status_code, 400)
+        self.assertEqual(self.client.post('/api/llm/estimate', json={**base, 'model': 'gpt-9-unknown'}).status_code, 400)
+        self.assertEqual(self.client.post('/api/llm/estimate', json={**base, 'model': 'gpt-6-astra'}).status_code, 200)
         huge = [{'role': 'user', 'content': 'x' * (llm_guard.MAX_INPUT_CHARS + 1)}]
         self.assertEqual(self.client.post('/api/llm/estimate', json={**base, 'messages': huge}).status_code, 400)
         self.assertEqual(self.client.post('/api/llm/estimate', json={**base, 'project_id': 'absent'}).status_code, 404)

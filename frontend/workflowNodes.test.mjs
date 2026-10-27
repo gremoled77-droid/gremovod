@@ -14,7 +14,7 @@ test('узел «Видео»: промпт, первый кадр из рефе
     n('v', 300, {kind: 'video', model: 'minimax-h3', title: 'Ролик', options: {duration: 8}}),
   ];
   const edges = [e('t', 'v'), e('r', 'v'), e('a', 'v')];
-  assert.equal(canConnect(nodes[2], nodes[3]), true);
+  assert.equal(canConnect(nodes[2], nodes[3]), false);
   const {steps, problems} = buildSteps(nodes, edges, {});
   assert.deepEqual(problems, []);
   assert.equal(steps.length, 1);

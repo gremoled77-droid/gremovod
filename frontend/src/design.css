@@ -561,17 +561,6 @@ section.panel {
   }
 }
 
-/* Телефон, «Мир»: содержимое выше колонки персонажей */
-@media (max-width: 700px) {
-  .app main.styles-main {
-    display: flex;
-    flex-direction: column;
-  }
-  .styles-main > .sidebar {
-    order: 2;
-  }
-}
-
 /* Сворачиваемые разделы */
 .collapsible {
   padding: 0;
@@ -732,4 +721,94 @@ section.panel {
 }
 .panel-title:empty {
   display: none;
+}
+
+/* Верхняя панель: компактная полоса, как в макете «Создать» (пилюли справа) */
+.topbar {
+  min-height: 56px;
+  padding: 10px 28px;
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid #22252c;
+}
+.topbar-project {
+  align-items: center;
+  gap: 12px;
+}
+.topbar-project-picker {
+  height: 36px;
+  padding: 0 34px 0 14px;
+  border-radius: 99px;
+  border: 1px solid var(--border-strong);
+  background-color: var(--surface);
+  font-size: 14px;
+}
+.topbar-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 12px;
+  border-radius: 99px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1;
+  white-space: nowrap;
+}
+.topbar-status i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 8px currentColor;
+}
+.topbar .top-actions {
+  gap: 8px;
+  flex-wrap: nowrap;
+}
+.topbar .top-actions button {
+  height: 36px;
+  padding: 0 16px;
+  border-radius: 99px;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.topbar .top-actions .topbar-ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--muted);
+}
+.topbar .top-actions .topbar-ghost:hover {
+  color: var(--text);
+  background: var(--surface);
+}
+.topbar .project-global-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.topbar .topbar-new {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 600;
+}
+.topbar .topbar-new:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+.topbar .settings-button {
+  width: 36px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+}
+.topbar-status.online {
+  color: var(--ok);
+}
+.topbar-status.offline {
+  color: var(--bad);
 }

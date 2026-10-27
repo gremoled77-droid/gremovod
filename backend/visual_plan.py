@@ -18,6 +18,8 @@ class VisualPlan(BaseModel):
     line: Literal['', 'horizontal', 'vertical', 'diagonal', 'mixed'] = ''
     shape: Literal['', 'circle', 'square', 'triangle'] = ''
     tone: Literal['', 'reveal', 'conceal'] = ''
+    balance: Literal['', 'stable', 'tense'] = ''
+    counterweight: str = Field(default='', max_length=300)
     beat: int | None = Field(default=None, ge=1, le=99)
     sector_start: int | None = Field(default=None, ge=1, le=9)
     sector_end: int | None = Field(default=None, ge=1, le=9)
@@ -25,6 +27,23 @@ class VisualPlan(BaseModel):
     visual: int | None = Field(default=None, ge=0, le=10)
     note: str = Field(default='', max_length=500)
     beats: str = Field(default='', max_length=3000)
+
+
+class SeriesNorm(BaseModel):
+    """Series norm (Mercado): frame format, the 'normal' lens and standing angle/color rules."""
+    format: str = Field(default='', max_length=100)
+    normal_lens: str = Field(default='', max_length=200)
+    angle_rules: str = Field(default='', max_length=300)
+    color_rules: str = Field(default='', max_length=300)
+
+
+class HeroFrame(BaseModel):
+    """Hero frame (Mercado): one emotional state -> shot size, angle, lens, air around the gaze."""
+    state: str = Field(default='', max_length=100)
+    size: str = Field(default='', max_length=100)
+    angle: str = Field(default='', max_length=100)
+    lens: str = Field(default='', max_length=100)
+    looking_room: str = Field(default='', max_length=100)
 
 
 class VisualRules(BaseModel):
@@ -36,6 +55,8 @@ class VisualRules(BaseModel):
     camera: str = Field(default='', max_length=300)
     rhythm: str = Field(default='', max_length=300)
     note: str = Field(default='', max_length=500)
+    norm: SeriesNorm = Field(default_factory=SeriesNorm)
+    hero_frames: list[HeroFrame] = Field(default_factory=list, max_length=8)
 
 
 RULE_KINDS = ('series', 'episode', 'location', 'character')
@@ -49,7 +70,11 @@ PHRASES = {
     'shape': {'circle': 'soft rounded shapes and silhouettes', 'square': 'stable squared shapes and silhouettes',
               'triangle': 'sharp triangular shapes and silhouettes'},
     'tone': {'reveal': 'lighting clearly reveals the subject', 'conceal': 'shadow partly conceals the subject'},
+    'balance': {'stable': 'stable balanced composition: symmetric, level horizon, calm',
+                'tense': 'tense unbalanced composition: diagonal lines, off-center subject, tilted or unexpected element'},
 }
+ROWS = ('upper', 'middle', 'lower')
+COLUMNS = ('left', 'center', 'right')
 SCOPES = {'series': 'Series', 'episode': 'Scene', 'location': 'Location', 'character': 'Character', 'frame': 'Shot'}
 
 
@@ -79,7 +104,28 @@ def rule_clauses(data):
             parts.append(f'{label}: {data[key].strip()}')
     if data.get('note', '').strip():
         parts.append(data['note'].strip())
+    parts += norm_clauses(data.get('norm')) + hero_frame_clauses(data.get('hero_frames'))
     return parts
+
+
+def norm_clauses(norm):
+    norm = norm if isinstance(norm, dict) else {}
+    labels = (('format', 'series frame format'), ('normal_lens', 'normal lens of the series (use it by default)'),
+              ('angle_rules', 'angle rules'), ('color_rules', 'color rules'))
+    return [f'{label}: {norm[key].strip()}' for key, label in labels if str(norm.get(key, '')).strip()]
+
+
+def hero_frame_clauses(frames):
+    """One clause per filled state: 'when <state>: size ..., angle ..., lens ..., looking room ...'."""
+    out = []
+    for item in frames if isinstance(frames, list) else []:
+        if not isinstance(item, dict) or not str(item.get('state', '')).strip():
+            continue
+        bits = [f'{label} {item[key].strip()}' for key, label in (('size', 'shot size'), ('angle', 'angle'), ('lens', 'lens'),
+                ('looking_room', 'looking room')) if str(item.get(key, '')).strip()]
+        if bits:
+            out.append(f'when {item["state"].strip()}: ' + ', '.join(bits))
+    return out
 
 
 def stored(db, table, nid):
@@ -113,6 +159,10 @@ def rules_text(db, pid, nid):
     if scene:
         chain.append(('episode', scene['id']))
         cast = stored(db, 'production_entity_state', scene['id']) or {}
+        if frame:
+            own = stored(db, 'production_entity_state', frame['id']) or {}
+            if own.get('character_node_ids') or own.get('location_node_id'):
+                cast = own
         if cast.get('location_node_id'):
             chain.append(('location', cast['location_node_id']))
         chain += [('character', c) for c in cast.get('character_node_ids', [])]
@@ -129,12 +179,47 @@ def rules_text(db, pid, nid):
         plan = stored(db, 'visual_plans', ident)
         if plan:
             plan = clean(plan)
-            clauses = [PHRASES[k][plan[k]] for k in ('space', 'line', 'shape', 'tone') if plan.get(k) in PHRASES[k]]
+            clauses = [PHRASES[k][plan[k]] for k in ('space', 'line', 'shape', 'tone', 'balance') if plan.get(k) in PHRASES[k]]
+            if plan.get('counterweight', '').strip():
+                clauses.append('counterweight: ' + plan['counterweight'].strip())
             if plan.get('note', '').strip():
                 clauses.append(plan['note'].strip())
             if clauses:
                 lines.append(f'{SCOPES[kind]} plan: ' + '; '.join(clauses))
     return ('VISUAL RULES (keep consistent, never render as text):\n' + '\n'.join(lines)) if lines else ''
+
+
+def sector_place(sector):
+    if not isinstance(sector, int) or not 1 <= sector <= 9:
+        return ''
+    row, col = ROWS[(sector - 1) // 3], COLUMNS[(sector - 1) % 3]
+    return 'center' if (row, col) == ('middle', 'center') else f'{row} {col}'
+
+
+def composition_brief(db, pid, nid):
+    """VISUAL COMPOSITION BRIEF (Dondis): focal point, balance/tension, counterweight from the shot plan plus fixed reading rules."""
+    node = db.execute('SELECT * FROM production_nodes WHERE id=? AND production_id=?', (nid, pid)).fetchone()
+    plan = clean(stored(db, 'visual_plans', nid) if node else None)
+    if node and node['kind'] == 'frame':
+        scene = stored(db, 'visual_plans', node['parent_id'])
+        scene = clean(scene) if scene else {}
+        for key in ('balance', 'counterweight'):
+            plan[key] = plan[key] or scene.get(key, '')
+    place = sector_place(plan['sector_end'] or plan['sector_start'])
+    focal = f'one dominant subject, {place}' if place else 'one dominant subject, placed exactly at the center or clearly to one side, never almost-center'
+    balance = PHRASES['balance'].get(plan['balance'], 'balance chosen on purpose: either calm symmetry or deliberate tension, never accidental')
+    lines = ['VISUAL COMPOSITION BRIEF (follow silently, never render as text):',
+             f'Focal point: {focal}. Only one dominant element, no competing focal points.',
+             f'Balance: {balance}.']
+    if plan['counterweight'].strip():
+        lines.append(f'Visual weight: heavy element balanced by counterweight: {plan["counterweight"].strip()}.')
+    else:
+        lines.append('Visual weight: large, dark or high-right elements are heavy; balance them with a small distant counterweight on the opposite side.')
+    lines += ['Figure/ground: subject clearly separated from background by tone contrast, readable in black and white.',
+              'Grouping: related objects close and similar in shape and color; unrelated objects different.',
+              'Lines & direction: leading lines point toward the subject; movement follows left to right unless tension is intended.',
+              'Avoid: ambiguous near-center placement, tilted horizon unless tension is intended.']
+    return '\n'.join(lines)
 
 
 def register(app, studio):
@@ -181,7 +266,7 @@ def register(app, studio):
             node = db.execute('SELECT kind FROM production_nodes WHERE id=? AND production_id=?', (nid, pid)).fetchone()
             if not node:
                 raise HTTPException(404, 'Карточка не найдена в этом проекте')
-            return {'rules': clean_rules(stored(db, 'visual_rules', nid)), 'editable': node['kind'] in RULE_KINDS, 'prompt': rules_text(db, pid, nid)}
+            return {'rules': clean_rules(stored(db, 'visual_rules', nid)), 'kind': node['kind'], 'editable': node['kind'] in RULE_KINDS, 'prompt': rules_text(db, pid, nid)}
 
     @app.put('/api/productions/{pid}/nodes/{nid}/visual-rules')
     def write_rules(pid: str, nid: str, body: VisualRules):
@@ -194,4 +279,4 @@ def register(app, studio):
             data = body.model_dump()
             db.execute('INSERT INTO visual_rules(node_id,data,updated_at) VALUES(?,?,?) ON CONFLICT(node_id) DO UPDATE SET data=excluded.data,updated_at=excluded.updated_at',
                        (nid, json.dumps(data, ensure_ascii=False), studio.now()))
-            return {'rules': data, 'editable': True, 'prompt': rules_text(db, pid, nid)}
+            return {'rules': data, 'kind': node['kind'], 'editable': True, 'prompt': rules_text(db, pid, nid)}

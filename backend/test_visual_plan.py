@@ -64,6 +64,22 @@ class VisualRulesTests(unittest.TestCase):
             self.assertIn(part,text['prompt'])
         self.assertLess(text['prompt'].index('Series'),text['prompt'].index('Shot plan'))
 
+    def test_series_norm_and_hero_frames_reach_prompt(self):
+        series,scene,frame=self.tree()
+        hero=self.new('character','Бабушка')
+        url=lambda n:f'/api/productions/{self.pid}/nodes/{n["id"]}/visual-rules'
+        norm={'format':'16:9','normal_lens':'35mm','angle_rules':'eye level unless humiliated','color_rules':'ochre dominates'}
+        r=self.client.put(url(series),json={'norm':norm});self.assertEqual(r.status_code,200,r.text)
+        self.assertEqual(r.json()['kind'],'series');self.assertEqual(r.json()['rules']['norm']['normal_lens'],'35mm')
+        frames=[{'state':'doubts','size':'medium close-up','angle':'slightly high','lens':'50mm','looking_room':'none'},{'state':'','size':'wide'}]
+        self.assertEqual(self.client.put(url(hero),json={'hero_frames':frames}).status_code,200)
+        prompt=self.client.get(url(hero)).json()['prompt']
+        self.assertIn('when doubts: shot size medium close-up, angle slightly high, lens 50mm, looking room none',self.client.get(url(hero)).json()['prompt'])
+        self.assertNotIn('wide',prompt)
+        self.assertIn('normal lens of the series (use it by default): 35mm',self.client.get(url(series)).json()['prompt'])
+        self.assertEqual(self.client.put(url(hero),json={'hero_frames':[{}]*9}).status_code,422)
+        self.assertEqual(visual_plan.clean_rules({'norm':'junk'})['norm']['format'],'')
+
     def test_rules_validation_and_empty(self):
         series,scene,frame=self.tree()
         url=lambda n:f'/api/productions/{self.pid}/nodes/{n}/visual-rules'

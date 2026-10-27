@@ -3,7 +3,7 @@ import unittest
 
 from fastapi import HTTPException
 
-from backend import adapters, main
+from backend import adapters, kie, main
 from backend.image_assets import output_urls
 
 REF = 'https://example.test/a.png'
@@ -117,6 +117,67 @@ class AdapterTests(unittest.TestCase):
         self.assertEqual(output_urls(minimax, 'video'), ['https://example.test/v.mp4'])
 
 
+class UpscaleAdapterTests(unittest.TestCase):
+    """Апскейл: параметры и цена по документации PiAPI, запуск выключен до живой проверки."""
+
+    def test_upscale_is_preview_only_and_priced_per_megapixel(self):
+        spec = main.MODEL_SPECS['image-upscale']
+        self.assertFalse(spec['launch_enabled'])
+        self.assertIsNone(spec.get('verified_at'))
+        with self.assertRaises(HTTPException):
+            main.image_payload(job('image-upscale', prompt='Upscale', reference_urls=[REF]))  # запуск заблокирован
+        payload, cost = preview('image-upscale', prompt='Upscale', reference_urls=[REF],
+                                options={'scale': 2, 'in_width': 1024, 'in_height': 1024})
+        self.assertEqual(cost, 0.004)  # 1024² ×2 = 4 Мп (пример из документации)
+        self.assertEqual((payload['model'], payload['task_type']), ('Qubico/image-toolkit', 'upscale'))
+        _, big = preview('image-upscale', prompt='Upscale', reference_urls=[REF], options={'scale': 4})
+        self.assertEqual(big, 0.064)  # потолок: 2048² ×4 = 64 Мп (пример из документации)
+        _, tiny = preview('image-upscale', prompt='Upscale', reference_urls=[REF],
+                          options={'scale': 2, 'in_width': 480, 'in_height': 480})
+        self.assertEqual(tiny, 0.001)  # меньше 1 Мп, минимум $0.001
+        _, unknown = preview('image-upscale', prompt='Upscale', reference_urls=[REF])
+        self.assertEqual(unknown, 0.016)  # без размеров входа: максимум 2048² ×2
+
+    def test_upscale_wire_body_has_no_internal_fields_and_inputs_are_checked(self):
+        body = job('image-upscale', prompt='Upscale', reference_urls=[REF], options={'scale': 4, 'in_width': 800, 'in_height': 600})
+        payload = main.image_payload(body, enforce_launch=False)
+        spec = main.MODEL_SPECS['image-upscale']
+        self.assertEqual(adapters.wire_body(spec, payload), {'model': 'Qubico/image-toolkit', 'task_type': 'upscale',
+                                                           'input': {'image': REF, 'scale': 4}})
+        self.assertEqual(adapters.submit_path(spec), '/api/v1/task')
+        for bad in (dict(reference_urls=[]), dict(reference_urls=[REF, REF + '?2']),
+                    dict(reference_urls=['http://example.test/a.png']), dict(reference_urls=['https://localhost/a.png']),
+                    dict(reference_urls=[REF], options={'scale': 8}), dict(reference_urls=[REF], options={'scale': 3}),
+                    dict(reference_urls=[REF], options={'in_width': 4096}), dict(reference_urls=[REF], options={'face_enhance': True})):
+            with self.assertRaises(HTTPException, msg=str(bad)):
+                preview('image-upscale', prompt='Upscale', **bad)
+
+    def test_upscale_result_is_read_from_documented_or_example_shape(self):
+        schema = {'data': {'task_result': {'task_output': {'image_url': 'https://example.test/u.png'}}}}
+        example = {'data': {'output': {'image_url': 'https://example.test/e.png'}}}
+        self.assertEqual(output_urls(schema), ['https://example.test/u.png'])
+        self.assertEqual(output_urls(example), ['https://example.test/e.png'])
+        self.assertEqual(output_urls({'data': {'output': None, 'task_result': None}}), [])
+
+
+class SeedTests(unittest.TestCase):
+    """seed есть в документации PiAPI только у MiniMax H3: необязательный, без него тело запроса прежнее."""
+
+    def test_minimax_seed_is_optional_and_checked(self):
+        without, _ = preview('minimax-h3')
+        self.assertNotIn('seed', without['input'])
+        with_seed, cost = preview('minimax-h3', options={'seed': 42})
+        self.assertEqual(with_seed['input']['seed'], 42)
+        self.assertEqual(cost, 0.15)  # seed цену не меняет
+        for bad in (-1, 2 ** 31, 'abc', 1.5, True):
+            with self.assertRaises(HTTPException, msg=str(bad)):
+                preview('minimax-h3', options={'seed': bad})
+
+    def test_other_video_models_do_not_take_seed(self):
+        with self.assertRaises(HTTPException):
+            preview('seedance-2.5', options={'seed': 1})
+
+
 if __name__ == '__main__':
     unittest.main()
 
@@ -132,3 +193,37 @@ class ProviderShapeTests(unittest.TestCase):
         urls = output_urls(resp, 'image')
         self.assertTrue(urls[0].startswith('data:image/png;base64,'))
         self.assertEqual(asyncio.run(download_image(urls[0])), buf.getvalue())
+
+
+class KieTests(unittest.TestCase):
+    def test_kie_models_live_verified_tiers_and_priced_from_kie_pages(self):
+        for model in ('kie-seedream-5-pro', 'kie-qwen-image-2.1'):
+            spec = main.MODEL_SPECS[model]
+            self.assertEqual((spec['provider'], spec['launch_enabled'], spec['verified_at']), ('kie', True, '2026-10-18'))
+            self.assertEqual(spec['page_urls'], {'kie': spec['docs']})
+        payload, cost = preview('kie-seedream-5-pro', reference_urls=[REF] * 3)
+        self.assertEqual((payload['input']['quality'], cost), ('basic', 0.04))  # 7 кредитов + 2 × 0.5
+        payload, cost = preview('kie-qwen-image-2.1', reference_urls=[REF] * 3)
+        self.assertEqual(cost, 0.02)
+        for model, option in (('kie-seedream-5-pro', {'quality': 'high'}), ('kie-qwen-image-2.1', {'resolution': '2K'})):
+            with self.assertRaises(HTTPException):  # 2K не проверен вживую
+                preview(model, reference_urls=[REF], options=option)
+        self.assertFalse(payload['input']['enhance_prompt'])
+        self.assertEqual(adapters.wire_body(main.MODEL_SPECS['kie-qwen-image-2.1'], payload),
+                         {'model': 'qwen2-1/image-to-image', 'input': payload['input']})
+
+    def test_kie_rejects_text_only_unknown_options_and_long_prompt(self):
+        for extra in ({}, {'reference_urls': [REF], 'options': {'size': '2K'}},
+                      {'reference_urls': [REF], 'prompt': 'x' * 5001}):
+            with self.assertRaises(HTTPException):
+                preview('kie-seedream-5-pro', **extra)
+
+    def test_kie_status_normalized_to_piapi_shape(self):
+        done = kie.status({'code': 200, 'data': {'taskId': 't1', 'state': 'success',
+                                                 'resultJson': '{"resultUrls":["https://cdn.test/1.png","http://bad"]}'}})
+        self.assertEqual(output_urls(done), ['https://cdn.test/1.png'])
+        self.assertEqual(done['data']['status'], 'completed')
+        self.assertEqual(kie.status({'code': 200, 'data': {'state': 'generating'}})['data']['status'], 'processing')
+        failed = kie.status({'code': 200, 'data': {'state': 'fail', 'failMsg': 'nsfw'}})['data']
+        self.assertEqual((failed['status'], failed['error']['message']), ('failed', 'nsfw'))
+        self.assertEqual(kie.submitted({'code': 200, 'data': {}})['data'], {})

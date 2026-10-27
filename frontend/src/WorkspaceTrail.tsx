@@ -50,7 +50,8 @@ export default function WorkspaceTrail({
   const title: Record<Mode, string> = {
     home: 'Старт',
     studio: 'Идея',
-    styles: 'Мир и персонажи',
+    styles: 'Мир',
+    characters: 'Персонажи',
     storyboard: 'Раскадровка',
     create: 'Кадры',
     video: 'Видео',

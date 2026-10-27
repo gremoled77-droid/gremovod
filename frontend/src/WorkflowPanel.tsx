@@ -1,4 +1,4 @@
-import {createContext, useContext, useMemo, useRef, useState, type CSSProperties} from 'react';
+import {createContext, useContext, useEffect, useMemo, useRef, useState, type CSSProperties} from 'react';
 import {
   ReactFlow,
   Background,
@@ -20,8 +20,12 @@ import {
   DEFAULT_LLM_SYSTEM,
   buildLlmSteps,
   buildSteps,
-  canConnect,
+  PORT_COLOR,
+  checkConnection,
+  inPorts,
   llmInput,
+  outPort,
+  type ModelSpecLite,
   type LlmStep,
   type NodeKind,
   type Step,
@@ -29,6 +33,7 @@ import {
 } from './workflowPlan';
 import {useNodePrices} from './workflowPrices';
 import {LLM_MAX_TOKENS, LLM_MODELS, llmEstimate} from './llmPricing';
+import {missingAssetIds} from './workflowLibrary';
 
 type Graph = {nodes: Node[]; edges: Edge[]};
 type Lib = {
@@ -47,14 +52,14 @@ const ACCEPT: Record<string, string> = {
 
 const KINDS: {kind: NodeKind; label: string; enabled: boolean; hint: string; color: string}[] = [
   {kind: 'video', label: 'Видео', enabled: true, hint: 'MiniMax H3, Seedance 2.5', color: '#b18cff'},
-  {kind: 'image', label: 'Image', enabled: true, hint: '6 моделей PiAPI', color: '#6ea8fe'},
+  {kind: 'image', label: 'Изображение', enabled: true, hint: '6 моделей PiAPI', color: '#6ea8fe'},
   {kind: 'audio', label: 'Аудио', enabled: true, hint: 'Аудио-референс', color: '#f2b134'},
   {kind: 'text', label: 'Текст', enabled: true, hint: 'Промпт, реплика', color: '#5ec4b6'},
   {kind: 'llm', label: 'LLM', enabled: true, hint: 'ИИ пишет или улучшает текст', color: '#5ec4b6'},
   {kind: 'reference', label: 'Референс', enabled: true, hint: 'Картинка из библиотеки', color: '#6ea8fe'},
   {kind: 'file', label: 'Файл', enabled: true, hint: 'Документ: txt, md, srt, json, pdf', color: '#9aa4b2'},
 ];
-const MENU_KINDS: NodeKind[] = ['video', 'image', 'audio', 'text', 'llm'];
+const MENU_KINDS: NodeKind[] = ['text', 'image', 'video', 'audio'];
 const KIND_COLOR = Object.fromEntries(KINDS.map(k => [k.kind, k.color])) as Record<string, string>;
 const STATUS_LABEL: Record<string, string> = {
   done: 'готово',
@@ -65,7 +70,7 @@ const STATUS_LABEL: Record<string, string> = {
   error: 'ошибка',
 };
 const IMAGE_MODELS: Record<string, string> = {
-  'seedream-5-lite': 'Seedream 5 Fast',
+  'seedream-5-lite': 'Seedream 5 Lite',
   'seedream-5-pro': 'Seedream 5 Pro',
   'gpt-image-2': 'GPT Image 2.0',
   'gpt-image-2.5': 'GPT Image 2.5',
@@ -78,15 +83,15 @@ const COLUMN_X: Record<NodeKind, number> = {
   text: 40,
   reference: 40,
   file: 40,
-  llm: 330,
-  image: 620,
-  video: 900,
+  llm: 340,
+  image: 660,
+  video: 980,
   audio: 40,
 };
 function slot(kind: NodeKind, nodes: Node[]) {
   const x = COLUMN_X[kind];
   const below = nodes.filter(n => Math.abs(n.position.x - x) < 160).map(n => n.position.y);
-  return {x, y: below.length ? Math.max(...below) + 300 : 40};
+  return {x, y: below.length ? Math.max(...below) + 350 : 40};
 }
 async function json(r: Response) {
   const d = await r.json().catch(() => ({}));
@@ -103,6 +108,29 @@ type Ctx = {
   prices: Record<string, number | null>;
   run: (ids: string[]) => void;
   upload: (accept: string, done: (asset: Lib) => void) => void;
+  specs: Record<string, ModelSpecLite>;
+  duplicate: (id: string) => void;
+  heroes: () => Promise<{id: string; name: string}[]>;
+  toReference: (assetId: string, characterId: string) => void;
+};
+/** Подпись вида узла в шапке. */
+const TYPE_LABEL: Record<string, string> = {
+  text: 'Текст',
+  llm: 'LLM',
+  reference: 'Референс',
+  file: 'Файл',
+  image: 'Изображение',
+  video: 'Видео',
+  audio: 'Аудио',
+};
+const OPTION_LABEL: Record<string, string> = {
+  size: 'размер',
+  aspect_ratio: 'формат',
+  output_format: 'файл',
+  quality: 'качество',
+  variant: 'вариант',
+  resolution: 'разрешение',
+  duration: 'сек',
 };
 // Контекст, а не глобальная переменная: узлы перерисовываются, когда меняется библиотека или результаты.
 /** Цена с нужной точностью: копейки LLM видны, крупные суммы без лишних знаков. */
@@ -118,29 +146,104 @@ function Block({id, data, selected}: {id: string; data: Record<string, any>; sel
   const lib = ctx.library.find(a => a.id === data.asset_id);
   const out = ctx.results[id] ? ctx.library.find(a => a.id === ctx.results[id]) : undefined;
   const state = ctx.status[id] || (out || (kind === 'llm' && data.output) ? 'done' : '');
-  const accepts = kind === 'image' || kind === 'video' || kind === 'llm';
-  const emits = ['text', 'reference', 'image', 'llm', 'audio', 'file'].includes(kind);
+  const spec = ctx.specs[String(data.model)];
+  const hasModel = kind === 'image' || kind === 'video' || kind === 'llm';
+  const [open, setOpen] = useState(hasModel && !data.model);
+  const [menu, setMenu] = useState(false);
+  const [refMenu, setRefMenu] = useState<{id: string; name: string}[] | null>(null);
   const images = ctx.library.filter(a => libKind(a) === 'image');
   const audios = ctx.library.filter(a => libKind(a) === 'audio');
+  const modelName =
+    kind === 'image'
+      ? IMAGE_MODELS[data.model]
+      : kind === 'video'
+        ? VIDEO_MODELS[data.model]?.label
+        : kind === 'llm'
+          ? LLM_MODELS[data.model]?.label
+          : '';
+  const outType = outPort(kind);
+  const ins = inPorts(kind);
+  const imageOptions = kind === 'image' && spec?.options ? Object.entries(spec.options) : [];
+  const chips: string[] = [];
+  if (kind === 'video' && VIDEO_MODELS[data.model]) {
+    const m = VIDEO_MODELS[data.model];
+    chips.push(
+      String(data.options?.resolution || m.resolutions[0]),
+      String(data.options?.aspect_ratio || m.aspects[0]),
+      (data.options?.duration || m.durationMin) + ' с'
+    );
+  }
+  for (const [k, o] of imageOptions) {
+    const v = data.options?.[k] ?? o.default;
+    if (v !== undefined && ['size', 'aspect_ratio', 'quality', 'output_format'].includes(k))
+      chips.push(String(v));
+  }
   return (
     <div
       className={'wf-node wf-' + kind + (selected ? ' sel' : '') + (state ? ' st-' + state : '')}
       style={{'--kc': color} as CSSProperties}
     >
-      {accepts && <Handle type="target" position={Position.Left} className="wf-handle" />}
+      {ins.map((t, i) => (
+        <Handle
+          key={t}
+          id={'in-' + t}
+          type="target"
+          position={Position.Left}
+          className="wf-handle target"
+          title={'Вход: ' + t}
+          style={{'--pc': PORT_COLOR[t], top: 58 + i * 26} as CSSProperties}
+        />
+      ))}
       <header className="wf-node-head">
         <i className="wf-dot" />
-        <b>{data.title}</b>
-        {kind === 'image' && data.model && <span className="wf-model">{IMAGE_MODELS[data.model]}</span>}
-        {kind === 'video' && data.model && (
-          <span className="wf-model">{VIDEO_MODELS[data.model]?.label || data.model}</span>
+        <b>{TYPE_LABEL[kind] || data.title}</b>
+        <span className="wf-title" title={String(data.title || '')}>
+          {modelName || (kind === 'reference' || kind === 'file' || kind === 'audio' ? data.title : '')}
+        </span>
+        {hasModel && (
+          <button
+            className={'nodrag wf-icon' + (open ? ' on' : '')}
+            title="Настройки модели"
+            aria-label="Настройки модели"
+            onClick={() => setOpen(v => !v)}
+          >
+            ⚙
+          </button>
         )}
-        {kind === 'llm' && data.model && (
-          <span className="wf-model">{LLM_MODELS[data.model]?.label || data.model}</span>
-        )}
-        <button className="wf-node-x nodrag" title="Убрать узел из схемы" onClick={() => ctx.remove(id)}>
-          ×
-        </button>
+        <span className="wf-menu-wrap">
+          <button
+            className="nodrag wf-icon"
+            title="Действия с узлом"
+            aria-label="Действия с узлом"
+            aria-haspopup="menu"
+            onClick={() => setMenu(v => !v)}
+          >
+            ⋯
+          </button>
+          {menu && (
+            <div className="wf-menu nodrag" role="menu" onMouseLeave={() => setMenu(false)}>
+              <button
+                role="menuitem"
+                onClick={() => {
+                  setMenu(false);
+                  ctx.duplicate(id);
+                }}
+              >
+                Дублировать
+              </button>
+              <button
+                role="menuitem"
+                className="danger"
+                onClick={() => {
+                  setMenu(false);
+                  ctx.remove(id);
+                }}
+              >
+                Убрать из схемы
+              </button>
+            </div>
+          )}
+        </span>
       </header>
       <div className="wf-node-body">
         {kind === 'text' && (
@@ -157,18 +260,20 @@ function Block({id, data, selected}: {id: string; data: Record<string, any>; sel
         )}
         {kind === 'llm' && (
           <>
-            <select
-              className="nodrag"
-              value={data.model || ''}
-              onChange={e => ctx.patch(id, {model: e.target.value})}
-            >
-              <option value="">Модель…</option>
-              {Object.entries(LLM_MODELS).map(([k, v]) => (
-                <option key={k} value={k}>
-                  {v.label}
-                </option>
-              ))}
-            </select>
+            {open && (
+              <select
+                className="nodrag"
+                value={data.model || ''}
+                onChange={e => ctx.patch(id, {model: e.target.value})}
+              >
+                <option value="">Модель…</option>
+                {Object.entries(LLM_MODELS).map(([k, v]) => (
+                  <option key={k} value={k}>
+                    {v.label}
+                  </option>
+                ))}
+              </select>
+            )}
             <textarea
               className="nodrag"
               rows={3}
@@ -283,18 +388,39 @@ function Block({id, data, selected}: {id: string; data: Record<string, any>; sel
         )}
         {kind === 'image' && (
           <>
-            <select
-              className="nodrag"
-              value={data.model || ''}
-              onChange={e => ctx.patch(id, {model: e.target.value})}
-            >
-              <option value="">Модель…</option>
-              {Object.entries(IMAGE_MODELS).map(([k, v]) => (
-                <option key={k} value={k}>
-                  {v}
-                </option>
-              ))}
-            </select>
+            {open && (
+              <div className="wf-settings nodrag">
+                <select
+                  value={data.model || ''}
+                  onChange={e => ctx.patch(id, {model: e.target.value, options: {}})}
+                >
+                  <option value="">Модель…</option>
+                  {Object.entries(IMAGE_MODELS)
+                    .filter(
+                      ([k]) =>
+                        !Object.keys(ctx.specs).length || ctx.specs[k]?.launch_enabled || k === data.model
+                    )
+                    .map(([k, v]) => (
+                      <option key={k} value={k}>
+                        {v}
+                      </option>
+                    ))}
+                </select>
+                {imageOptions.map(([k, o]) => (
+                  <label key={k}>
+                    <span>{OPTION_LABEL[k] || k}</span>
+                    <select
+                      value={String(data.options?.[k] ?? o.default ?? '')}
+                      onChange={e => ctx.patch(id, {options: {...data.options, [k]: e.target.value}})}
+                    >
+                      {(o.values || []).map(v => (
+                        <option key={String(v)}>{String(v)}</option>
+                      ))}
+                    </select>
+                  </label>
+                ))}
+              </div>
+            )}
             {out ? (
               <img className="wf-thumb" src={out.thumbnail_url || out.url} alt="" />
             ) : (
@@ -304,19 +430,21 @@ function Block({id, data, selected}: {id: string; data: Record<string, any>; sel
         )}
         {kind === 'video' && (
           <>
-            <select
-              className="nodrag"
-              value={data.model || ''}
-              onChange={e => ctx.patch(id, {model: e.target.value, options: {}})}
-            >
-              <option value="">Модель…</option>
-              {Object.entries(VIDEO_MODELS).map(([k, v]) => (
-                <option key={k} value={k}>
-                  {v.label}
-                </option>
-              ))}
-            </select>
-            {VIDEO_MODELS[data.model] && (
+            {open && (
+              <select
+                className="nodrag"
+                value={data.model || ''}
+                onChange={e => ctx.patch(id, {model: e.target.value, options: {}})}
+              >
+                <option value="">Модель…</option>
+                {Object.entries(VIDEO_MODELS).map(([k, v]) => (
+                  <option key={k} value={k}>
+                    {v.label}
+                  </option>
+                ))}
+              </select>
+            )}
+            {open && VIDEO_MODELS[data.model] && (
               <div className="wf-opts nodrag">
                 <select
                   title="Разрешение"
@@ -356,28 +484,73 @@ function Block({id, data, selected}: {id: string; data: Record<string, any>; sel
           </>
         )}
       </div>
+      {out && (kind === 'image' || kind === 'video') && (
+        <div className="wf-result-actions nodrag">
+          <button onClick={() => ctx.run([id])}>
+            ↻ Перегенерировать{ctx.prices[id] != null ? ' · $' + formatPrice(ctx.prices[id] as number) : ''}
+          </button>
+          {kind === 'image' && (
+            <span className="wf-menu-wrap">
+              <button
+                className="primary"
+                onClick={async () => setRefMenu(refMenu ? null : await ctx.heroes().catch(() => []))}
+              >
+                В референсы ▾
+              </button>
+              {refMenu && (
+                <div className="wf-menu up" role="menu" onMouseLeave={() => setRefMenu(null)}>
+                  <small>Отправить в референсы героя</small>
+                  {refMenu.map(h => (
+                    <button
+                      key={h.id}
+                      role="menuitem"
+                      onClick={() => {
+                        setRefMenu(null);
+                        ctx.toReference(out.id, h.id);
+                      }}
+                    >
+                      {h.name}
+                    </button>
+                  ))}
+                  {!refMenu.length && <small>В проекте нет героев</small>}
+                </div>
+              )}
+            </span>
+          )}
+        </div>
+      )}
       {(kind === 'image' || kind === 'llm' || kind === 'video') && (
         <footer className="wf-node-foot">
           <span className={'wf-chip ' + (state ? 'st-' + state : '')}>
             {STATUS_LABEL[state] || state || 'не запускался'}
           </span>
+          {chips.map(c => (
+            <span key={c} className="wf-param">
+              {c}
+            </span>
+          ))}
           {ctx.prices[id] != null && (
             <span className="wf-price" title="Оценка цены запуска узла">
               {kind === 'llm' ? 'до ' : ''}${formatPrice(ctx.prices[id] as number)}
             </span>
           )}
-          <button className="nodrag wf-run" onClick={() => ctx.run([id])}>
-            {kind === 'llm'
-              ? data.output
-                ? '↻ Ещё раз'
-                : '▶ Сгенерировать'
-              : out
-                ? '↻ Ещё раз'
-                : '▶ Запустить'}
-          </button>
+          {(kind === 'llm' || !out) && (
+            <button className="nodrag wf-run" onClick={() => ctx.run([id])}>
+              {kind === 'llm' ? (data.output ? '↻ Ещё раз' : '▶ Сгенерировать') : '▶ Запустить'}
+            </button>
+          )}
         </footer>
       )}
-      {emits && <Handle type="source" position={Position.Right} className="wf-handle" />}
+      {outType && (
+        <Handle
+          id={'out-' + outType}
+          type="source"
+          position={Position.Right}
+          className="wf-handle"
+          title={'Выход: ' + outType}
+          style={{'--pc': PORT_COLOR[outType]} as CSSProperties}
+        />
+      )}
     </div>
   );
 }
@@ -410,6 +583,13 @@ export default function WorkflowPanel({
   const [approved, setApproved] = useState(false);
   const [highOk, setHighOk] = useState(false);
   const [llmState, setLlmState] = useState<Record<string, string>>({});
+  const [specs, setSpecs] = useState<Record<string, ModelSpecLite>>({});
+  useEffect(() => {
+    void apiFetch('/api/model-specs')
+      .then(json)
+      .then(setSpecs)
+      .catch(() => undefined);
+  }, []);
   const graph = useRef({nodes, edges});
   graph.current = {nodes, edges};
   const [running, setRunning] = useState(false);
@@ -437,6 +617,22 @@ export default function WorkflowPanel({
     }
     return {results, status};
   }, [items]);
+
+  // Сервер сам сохраняет готовый результат в библиотеку (монитор раз в 30 с), но загруженный список библиотеки
+  // устаревает: пока вкладка открыта, подтягиваем новые ассеты, чтобы клип появился в узле без перезагрузки.
+  const missing = missingAssetIds(results, library).join(',');
+  useEffect(() => {
+    if (!missing || !projectId) return;
+    let tries = 0;
+    const tick = () => {
+      tries++;
+      void refreshLibrary().catch(() => undefined);
+    };
+    tick();
+    const timer = window.setInterval(() => (tries >= 6 ? window.clearInterval(timer) : tick()), 4000);
+    return () => window.clearInterval(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [missing, projectId]);
 
   const live = useRef({results, status});
   live.current = {results, status};
@@ -489,7 +685,7 @@ export default function WorkflowPanel({
     );
     if (problems.length) return setError(problems.join(' · '));
     if (!steps.length && !llmSteps.length)
-      return setError('Нет узлов «Image», «Видео» или «LLM» для запуска');
+      return setError('Нет узлов «Изображение», «Видео» или «LLM» для запуска');
     try {
       const estimates: Record<string, number> = {};
       for (const s of llmSteps) {
@@ -591,7 +787,8 @@ export default function WorkflowPanel({
       }
       const fresh = buildSteps(graph.current.nodes, graph.current.edges, live.current.results, {llm: outs});
       const pending = review.steps.map(s => fresh.steps.find(f => f.nodeId === s.nodeId) ?? s);
-      if (pending.some(s => !s.prompt)) throw Error('У узла «Image» или «Видео» пустой промпт после LLM');
+      if (pending.some(s => !s.prompt))
+        throw Error('У узла «Изображение» или «Видео» пустой промпт после LLM');
       const finished = new Set<string>();
       let guard = 0;
       while (pending.length && guard++ < 50) {
@@ -640,6 +837,48 @@ export default function WorkflowPanel({
       setError((e instanceof Error ? e.message : String(e)) + ' Проверь очередь перед повторным запуском.');
     } finally {
       setRunning(false);
+    }
+  };
+
+  const duplicate = (id: string) =>
+    onChange(g => {
+      const src = g.nodes.find(n => n.id === id);
+      if (!src) return g;
+      const {output: _o, ...keep} = src.data as Record<string, unknown>;
+      return {
+        ...g,
+        nodes: [
+          ...g.nodes,
+          {
+            ...src,
+            id: crypto.randomUUID(),
+            selected: false,
+            position: {x: src.position.x + 40, y: src.position.y + 40},
+            data: keep,
+          },
+        ],
+      };
+    });
+
+  /** Герои проекта для «В референсы»: берём из сохранённого состояния проекта, чтобы не менять App. */
+  const heroes = async () => {
+    const project = await json(await apiFetch('/api/projects/' + encodeURIComponent(projectId)));
+    const list = (project.state?.characters || []) as {id: string; name: string}[];
+    return list.map(c => ({id: c.id, name: c.name}));
+  };
+  const toReference = async (assetId: string, characterId: string) => {
+    setError('');
+    try {
+      await json(
+        await apiFetch(`/api/library/${assetId}/to-character`, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({project_id: projectId, character_id: characterId}),
+        })
+      );
+      setNotice('Добавлено в референсы героя');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
     }
   };
 
@@ -724,14 +963,23 @@ export default function WorkflowPanel({
     prices,
     run: ids => void prepare(ids),
     upload,
+    specs,
+    duplicate,
+    heroes,
+    toReference,
   };
 
-  // Цвет связи — по типу узла-источника (только для показа, в схему не пишется)
+  // Цвет и порты связи — по типу данных источника (только для показа, в схему не пишется)
   const shownEdges = useMemo(
     () =>
       edges.map(e => {
-        const kind = String(nodes.find(n => n.id === e.source)?.data?.kind || '');
-        return {...e, style: {...e.style, stroke: KIND_COLOR[kind] || '#8b8f99', strokeWidth: 2}};
+        const port = outPort(String(nodes.find(n => n.id === e.source)?.data?.kind || '') as NodeKind);
+        return {
+          ...e,
+          sourceHandle: port ? 'out-' + port : e.sourceHandle,
+          targetHandle: port ? 'in-' + port : e.targetHandle,
+          style: {...e.style, stroke: port ? PORT_COLOR[port] : '#8b8f99', strokeWidth: 2},
+        };
       }),
     [nodes, edges]
   );
@@ -761,7 +1009,7 @@ export default function WorkflowPanel({
         <aside className="wf-console">
           <div className="wf-console-head">
             <h2>Воркфлоу</h2>
-            <p>Собери цепочку: текст, LLM и референсы подаются в узлы «Image» и «Видео».</p>
+            <p>Собери цепочку: текст и картинки подаются в узлы «Изображение» и «Видео».</p>
           </div>
           <input
             className="wf-search"
@@ -793,8 +1041,8 @@ export default function WorkflowPanel({
                 <em>＋</em>
               </button>
             ))}
-          <div className="wf-console-title">Референсы</div>
-          {KINDS.filter(k => k.kind === 'reference' || k.kind === 'file')
+          <div className="wf-console-title">Ещё</div>
+          {KINDS.filter(k => k.kind === 'llm' || k.kind === 'reference' || k.kind === 'file')
             .filter(
               k =>
                 !search.trim() || (k.label + ' ' + k.hint).toLowerCase().includes(search.trim().toLowerCase())
@@ -818,8 +1066,10 @@ export default function WorkflowPanel({
           <div className="wf-console-title">Как это работает</div>
           <ol className="wf-help">
             <li>Добавь «Текст» (при желании «LLM») и референсы.</li>
-            <li>Добавь «Image» или «Видео», выбери модель.</li>
-            <li>Протяни связь от кружка справа к кружку слева.</li>
+            <li>Добавь «Изображение» или «Видео», выбери модель (⚙ в шапке).</li>
+            <li>
+              Протяни связь от кружка справа к кружку слева того же цвета: текст, изображение, аудио, видео.
+            </li>
             <li>«Запустить» — сначала оценка цены и подтверждение.</li>
             <li>Кнопка «＋» сверху справа загружает картинки, аудио и файлы сразу узлами.</li>
           </ol>
@@ -914,12 +1164,38 @@ export default function WorkflowPanel({
               onNodesChange={changes => onChange(g => ({...g, nodes: applyNodeChanges(changes, g.nodes)}))}
               onEdgesChange={changes => onChange(g => ({...g, edges: applyEdgeChanges(changes, g.edges)}))}
               isValidConnection={c =>
-                canConnect(
+                checkConnection(
                   nodes.find(n => n.id === c.source),
-                  nodes.find(n => n.id === c.target)
-                )
+                  nodes.find(n => n.id === c.target),
+                  nodes,
+                  edges,
+                  specs,
+                  c.targetHandle
+                ).ok
               }
-              onConnect={c => onChange(g => ({...g, edges: addEdge({...c, animated: true}, g.edges)}))}
+              onConnect={c => {
+                const port = outPort(String(nodes.find(n => n.id === c.source)?.data?.kind) as NodeKind);
+                onChange(g => ({
+                  ...g,
+                  edges: addEdge(
+                    {...c, sourceHandle: 'out-' + port, targetHandle: 'in-' + port, animated: true},
+                    g.edges
+                  ),
+                }));
+              }}
+              onConnectEnd={(_, state) => {
+                if (state.isValid === false && state.fromNode && state.toNode) {
+                  const why = checkConnection(
+                    state.fromNode as Node,
+                    state.toNode as Node,
+                    nodes,
+                    edges,
+                    specs,
+                    state.toHandle?.id
+                  ).reason;
+                  if (why) setError('Связь не создана: ' + why);
+                }
+              }}
               nodeTypes={types}
               fitView
               proOptions={{hideAttribution: true}}
@@ -947,7 +1223,7 @@ export default function WorkflowPanel({
         {review && (
           <div className="modal-backdrop">
             <section className="panel generation-review" role="dialog" aria-modal="true">
-              <h2>Запустить всё: подтверждение</h2>
+              <h2>Запустить всё: платные узлы</h2>
               <ol>
                 {review.llmSteps.map(s => (
                   <li key={s.nodeId}>

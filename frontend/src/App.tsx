@@ -30,6 +30,12 @@ import NativeGallery from './NativeGallery';
 import {type CharacterVersion} from './ReplaceCharacterButton';
 import RefinePanel, {EMPTY_REFINE, type RefineDraft} from './RefinePanel';
 import ChatGPTPanel from './ChatGPTPanel';
+import WorldFromBrief from './WorldFromBrief';
+import {passportText} from './worldBible';
+import AttachmentMenu, {AttachmentStrip} from './AttachmentMenu';
+import CharactersScreen from './CharactersScreen';
+import SoundScreen from './SoundScreen';
+import FrameBuilder from './FrameBuilder';
 import ScenePanel, {EMPTY_SCENE, type Scene} from './ScenePanel';
 import EconomicsPanel from './EconomicsPanel';
 import PromptComposer, {type PromptRequest} from './PromptComposer';
@@ -37,17 +43,20 @@ import ConnectionsPanel from './ConnectionsPanel';
 import GenerationReview, {type GenerationRequest} from './GenerationReview';
 import AssetLibrary from './AssetLibrary';
 import CreateScreen from './CreateScreen';
+import VideoScreen from './VideoScreen';
 import HomeScreen from './HomeScreen';
 import ReelsScreen, {type ReelUse} from './ReelsScreen';
 import GenerationWatcher from './GenerationWatcher';
 import {ActivityProvider} from './ActivityContext';
-import StageNav, {type Mode} from './StageNav';
+import StageNav, {STAGES, type Mode} from './StageNav';
 import WorkspaceTrail, {type WorkspaceLocation} from './WorkspaceTrail';
 import {readWorkspaceRoute, workspaceHash} from './workspaceRoute';
 import {readLocal, writeLocal, clearLocal} from './localDrafts';
 import Dock, {countActive} from './Dock';
 import useActivity from './useActivity';
 import AgentPanel from './AgentPanel';
+import IdeaBrief from './IdeaBrief';
+import IdeaRefs from './IdeaRefs';
 import {lazy, Suspense, useCallback, useEffect, useRef, useState} from 'react';
 import type {Node, Edge} from '@xyflow/react';
 import {
@@ -103,6 +112,10 @@ type StyleBible = {
   lighting: string;
   camera: string;
   environment: string;
+  time: string;
+  tech: string;
+  textures: string;
+  mood: string;
   rules: string;
   avoid: string;
 };
@@ -115,6 +128,10 @@ type Studio = {
   scene?: Scene;
   style: StyleBible;
   brief: string;
+  ideaResult?: string;
+  ideaModel?: string;
+  ideaRefs?: string[];
+  worldDraft?: Partial<StyleBible>;
   prompts: Record<string, string>;
   parameters: Record<string, Record<string, string | number>>;
   characters: Character[];
@@ -133,6 +150,10 @@ const INITIAL: Studio = {
     lighting: 'Ночной Минск; теплые фонари, прохладный ambient',
     camera: 'Согласованные пропорции и ракурсы',
     environment: 'Минск, дворики, панельки, гаражи, улицы',
+    time: '',
+    tech: '',
+    textures: '',
+    mood: '',
     rules: 'Грэм и автомобиль соответствуют утвержденным референсам',
     avoid: 'Случайные изменения внешности, формы машины, цвета и стилистики',
   },
@@ -1311,8 +1332,9 @@ function App() {
                 </option>
               ))}
             </select>
-            <span className={'status ' + apiHealth} role="status">
-              ● {apiStatus}
+            <span className={'status topbar-status ' + apiHealth} role="status" title={apiStatus}>
+              <i aria-hidden="true" />
+              {apiStatus}
             </span>
           </div>
           <div className="top-actions">
@@ -1331,6 +1353,7 @@ function App() {
               Очередь{activeCount ? ` · ${activeCount}` : ''}
             </button>
             <button
+              className="topbar-ghost"
               onClick={() => {
                 void checkHealth();
                 void refresh();
@@ -1340,6 +1363,7 @@ function App() {
             </button>
             <div className="project-global-actions">
               <button
+                className="topbar-new"
                 disabled={startup !== 'ready' || !!busy}
                 onClick={() => void requestProjectChange({type: 'new'})}
               >
@@ -1371,21 +1395,25 @@ function App() {
         ) : (
           <main
             className={
-              mode === 'video' || mode === 'audio'
+              mode === 'audio'
                 ? 'media-main'
-                : mode === 'storyboard'
-                  ? 'storyboard-main'
-                  : mode === 'create'
-                    ? 'create-main'
-                    : mode === 'home'
-                      ? 'home-main'
-                      : mode === 'graph'
-                        ? 'workflow-main'
-                        : mode === 'reels'
-                          ? 'reels-main'
-                          : mode === 'styles'
-                            ? 'styles-main'
-                            : 'solo-main'
+                : mode === 'video'
+                  ? 'create-main video-main'
+                  : mode === 'storyboard'
+                    ? 'storyboard-main'
+                    : mode === 'create'
+                      ? 'create-main'
+                      : mode === 'home'
+                        ? 'home-main'
+                        : mode === 'graph'
+                          ? 'workflow-main'
+                          : mode === 'reels'
+                            ? 'reels-main'
+                            : mode === 'styles' || mode === 'characters'
+                              ? 'world-main'
+                              : mode === 'studio'
+                                ? 'idea-main'
+                                : 'solo-main'
             }
           >
             <aside className="sidebar">
@@ -1606,13 +1634,15 @@ function App() {
               )}
             </aside>
             <div className="content">
-              <WorkspaceTrail
-                projectId={projectId}
-                mode={mode}
-                onMode={setMode}
-                onLocation={setWorkspaceLocation}
-                onOpenProject={id => void load(id, 'home')}
-              />
+              {mode !== 'studio' && (
+                <WorkspaceTrail
+                  projectId={projectId}
+                  mode={mode}
+                  onMode={setMode}
+                  onLocation={setWorkspaceLocation}
+                  onOpenProject={id => void load(id, 'home')}
+                />
+              )}
               {!projectDraftSaved && (
                 <p className="alert" role="alert">
                   Черновик проекта не сохранён браузером. Сохрани проект перед перезагрузкой.
@@ -1740,16 +1770,25 @@ function App() {
                   </>
                 </SettingsPanel>
               ) : mode === 'storyboard' ? (
-                <ProductionStoryboard
-                  onInspect={(productionId, nodeId) => {
-                    setProductionTarget({productionId, nodeId});
-                    setMode('files');
-                  }}
-                  location={workspaceLocation}
-                  onOpenProject={id => {
-                    void load(id, 'create');
-                  }}
-                />
+                <>
+                  <IdeaRefs projectId={projectId} ids={state.ideaRefs || []} />
+                  <ProductionStoryboard
+                    onInspect={(productionId, nodeId) => {
+                      setProductionTarget({productionId, nodeId});
+                      setMode('files');
+                    }}
+                    location={workspaceLocation}
+                    outlineContext={{
+                      projectId,
+                      brief: state.brief,
+                      passport: passportText(state.style),
+                      heroes: state.characters.map(c => c.name),
+                    }}
+                    onOpenProject={id => {
+                      void load(id, 'create');
+                    }}
+                  />
+                </>
               ) : mode === 'files' ? (
                 <>
                   <MontageSummary projectId={projectId} onMode={setMode} />
@@ -1813,47 +1852,71 @@ function App() {
                   <EconomicsPanel projectId={projectId} revision={libraryRevision} />
                 </>
               ) : mode === 'styles' ? (
-                <section className="panel">
-                  <div className="panel-title">
-                    <h2>Библия мира / Style Library</h2>
-                    <Palette size={22} />
-                  </div>
-                  <p className="muted">
-                    Единый стиль сохраняется вместе с проектом. Это канон визуального мира, а не случайный
-                    пресет. Применяй его при постановке задач агентам и проверке результатов.
-                  </p>
-                  {(
-                    [
-                      ['look', 'Визуальный стиль'],
-                      ['palette', 'Палитра'],
-                      ['lighting', 'Освещение'],
-                      ['camera', 'Камера и оптика'],
-                      ['environment', 'Среда и локации'],
-                      ['rules', 'Неизменные правила'],
-                      ['avoid', 'Что запрещено'],
-                    ] as [keyof StyleBible, string][]
-                  ).map(([k, label]) => (
-                    <label key={k}>
-                      {label}
-                      <textarea
-                        rows={3}
-                        value={state.style?.[k] || ''}
-                        onChange={e =>
-                          change({
-                            style: {...state.style, [k]: e.target.value},
-                          })
+                <>
+                  <IdeaRefs projectId={projectId} ids={state.ideaRefs || []} />
+                  <section className="panel world-bible">
+                    <div className="panel-title">
+                      <h2>Библия мира</h2>
+                      <CinemaInfo topic="world" />
+                      <Palette size={22} />
+                    </div>
+                    <p className="muted">
+                      Единый стиль сохраняется вместе с проектом и держит все кадры серии в одном мире.
+                      Заполни коротко и по делу: эти поля подставляются в промпты и проверку результатов.
+                    </p>
+                    <AttachmentStrip items={(state.scene || EMPTY_SCENE).assets} />
+                    <div className="world-fields">
+                      {(
+                        [
+                          ['look', 'Визуальный стиль', 'Техника, жанр, общий образ'],
+                          ['environment', 'Архитектура и среда', 'Где происходит действие, какие здания'],
+                          ['time', 'Время суток и сезон', 'Когда: ночь, рассвет, зима, дождь'],
+                          ['tech', 'Уровень технологий', 'Эпоха, транспорт, устройства'],
+                          ['textures', 'Фактуры и материалы', 'Металл, стекло, ткань, поверхности'],
+                          ['palette', 'Палитра', 'Главные цвета и оттенки'],
+                          ['lighting', 'Освещение', 'Направление, температура, источники света'],
+                          ['camera', 'Камера и оптика', 'Ракурсы, объективы, движение'],
+                          ['mood', 'Настроение', 'Эмоция и атмосфера ролика'],
+                          ['rules', 'Неизменные правила', 'Что одинаково в каждом кадре'],
+                          ['avoid', 'Что запрещено', 'Чего не должно быть в кадре'],
+                        ] as [keyof StyleBible, string, string][]
+                      ).map(([k, label, hint]) => (
+                        <label key={k} className={'world-field world-field-' + k}>
+                          <b>{label}</b>
+                          <small>{hint}</small>
+                          <textarea
+                            rows={2}
+                            value={state.style?.[k] || ''}
+                            onChange={e =>
+                              change({
+                                style: {...state.style, [k]: e.target.value},
+                              })
+                            }
+                          />
+                        </label>
+                      ))}
+                    </div>
+                    <div className="world-actions">
+                      <button className="primary" disabled={!!busy} onClick={save}>
+                        Сохранить стиль проекта
+                      </button>
+                      <button
+                        onClick={() =>
+                          void navigator.clipboard
+                            ?.writeText(passportText(state.style))
+                            .then(() => setNotice('Паспорт мира скопирован'))
                         }
-                      />
-                    </label>
-                  ))}
-                  <button className="primary" disabled={!!busy} onClick={save}>
-                    Сохранить стиль проекта
-                  </button>
-                  <p className="muted">
-                    Для «Таксиста Грэма» добавляй утверждённые референсы в Character Vault. Библия мира не
-                    заменяет проверку изображений человеком.
-                  </p>
-                </section>
+                      >
+                        Копировать паспорт
+                      </button>
+                      <button onClick={() => setMode('characters')}>Дальше: персонажи →</button>
+                    </div>
+                    <p className="muted">
+                      Герои справа: добавь утверждённые референсы в Character Vault. Библия мира не заменяет
+                      проверку изображений человеком.
+                    </p>
+                  </section>
+                </>
               ) : mode === 'home' ? (
                 <HomeScreen
                   projectId={projectId}
@@ -1861,6 +1924,47 @@ function App() {
                   projects={projects}
                   onMode={setMode}
                   onOpenProject={id => void load(id, 'home')}
+                />
+              ) : mode === 'characters' ? (
+                <CharactersScreen
+                  projectId={projectId}
+                  ensureProject={ensureProject}
+                  heroes={state.characters}
+                  selectedId={state.selectedCharacter}
+                  world={state.style}
+                  onSelect={id => change({selectedCharacter: id})}
+                  onCreate={mkChar}
+                  onToWorld={() => setMode('styles')}
+                  onNext={() => setMode('storyboard')}
+                  revision={libraryRevision}
+                  onLibrary={() => setLibraryRevision(x => x + 1)}
+                  builder={
+                    <FrameBuilder
+                      projectId={projectId}
+                      ensureProject={ensureProject}
+                      heroes={state.characters}
+                      world={state.style}
+                      brief={state.brief}
+                      locationAssetIds={(state.scene || EMPTY_SCENE).assets
+                        .filter(a => a.role === 'location')
+                        .map(a => a.asset_id)}
+                      revision={libraryRevision}
+                      onSent={() => setMode('storyboard')}
+                    />
+                  }
+                  results={
+                    <AssetLibrary
+                      {...replacementControls}
+                      onRefine={refineAsset}
+                      onScene={addToScene}
+                      projectId={projectId}
+                      revision={libraryRevision}
+                      onUse={(link, id) => {
+                        change({videoReference: link, videoAssetId: id});
+                        setNotice('Изображение из библиотеки выбрано для Video Lab');
+                      }}
+                    />
+                  }
                 />
               ) : mode === 'reels' ? (
                 <ReelsScreen onUse={useReelRecipe} />
@@ -1870,25 +1974,31 @@ function App() {
                   heroes={state.characters.map(c => ({
                     id: c.id,
                     name: c.name,
+                    assetId: c.working_asset_id,
                   }))}
+                  world={[
+                    state.style?.look,
+                    state.style?.palette,
+                    state.style?.lighting,
+                    state.style?.environment,
+                  ]
+                    .filter(Boolean)
+                    .join('. ')}
                 />
               ) : mode === 'video' ? (
-                <>
-                  {modelPanel('video')}
-                  <AssetLibrary
-                    {...replacementControls}
-                    onRefine={refineAsset}
-                    onScene={addToScene}
-                    projectId={projectId}
-                    revision={libraryRevision}
-                    onUse={(link, id) => {
-                      change({videoReference: link, videoAssetId: id});
-                      setNotice('Фото выбрано для видео. Опиши движение и проверь стоимость перед запуском.');
-                    }}
-                  />
-                </>
+                <VideoScreen
+                  projectId={projectId}
+                  world={[
+                    state.style?.look,
+                    state.style?.palette,
+                    state.style?.lighting,
+                    state.style?.environment,
+                  ]
+                    .filter(Boolean)
+                    .join('. ')}
+                />
               ) : mode === 'audio' ? (
-                <>{audioPanel()}</>
+                <SoundScreen projectId={projectId} audioLab={audioPanel()} />
               ) : mode === 'archive' ? (
                 <AssetLibrary
                   {...replacementControls}
@@ -1904,48 +2014,92 @@ function App() {
               ) : mode === 'studio' ? (
                 <>
                   <StoryPlanBoard location={workspaceLocation} brief={state.brief} />
-                  <section className="panel">
-                    <h2>Задание ролика</h2>
-                    <p className="muted">
-                      Опиши идею серии в одной-двух фразах. Дальше: «Мир» (стиль и герои), «Раскадровка»
-                      (кадры).
-                    </p>
-                    <label>
-                      Режиссёрское задание
-                      <textarea
-                        rows={4}
-                        value={state.brief}
-                        onChange={e => change({brief: e.target.value})}
+                  <div className="idea-layout">
+                    <div className="idea-col">
+                      <IdeaBrief
+                        projectId={projectId}
+                        brief={state.brief}
+                        onBrief={v => change({brief: v})}
+                        result={state.ideaResult || ''}
+                        onResult={v => change({ideaResult: v})}
+                        model={state.ideaModel || 'gpt-5.6-luna'}
+                        onModel={v => change({ideaModel: v})}
+                        refs={state.ideaRefs || []}
+                        onRefs={ids => change({ideaRefs: ids})}
+                        world={[state.style.look, state.style.rules].filter(Boolean).join('. ')}
+                        onNext={() => setMode('styles')}
+                        onScene={() => setMode('scene')}
                       />
-                    </label>
-                    <button onClick={() => setMode('scene')}>Собрать сцену из исходников →</button>
-                  </section>
-                  <section className="panel photo-setup" aria-label="Фото">
-                    <h2>Фото · постановка и промпт</h2>
-                    <FrameSelector
-                      catalogue={frameCatalogue}
-                      value={state.composition}
-                      onChange={chooseComposition}
-                      onCatalogue={() => setCatalogue('frame')}
-                    />
-                    {frameError && <p role="alert">{frameError}</p>}
-                    <ChatGPTPanel
-                      {...replacementControls}
-                      projectId={projectId}
-                      ensureProject={ensureProject}
-                      onPrompt={(prompt, target, _movement, frame) =>
-                        setState(s => ({
-                          ...s,
-                          prompts: {...s.prompts, [target]: prompt},
-                          compositionPromptBasis: {
-                            ...s.compositionPromptBasis,
-                            [target]: frameBasis(frame),
-                          },
-                        }))
-                      }
-                      onAsset={() => setLibraryRevision(x => x + 1)}
-                    />
-                  </section>
+                      <section className="panel photo-setup" aria-label="Фото">
+                        <h2>Фото · постановка и промпт</h2>
+                        <FrameSelector
+                          catalogue={frameCatalogue}
+                          value={state.composition}
+                          onChange={chooseComposition}
+                          onCatalogue={() => setCatalogue('frame')}
+                        />
+                        {frameError && <p role="alert">{frameError}</p>}
+                        <ChatGPTPanel
+                          {...replacementControls}
+                          projectId={projectId}
+                          ensureProject={ensureProject}
+                          onPrompt={(prompt, target, _movement, frame) =>
+                            setState(s => ({
+                              ...s,
+                              prompts: {...s.prompts, [target]: prompt},
+                              compositionPromptBasis: {
+                                ...s.compositionPromptBasis,
+                                [target]: frameBasis(frame),
+                              },
+                            }))
+                          }
+                          onAsset={() => setLibraryRevision(x => x + 1)}
+                        />
+                      </section>
+                      <section className="panel idea-world" aria-label="Мир по заданию">
+                        <AttachmentMenu
+                          projectId={projectId}
+                          ensureProject={ensureProject}
+                          heroes={state.characters}
+                          items={(state.scene || EMPTY_SCENE).assets}
+                          revision={libraryRevision}
+                          onChange={assets =>
+                            setState(s => ({...s, scene: {...(s.scene || EMPTY_SCENE), assets}}))
+                          }
+                          onAsset={() => setLibraryRevision(x => x + 1)}
+                        />
+                        <WorldFromBrief
+                          projectId={projectId}
+                          brief={state.brief}
+                          style={state.style}
+                          conflicts={state.worldDraft || {}}
+                          onConflicts={worldDraft => setState(s => ({...s, worldDraft}))}
+                          ensureProject={ensureProject}
+                          onApply={fields => setState(s => ({...s, style: {...s.style, ...fields}}))}
+                          onDone={() => setMode('styles')}
+                        />
+                      </section>
+                    </div>
+                    <aside className="idea-path" aria-label="Путь ролика">
+                      <h3>Путь ролика</h3>
+                      <ol>
+                        {STAGES.map(stage => (
+                          <li key={stage.key} className={stage.mode === 'studio' ? 'current' : ''}>
+                            <button onClick={() => setMode(stage.mode)}>
+                              <span className="idea-path-n">{stage.icon}</span>
+                              <span>
+                                <b>{stage.label}</b>
+                                <small>{stage.hint}</small>
+                              </span>
+                            </button>
+                          </li>
+                        ))}
+                      </ol>
+                      <p className="muted">
+                        Начни с задания, затем иди вниз по списку: каждый этап готовит следующий.
+                      </p>
+                    </aside>
+                  </div>
 
                   <Collapsible title="Очередь и галерея" hint="задачи проекта и результаты из ChatGPT">
                     <NativeGallery {...replacementControls} projectId={projectId} onRefine={refineAsset} />
@@ -2071,7 +2225,6 @@ function App() {
                 </Suspense>
               )}
               <StageFooter mode={mode} onMode={setMode} />
-              <footer>Workflow Studio · ChatGPT · сцены · экономика ролика</footer>
             </div>
           </main>
         )}

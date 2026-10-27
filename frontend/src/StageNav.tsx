@@ -5,6 +5,7 @@ export type Mode =
   | 'graph'
   | 'agents'
   | 'styles'
+  | 'characters'
   | 'connections'
   | 'scene'
   | 'economics'
@@ -19,23 +20,73 @@ export type Mode =
   | 'reels'
   | 'archive';
 
-type Item = {key: string; mode: Mode; label: string; hint?: string; icon: ReactNode};
+type Item = {key: string; mode: Mode; label: string; hint?: string; text?: string; icon: ReactNode};
 
 export const STAGES: Item[] = [
-  {key: 'idea', mode: 'studio', label: 'Идея', hint: 'задание ролика', icon: '1'},
-  {key: 'world', mode: 'styles', label: 'Мир', hint: 'стиль и герои', icon: '2'},
-  {key: 'board', mode: 'storyboard', label: 'Раскадровка', hint: 'кадры эпизода', icon: '3'},
-  {key: 'frames', mode: 'create', label: 'Кадры', hint: 'картинки', icon: '4'},
-  {key: 'video', mode: 'video', label: 'Видео', hint: 'оживление кадров', icon: '5'},
-  {key: 'sound', mode: 'audio', label: 'Звук', hint: 'голос и обработка', icon: '6'},
-  {key: 'edit', mode: 'files', label: 'Монтаж', hint: 'выгрузка в CapCut', icon: '7'},
-  {key: 'release', mode: 'economics', label: 'Выпуск', hint: 'бюджет серии', icon: '8'},
+  {
+    key: 'idea',
+    mode: 'studio',
+    label: 'Идея',
+    hint: 'задание ролика',
+    text: 'Задание ролика, шутка, сюжет',
+    icon: '1',
+  },
+  {
+    key: 'world',
+    mode: 'styles',
+    label: 'Мир',
+    hint: 'стиль и локации',
+    text: 'Стиль, мир, локации',
+    icon: '2',
+  },
+  {
+    key: 'chars',
+    mode: 'characters',
+    label: 'Персонажи',
+    hint: 'герои и образы',
+    text: 'Герои и их образы',
+    icon: '3',
+  },
+  {
+    key: 'board',
+    mode: 'storyboard',
+    label: 'Раскадровка',
+    hint: 'кадры эпизода',
+    text: 'Сцены и кадры эпизода',
+    icon: '4',
+  },
+  {
+    key: 'frames',
+    mode: 'create',
+    label: 'Кадры',
+    hint: 'картинки',
+    text: 'Картинки от нескольких моделей',
+    icon: '5',
+  },
+  {key: 'video', mode: 'video', label: 'Видео', hint: 'оживление кадров', text: 'Оживить кадры', icon: '6'},
+  {key: 'sound', mode: 'audio', label: 'Звук', hint: 'голос и обработка', text: 'Голос и музыка', icon: '7'},
+  {
+    key: 'edit',
+    mode: 'files',
+    label: 'Монтаж',
+    hint: 'выгрузка в CapCut',
+    text: 'Выгрузка в CapCut по порядку кадров',
+    icon: '8',
+  },
+  {
+    key: 'release',
+    mode: 'economics',
+    label: 'Выпуск',
+    hint: 'бюджет серии',
+    text: 'Бюджет серии и итоги',
+    icon: '9',
+  },
 ];
 /** Нижние вкладки на телефоне (макет Mobile): пять частых действий и «Ещё». */
 const TABS: {mode: Mode; label: string; icon: string}[] = [
   {mode: 'create', label: 'Создать', icon: '✦'},
   {mode: 'storyboard', label: 'Сцены', icon: '▦'},
-  {mode: 'styles', label: 'Герои', icon: '☺'},
+  {mode: 'characters', label: 'Герои', icon: '☺'},
   {mode: 'archive', label: 'Архив', icon: '▤'},
   {mode: 'economics', label: 'Бюджет', icon: '$'},
 ];

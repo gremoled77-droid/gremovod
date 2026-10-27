@@ -6,12 +6,23 @@ import {useEffect, useRef, useState} from 'react';
 import {apiFetch} from './api';
 import {responseJson} from './ChatGPTPanel';
 import Lightbox, {type LightboxItem} from './Lightbox';
-import {withoutMediaItem} from './mediaAsset';
+import CinemaInfo from './CinemaInfo';
 import {analyzeAsset, shotPoints, TensionGraph, useVisualPlans, VisualPlanForm} from './VisualPlanPanel';
 import {emptyPlan, planFromAnalysis} from './visualPlan';
 import VisualRulesForm from './VisualRulesForm';
 import EditListPanel from './EditListPanel';
 import ShotContractInspector from './ShotContractInspector';
+import FrameTakes from './FrameTakes';
+import SceneCast from './SceneCast';
+import AnimateDialog from './AnimateDialog';
+import FrameCast from './FrameCast';
+import {soundLabel, sceneSound, type Cue, type FrameSound} from './soundCues';
+import {frameStatus, photoLabel, sceneVideoCount, videoLabel, type Pending} from './frameStatus';
+import UpscaleButton from './UpscaleButton';
+import {moveItem} from './boardOrder';
+import {patchEntity, putOrder, type EntityPatch} from './boardApi';
+import OutlineDialog, {type OutlineContext} from './OutlineDialog';
+import {changeOf} from './outlinePlan';
 import './ProductionStoryboard.css';
 
 type Node = {
@@ -27,6 +38,7 @@ type Media = {id: string; asset_id: string | null; kind: string; filename: strin
 type Selection = {
   character_node_ids: string[];
   location_node_id: string | null;
+  location_angle_file_id?: string | null;
   selected_image_file_id: string | null;
   selected_video_file_id: string | null;
 };
@@ -63,8 +75,10 @@ export default function ProductionStoryboard({
   onInspect,
   onOpenProject,
   location,
+  outlineContext,
 }: {
   location?: WorkspaceLocation | null;
+  outlineContext?: OutlineContext;
   onInspect: (productionId: string, nodeId: string) => void;
   onOpenProject: (id: string) => void;
 }) {
@@ -88,7 +102,8 @@ export default function ProductionStoryboard({
   }, [location?.production_id, location?.series?.id]);
   const [nodes, setNodes] = useState<Node[]>([]),
     [board, setBoard] = useState<Board | null>(null),
-    [tick, setTick] = useState(0);
+    [tick, setTick] = useState(0),
+    [sound, setSound] = useState<Record<string, Cue[]>>({});
   const [drafts, setDrafts] = useState<Record<string, string>>(() =>
       readLocal('studio:storyboard-drafts', {})
     ),
@@ -101,8 +116,14 @@ export default function ProductionStoryboard({
     [error, setError] = useState(''),
     [notice, setNotice] = useState(''),
     [showScript, setShowScript] = useState(false),
-    [importMode, setImportMode] = useState<'append' | 'update'>('append'),
-    [contractShot, setContractShot] = useState<{shotId: string; sceneId: string; title: string} | null>(null);
+    [showOutline, setShowOutline] = useState(false),
+    [animate, setAnimate] = useState<{frame: Frame; heroes: {name: string}[]} | null>(null),
+    [pending, setPending] = useState<Record<string, Pending>>(() => readLocal('studio:video-pending', {})),
+    [onlyNoVideo, setOnlyNoVideo] = useState(false),
+    [contractShot, setContractShot] = useState<{shotId: string; sceneId: string; title: string} | null>(
+      null
+    ),
+    [importMode, setImportMode] = useState<'append' | 'update'>('append');
   const visual = useVisualPlans(pid, sid);
   const [estimating, setEstimating] = useState(false);
   const estimateEmpty = async () => {
@@ -200,6 +221,19 @@ export default function ProductionStoryboard({
     };
   }, [pid, sid, tick, path]);
   useEffect(() => {
+    let live = true;
+    if (pid && sid)
+      void apiFetch(`/api/productions/${pid}/series/${sid}/sound`)
+        .then(r => (r.ok ? r.json() : []))
+        .then((rows: FrameSound[]) => {
+          if (live) setSound(Object.fromEntries(rows.map(r => [r.frame_id, r.cues])));
+        })
+        .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, [pid, sid, tick]);
+  useEffect(() => {
     if (pid && sid && nodes.some(n => n.id === sid)) writeLocal('studio:board-location', {pid, sid});
   }, [pid, sid, nodes]);
   useEffect(() => {
@@ -285,6 +319,36 @@ export default function ProductionStoryboard({
       setNotice('Кадр создан. Открой его в студии для подготовки изображения.');
     });
   }
+  /** Сдвиг сцены (parentId = серия) или кадра (parentId = сцена) на одну позицию; папки не переименовываются. */
+  function shift(parentId: string, ids: string[], index: number, delta: number) {
+    const next = moveItem(ids, index, delta);
+    if (!next || !board) return;
+    void perform(async () => {
+      await putOrder(path, board.revision, parentId, next);
+      setTick(t => t + 1);
+    });
+  }
+  /** Состав, локация и главный дубль: сохраняются сразу, остальное в карточке не меняется. */
+  function savePatch(nodeId: string, patch: EntityPatch, message: string) {
+    void perform(async () => {
+      await patchEntity(pid, nodeId, patch);
+      setTick(t => t + 1);
+      setNotice(message);
+    });
+  }
+  /** Пока идёт генерация видео, доска сама обновляется раз в 20 секунд: готовый клип появится в карточке кадра. */
+  useEffect(() => {
+    if (!Object.keys(pending).length) return;
+    const timer = setInterval(() => setTick(t => t + 1), 20000);
+    return () => clearInterval(timer);
+  }, [pending]);
+  function launched(frame: Frame, videosBefore: number) {
+    const next = {...pending, [frame.id]: {since: Date.now(), videosBefore}};
+    setPending(next);
+    writeLocal('studio:video-pending', next);
+    setAnimate(null);
+    setNotice('Видео запущено. Готовый клип появится в карточке кадра: доска обновляется сама.');
+  }
   function openFrame(frame: Frame) {
     void perform(async () => {
       const bound = await request(`/api/productions/${pid}/nodes/${frame.id}/open-project`, {});
@@ -297,6 +361,7 @@ export default function ProductionStoryboard({
         <div>
           <span className="ps-eyebrow">РАСКАДРОВКА · РАБОЧАЯ ДОСКА</span>
           <h2>{nodes.find(n => n.id === sid)?.title || 'Сценарий и раскадровка'}</h2>
+          <CinemaInfo topic="composition" />
         </div>
         <div className="ps-top-actions">
           {board && (
@@ -408,9 +473,39 @@ export default function ProductionStoryboard({
           <SeriesEconomics key={pid + sid} pid={pid} sid={sid} />
           <div className="chips">
             <button onClick={() => setShowScript(s => !s)}>Вставить сценарий</button>
+            <label>
+              <input type="checkbox" checked={onlyNoVideo} onChange={e => setOnlyNoVideo(e.target.checked)} />{' '}
+              только кадры без видео
+            </label>
+            {outlineContext && (
+              <button onClick={() => setShowOutline(true)}>Разбить на сцены и кадры (GPT)</button>
+            )}
             <button onClick={() => inspect(sid)}>Файлы и описание серии ↗</button>
           </div>
           <VisualRulesForm key={sid} pid={pid} nid={sid} />
+          {animate && (
+            <AnimateDialog
+              pid={pid}
+              frame={animate.frame}
+              heroes={animate.heroes}
+              onClose={() => setAnimate(null)}
+              onLaunched={before => launched(animate.frame, before)}
+            />
+          )}
+          {showOutline && outlineContext && board && (
+            <OutlineDialog
+              pid={pid}
+              sid={sid}
+              revision={board.revision}
+              context={outlineContext}
+              onClose={() => setShowOutline(false)}
+              onDone={() => {
+                setShowOutline(false);
+                setTick(t => t + 1);
+                setNotice('Сцены и кадры добавлены в раскадровку');
+              }}
+            />
+          )}
           {showScript && (
             <section className="ps-script">
               <label>
@@ -518,7 +613,9 @@ export default function ProductionStoryboard({
           {!board.scenes.length && (
             <p>Сцен ещё нет. Вставь сценарий и проверь разбиение перед сохранением.</p>
           )}
-          {board.scenes.some(s => s.frames.length) && <EditListPanel key={sid} pid={pid} sid={sid} />}
+          {board.scenes.some(s => s.frames.length) && (
+            <EditListPanel key={'edit-' + sid} pid={pid} sid={sid} />
+          )}
           {board.scenes.some(s => s.frames.length) && (
             <TensionGraph
               points={shotPoints(board.scenes, visual.plans)}
@@ -526,9 +623,41 @@ export default function ProductionStoryboard({
               estimating={estimating}
             />
           )}
-          {board.scenes.map(scene => (
+          {board.scenes.map((scene, sceneIndex) => (
             <article key={scene.id} className="ps-scene">
               <div className="ps-scene-head">
+                <span className="ps-order" role="group" aria-label={`Порядок сцены ${scene.title}`}>
+                  <button
+                    disabled={busy || sceneIndex === 0}
+                    title="Сцену выше"
+                    aria-label="Сцену выше"
+                    onClick={() =>
+                      shift(
+                        sid,
+                        board.scenes.map(s => s.id),
+                        sceneIndex,
+                        -1
+                      )
+                    }
+                  >
+                    ▲
+                  </button>
+                  <button
+                    disabled={busy || sceneIndex === board.scenes.length - 1}
+                    title="Сцену ниже"
+                    aria-label="Сцену ниже"
+                    onClick={() =>
+                      shift(
+                        sid,
+                        board.scenes.map(s => s.id),
+                        sceneIndex,
+                        1
+                      )
+                    }
+                  >
+                    ▼
+                  </button>
+                </span>
                 <button className="ps-heading" onClick={() => inspect(scene.id)}>
                   <small>СЦЕНА {String(scene.number).padStart(2, '0')}</small>
                   <h3>{scene.title} ↗</h3>
@@ -542,28 +671,40 @@ export default function ProductionStoryboard({
                     </span>
                   );
                 })()}
+                {(() => {
+                  const {done, all} = sceneVideoCount(scene.frames);
+                  return (
+                    <span className={'ps-prog' + (all && done === all ? ' ok' : '')}>
+                      видео {done} из {all}
+                    </span>
+                  );
+                })()}
+                {(() => {
+                  const {done, all} = sceneSound(scene.frames.map(f => ({cues: sound[f.id] || []})));
+                  return (
+                    <span className={'ps-prog' + (all && done === all ? ' ok' : '')}>
+                      звук {done} из {all}
+                    </span>
+                  );
+                })()}
               </div>
               <p className="ps-text">{scene.notes || 'Описание пока не добавлено'}</p>
-              <div className="ps-cast">
-                {scene.selection.character_node_ids.map(id => (
-                  <button key={id} onClick={() => inspect(id)}>
-                    {nodes.find(n => n.id === id)?.title || 'Персонаж'} ↗
-                  </button>
-                ))}
-                {scene.selection.location_node_id && (
-                  <button onClick={() => inspect(scene.selection.location_node_id!)}>
-                    {nodes.find(n => n.id === scene.selection.location_node_id)?.title || 'Локация'} ↗
-                  </button>
-                )}
-                <button onClick={() => inspect(scene.id)}>Состав сцены и бэкграунд</button>
-              </div>
+              <SceneCast
+                catalogue={nodes}
+                characterIds={scene.selection.character_node_ids}
+                locationId={scene.selection.location_node_id}
+                busy={busy}
+                onOpen={inspect}
+                onChange={patch => savePatch(scene.id, patch, 'Состав сцены сохранён.')}
+              />
               <VisualPlanForm
                 kind="scene"
                 plan={visual.plans[scene.id]}
                 onSave={plan => visual.save(scene.id, plan)}
               />
               <div className="ps-frames">
-                {scene.frames.map(frame => {
+                {scene.frames.map((frame, frameIndex) => {
+                  if (onlyNoVideo && frame.selection.selected_video_file_id) return null;
                   const image =
                       frame.files.find(f => f.id === frame.selection.selected_image_file_id) ||
                       frame.files.find(f => f.kind === 'image'),
@@ -586,7 +727,6 @@ export default function ProductionStoryboard({
                                   return im
                                     ? {
                                         url: im.asset_id ? `/api/library/${im.asset_id}/file` : im.url,
-                                        assetId: im.asset_id || undefined,
                                         title: `${scene.number}.${fr.number} · ${fr.title}`,
                                         id: fr.id,
                                       }
@@ -624,6 +764,7 @@ export default function ProductionStoryboard({
                         )}
                       </div>
                       <b>{frame.title}</b>
+                      {changeOf(frame.notes) && <p className="ps-change">{changeOf(frame.notes)}</p>}
                       <small>
                         {image
                           ? frame.selection.selected_image_file_id
@@ -631,11 +772,75 @@ export default function ProductionStoryboard({
                             : 'последнее фото · не утверждено'
                           : 'запланирован'}
                       </small>
+                      {(() => {
+                        const st = frameStatus(frame.files, frame.selection, pending[frame.id], Date.now());
+                        return (
+                          <div className="ps-badges" aria-label="Статус кадра">
+                            <span className={'ps-badge ' + st.photo}>{photoLabel(st)}</span>
+                            <span className={'ps-badge v-' + st.video}>{videoLabel(st)}</span>
+                            <span className={'ps-badge s-' + (sound[frame.id]?.length ? 'on' : 'off')}>
+                              {soundLabel(sound[frame.id] || [])}
+                            </span>
+                          </div>
+                        );
+                      })()}
+                      <FrameCast
+                        id={frame.id}
+                        pid={pid}
+                        catalogue={nodes}
+                        own={frame.selection}
+                        scene={scene.selection}
+                        busy={busy}
+                        onChange={(patch, message) => savePatch(frame.id, patch, message)}
+                      />
+                      {frame.selection.selected_image_file_id && (
+                        <UpscaleButton fileId={frame.selection.selected_image_file_id} />
+                      )}
+                      <FrameTakes
+                        files={frame.files}
+                        imageId={frame.selection.selected_image_file_id}
+                        videoId={frame.selection.selected_video_file_id}
+                        busy={busy}
+                        onPick={(kind, id) =>
+                          savePatch(
+                            frame.id,
+                            kind === 'image' ? {selected_image_file_id: id} : {selected_video_file_id: id},
+                            id
+                              ? kind === 'image'
+                                ? 'Главное фото выбрано.'
+                                : 'Главное видео выбрано.'
+                              : 'Выбор снят.'
+                          )
+                        }
+                      />
                       <div className="ps-acts">
+                        <button
+                          className="primary"
+                          disabled={busy || !frame.selection.selected_image_file_id}
+                          title={
+                            frame.selection.selected_image_file_id
+                              ? 'Оживить главное фото кадра'
+                              : 'Сначала утверди главное фото'
+                          }
+                          onClick={() =>
+                            setAnimate({
+                              frame,
+                              heroes: (frame.selection.character_node_ids.length ||
+                              frame.selection.location_node_id
+                                ? frame.selection.character_node_ids
+                                : scene.selection.character_node_ids
+                              )
+                                .map(id => ({name: nodes.find(n => n.id === id)?.title || ''}))
+                                .filter(h => h.name),
+                            })
+                          }
+                        >
+                          Оживить
+                        </button>
                         <button disabled={busy} onClick={() => openFrame(frame)}>
                           В студию
                         </button>
-                        <button onClick={() => inspect(frame.id)}>Съёмка и файлы ↗</button>
+                        <button onClick={() => inspect(frame.id)}>Файлы ↗</button>
                         <button
                           onClick={() =>
                             setContractShot({shotId: frame.id, sceneId: scene.id, title: frame.title})
@@ -643,6 +848,38 @@ export default function ProductionStoryboard({
                         >
                           Контракт
                         </button>
+                        <span className="ps-order" role="group" aria-label={`Порядок кадра ${frame.title}`}>
+                          <button
+                            disabled={busy || frameIndex === 0}
+                            title="Кадр раньше"
+                            aria-label="Кадр раньше"
+                            onClick={() =>
+                              shift(
+                                scene.id,
+                                scene.frames.map(f => f.id),
+                                frameIndex,
+                                -1
+                              )
+                            }
+                          >
+                            ◀
+                          </button>
+                          <button
+                            disabled={busy || frameIndex === scene.frames.length - 1}
+                            title="Кадр позже"
+                            aria-label="Кадр позже"
+                            onClick={() =>
+                              shift(
+                                scene.id,
+                                scene.frames.map(f => f.id),
+                                frameIndex,
+                                1
+                              )
+                            }
+                          >
+                            ▶
+                          </button>
+                        </span>
                       </div>
                       <VisualPlanForm
                         kind="frame"
@@ -655,6 +892,16 @@ export default function ProductionStoryboard({
                   );
                 })}
               </div>
+              {contractShot && (
+                <ShotContractInspector
+                  pid={pid}
+                  sid={sid}
+                  shotId={contractShot.shotId}
+                  sceneId={contractShot.sceneId}
+                  title={contractShot.title}
+                  onClose={() => setContractShot(null)}
+                />
+              )}
               <details>
                 <summary>＋ Кадр сцены</summary>
                 <label>
@@ -672,16 +919,6 @@ export default function ProductionStoryboard({
               </details>
             </article>
           ))}
-          {contractShot && (
-            <ShotContractInspector
-              pid={pid}
-              sid={sid}
-              shotId={contractShot.shotId}
-              sceneId={contractShot.sceneId}
-              title={contractShot.title}
-              onClose={() => setContractShot(null)}
-            />
-          )}
           <details>
             <summary>Общие персонажи и локации проекта</summary>
             <p className="muted">
@@ -705,12 +942,6 @@ export default function ProductionStoryboard({
           index={view.index}
           onIndex={i => setView(v => (v ? {...v, index: i} : v))}
           onClose={() => setView(null)}
-          onAssetChanged={(id, change) => {
-            if (change.trashed) {
-              setView(current => (current ? withoutMediaItem(current, id) : null));
-              setTick(value => value + 1);
-            }
-          }}
         />
       )}
       {editorStack.length > 0 && (
